@@ -1,0 +1,3 @@
+add_subdirectory(polli)
+set(LLVM_COMMON_DEPENDS ${LLVM_COMMON_DEPENDS} PARENT_SCOPE)
+
