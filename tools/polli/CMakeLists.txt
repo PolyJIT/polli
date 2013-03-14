@@ -1,13 +1,13 @@
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
-  mcjit
   jit
   interpreter
   nativecodegen
   bitreader
   asmparser
   selectiondag
-  native)
+  native
+  support)
 
 if( LLVM_USE_OPROFILE )
   set(LLVM_LINK_COMPONENTS
@@ -23,9 +23,12 @@ if( LLVM_USE_INTEL_JITEVENTS )
     )
 endif( LLVM_USE_INTEL_JITEVENTS )
 
+# We want a static binary
+set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -static")
+
 add_polli_executable(polli
   polli.cpp
-  PolyJIT.cpp
   RecordingMemoryManager.cpp
   RemoteTarget.cpp
   )
@@ -37,6 +40,7 @@ target_link_libraries(polli
   PollySupport
   PollyJSON
   PollyTransform
+  ffi
 )
 
 add_dependencies(polli
@@ -46,5 +50,5 @@ add_dependencies(polli
   PollySupport
   PollyJSON
   PollyTransform
+  ffi
   )
-

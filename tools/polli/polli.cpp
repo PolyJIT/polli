@@ -29,7 +29,6 @@
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/ExecutionEngine/JITMemoryManager.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -69,21 +68,6 @@ namespace {
   cl::opt<bool> ForceInterpreter("force-interpreter",
                                  cl::desc("Force interpretation: disable JIT"),
                                  cl::init(false));
-  
-  cl::opt<bool> ForceJIT("force-jit",
-                         cl::desc("Force JIT: disable PolyJIT"),
-                         cl::init(false));
-
-  cl::opt<bool> UseMCJIT(
-    "use-mcjit", cl::desc("Enable use of the MC-based JIT (if available)"),
-    cl::init(false));
-
-  // The MCJIT supports building for a target address space separate from
-  // the JIT compilation process. Use a forked process and a copying
-  // memory manager with IPC to execute using this functionality.
-  cl::opt<bool> RemoteMCJIT("remote-mcjit",
-    cl::desc("Execute MCJIT'ed code in a separate process."),
-    cl::init(false));
 
   // Determine optimization level.
   cl::opt<char>
@@ -348,23 +332,8 @@ int main(int argc, char **argv, char * const *envp) {
   if (!TargetTriple.empty())
     Mod->setTargetTriple(Triple::normalize(TargetTriple));
 
-  // Enable MCJIT if desired.
-  JITMemoryManager *JMM = 0;
-  if (UseMCJIT && !ForceInterpreter) {
-    builder.setUseMCJIT(true);
-    if (RemoteMCJIT)
-      JMM = new RecordingMemoryManager();
-    else
-      JMM = new SectionMemoryManager();
-    builder.setJITMemoryManager(JMM);
-  } else {
-    if (RemoteMCJIT) {
-      errs() << "error: Remote process execution requires -use-mcjit\n";
-      exit(1);
-    }
-    builder.setJITMemoryManager(ForceInterpreter ? 0 :
-                                JITMemoryManager::CreateDefaultMemManager());
-  }
+  builder.setJITMemoryManager(ForceInterpreter ? 0 :
+                              JITMemoryManager::CreateDefaultMemManager());
 
   CodeGenOpt::Level OLvl = CodeGenOpt::Default;
   switch (OptLevel) {
@@ -387,11 +356,9 @@ int main(int argc, char **argv, char * const *envp) {
     FloatABIForCalls = FloatABI::Soft;
 
   // Remote target execution doesn't handle EH or debug registration.
-  if (!RemoteMCJIT) {
-    Options.JITExceptionHandling = EnableJITExceptionHandling;
-    Options.JITEmitDebugInfo = EmitJitDebugInfo;
-    Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
-  }
+  Options.JITExceptionHandling = EnableJITExceptionHandling;
+  Options.JITEmitDebugInfo = EmitJitDebugInfo;
+  Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
 
   builder.setTargetOptions(Options);
 
@@ -410,11 +377,6 @@ int main(int argc, char **argv, char * const *envp) {
                 JITEventListener::createOProfileJITEventListener());
   EE->RegisterJITEventListener(
                 JITEventListener::createIntelJITEventListener());
-
-  if (!NoLazyCompilation && RemoteMCJIT) {
-    errs() << "warning: remote mcjit does not support lazy compilation\n";
-    NoLazyCompilation = true;
-  }
   EE->DisableLazyCompilation(NoLazyCompilation);
 
   // If the user specifically requested an argv[0] to pass into the program,
@@ -451,18 +413,8 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  // Remote target MCJIT doesn't (yet) support static constructors. No reason
-  // it couldn't. This is a limitation of the LLI implemantation, not the
-  // MCJIT itself. FIXME.
-  //
   // Run static constructors.
-  if (!RemoteMCJIT) {
-      if (UseMCJIT && !ForceInterpreter) {
-        // Give MCJIT a chance to apply relocations and set page permissions.
-        EE->finalizeObject();
-      }
-      EE->runStaticConstructorsDestructors(false);
-  }
+  EE->runStaticConstructorsDestructors(false);
 
   if (NoLazyCompilation) {
     for (Module::iterator I = Mod->begin(), E = Mod->end(); I != E; ++I) {
@@ -473,68 +425,30 @@ int main(int argc, char **argv, char * const *envp) {
   }
 
   int Result;
-  if (RemoteMCJIT) {
-    RecordingMemoryManager *MM = static_cast<RecordingMemoryManager*>(JMM);
-    // Everything is prepared now, so lay out our program for the target
-    // address space, assign the section addresses to resolve any relocations,
-    // and send it to the target.
-    RemoteTarget Target;
-    Target.create();
+  // Trigger compilation separately so code regions that need to be 
+  // invalidated will be known.
+  (void)EE->getPointerToFunction(EntryFn);
 
-    // Ask for a pointer to the entry function. This triggers the actual
-    // compilation.
-    (void)EE->getPointerToFunction(EntryFn);
+  // Run main.
+  Result = EE->runFunctionAsMain(EntryFn, InputArgv, envp);
 
-    // Enough has been compiled to execute the entry function now, so
-    // layout the target memory.
-    layoutRemoteTargetMemory(&Target, MM);
+  // Run static destructors.
+  EE->runStaticConstructorsDestructors(true);
 
-    // Since we're executing in a (at least simulated) remote address space,
-    // we can't use the ExecutionEngine::runFunctionAsMain(). We have to
-    // grab the function address directly here and tell the remote target
-    // to execute the function.
-    // FIXME: argv and envp handling.
-    uint64_t Entry = (uint64_t)EE->getPointerToFunction(EntryFn);
-
-    DEBUG(dbgs() << "Executing '" << EntryFn->getName() << "' at "
-                 << format("%p", Entry) << "\n");
-
-    if (Target.executeCode(Entry, Result))
-      errs() << "ERROR: " << Target.getErrorMsg() << "\n";
-
-    Target.stop();
+  // If the program didn't call exit explicitly, we should call it now.
+  // This ensures that any atexit handlers get called correctly.
+  if (Function *ExitF = dyn_cast<Function>(Exit)) {
+    std::vector<GenericValue> Args;
+    GenericValue ResultGV;
+    ResultGV.IntVal = APInt(32, Result);
+    Args.push_back(ResultGV);
+    EE->runFunction(ExitF, Args);
+    errs() << "ERROR: exit(" << Result << ") returned!\n";
+    abort();
   } else {
-    // Trigger compilation separately so code regions that need to be 
-    // invalidated will be known.
-    (void)EE->getPointerToFunction(EntryFn);
-    // Clear instruction cache before code will be executed.
-    if (JMM)
-      static_cast<SectionMemoryManager*>(JMM)->invalidateInstructionCache();
-
-    // Run main.
-    Result = EE->runFunctionAsMain(EntryFn, InputArgv, envp);
+    errs() << "ERROR: exit defined with wrong prototype!\n";
+    abort();
   }
 
-  // Like static constructors, the remote target MCJIT support doesn't handle
-  // this yet. It could. FIXME.
-  if (!RemoteMCJIT) {
-    // Run static destructors.
-    EE->runStaticConstructorsDestructors(true);
-
-    // If the program didn't call exit explicitly, we should call it now.
-    // This ensures that any atexit handlers get called correctly.
-    if (Function *ExitF = dyn_cast<Function>(Exit)) {
-      std::vector<GenericValue> Args;
-      GenericValue ResultGV;
-      ResultGV.IntVal = APInt(32, Result);
-      Args.push_back(ResultGV);
-      EE->runFunction(ExitF, Args);
-      errs() << "ERROR: exit(" << Result << ") returned!\n";
-      abort();
-    } else {
-      errs() << "ERROR: exit defined with wrong prototype!\n";
-      abort();
-    }
-  }
   return Result;
 }
