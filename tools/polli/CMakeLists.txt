@@ -1,6 +1,8 @@
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   jit
+  codegen
+  executionengine
   interpreter
   nativecodegen
   bitreader
@@ -34,21 +36,23 @@ add_polli_executable(polli
   )
 
 target_link_libraries(polli
-  PollyAnalysis
-  PollyCodeGen
-  PollyExchange
-  PollySupport
-  PollyJSON
-  PollyTransform
+#  PollyAnalysis
+#  PollyCodeGen
+#  PollyExchange
+#  PollySupport
+#  PollyJSON
+#  PollyTransform
+  PolyJIT
   ffi
 )
 
 add_dependencies(polli
-  PollyAnalysis
-  PollyCodeGen
-  PollyExchange
-  PollySupport
-  PollyJSON
-  PollyTransform
+#  PollyAnalysis
+#  PollyCodeGen
+#  PollyExchange
+#  PollySupport
+#  PollyJSON
+#  PollyTransform
+  PolyJIT
   ffi
   )

@@ -49,6 +49,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cerrno>
 
+#include "polli/PolyJIT.h"
+
 #ifdef __CYGWIN__
 #include <cygwin/version.h>
 #if defined(CYGWIN_VERSION_DLL_MAJOR) && CYGWIN_VERSION_DLL_MAJOR<1007
@@ -362,7 +364,11 @@ int main(int argc, char **argv, char * const *envp) {
 
   builder.setTargetOptions(Options);
 
-  EE = builder.create();
+  // We only want PolyJIT.
+  EE = PolyJIT::createJIT(Mod, &ErrorMsg,
+                          JITMemoryManager::CreateDefaultMemManager(),
+                          false, builder.selectTarget());
+
   if (!EE) {
     if (!ErrorMsg.empty())
       errs() << argv[0] << ": error creating EE: " << ErrorMsg << "\n";
@@ -428,7 +434,7 @@ int main(int argc, char **argv, char * const *envp) {
   // Trigger compilation separately so code regions that need to be 
   // invalidated will be known.
   (void)EE->getPointerToFunction(EntryFn);
-
+  
   // Run main.
   Result = EE->runFunctionAsMain(EntryFn, InputArgv, envp);
 
