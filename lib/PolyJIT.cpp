@@ -215,6 +215,7 @@ ExecutionEngine *PolyJIT::createJIT(Module *M,
                                 JITMemoryManager *JMM,
                                 bool GVsWithCode,
                                 TargetMachine *TM) {
+  outs() << "Starting PolyJIT\n";
   // Try to register the program as a source of symbols to resolve against.
   //
   // FIXME: Don't do this here.
