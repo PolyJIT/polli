@@ -14,10 +14,8 @@
 
 #include "polli/PolyJIT.h"
 
-#if 0
 #include "polly/RegisterPasses.h"
 #include "polly/LinkAllPasses.h"
-#endif
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/CodeGen/JITCodeEmitter.h"
@@ -325,6 +323,33 @@ PolyJIT::~PolyJIT() {
   delete &TM;
 }
 
+static void registerPollyPreoptPasses(PassManagerBase &PM) {
+  // A standard set of optimization passes partially taken/copied from the
+  // set of default optimization passes. It is used to bring the code into
+  // a canonical form that can than be analyzed by Polly. This set of passes is
+  // most probably not yet optimal. TODO: Investigate optimal set of passes.
+  PM.add(polly::createIndVarSimplifyPass());        // Canonicalize indvars
+
+  PM.add(polly::createCodePreparationPass());
+  // TODO: Testing vs. PapiRegionPreparePass!
+  //  PM.add(polly::createRegionSimplifyPass());
+  PM.add(polly::createPapiRegionPreparePass());
+  // FIXME: The next two passes should not be necessary here. They are currently
+  //        because of two problems:
+  //
+  //        1. The RegionSimplifyPass destroys the canonical form of induction
+  //           variables,as it produces PHI nodes with incorrectly ordered
+  //           operands. To fix this we run IndVarSimplify.
+  //
+  //        2. IndVarSimplify does not preserve the region information and
+  //           the regioninfo pass does currently not recover simple regions.
+  //           As a result we need to run the RegionSimplify pass again to
+  //           recover them
+  PM.add(polly::createIndVarSimplifyPass());
+  //TODO (Testing): PM.add(polly::createRegionSimplifyPass());
+  PM.add(polly::createPapiRegionPreparePass());
+}
+
 /// addModule - Add a new Module to the JIT.  If we previously removed the last
 /// Module, we need re-initialize jitstate with a valid Module.
 void PolyJIT::addModule(Module *M) {
@@ -337,6 +362,8 @@ void PolyJIT::addModule(Module *M) {
 
     FunctionPassManager &PM = jitstate->getPM(locked);
     PM.add(new DataLayout(*TM.getDataLayout()));
+
+    registerPollyPreoptPasses(PM);
 
     // Turn the machine code intermediate representation into bytes in memory
     // that may be executed.
@@ -397,6 +424,8 @@ GenericValue PolyJIT::runFunction(Function *F,
          "Wrong number of arguments passed into function!");
   assert(FTy->getNumParams() == ArgValues.size() &&
          "This doesn't support passing arguments through varargs (yet)!");
+
+  outs() << "[polli]" << F->getName() << " running\n";
 
   // Handle some common cases first.  These cases correspond to common `main'
   // prototypes.
@@ -579,6 +608,9 @@ void PolyJIT::NotifyFunctionEmitted(
   for (unsigned I = 0, S = EventListeners.size(); I < S; ++I) {
     EventListeners[I]->NotifyFunctionEmitted(F, Code, Size, Details);
   }
+
+
+  outs() << "[polli]" << F.getName() << " emitted\n";
 }
 
 void PolyJIT::NotifyFreeingMachineCode(void *OldPtr) {

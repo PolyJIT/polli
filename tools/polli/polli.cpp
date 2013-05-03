@@ -17,7 +17,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "polli"
 #include "llvm/IR/LLVMContext.h"
 #include "RecordingMemoryManager.h"
 #include "RemoteTarget.h"
@@ -33,7 +32,10 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/CommandLine.h"
+
+#define DEBUG_TYPE "polli"
 #include "llvm/Support/Debug.h"
+
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/IRReader.h"

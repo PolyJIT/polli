@@ -18,23 +18,23 @@ add_polli_library(PolyJIT
   PolyJITMemoryManager.cpp
   )
 
-#target_link_libraries(PolyJIT
-#  PollyAnalysis
-#  PollyCodeGen
-#  PollyExchange
-#  PollySupport
-#  PollyJSON
-#  PollyTransform
-#  )
+target_link_libraries(PolyJIT
+  PollyAnalysis
+  PollyCodeGen
+  PollyExchange
+  PollySupport
+  PollyJSON
+  PollyTransform
+  )
 
-#add_dependencies(PolyJIT
-#  PollyAnalysis
-#  PollyCodeGen
-#  PollyExchange
-#  PollySupport
-#  PollyJSON
-#  PollyTransform
-#  )
+add_dependencies(PolyJIT
+  PollyAnalysis
+  PollyCodeGen
+  PollyExchange
+  PollySupport
+  PollyJSON
+  PollyTransform
+  )
 
 set_target_properties(PolyJIT
   PROPERTIES
