@@ -366,11 +366,7 @@ int main(int argc, char **argv, char * const *envp) {
 
   builder.setTargetOptions(Options);
 
-  // We only want PolyJIT.
-  EE = PolyJIT::createJIT(Mod, &ErrorMsg,
-                          JITMemoryManager::CreateDefaultMemManager(),
-                          false, builder.selectTarget());
-
+  EE = builder.create(builder.selectTarget());
   if (!EE) {
     if (!ErrorMsg.empty())
       errs() << argv[0] << ": error creating EE: " << ErrorMsg << "\n";
@@ -401,62 +397,18 @@ int main(int argc, char **argv, char * const *envp) {
   // Add the module's name to the start of the vector of arguments to main().
   InputArgv.insert(InputArgv.begin(), InputFile);
 
-  // Call the main function from M as if its signature were:
-  //   int main (int argc, char **argv, const char **envp)
-  // using the contents of Args to determine argc & argv, and the contents of
-  // EnvVars to determine envp.
-  //
-  Function *EntryFn = Mod->getFunction(EntryFunc);
-  if (!EntryFn) {
-    errs() << '\'' << EntryFunc << "\' function not found in module.\n";
-    return -1;
-  }
-
-  // If the program doesn't explicitly call exit, we will need the Exit
-  // function later on to make an explicit call, so get the function now.
-  Constant *Exit = Mod->getOrInsertFunction("exit", Type::getVoidTy(Context),
-                                                    Type::getInt32Ty(Context),
-                                                    NULL);
-
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  // Run static constructors.
-  EE->runStaticConstructorsDestructors(false);
-
-  if (NoLazyCompilation) {
-    for (Module::iterator I = Mod->begin(), E = Mod->end(); I != E; ++I) {
-      Function *Fn = &*I;
-      if (Fn != EntryFn && !Fn->isDeclaration())
-        EE->getPointerToFunction(Fn);
-    }
-  }
-
   int Result;
-  // Trigger compilation separately so code regions that need to be 
-  // invalidated will be known.
-  (void)EE->getPointerToFunction(EntryFn);
-  
+
+  PolyJIT pjit(EE, Mod);
+  pjit.setEntryFunction(EntryFunc);
+
   // Run main.
-  Result = EE->runFunctionAsMain(EntryFn, InputArgv, envp);
+  Result = pjit.runMain(InputArgv, envp);
 
-  // Run static destructors.
-  EE->runStaticConstructorsDestructors(true);
-
-  // If the program didn't call exit explicitly, we should call it now.
-  // This ensures that any atexit handlers get called correctly.
-  if (Function *ExitF = dyn_cast<Function>(Exit)) {
-    std::vector<GenericValue> Args;
-    GenericValue ResultGV;
-    ResultGV.IntVal = APInt(32, Result);
-    Args.push_back(ResultGV);
-    EE->runFunction(ExitF, Args);
-    errs() << "ERROR: exit(" << Result << ") returned!\n";
-    abort();
-  } else {
-    errs() << "ERROR: exit defined with wrong prototype!\n";
-    abort();
-  }
+  pjit.shutdown(Result);
 
   return Result;
 }

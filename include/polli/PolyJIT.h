@@ -14,9 +14,17 @@
 #ifndef PolyJIT_H
 #define PolyJIT_H
 
+#include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/PassManager.h"
 #include "llvm/Support/ValueHandle.h"
+
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+
 
 namespace llvm {
 
@@ -27,198 +35,74 @@ class MachineCodeInfo;
 class TargetJITInfo;
 class TargetMachine;
 
-class JITState {
-private:
-  FunctionPassManager PM;  // Passes to compile a function
-  Module *M;               // Module used to create the PM
-
-  /// PendingFunctions - Functions which have not been code generated yet, but
-  /// were called from a function being code generated.
-  std::vector<AssertingVH<Function> > PendingFunctions;
-
+class PolyJIT {
+  ExecutionEngine &EE;
+  Module &M;
+  std::string EntryFn;
 public:
-  explicit JITState(Module *M) : PM(M), M(M) {}
-
-  FunctionPassManager &getPM(const MutexGuard &L) {
-    return PM;
-  }
-
-  Module *getModule() const { return M; }
-  std::vector<AssertingVH<Function> > &getPendingFunctions(const MutexGuard &L){
-    return PendingFunctions;
-  }
-};
-
-
-class PolyJIT : public ExecutionEngine {
-  /// types
-  typedef ValueMap<const BasicBlock *, void *>
-      BasicBlockAddressMapTy;
-  /// data
-  TargetMachine &TM;       // The current target we are compiling to
-  TargetJITInfo &TJI;      // The JITInfo for the target we are compiling to
-  JITCodeEmitter *JCE;     // JCE object
-  JITMemoryManager *JMM;
-  std::vector<JITEventListener*> EventListeners;
-
-  /// AllocateGVsWithCode - Some applications require that global variables and
-  /// code be allocated into the same region of memory, in which case this flag
-  /// should be set to true.  Doing so breaks freeMachineCodeForFunction.
-  bool AllocateGVsWithCode;
-
-  /// True while the JIT is generating code.  Used to assert against recursive
-  /// entry.
-  bool isAlreadyCodeGenerating;
-
-  JITState *jitstate;
-
-  /// BasicBlockAddressMap - A mapping between LLVM basic blocks and their
-  /// actualized version, only filled for basic blocks that have their address
-  /// taken.
-  BasicBlockAddressMapTy BasicBlockAddressMap;
-
-
-  PolyJIT(Module *M, TargetMachine &tm, TargetJITInfo &tji,
-          JITMemoryManager *JMM, bool AllocateGVsWithCode);
-public:
+  PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {};
   ~PolyJIT();
 
-  static void Register() {
-    JITCtor = createJIT;
-  }
+  void setEntryFunction(std::string name) {
+    EntryFn = name;
+  };
 
-  /// getJITInfo - Return the target JIT information structure.
-  ///
-  TargetJITInfo &getJITInfo() const { return TJI; }
+  void runJitableSCoPDetection(Module &);
+  void runPollyPreoptimizationPasses(Module &);
 
-  /// create - Create an return a new JIT compiler if there is one available
-  /// for the current target.  Otherwise, return null.
-  ///
-  static ExecutionEngine *create(Module *M,
-                                 std::string *Err,
-                                 JITMemoryManager *JMM,
-                                 CodeGenOpt::Level OptLevel =
-                                   CodeGenOpt::Default,
-                                 bool GVsWithCode = true,
-                                 Reloc::Model RM = Reloc::Default,
-                                 CodeModel::Model CMM = CodeModel::JITDefault) {
-    return ExecutionEngine::createJIT(M, Err, JMM, OptLevel, GVsWithCode,
-                                      RM, CMM);
-  }
-
-  virtual void addModule(Module *M);
-
-  /// removeModule - Remove a Module from the list of modules.  Returns true if
-  /// M is found.
-  virtual bool removeModule(Module *M);
-
-  /// runFunction - Start execution with the specified function and arguments.
-  ///
-  virtual GenericValue runFunction(Function *F,
-                                   const std::vector<GenericValue> &ArgValues);
-
-  /// getPointerToNamedFunction - This method returns the address of the
-  /// specified function by using the MemoryManager. As such it is only
-  /// useful for resolving library symbols, not code generated symbols.
-  ///
-  /// If AbortOnFailure is false and no function with the given name is
-  /// found, this function silently returns a null pointer. Otherwise,
-  /// it prints a message to stderr and aborts.
-  ///
-  virtual void *getPointerToNamedFunction(const std::string &Name,
-                                          bool AbortOnFailure = true);
-
-  // CompilationCallback - Invoked the first time that a call site is found,
-  // which causes lazy compilation of the target function.
+  // JIT and run the Main function.
   //
-  static void CompilationCallback();
+  // Before execution the Module preoptimizes every
+  // module for use with Polly.
+  // Afterwards n phases are executed:
+  //
+  int runMain(const std::vector<std::string> &inputArgs, const char * const *envp) {
+    Function *Main = M.getFunction(EntryFn);
 
-  /// getPointerToFunction - This returns the address of the specified function,
-  /// compiling it if necessary.
-  ///
-  void *getPointerToFunction(Function *F);
+    if (!Main) {
+      errs() << '\'' << EntryFn << "\' function not found in module.\n";
+      return -1;
+    }
 
-  /// addPointerToBasicBlock - Adds address of the specific basic block.
-  void addPointerToBasicBlock(const BasicBlock *BB, void *Addr);
+    // Run static constructors.
+    EE.runStaticConstructorsDestructors(false);
 
-  /// clearPointerToBasicBlock - Removes address of specific basic block.
-  void clearPointerToBasicBlock(const BasicBlock *BB);
+    // Trigger compilation separately so code regions that need to be 
+    // invalidated will be known.
+    //(void)EE.getPointerToFunction(Main);
 
-  /// getPointerToBasicBlock - This returns the address of the specified basic
-  /// block, assuming function is compiled.
-  void *getPointerToBasicBlock(BasicBlock *BB);
+    runPollyPreoptimizationPasses(M);
+    runJitableSCoPDetection(M);
 
-  /// getOrEmitGlobalVariable - Return the address of the specified global
-  /// variable, possibly emitting it to memory if needed.  This is used by the
-  /// Emitter.
-  void *getOrEmitGlobalVariable(const GlobalVariable *GV);
+    return EE.runFunctionAsMain(Main, inputArgs, envp);
+  };
 
-  /// getPointerToFunctionOrStub - If the specified function has been
-  /// code-gen'd, return a pointer to the function.  If not, compile it, or use
-  /// a stub to implement lazy compilation if available.
-  ///
-  void *getPointerToFunctionOrStub(Function *F);
+  int shutdown(int result) {
+    LLVMContext &Context = M.getContext();
+    // Run static destructors.
+    EE.runStaticConstructorsDestructors(true);
 
-  /// recompileAndRelinkFunction - This method is used to force a function
-  /// which has already been compiled, to be compiled again, possibly
-  /// after it has been modified. Then the entry to the old copy is overwritten
-  /// with a branch to the new copy. If there was no old copy, this acts
-  /// just like JIT::getPointerToFunction().
-  ///
-  void *recompileAndRelinkFunction(Function *F);
+    // If the program doesn't explicitly call exit, we will need the Exit
+    // function later on to make an explicit call, so get the function now.
+    Constant *Exit = M.getOrInsertFunction("exit", Type::getVoidTy(Context),
+                                                   Type::getInt32Ty(Context),
+                                                   NULL);
 
-  /// freeMachineCodeForFunction - deallocate memory used to code-generate this
-  /// Function.
-  ///
-  void freeMachineCodeForFunction(Function *F);
-
-  /// addPendingFunction - while jitting non-lazily, a called but non-codegen'd
-  /// function was encountered.  Add it to a pending list to be processed after
-  /// the current function.
-  ///
-  void addPendingFunction(Function *F);
-
-  /// getCodeEmitter - Return the code emitter this JIT is emitting into.
-  ///
-  JITCodeEmitter *getCodeEmitter() const { return JCE; }
-
-  static ExecutionEngine *createJIT(Module *M,
-                                    std::string *ErrorStr,
-                                    JITMemoryManager *JMM,
-                                    bool GVsWithCode,
-                                    TargetMachine *TM);
-
-  // Run the JIT on F and return information about the generated code
-  void runJITOnFunction(Function *F, MachineCodeInfo *MCI = 0);
-
-  virtual void RegisterJITEventListener(JITEventListener *L);
-  virtual void UnregisterJITEventListener(JITEventListener *L);
-  /// These functions correspond to the methods on JITEventListener.  They
-  /// iterate over the registered listeners and call the corresponding method on
-  /// each.
-  void NotifyFunctionEmitted(
-      const Function &F, void *Code, size_t Size,
-      const JITEvent_EmittedFunctionDetails &Details);
-  void NotifyFreeingMachineCode(void *OldPtr);
-
-  BasicBlockAddressMapTy &
-  getBasicBlockAddressMap(const MutexGuard &) {
-    return BasicBlockAddressMap;
-  }
-
-
-private:
-  static JITCodeEmitter *createEmitter(PolyJIT &J, JITMemoryManager *JMM,
-                                       TargetMachine &tm);
-  void runJITOnFunctionUnlocked(Function *F, const MutexGuard &locked);
-  void updateFunctionStub(Function *F);
-  void jitTheFunction(Function *F, const MutexGuard &locked);
-
-protected:
-
-  /// getMemoryforGV - Allocate memory for a global variable.
-  virtual char* getMemoryForGV(const GlobalVariable* GV);
-
+    // If the program didn't call exit explicitly, we should call it now.
+    // This ensures that any atexit handlers get called correctly.
+    if (Function *ExitF = dyn_cast<Function>(Exit)) {
+      std::vector<GenericValue> Args;
+      GenericValue ResultGV;
+      ResultGV.IntVal = APInt(32, result);
+      Args.push_back(ResultGV);
+      EE.runFunction(ExitF, Args);
+      errs() << "ERROR: exit(" << result << ") returned!\n";
+      abort();
+    } else {
+      errs() << "ERROR: exit defined with wrong prototype!\n";
+      abort();
+    }
+  };
 };
 
 } // End llvm namespace

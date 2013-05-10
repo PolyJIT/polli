@@ -10,12 +10,11 @@ set(LLVM_LINK_COMPONENTS
   asmparser
   selectiondag
   native
+  scalarOpts
   support)
 
 add_polli_library(PolyJIT
   PolyJIT.cpp
-  PolyJITEmitter.cpp
-  PolyJITMemoryManager.cpp
   )
 
 target_link_libraries(PolyJIT
