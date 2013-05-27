@@ -46,45 +46,6 @@
 
 using namespace llvm;
 
-class ScopDetectionErrorLog : FunctionPass {
-
-public: 
-};
-
-static void initializePollyPasses(PassRegistry &Registry) {
-#ifdef CLOOG_FOUND
-//  initializeCloogInfoPass(Registry);
-  initializeCodeGenerationPass(Registry);
-#endif
-  initializeIslCodeGenerationPass(Registry);
-  initializeCodePreparationPass(Registry);
-  initializeDeadCodeElimPass(Registry);
-//  initializeDependencesPass(Registry);
-  initializeIndependentBlocksPass(Registry);
-  initializeJITScopDetectionPass(Registry);
-  initializeJSONExporterPass(Registry);
-  initializeJSONImporterPass(Registry);
-  initializeIslAstInfoPass(Registry);
-  initializeIslScheduleOptimizerPass(Registry);
-  initializePapiProfilingPass(Registry);
-  initializePapiRegionProfilingPass(Registry);
-  initializePapiRegionPreparePass(Registry);
-#ifdef SCOPLIB_FOUND
-  initializePoccPass(Registry);
-#endif
-  initializePollyIndVarSimplifyPass(Registry);
-  initializeRegionSimplifyPass(Registry);
-  initializeScopDetectionPass(Registry);
-//  initializeScopInfoPass(Registry);
-
-#if 0
-  initializeScopInlinerPass(Registry);
-#endif
-//  initializeScopProfileInfoPass(Registry);
-//  initializeScopLoaderPass(Registry);
-//  initializeTempScopInfoPass(Registry);
-}
-
 namespace {
 // Statically register all Polly passes such that they are available after
 // loading Polly.
@@ -99,34 +60,6 @@ public:
 } // end of anonymous namespace.
 
 static StaticInitializer InitializeEverything;
-
-static void registerPollyPreoptPasses(PassManagerBase &PM) {
-  // A standard set of optimization passes partially taken/copied from the
-  // set of default optimization passes. It is used to bring the code into
-  // a canonical form that can than be analyzed by Polly. This set of passes is
-  // most probably not yet optimal. TODO: Investigate optimal set of passes.
-
-  PM.add(llvm::createPromoteMemoryToRegisterPass());
-  PM.add(polly::createIndVarSimplifyPass());        // Canonicalize indvars
-  PM.add(polly::createCodePreparationPass());
-  // TODO: Testing vs. PapiRegionPreparePass!
-  //  PM.add(polly::createRegionSimplifyPass());
-  PM.add(polly::createPapiRegionPreparePass());
-  // FIXME: The next two passes should not be necessary here. They are currently
-  //        because of two problems:
-  //
-  //        1. The RegionSimplifyPass destroys the canonical form of induction
-  //           variables,as it produces PHI nodes with incorrectly ordered
-  //           operands. To fix this we run IndVarSimplify.
-  //
-  //        2. IndVarSimplify does not preserve the region information and
-  //           the regioninfo pass does currently not recover simple regions.
-  //           As a result we need to run the RegionSimplify pass again to
-  //           recover them
-  PM.add(polly::createIndVarSimplifyPass());
-  //TODO (Testing): PM.add(polly::createRegionSimplifyPass());
-  PM.add(polly::createPapiRegionPreparePass());
-}
 
 /// Check if a given SCEV becomes affine if parameters
 /// get substituted at run time.
@@ -160,7 +93,7 @@ private:
         S->isOffsetOf(AllocTy, FieldNo))
       return true;
 
-    if (Argument *Arg = dyn_cast<Argument>(V))
+    if (dyn_cast<Argument>(V))
       return true;
 
     // Invariant only if not contained inside the region.
@@ -301,11 +234,12 @@ public:
       const Region *R              = (*i).first;
       std::vector<RejectInfo> rlog = (*i).second;
       
-      bool isValid = true;
+      bool isValid;
       for (unsigned j=0; j < rlog.size(); ++j) {
         const SCEV *lhs = rlog[j].Failed_LHS;
         const SCEV *rhs = rlog[j].Failed_RHS;
 
+        isValid = false;
         if (lhs)
           isValid &= NonAffineSCEVValidator::isJITable(lhs, R, SE);
         if (rhs)
