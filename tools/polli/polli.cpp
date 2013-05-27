@@ -402,13 +402,13 @@ int main(int argc, char **argv, char * const *envp) {
 
   int Result;
 
-  PolyJIT pjit(EE, Mod);
-  pjit.setEntryFunction(EntryFunc);
+  PolyJIT *pjit = new PolyJIT(EE, Mod);
+  pjit->setEntryFunction(EntryFunc);
 
   // Run main.
-  Result = pjit.runMain(InputArgv, envp);
+  Result = pjit->runMain(InputArgv, envp);
+  pjit->shutdown(Result);
 
-  pjit.shutdown(Result);
-
+  delete pjit;
   return Result;
 }

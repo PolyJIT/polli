@@ -284,6 +284,7 @@ public:
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
     AU.addRequired<ScalarEvolution>();
+    AU.setPreservesAll();
   };
 
   virtual void releaseMemory() {
@@ -349,6 +350,7 @@ public:
   //@{
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
+    AU.setPreservesAll();
   };
 
   virtual void releaseMemory() {
@@ -395,36 +397,37 @@ public:
 char ScopDetectionResultsViewer::ID = 0;
 
 void PolyJIT::runJitableSCoPDetection(Module &M) {
-  FunctionPassManager FPM = FunctionPassManager(&M);
+  ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
+  NonAffineScopDetection *NaSD = new NonAffineScopDetection();
 
-  FPM.doInitialization();
+  FPM = new FunctionPassManager(&M);
+  FPM->doInitialization();
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe ; ++f) {
     if (f->isDeclaration())
       continue;
-
+    
+    FPM->add(SD);
+    FPM->add(new ScopDetectionResultsViewer());
+    FPM->add(NaSD);
+  
     outs() << "[polli] finding SCoPs in " << (*f).getName() << "\n";
 
-    ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
-    FPM.add(SD);
-    FPM.add(new ScopDetectionResultsViewer());
-    FPM.add(new NonAffineScopDetection());
-    FPM.run(*f);
+    FPM->run(*f);
   }
-  FPM.doFinalization();
+  FPM->doFinalization();
+  delete FPM;
 }
 
 void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
-  FunctionPassManager FPM = FunctionPassManager(&M);
-  
-  registerPollyPreoptPasses(FPM);
+  registerPollyPreoptPasses(*FPM);
 
-  FPM.doInitialization();
+  FPM->doInitialization();
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe ; ++f) {
     if (f->isDeclaration())
       continue;
 
     outs() << "[polli] preoptimizing: " << (*f).getName() << "\n";
-    FPM.run(*f);
+    FPM->run(*f);
   }
-  FPM.doFinalization();
+  FPM->doFinalization();
 }

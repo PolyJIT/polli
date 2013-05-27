@@ -36,12 +36,10 @@ class TargetJITInfo;
 class TargetMachine;
 
 class PolyJIT {
-  ExecutionEngine &EE;
-  Module &M;
-  std::string EntryFn;
 public:
-  PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {};
-  ~PolyJIT();
+  PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {
+    FPM = new FunctionPassManager(&M);
+  };
 
   void setEntryFunction(std::string name) {
     EntryFn = name;
@@ -103,6 +101,11 @@ public:
       abort();
     }
   };
+private:
+  ExecutionEngine &EE;
+  Module &M;
+  std::string EntryFn;
+  FunctionPassManager *FPM;
 };
 
 } // End llvm namespace
