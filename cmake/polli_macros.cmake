@@ -1,6 +1,9 @@
 macro(add_polli_executable name)
   add_llvm_executable( ${name} ${ARGN} )
   set_target_properties(${name} PROPERTIES FOLDER "Polli executables")
+  install (TARGETS ${name}
+    RUNTIME DESTINATION bin
+  )
 endmacro(add_polli_executable)
 
 macro(add_polli_library name)
