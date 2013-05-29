@@ -6,4 +6,6 @@ int main(int argc, char **argv) {
   for (int i=0;i<32;++i) {
     A[i] = A[rand() % 1024];
   }
+
+  return A[42];
 }

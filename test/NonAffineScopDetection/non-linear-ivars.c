@@ -5,4 +5,6 @@ int main(int argc, char **argv) {
       A[i*j] = i+j;
     }
   }
+
+  return A[64];
 }

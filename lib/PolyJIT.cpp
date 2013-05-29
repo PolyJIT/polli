@@ -17,6 +17,7 @@
 #include "polly/RegisterPasses.h"
 #include "polly/LinkAllPasses.h"
 
+#include "polly/Support/SCEVValidator.h"
 #include "polly/PapiProfiling.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
@@ -97,13 +98,9 @@ private:
       return true;
 
     // Invariant only if not contained inside the region.
-    if (Instruction *I = dyn_cast<Instruction>(V)) {
-      if (!R->contains(I)) {
+    if (Instruction *I = dyn_cast<Instruction>(V))
+      if (!R->contains(I))
         return true;
-      } else {
-        dbgs() << "\n Region-variant: " << *I;
-      }
-    }
 
     return false;
   }
@@ -233,26 +230,58 @@ public:
          i = rl.begin(), ie = rl.end(); i != ie; ++i) {
       const Region *R              = (*i).first;
       std::vector<RejectInfo> rlog = (*i).second;
-      
-      bool isValid;
+     
+      bool isValid = true;
       for (unsigned j=0; j < rlog.size(); ++j) {
         const SCEV *lhs = rlog[j].Failed_LHS;
         const SCEV *rhs = rlog[j].Failed_RHS;
+        RejectKind kind = rlog[j].Reason;
 
-        isValid = false;
-        if (lhs)
-          isValid &= NonAffineSCEVValidator::isJITable(lhs, R, SE);
-        if (rhs)
-          isValid &= NonAffineSCEVValidator::isJITable(rhs, R, SE);
+        isValid &= (kind == NonAffineLoopBound ||
+                    kind == NonAffineCondition ||
+                    kind == NonAffineAccess);
 
-        if (isValid) {
-          ValidRegions.insert(R);
-          outs() << "[polli] valid non affine SCoP! "
-                 << R->getNameStr() << "\n";
-        } else {
-          outs() << "[polli] invalid non affine SCoP! "
-                 << R->getNameStr() << "\n";
+        // We do not handle these reject reasons here.
+        if (!isValid) {
+          outs() << "[polli] reject reason was not related to affinity; continuing.\n";
+          break;
         }
+         
+        std::vector<const SCEV *> RequiredParams; 
+        if (kind == NonAffineLoopBound) {
+          std::vector<const SCEV*> params;
+          
+          isValid &= polly::isNonAffineExpr(R, rhs, *SE);
+          params = getParamsInNonAffineExpr(R, rhs, *SE);
+          RequiredParams.insert(RequiredParams.end(),
+                                params.begin(), params.end());
+        }
+          //isValid &= NonAffineSCEVValidator::isJITable(rhs, R, SE);
+        
+        if (kind == NonAffineAccess || kind == NonAffineCondition) {
+          std::vector<const SCEV*> params;
+          
+          isValid &= polly::isNonAffineExpr(R, lhs, *SE); 
+          params = getParamsInNonAffineExpr(R, lhs, *SE);
+          RequiredParams.insert(RequiredParams.end(),
+                                params.begin(), params.end());
+        }
+          //isValid = NonAffineSCEVValidator::isJITable(lhs, R, SE);  
+        
+        if (isValid) {
+          outs() << "[polli] [" << j << "] "
+                 << rlog[j].getRejectReason() << "\n";
+          outs() << "           is fixable at run-time.\n";
+        }
+      }
+
+      if (isValid) {
+        ValidRegions.insert(R);
+        outs() << "[polli] valid non affine SCoP! "
+               << R->getNameStr() << "\n";
+      } else {
+        outs() << "[polli] invalid non affine SCoP! "
+               << R->getNameStr() << "\n";
       }
     }
 
@@ -335,17 +364,17 @@ void PolyJIT::runJitableSCoPDetection(Module &M) {
   NonAffineScopDetection *NaSD = new NonAffineScopDetection();
 
   FPM = new FunctionPassManager(&M);
+
+  /* Add ScopDetection, ResultsViewer and NonAffineScopDetection */
+  FPM->add(SD);
+  FPM->add(new ScopDetectionResultsViewer());
+  FPM->add(NaSD);
+  
   FPM->doInitialization();
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe ; ++f) {
     if (f->isDeclaration())
       continue;
-    
-    FPM->add(SD);
-    FPM->add(new ScopDetectionResultsViewer());
-    FPM->add(NaSD);
-  
     outs() << "[polli] finding SCoPs in " << (*f).getName() << "\n";
-
     FPM->run(*f);
   }
   FPM->doFinalization();
