@@ -20,7 +20,12 @@
 #include "polly/Support/SCEVValidator.h"
 #include "polly/PapiProfiling.h"
 
+#include "llvm/Analysis/Dominators.h"
+#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/ValueMap.h"
+#include "llvm/Assembly/PrintModulePass.h"
+#include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/JITCodeEmitter.h"
 #include "llvm/CodeGen/MachineCodeInfo.h"
 #include "llvm/Config/config.h"
@@ -33,19 +38,32 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Dwarf.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MutexGuard.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Target/TargetJITInfo.h"
 #include "llvm/Target/TargetMachine.h"
 
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
+#include "llvm/IR/IRBuilder.h"
+
+#include "llvm/Linker.h"
+
 #include <set>
 #include <map>
 
 using namespace llvm;
+
+static cl::opt<bool>
+AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));
 
 namespace {
 // Statically register all Polly passes such that they are available after
@@ -62,128 +80,138 @@ public:
 
 static StaticInitializer InitializeEverything;
 
-/// Check if a given SCEV becomes affine if parameters
-/// get substituted at run time.
-//@{
-class NonAffineSCEVValidator : SCEVVisitor<NonAffineSCEVValidator, bool> {
-  friend struct SCEVVisitor<NonAffineSCEVValidator, bool>;
+static void StoreModule(Module &M, const Twine &Name) {
+  std::string ErrorInfo;
+  PassManager PM;
+  OwningPtr<tool_output_file> Out;
 
-  const Region *R;
-  ScalarEvolution *SE;
-private:
-  typedef SCEVNAryExpr::op_iterator scev_op_it;
+  M.setModuleIdentifier(Name.str());
 
-  // DO NOT IMPLEMENT
-  NonAffineSCEVValidator(const NonAffineSCEVValidator &);
-  // DO NOT IMPLEMENT
-  const NonAffineSCEVValidator &operator=(const NonAffineSCEVValidator &);
+  Out.reset(new tool_output_file(Name.str().c_str(),
+                                 ErrorInfo, raw_fd_ostream::F_Binary));
+  PM.add(new DataLayout(M.getDataLayout()));
+  PM.add(createPrintModulePass(&Out->os()));
+  PM.run(M);
+  Out->keep();
+}
 
-  bool visitConstant(const SCEVConstant *S)  {
-    // We're always fine with constant expressions.
-    return true;
+static void StoreModules(std::set<Module *> Modules) {
+  for (std::set<Module *>::iterator
+       MI = Modules.begin(), ME = Modules.end(); MI != ME; ++MI) {
+    Module *M = *MI;
+    StoreModule(*M, M->getModuleIdentifier());
   }
-
-  bool visitUnknown(const SCEVUnknown* S)  {
-    Value *V = S->getValue();
-
-    Type *AllocTy;
-    Constant *FieldNo;
-    // We treat these as constant.
-    if (S->isSizeOf  (AllocTy) ||
-        S->isAlignOf (AllocTy) ||
-        S->isOffsetOf(AllocTy, FieldNo))
-      return true;
-
-    if (dyn_cast<Argument>(V))
-      return true;
-
-    // Invariant only if not contained inside the region.
-    if (Instruction *I = dyn_cast<Instruction>(V))
-      if (!R->contains(I))
-        return true;
-
-    return false;
-  }
-
-  bool visitNAryExpr(const SCEVNAryExpr* S)  {
-    for (scev_op_it I = S->op_begin(), E = S->op_end(); I != E; ++I)
-      if (!visit(*I))
-        return false;
-
-    return true;
-  }
-
-  bool visitMulExpr(const SCEVMulExpr* S) {
-    return visitNAryExpr(S);
-  }
-
-  bool visitCastExpr(const SCEVCastExpr *S)  {
-    return visit(S->getOperand());
-  }
-
-  bool visitTruncateExpr(const SCEVTruncateExpr *S)  {
-    return visit(S->getOperand());
-  }
-
-  bool visitZeroExtendExpr(const SCEVZeroExtendExpr *S)  {
-    return visit(S->getOperand());
-  }
-
-  bool visitSignExtendExpr(const SCEVSignExtendExpr *S)  {
-    return visit(S->getOperand());
-  }
-
-  bool visitAddExpr(const SCEVAddExpr *S)  {
-    return visitNAryExpr(S);
-  }
-
-  bool visitAddRecExpr(const SCEVAddRecExpr *S)  {
-    bool ret;
-
-    // {a, +, b, +, c}  Is always bad.
-    // {a,+, {b ,+, c}} Is always bad.
-    // {{a,+,b} ,+,c}   Is always bad.
-    if (isa<SCEVAddRecExpr>(S->getStepRecurrence(*SE)))
-      return false;
-
-    // Check for invariance.
-    ret = visitNAryExpr(S);
-
-    return ret;
-  }
-
-  bool visitUDivExpr(const SCEVUDivExpr *S)  {
-    return visit(S->getLHS()) && visit(S->getRHS());
-  }
-
-  bool visitSMaxExpr(const SCEVSMaxExpr *S)  {
-    return visitNAryExpr(S);
-  }
-
-  bool visitUMaxExpr(const SCEVUMaxExpr *S)  {
-    return visitNAryExpr(S);
-  }
-
-  bool visitCouldNotCompute(const SCEVCouldNotCompute *S) {
-    return false;
-  }
-
-public:
-  explicit NonAffineSCEVValidator(const Region *r, ScalarEvolution *se) :
-    R(r), SE(se) {}
-
-  static bool isJITable(const SCEV *s, const Region *r, ScalarEvolution *se) {
-    bool ret = false;
-    DEBUG(dbgs() << *s);
-    NonAffineSCEVValidator check(r,se);
-    ret = check.visit(s);
-    DEBUG(dbgs()  << " [ " << ((ret) ? "TRUE" : "FALSE") << " ]\n");
-    return ret;
-  }
-};
-//@}
+}
 
 class NonAffineScopDetection : public FunctionPass {
+public:
+  static char ID;
+  explicit NonAffineScopDetection() : FunctionPass(ID) {}
+
+  typedef std::vector<const SCEV *> ParamList;
+  typedef std::map<const Region *, ParamList> ParamMap;
+  typedef ParamMap::iterator iterator;
+  typedef ParamMap::const_iterator const_iterator;
+
+  iterator begin()  { return RequiredParams.begin(); }
+  iterator end()    { return RequiredParams.end();   }
+
+  const_iterator begin() const { return RequiredParams.begin(); }
+  const_iterator end()   const { return RequiredParams.end();   }
+
+  /// @name FunctionPass interface
+  //@{
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<ScopDetection>();
+    AU.addRequired<ScalarEvolution>();
+    AU.addRequired<DominatorTree>();
+    AU.addRequired<RegionInfo>();
+    AU.setPreservesAll();
+  };
+
+  virtual void releaseMemory() {
+    RequiredParams.clear();
+  };
+
+  virtual bool runOnFunction(Function &F) {
+    SD = &getAnalysis<ScopDetection>();
+    SE = &getAnalysis<ScalarEvolution>();
+    DT = &getAnalysis<DominatorTree>();
+    RI = &getAnalysis<RegionInfo>();
+    M = F.getParent();
+
+    polly::RejectedLog rl = SD->getRejectedLog();
+    for (polly::RejectedLog::iterator
+         i = rl.begin(), ie = rl.end(); i != ie; ++i) {
+      const Region *R              = (*i).first;
+      std::vector<RejectInfo> rlog = (*i).second;
+      RequiredParams[R] = ParamList();
+
+      bool isValid = true;
+      for (unsigned j=0; j < rlog.size(); ++j) {
+        const SCEV *lhs = rlog[j].Failed_LHS;
+        const SCEV *rhs = rlog[j].Failed_RHS;
+        RejectKind kind = rlog[j].Reason;
+
+        // We do not handle these reject reasons here.
+        isValid &= (kind == NonAffineLoopBound ||
+                    kind == NonAffineCondition ||
+                    kind == NonAffineAccess);
+        if (!isValid) {
+          DEBUG(dbgs() << "[polli] reject reason was not related to affinity;"
+                       << " continuing.\n");
+          break;
+        }
+
+        ParamList params;
+        if (kind == NonAffineLoopBound) {
+          isValid &= polly::isNonAffineExpr(R, rhs, *SE);
+          params = getParamsInNonAffineExpr(R, rhs, *SE);
+          RequiredParams[R].insert(RequiredParams[R].end(),
+                                   params.begin(), params.end());
+        }
+
+        if (kind == NonAffineAccess || kind == NonAffineCondition) {
+          std::vector<const SCEV*> params;
+
+          isValid &= polly::isNonAffineExpr(R, lhs, *SE);
+          params = getParamsInNonAffineExpr(R, lhs, *SE);
+          RequiredParams[R].insert(RequiredParams[R].end(),
+                                   params.begin(), params.end());
+        }
+      }
+
+      if (isValid) {
+        DEBUG(dbgs() << "[polli] valid non affine SCoP! "
+               << R->getNameStr() << "\n");
+      } else {
+        DEBUG(outs() << "[polli] invalid non affine SCoP! "
+               << R->getNameStr() << "\n");
+      }
+    }
+
+    if (AnalyzeOnly)
+      print(outs(), F.getParent());
+
+    return true;
+  };
+
+  virtual void print(raw_ostream &OS, const Module *) const {
+    for (ParamMap::const_iterator r = RequiredParams.begin(),
+                                 RE = RequiredParams.end(); r != RE; ++r) {
+      const Region *R = r->first;
+      ParamList Params = r->second;
+
+      OS.indent(4) << R->getNameStr() << "(";
+      for (ParamList::iterator i = Params.begin(), e = Params.end();
+           i != e; ++i) {
+        (*i)->print(OS.indent(1));
+      }
+      OS << " )\n";
+    }
+  };
+  //@}
+private:
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   NonAffineScopDetection(const NonAffineScopDetection &);
@@ -192,109 +220,147 @@ class NonAffineScopDetection : public FunctionPass {
 
   ScopDetection *SD;
   ScalarEvolution *SE;
+  DominatorTree *DT;
+  RegionInfo *RI;
 
-  typedef std::set<const Region *> RegionSet;
-  RegionSet ValidRegions;
+  Module *M;
 
+  ParamMap RequiredParams;
+};
+char NonAffineScopDetection::ID = 0;
+
+struct ScopMapper : public FunctionPass {
 public:
+  typedef std::set<Function *> FunctionSet;
+  typedef FunctionSet::iterator iterator;
+
+  iterator begin() { return CreatedFunctions.begin(); }
+  iterator end() { return CreatedFunctions.end(); }
+
+  typedef std::set<Module *> ModuleSet;
+  typedef ModuleSet::iterator module_iterator;
+
+  module_iterator modules_begin() { return CreatedModules.begin(); }
+  module_iterator modules_end() { return CreatedModules.end(); }
+
   static char ID;
-  explicit NonAffineScopDetection() : FunctionPass(ID) {}
-
-  typedef RegionSet::iterator iterator;
-  typedef RegionSet::const_iterator const_iterator;
-
-  iterator begin()  { return ValidRegions.begin(); }
-  iterator end()    { return ValidRegions.end();   }
-
-  const_iterator begin() const { return ValidRegions.begin(); }
-  const_iterator end()   const { return ValidRegions.end();   }
-
+  explicit ScopMapper() : FunctionPass(ID) {}
   /// @name FunctionPass interface
   //@{
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<ScopDetection>();
-    AU.addRequired<ScalarEvolution>();
+    AU.addRequired<NonAffineScopDetection>();
+    AU.addRequired<DominatorTree>();
+    AU.addRequired<RegionInfo>();
     AU.setPreservesAll();
   };
 
-  virtual void releaseMemory() {
-    ValidRegions.clear();
+  virtual void releaseMemory() {};
+
+  void moveFunctionIntoModule(Function *F, Module *Dest) {
+    /* Create a new function for cloning, based on the properties
+     * of our source function, but set linkage to external. */
+    Function *NewF =Function::Create(F->getFunctionType(),
+                                     F->getLinkage(),
+                                     F->getName(),
+                                     Dest);
+    NewF->copyAttributesFrom(F);
+
+    /* Copy function body ExtractedF over to ClonedF */
+    ValueToValueMapTy VMap;
+    VMap[F] = NewF;
+    Function::arg_iterator NewArg = NewF->arg_begin();
+    for (Function::const_arg_iterator
+         Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
+      NewArg->setName(Arg->getName());
+      VMap[Arg] = NewArg++;
+    }
+
+    SmallVector<ReturnInst*, 8> Returns;
+    CloneFunctionInto(NewF, F, VMap,/* ModuleLevelChanges=*/true, Returns);
+
+    // No need for the mapping anymore. TODO: Think about that more.
+    for (Function::const_arg_iterator
+         Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
+      VMap.erase(Arg);
+    }
+    VMap.clear();
   };
 
   virtual bool runOnFunction(Function &F) {
-    SD = &getAnalysis<ScopDetection>();
-    SE = &getAnalysis<ScalarEvolution>();
+    NSD = &getAnalysis<NonAffineScopDetection>();
+    DT  = &getAnalysis<DominatorTree>();
+    RI  = &getAnalysis<RegionInfo>();
 
-    polly::RejectedLog rl = SD->getRejectedLog();
-    for (polly::RejectedLog::iterator
-         i = rl.begin(), ie = rl.end(); i != ie; ++i) {
-      const Region *R              = (*i).first;
-      std::vector<RejectInfo> rlog = (*i).second;
-     
-      bool isValid = true;
-      for (unsigned j=0; j < rlog.size(); ++j) {
-        const SCEV *lhs = rlog[j].Failed_LHS;
-        const SCEV *rhs = rlog[j].Failed_RHS;
-        RejectKind kind = rlog[j].Reason;
+    if (CreatedFunctions.count(&F))
+      return false;
 
-        isValid &= (kind == NonAffineLoopBound ||
-                    kind == NonAffineCondition ||
-                    kind == NonAffineAccess);
+    /* Prepare a fresh module for this function. */
+    //LLVMContext &NewContext = *(new LLVMContext());
+    Module *M, *NewM;
+    M = F.getParent();
 
-        // We do not handle these reject reasons here.
-        if (!isValid) {
-          outs() << "[polli] reject reason was not related to affinity; continuing.\n";
-          break;
-        }
-         
-        std::vector<const SCEV *> RequiredParams; 
-        if (kind == NonAffineLoopBound) {
-          std::vector<const SCEV*> params;
-          
-          isValid &= polly::isNonAffineExpr(R, rhs, *SE);
-          params = getParamsInNonAffineExpr(R, rhs, *SE);
-          RequiredParams.insert(RequiredParams.end(),
-                                params.begin(), params.end());
-        }
-          //isValid &= NonAffineSCEVValidator::isJITable(rhs, R, SE);
-        
-        if (kind == NonAffineAccess || kind == NonAffineCondition) {
-          std::vector<const SCEV*> params;
-          
-          isValid &= polly::isNonAffineExpr(R, lhs, *SE); 
-          params = getParamsInNonAffineExpr(R, lhs, *SE);
-          RequiredParams.insert(RequiredParams.end(),
-                                params.begin(), params.end());
-        }
-          //isValid = NonAffineSCEVValidator::isJITable(lhs, R, SE);  
-        
-        if (isValid) {
-          outs() << "[polli] [" << j << "] "
-                 << rlog[j].getRejectReason() << "\n";
-          outs() << "           is fixable at run-time.\n";
-        }
+    /* Copy properties of our source module */
+    NewM = new Module(M->getModuleIdentifier(), M->getContext());
+    //NewM = new Module(M->getModuleIdentifier(), NewContext);
+    NewM->setTargetTriple(M->getTargetTriple());
+    NewM->setDataLayout(M->getDataLayout());
+    NewM->setMaterializer(M->getMaterializer());
+    NewM->setModuleIdentifier(
+      (M->getModuleIdentifier() + "." + F.getName()).str());
+
+    /* Extract each SCoP in this function into a new one. */
+    CodeExtractor *Extractor;
+    for (NonAffineScopDetection::iterator
+         RP = NSD->begin(), RE = NSD->end(); RP != RE; ++RP) {
+      const Region *R = RP->first;
+
+      Extractor = new CodeExtractor(*DT, *R);
+      Function *ExtractedF = Extractor->extractCodeRegion();
+
+      if (ExtractedF) {
+        ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
+        moveFunctionIntoModule(ExtractedF, NewM);
+
+        /* FIXME: Do not depend on this set. */
+        CreatedFunctions.insert(ExtractedF);
       }
-
-      if (isValid) {
-        ValidRegions.insert(R);
-        outs() << "[polli] valid non affine SCoP! "
-               << R->getNameStr() << "\n";
-      } else {
-        outs() << "[polli] invalid non affine SCoP! "
-               << R->getNameStr() << "\n";
-      }
+      delete Extractor;
     }
 
-    return false;
+    DEBUG(StoreModule(*NewM, M->getModuleIdentifier() + "." + F.getName()));
+
+    /* Keep track for the linker after cleaning the cloned functions. */
+    CreatedModules.insert(NewM);
+
+    return true;
   };
 
   virtual void print(raw_ostream &OS, const Module *) const {
 
   };
   //@}
+private:
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  ScopMapper(const ScopMapper&);
+  // DO NOT IMPLEMENT
+  const ScopMapper &operator=(const ScopMapper &);
+
+  NonAffineScopDetection *NSD;
+  DominatorTree *DT;
+  RegionInfo *RI;
+
+  Module *M;
+  FunctionSet CreatedFunctions;
+  ModuleSet CreatedModules;
 };
 
-char NonAffineScopDetection::ID = 0;
+char ScopMapper::ID = 0;
+
+
+void pjit_callback(void) {
+  outs() << "HARR HARR\n";
+};
 
 class ScopDetectionResultsViewer : public FunctionPass {
   //===--------------------------------------------------------------------===//
@@ -328,7 +394,7 @@ public:
          i = rl.begin(), ie = rl.end(); i != ie; ++i) {
       const Region *R              = (*i).first;
       std::vector<RejectInfo> rlog = (*i).second;
-      
+
       if (R) {
         outs() << "[polli] rejected region: " <<  R->getNameStr() << "\n";
 
@@ -359,38 +425,164 @@ public:
 
 char ScopDetectionResultsViewer::ID = 0;
 
-void PolyJIT::runJitableSCoPDetection(Module &M) {
+void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
+  outs() << "[polli] Phase III: Injecting call to JIT\n";
+  LLVMContext &Ctx = M.getContext();
+  IRBuilder<> Builder(Ctx);
+
+  /* Insert declaration into source module */
+  Function *PJITCallback = cast<Function>(
+    M.getOrInsertFunction("pjit_callback", Type::getVoidTy(Ctx), NULL));
+
+  /* Insert a declaration & a call into each extracted module */
+  for (ManagedModules::iterator
+       i = Mods.begin(), ie = Mods.end(); i != ie; ++i) {
+    Module *ScopM = (*i);
+    Function *CallbackDecl = Function::Create(PJITCallback->getFunctionType(),
+                                              PJITCallback->getLinkage(),
+                                              PJITCallback->getName(),
+                                              ScopM);
+
+    /* Insert declaration into new module and call it in every function. */
+    outs().indent(2) << "Inject decl: " << CallbackDecl->getName() << "\n";
+
+    /* Inject call to callback declaration into every function */
+    for (Module::iterator
+         F = ScopM->begin(), FE = ScopM->end(); F != FE; ++F) {
+      BasicBlock *BB = F->begin();
+      Builder.SetInsertPoint(BB->getFirstInsertionPt());
+    //  Builder.CreateCall(CallbackDecl);
+    }
+  }
+};
+
+void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
+  /* We need to link the functions back in for execution */
+  std::string ErrorMsg;
+  for (ManagedModules::iterator
+       src = Mods.begin(), se = Mods.end(); src != se; ++src) {
+    outs().indent(2) << "Linking: " << (*src)->getModuleIdentifier() << "\n";
+
+    /* Link the module back in, preserving the source */
+    Linker::LinkModules(&M, (*src), Linker::DestroySource, &ErrorMsg);
+  }
+};
+
+void PolyJIT::extractJitableScops(Module &M) {
   ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
   NonAffineScopDetection *NaSD = new NonAffineScopDetection();
+  ScopMapper *SM = new ScopMapper();
 
   FPM = new FunctionPassManager(&M);
 
   /* Add ScopDetection, ResultsViewer and NonAffineScopDetection */
   FPM->add(SD);
-  FPM->add(new ScopDetectionResultsViewer());
+  DEBUG(FPM->add(new ScopDetectionResultsViewer()));
   FPM->add(NaSD);
-  
+  FPM->add(SM);
+
   FPM->doInitialization();
+
+  outs() << "[polli] Phase II: Extracting NonAffine Scops\n";
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe ; ++f) {
     if (f->isDeclaration())
       continue;
-    outs() << "[polli] finding SCoPs in " << (*f).getName() << "\n";
+    outs().indent(2) << "Extract: " << (*f).getName() << "\n";
     FPM->run(*f);
   }
+
+  /* Copy the set of modules generated by the ScopMapper */
+  for (ScopMapper::module_iterator
+       m = SM->modules_begin(), me = SM->modules_end(); m != me; ++m)
+    Mods.insert(*m);
+
+  /* Remove cloned functions */
+  for (ScopMapper::iterator
+       F = SM->begin(), FE = SM->end(); F != FE; ++F)
+   (*F)->deleteBody();
+
   FPM->doFinalization();
   delete FPM;
+}
+
+int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
+              const char * const *envp) {
+  Function *Main = M.getFunction(EntryFn);
+
+  if (!Main) {
+    errs() << '\'' << EntryFn << "\' function not found in module.\n";
+    return -1;
+  }
+
+  // Run static constructors.
+  EE.runStaticConstructorsDestructors(false);
+  // Trigger compilation separately so code regions that need to be
+  // invalidated will be known.
+  //(void)EE.getPointerToFunction(Main);
+
+  /* Preoptimize our module for polly */
+  runPollyPreoptimizationPasses(M);
+
+  /* Extract suitable Scops */
+  extractJitableScops(M);
+
+  /* Instrument extracted Scops with a callback */
+  instrumentScops(M, Mods);
+
+  /* Store temporary files */
+  StoreModules(Mods);
+
+  /* Get the Scops back */
+  linkJitableScops(Mods, M);
+
+  /* Store module before execution */
+  StoreModule(M, M.getModuleIdentifier() + ".final");
+
+  /* Add a mapping to our JIT callback function. */
+  EE.addGlobalMapping(PJITCallback, (void *)&pjit_callback);
+  return EE.runFunctionAsMain(Main, inputArgs, envp);
 }
 
 void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   registerPollyPreoptPasses(*FPM);
 
   FPM->doInitialization();
+
+  outs() << "[polli] Phase I: Applying Preoptimization:\n";
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe ; ++f) {
     if (f->isDeclaration())
       continue;
 
-    outs() << "[polli] preoptimizing: " << (*f).getName() << "\n";
+    outs().indent(2) << "PreOpt: " << (*f).getName() << "\n";
     FPM->run(*f);
   }
   FPM->doFinalization();
 }
+
+int PolyJIT::shutdown(int result) {
+  LLVMContext &Context = M.getContext();
+
+  // Run static destructors.
+  EE.runStaticConstructorsDestructors(true);
+
+  // If the program doesn't explicitly call exit, we will need the Exit
+  // function later on to make an explicit call, so get the function now.
+  Constant *Exit = M.getOrInsertFunction("exit", Type::getVoidTy(Context),
+                                                 Type::getInt32Ty(Context),
+                                                 NULL);
+
+  // If the program didn't call exit explicitly, we should call it now.
+  // This ensures that any atexit handlers get called correctly.
+  if (Function *ExitF = dyn_cast<Function>(Exit)) {
+    std::vector<GenericValue> Args;
+    GenericValue ResultGV;
+    ResultGV.IntVal = APInt(32, result);
+    Args.push_back(ResultGV);
+    EE.runFunction(ExitF, Args);
+    errs() << "ERROR: exit(" << result << ") returned!\n";
+    abort();
+  } else {
+    errs() << "ERROR: exit defined with wrong prototype!\n";
+    abort();
+  }
+};

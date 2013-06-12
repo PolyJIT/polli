@@ -398,14 +398,16 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  int Result;
-
   PolyJIT *pjit = new PolyJIT(EE, Mod);
   pjit->setEntryFunction(EntryFunc);
 
   // Run main.
-  Result = pjit->runMain(InputArgv, envp);
+  llvm_start_multithreaded();
+
+  int Result = pjit->runMain(InputArgv, envp);
   pjit->shutdown(Result);
+
+  llvm_stop_multithreaded();
 
   delete pjit;
   return Result;

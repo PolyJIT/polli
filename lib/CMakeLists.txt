@@ -5,6 +5,7 @@ set(LLVM_LINK_COMPONENTS
   codegen
   executionengine
   interpreter
+  linker
   nativecodegen
   bitreader
   asmparser

@@ -25,6 +25,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <set>
 
 namespace llvm {
 
@@ -45,7 +46,7 @@ public:
     EntryFn = name;
   };
 
-  void runJitableSCoPDetection(Module &);
+  void extractJitableScops(Module &);
   void runPollyPreoptimizationPasses(Module &);
 
   // JIT and run the Main function.
@@ -54,58 +55,27 @@ public:
   // module for use with Polly.
   // Afterwards n phases are executed:
   //
-  int runMain(const std::vector<std::string> &inputArgs, const char * const *envp) {
-    Function *Main = M.getFunction(EntryFn);
+  int runMain(const std::vector<std::string> &inputArgs,
+              const char * const *envp);
 
-    if (!Main) {
-      errs() << '\'' << EntryFn << "\' function not found in module.\n";
-      return -1;
-    }
-
-    // Run static constructors.
-    EE.runStaticConstructorsDestructors(false);
-
-    // Trigger compilation separately so code regions that need to be 
-    // invalidated will be known.
-    //(void)EE.getPointerToFunction(Main);
-
-    runPollyPreoptimizationPasses(M);
-    runJitableSCoPDetection(M);
-
-    return EE.runFunctionAsMain(Main, inputArgs, envp);
-  };
-
-  int shutdown(int result) {
-    LLVMContext &Context = M.getContext();
-    // Run static destructors.
-    EE.runStaticConstructorsDestructors(true);
-
-    // If the program doesn't explicitly call exit, we will need the Exit
-    // function later on to make an explicit call, so get the function now.
-    Constant *Exit = M.getOrInsertFunction("exit", Type::getVoidTy(Context),
-                                                   Type::getInt32Ty(Context),
-                                                   NULL);
-
-    // If the program didn't call exit explicitly, we should call it now.
-    // This ensures that any atexit handlers get called correctly.
-    if (Function *ExitF = dyn_cast<Function>(Exit)) {
-      std::vector<GenericValue> Args;
-      GenericValue ResultGV;
-      ResultGV.IntVal = APInt(32, result);
-      Args.push_back(ResultGV);
-      EE.runFunction(ExitF, Args);
-      errs() << "ERROR: exit(" << result << ") returned!\n";
-      abort();
-    } else {
-      errs() << "ERROR: exit defined with wrong prototype!\n";
-      abort();
-    }
-  };
+  int shutdown(int result);
 private:
   ExecutionEngine &EE;
   Module &M;
   std::string EntryFn;
   FunctionPassManager *FPM;
+
+  typedef std::set<Module *> ManagedModules;
+  ManagedModules Mods;
+
+  /* IR function declaration which gets mapped to our callback */
+  Function *PJITCallback;
+
+  /* Link extracted Scops into a module for execution. */
+  void linkJitableScops(ManagedModules &, Module &);
+
+  /* Instrument extracted Scops with a callback to the JIT */
+  void instrumentScops(Module &, ManagedModules &);
 };
 
 } // End llvm namespace
