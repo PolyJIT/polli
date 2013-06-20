@@ -27,6 +27,7 @@
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/Interpreter.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
 #include "llvm/ExecutionEngine/JITMemoryManager.h"
@@ -190,6 +191,11 @@ namespace {
     cl::Hidden,
     cl::desc("Emit debug info objfiles to disk"),
     cl::init(false));
+  
+  static cl::opt<bool>
+  UseMCJIT("mcjit",
+    cl::desc("Use MCJIT instead of old JIT"),
+    cl::init(false));
 }
 
 static ExecutionEngine *EE = 0;
@@ -328,11 +334,14 @@ int main(int argc, char **argv, char * const *envp) {
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(ForceInterpreter
                         ? EngineKind::Interpreter
-                        : EngineKind::PolyJIT);
+                        : EngineKind::JIT);
+  builder.setUseMCJIT(UseMCJIT);
 
   // If we are supposed to override the target triple, do so now.
   if (!TargetTriple.empty())
     Mod->setTargetTriple(Triple::normalize(TargetTriple));
+
+  JITMemoryManager *MM = JITMemoryManager::CreateDefaultMemManager();
 
   builder.setJITMemoryManager(ForceInterpreter ? 0 :
                               JITMemoryManager::CreateDefaultMemManager());
@@ -398,7 +407,7 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  PolyJIT *pjit = new PolyJIT(EE, Mod);
+  PolyJIT *pjit = PolyJIT::Get(EE, Mod);
   pjit->setEntryFunction(EntryFunc);
 
   // Run main.
@@ -409,6 +418,5 @@ int main(int argc, char **argv, char * const *envp) {
 
   llvm_stop_multithreaded();
 
-  delete pjit;
   return Result;
 }

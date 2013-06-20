@@ -1,6 +1,7 @@
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   jit
+  mcjit
   codegen
   executionengine
   interpreter

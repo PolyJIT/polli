@@ -2,6 +2,7 @@ set(LLVM_NO_RTTI 1)
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   jit
+  mcjit
   codegen
   executionengine
   interpreter

@@ -93,6 +93,7 @@ static void StoreModule(Module &M, const Twine &Name) {
   PM.add(createPrintModulePass(&Out->os()));
   PM.run(M);
   Out->keep();
+  DEBUG(dbgs() << "Stored module: " << M.getModuleIdentifier() << "\n");
 }
 
 static void StoreModules(std::set<Module *> Modules) {
@@ -259,10 +260,10 @@ public:
   void moveFunctionIntoModule(Function *F, Module *Dest) {
     /* Create a new function for cloning, based on the properties
      * of our source function, but set linkage to external. */
-    Function *NewF =Function::Create(F->getFunctionType(),
-                                     F->getLinkage(),
-                                     F->getName(),
-                                     Dest);
+    Function *NewF = Function::Create(F->getFunctionType(),
+                                      F->getLinkage(),
+                                      F->getName(),
+                                      Dest);
     NewF->copyAttributesFrom(F);
 
     /* Copy function body ExtractedF over to ClonedF */
@@ -357,9 +358,10 @@ private:
 
 char ScopMapper::ID = 0;
 
-
-void pjit_callback(void) {
-  outs() << "HARR HARR\n";
+/* Let's hope that we have called it before ;-) */
+void pjit_callback(int *ptr) {
+  PolyJIT *JIT = PolyJIT::Get();
+  ExecutionEngine *EE = JIT->GetEngine();
 };
 
 class ScopDetectionResultsViewer : public FunctionPass {
@@ -434,6 +436,14 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   Function *PJITCallback = cast<Function>(
     M.getOrInsertFunction("pjit_callback", Type::getVoidTy(Ctx), NULL));
 
+  /* Register our callback with the global mapping table, so the JIT can find
+   * it during object compilation */
+  EE.addGlobalMapping(PJITCallback, (void *)&pjit_callback);
+
+  /* Register our callback with the system linker, so the MCJIT can find it
+   * during object compilation */
+  sys::DynamicLibrary::AddSymbol(PJITCallback->getName(), (void *)&pjit_callback);
+
   /* Insert a declaration & a call into each extracted module */
   for (ManagedModules::iterator
        i = Mods.begin(), ie = Mods.end(); i != ie; ++i) {
@@ -442,6 +452,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
                                               PJITCallback->getLinkage(),
                                               PJITCallback->getName(),
                                               ScopM);
+    EE.addGlobalMapping(CallbackDecl, (void *)&pjit_callback);
 
     /* Insert declaration into new module and call it in every function. */
     outs().indent(2) << "Inject decl: " << CallbackDecl->getName() << "\n";
@@ -449,9 +460,12 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
     /* Inject call to callback declaration into every function */
     for (Module::iterator
          F = ScopM->begin(), FE = ScopM->end(); F != FE; ++F) {
+      if (F->isDeclaration())
+        continue;
+
       BasicBlock *BB = F->begin();
       Builder.SetInsertPoint(BB->getFirstInsertionPt());
-    //  Builder.CreateCall(CallbackDecl);
+      Builder.CreateCall(CallbackDecl);
     }
   }
 };
@@ -539,7 +553,6 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   StoreModule(M, M.getModuleIdentifier() + ".final");
 
   /* Add a mapping to our JIT callback function. */
-  EE.addGlobalMapping(PJITCallback, (void *)&pjit_callback);
   return EE.runFunctionAsMain(Main, inputArgs, envp);
 }
 
@@ -585,4 +598,12 @@ int PolyJIT::shutdown(int result) {
     errs() << "ERROR: exit defined with wrong prototype!\n";
     abort();
   }
+};
+
+PolyJIT* PolyJIT::Instance = NULL;
+PolyJIT* PolyJIT::Get(ExecutionEngine *EE, Module *M) {
+  if (!Instance) {
+    Instance = new PolyJIT(EE, M);
+  }
+  return Instance; 
 };
