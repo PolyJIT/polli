@@ -38,11 +38,13 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Dwarf.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MutexGuard.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -53,7 +55,6 @@
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
-#include "llvm/IR/IRBuilder.h"
 
 #include "llvm/Linker.h"
 
@@ -358,10 +359,48 @@ private:
 
 char ScopMapper::ID = 0;
 
-/* Let's hope that we have called it before ;-) */
-void pjit_callback(int *ptr) {
+void pjit_callback(const char *fName, const int paramc,
+                   const void** params) {
+  /* Let's hope that we have called it before ;-)
+   * Otherwise it will blow up. FIXME: Don't blow up. */
   PolyJIT *JIT = PolyJIT::Get();
-  ExecutionEngine *EE = JIT->GetEngine();
+
+  /* Be very careful here, we want to exit this callback asap to cut down on
+   * overhead. Think about triggering any modifications to the underlying IR
+   * in a concurrent thread instead of blocking everything here. */
+  Module& M = JIT->getExecutedModule();
+  Function *F = M.getFunction(fName);
+
+  if (F) {
+    outs() << "[" << fName << "] Argument-Value Table:\n";
+    int i = 0;
+
+    outs() << "{\n";
+    for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
+         Arg != ArgE; ++Arg) {
+      Type *ArgTy = Arg->getType();
+
+      outs().indent(2) << "params[" << i << "]: ";
+      ArgTy->print(outs());
+
+      if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
+        int raw = (int)(*(int *)params[i]);
+        APInt Val = APInt(IntTy->getBitWidth(), (uint64_t)raw,/*isSigned=*/true);
+        outs().indent(2) << " " << Arg->getName() << " = " << Val;
+  
+        outs() << " ByteBuf: "; 
+        int8_t *ptr = (int8_t *)params[i]; 
+        for (unsigned j=0; j < (IntTy->getBitWidth() / 8); j++) {
+          outs() << format("%d ", *ptr);
+          ptr++;
+        }
+      }
+      
+      outs() << "\n";
+      i++;
+    }
+    outs() << "}\n";
+  }
 };
 
 class ScopDetectionResultsViewer : public FunctionPass {
@@ -432,9 +471,16 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   LLVMContext &Ctx = M.getContext();
   IRBuilder<> Builder(Ctx);
 
+  PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
+
   /* Insert declaration into source module */
   Function *PJITCallback = cast<Function>(
-    M.getOrInsertFunction("pjit_callback", Type::getVoidTy(Ctx), NULL));
+    M.getOrInsertFunction("pjit_callback",
+                          Type::getVoidTy(Ctx),
+                          Type::getInt8PtrTy(Ctx),
+                          Type::getInt32Ty(Ctx),
+                          PtoArr,
+                          NULL));
 
   /* Register our callback with the global mapping table, so the JIT can find
    * it during object compilation */
@@ -457,15 +503,62 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
     /* Insert declaration into new module and call it in every function. */
     outs().indent(2) << "Inject decl: " << CallbackDecl->getName() << "\n";
 
+    std::vector<Value *> Args(3);
     /* Inject call to callback declaration into every function */
     for (Module::iterator
          F = ScopM->begin(), FE = ScopM->end(); F != FE; ++F) {
       if (F->isDeclaration())
         continue;
-
       BasicBlock *BB = F->begin();
       Builder.SetInsertPoint(BB->getFirstInsertionPt());
-      Builder.CreateCall(CallbackDecl);
+     
+      /* Create a generic IR sequence of this example C-code:
+       * 
+       * void foo(int n, int A[42]) {
+       *  void *params[2];
+       *  params[0] = &n;
+       *  params[1] = &A;
+       *  
+       *  pjit_callback("foo", 2, params);
+       * }
+       */
+
+      /* Prepare a stack array for the parameters. We will pass a pointer to
+       * this array into our callback function. */
+      int argc = F->arg_size();
+      Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc, true);
+      Value *Params = Builder.CreateAlloca(Type::getInt8PtrTy(Ctx),
+                                           ParamC, "params");
+
+      /* Store each parameter as pointer in the params array */
+      int i = 0;
+      Value *One    = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
+      for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
+           Arg != ArgE; ++Arg) {
+
+        /* Allocate a slot on the stack for the i'th argument and store it */
+        Value *Slot   = Builder.CreateAlloca(Arg->getType(), One,
+                                             "params." + Twine(i));
+        Builder.CreateAlignedStore(Arg, Slot, 4);
+       
+        /* Bitcast the allocated stack slot to i8* */
+        Value *Slot8 = Builder.CreateBitCast(Slot, Type::getInt8PtrTy(Ctx),
+                                             "ps.i8ptr." + Twine(i)); 
+          
+        /* Get the appropriate slot in the parameters array and store
+         * the stack slot in form of a i8*. */
+        Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
+        Value *Dest   = Builder.CreateGEP(Params, ArrIdx, "p." + Twine(i));
+        Builder.CreateAlignedStore(Slot8, Dest, 8); 
+
+        i++;
+      }
+
+      Args[0] = Builder.CreateGlobalStringPtr(F->getName());
+      Args[1] = ParamC;
+      Args[2] = Params;
+
+      Builder.CreateCall(CallbackDecl, Args);
     }
   }
 };

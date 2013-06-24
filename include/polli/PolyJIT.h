@@ -56,6 +56,8 @@ public:
               const char * const *envp);
 
   int shutdown(int result);
+
+  Module &getExecutedModule() { return M; }
 private:
   static PolyJIT* Instance;
   
@@ -80,6 +82,7 @@ private:
   FunctionPassManager *FPM;
 
   typedef std::set<Module *> ManagedModules;
+  /* The module we create & manage during execution of the main module M. */
   ManagedModules Mods;
 
   /* IR function declaration which gets mapped to our callback */
