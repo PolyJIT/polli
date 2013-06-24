@@ -11,6 +11,8 @@
 // execution of LLVM bitcode in an efficient manner.
 //
 //===----------------------------------------------------------------------===//
+#define DEBUG_TYPE "polyjit"
+#include "llvm/Support/Debug.h"
 
 #include "polli/PolyJIT.h"
 
@@ -359,6 +361,38 @@ private:
 
 char ScopMapper::ID = 0;
 
+static inline
+void printParameters(Function *F, const int paramc, const void **params) {
+  outs() << "[" << F->getName() << "] Argument-Value Table:\n";
+  int i = 0;
+
+  outs() << "{\n";
+  for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
+       Arg != ArgE; ++Arg) {
+    Type *ArgTy = Arg->getType();
+
+    outs().indent(2) << "params[" << i << "]: ";
+    ArgTy->print(outs());
+
+    if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
+      int raw = (int)(*(int *)params[i]);
+      APInt Val = APInt(IntTy->getBitWidth(), (uint64_t)raw,/*isSigned=*/true);
+      outs().indent(2) << " " << Arg->getName() << " = " << Val;
+
+      outs() << " ByteBuf: "; 
+      int8_t *ptr = (int8_t *)params[i]; 
+      for (unsigned j=0; j < (IntTy->getBitWidth() / 8); j++) {
+        outs() << format("%d ", *ptr);
+        ptr++;
+      }
+    }
+    
+    outs() << "\n";
+    i++;
+  }
+  outs() << "}\n";
+};
+
 void pjit_callback(const char *fName, const int paramc,
                    const void** params) {
   /* Let's hope that we have called it before ;-)
@@ -371,36 +405,10 @@ void pjit_callback(const char *fName, const int paramc,
   Module& M = JIT->getExecutedModule();
   Function *F = M.getFunction(fName);
 
-  if (F) {
-    outs() << "[" << fName << "] Argument-Value Table:\n";
-    int i = 0;
+  if (!F)
+    llvm_unreachable("Function not in this module. It must be there!");
 
-    outs() << "{\n";
-    for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
-         Arg != ArgE; ++Arg) {
-      Type *ArgTy = Arg->getType();
-
-      outs().indent(2) << "params[" << i << "]: ";
-      ArgTy->print(outs());
-
-      if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
-        int raw = (int)(*(int *)params[i]);
-        APInt Val = APInt(IntTy->getBitWidth(), (uint64_t)raw,/*isSigned=*/true);
-        outs().indent(2) << " " << Arg->getName() << " = " << Val;
-  
-        outs() << " ByteBuf: "; 
-        int8_t *ptr = (int8_t *)params[i]; 
-        for (unsigned j=0; j < (IntTy->getBitWidth() / 8); j++) {
-          outs() << format("%d ", *ptr);
-          ptr++;
-        }
-      }
-      
-      outs() << "\n";
-      i++;
-    }
-    outs() << "}\n";
-  }
+  DEBUG(printParameters(F, paramc, params));
 };
 
 class ScopDetectionResultsViewer : public FunctionPass {
