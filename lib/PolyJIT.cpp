@@ -189,13 +189,13 @@ public:
         DEBUG(dbgs() << "[polli] valid non affine SCoP! "
                << R->getNameStr() << "\n");
       } else {
-        DEBUG(outs() << "[polli] invalid non affine SCoP! "
+        DEBUG(dbgs() << "[polli] invalid non affine SCoP! "
                << R->getNameStr() << "\n");
       }
     }
 
     if (AnalyzeOnly)
-      print(outs(), F.getParent());
+      print(dbgs(), F.getParent());
 
     return true;
   };
@@ -361,37 +361,59 @@ private:
 
 char ScopMapper::ID = 0;
 
-static inline
-void printParameters(Function *F, const int paramc, const void **params) {
-  outs() << "[" << F->getName() << "] Argument-Value Table:\n";
-  int i = 0;
+template <class StorageT, class TypeT>
+struct RTParam {
+  explicit RTParam(StorageT val, TypeT *type, const StringRef name = "_") {
+    Value = val;
+    Type = type;
+    Name = name;
+  };
 
-  outs() << "{\n";
-  for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
-       Arg != ArgE; ++Arg) {
+  friend raw_ostream& operator<<(raw_ostream &out,
+                                 const struct RTParam &p) {
+    p.Type->print(out);
+    return (out << " " << p.Name << " = " << p.Value);
+  };
+private:
+  StorageT Value;
+  TypeT *Type;
+  StringRef Name;
+};
+
+typedef RTParam<APInt, IntegerType> RuntimeParam;
+typedef std::vector<RuntimeParam> RTParams;
+
+static inline
+void printParameters(Function *F, RTParams &Params) {
+  dbgs() << "[" << F->getName() << "] Argument-Value Table:\n";
+
+  dbgs() << "{\n";
+  for (RTParams::iterator P = Params.begin(), PE = Params.end(); P != PE; ++P) {
+    dbgs() << *P << "\n";
+  }
+  dbgs() << "}\n";
+};
+
+
+RTParams getRuntimeParameters(Function *F, const int paramc,
+                              const void** params) {
+  RTParams RuntimeParams;
+  int i = 0;
+  for (Function::arg_iterator Arg = F->arg_begin(), ArgE= F->arg_end();
+       Arg != ArgE; ++Arg, ++i) {
     Type *ArgTy = Arg->getType();
 
-    outs().indent(2) << "params[" << i << "]: ";
-    ArgTy->print(outs());
-
+    /* TODO: Add more types to be suitable for spawning new functions. */
     if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
-      int raw = (int)(*(int *)params[i]);
-      APInt Val = APInt(IntTy->getBitWidth(), (uint64_t)raw,/*isSigned=*/true);
-      outs().indent(2) << " " << Arg->getName() << " = " << Val;
-
-      outs() << " ByteBuf: "; 
-      int8_t *ptr = (int8_t *)params[i]; 
-      for (unsigned j=0; j < (IntTy->getBitWidth() / 8); j++) {
-        outs() << format("%d ", *ptr);
-        ptr++;
-      }
+      APInt val = APInt(IntTy->getBitWidth(),
+                        (uint64_t)(*(uint64_t *)params[i]),
+                        IntTy->getSignBit());
+      RuntimeParams.push_back(RuntimeParam(val, IntTy, Arg->getName()));
     }
-    
-    outs() << "\n";
-    i++;
   }
-  outs() << "}\n";
-};
+
+  return RuntimeParams;
+}
 
 void pjit_callback(const char *fName, const int paramc,
                    const void** params) {
@@ -408,7 +430,9 @@ void pjit_callback(const char *fName, const int paramc,
   if (!F)
     llvm_unreachable("Function not in this module. It must be there!");
 
-  DEBUG(printParameters(F, paramc, params));
+  RTParams RuntimeParams = getRuntimeParameters(F, paramc, params); 
+  
+  DEBUG(printParameters(F, RuntimeParams));
 };
 
 class ScopDetectionResultsViewer : public FunctionPass {
