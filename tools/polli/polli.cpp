@@ -34,10 +34,10 @@
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Format.h"
-#include "llvm/Support/IRReader.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Memory.h"
@@ -46,6 +46,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cerrno>
@@ -309,8 +310,9 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  Module *Mod = ParseIRFile(InputFile, Err, Context);
-  if (!Mod) {
+  OwningPtr<Module> Mod;
+  Mod.reset(ParseIRFile(InputFile, Err, Context));
+  if (Mod.get() == 0) {
     Err.print(argv[0], errs());
     return 1;
   }
@@ -325,7 +327,7 @@ int main(int argc, char **argv, char * const *envp) {
     }
   }
 
-  EngineBuilder builder(Mod);
+  EngineBuilder builder(Mod.get());
   builder.setMArch(MArch);
   builder.setMCPU(MCPU);
   builder.setMAttrs(MAttrs);
@@ -340,8 +342,6 @@ int main(int argc, char **argv, char * const *envp) {
   // If we are supposed to override the target triple, do so now.
   if (!TargetTriple.empty())
     Mod->setTargetTriple(Triple::normalize(TargetTriple));
-
-  JITMemoryManager *MM = JITMemoryManager::CreateDefaultMemManager();
 
   builder.setJITMemoryManager(ForceInterpreter ? 0 :
                               JITMemoryManager::CreateDefaultMemManager());
@@ -367,7 +367,6 @@ int main(int argc, char **argv, char * const *envp) {
     FloatABIForCalls = FloatABI::Soft;
 
   // Remote target execution doesn't handle EH or debug registration.
-  Options.JITExceptionHandling = EnableJITExceptionHandling;
   Options.JITEmitDebugInfo = EmitJitDebugInfo;
   Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
 
@@ -407,7 +406,7 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  PolyJIT *pjit = PolyJIT::Get(EE, Mod);
+  PolyJIT *pjit = PolyJIT::Get(EE, Mod.get());
   pjit->setEntryFunction(EntryFunc);
 
   // Run main.

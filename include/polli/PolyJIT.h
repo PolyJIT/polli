@@ -74,7 +74,7 @@ private:
       delete PolyJIT::Instance;
     }
   };
-  friend class Sentinel;
+  friend struct Sentinel;
 
   ExecutionEngine &EE;
   Module &M;
@@ -85,9 +85,6 @@ private:
   /* The module we create & manage during execution of the main module M. */
   ManagedModules Mods;
 
-  /* IR function declaration which gets mapped to our callback */
-  Function *PJITCallback;
-
   /* Link extracted Scops into a module for execution. */
   void linkJitableScops(ManagedModules &, Module &);
 
@@ -96,7 +93,6 @@ private:
   
   void extractJitableScops(Module &);
   void runPollyPreoptimizationPasses(Module &);
-
 };
 
 } // End llvm namespace

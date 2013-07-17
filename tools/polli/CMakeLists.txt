@@ -1,16 +1,21 @@
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
-  jit
-  mcjit
+  asmparser
+  bitreader
   codegen
   executionengine
   interpreter
-  nativecodegen
-  bitreader
-  asmparser
-  selectiondag
+  ipo
+  irreader
+  jit
+  mcjit
   native
-  support)
+  nativecodegen
+  selectiondag
+  support
+  transformutils
+  vectorize
+  )
 
 if( LLVM_USE_OPROFILE )
   set(LLVM_LINK_COMPONENTS
@@ -26,18 +31,14 @@ if( LLVM_USE_INTEL_JITEVENTS )
     )
 endif( LLVM_USE_INTEL_JITEVENTS )
 
+set(LLVM_USED_LIBS
+  PolyJIT
+  )
+
 add_polli_executable(polli
   polli.cpp
   RecordingMemoryManager.cpp
   RemoteTarget.cpp
   )
 
-target_link_libraries(polli
-  PolyJIT
-  ffi
-)
-
-add_dependencies(polli
-  PolyJIT
-  ffi
-  )
+target_link_libraries(polli PolyJIT)

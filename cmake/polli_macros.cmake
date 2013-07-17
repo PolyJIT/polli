@@ -56,13 +56,3 @@ macro(add_polli_library name)
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
 endmacro(add_polli_library)
-
-macro(add_polli_loadable_module name)
-  set(srcs ${ARGN})
-  add_polli_library(${name} ${srcs})
-  if (APPLE)
-    # Darwin-specific linker flags for loadable modules.
-    set_target_properties(${name} PROPERTIES
-      LINK_FLAGS "-Wl,-flat_namespace -Wl,-undefined -Wl,suppress")
-  endif()
-endmacro(add_polli_loadable_module)
