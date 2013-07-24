@@ -19,7 +19,6 @@
 #include "polly/RegisterPasses.h"
 #include "polly/LinkAllPasses.h"
 
-#include "polly/Support/SCEVValidator.h"
 #include "polly/PapiProfiling.h"
 
 #include "llvm/Analysis/Dominators.h"
@@ -65,35 +64,23 @@
 
 #include "llvm/Linker.h"
 
+#include "polli/NonAffineScopDetection.h"
+#include "polli/ScopMapper.h"
+#include "polli/Utils.h"
+
 #include <set>
 #include <map>
 
+using namespace polli;
+using namespace polly;
 using namespace llvm;
 using namespace llvm::sys::fs;
 
 namespace fs = llvm::sys::fs;
 namespace p  = llvm::sys::path;
 
-static cl::opt<bool>
-AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));
-
 namespace {
-// Statically register all Polly passes such that they are available after
-// loading Polly.
-static SmallVector<char, 255> DefaultDir;
-static void initializeOutputDir() {
-  SmallVector<char, 255> cwd;
-  fs::current_path(cwd);
-
-  p::append(cwd, "polli");
-  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), DefaultDir);
-  outs() << "DefaultDir = "
-         << StringRef(DefaultDir.data(), DefaultDir.size())
-         << "\n";
-};
-
 class StaticInitializer {
-
 public:
     StaticInitializer() {
       PassRegistry &Registry = *PassRegistry::getPassRegistry();
@@ -101,301 +88,8 @@ public:
       initializeOutputDir();
     }
 };
-} // end of anonymous namespace.
-
+}
 static StaticInitializer InitializeEverything;
-
-static void StoreModule(Module &M, const Twine &DirName, const Twine &Name) {
-  llvm::error_code err;
-  SmallVector<char, 255> destPath = DefaultDir;
-
-  std::string ErrorInfo;
-  PassManager PM;
-  OwningPtr<tool_output_file> Out;
-
-  M.setModuleIdentifier(Name.str());
-
-  p::append(destPath, Name);
-
-  std::string path = StringRef(destPath.data(), destPath.size()).str();
-  DEBUG(dbgs().indent(2) << "Storing: " << path << "\n");
-  Out.reset(new tool_output_file(path.c_str(), ErrorInfo,
-                                 raw_fd_ostream::F_Binary));
-  PM.add(new DataLayout(M.getDataLayout()));
-  PM.add(createPrintModulePass(&Out->os()));
-  PM.run(M);
-  Out->keep();
-}
-
-static void StoreModules(const StringRef DirName, std::set<Module *> Modules) {
-  for (std::set<Module *>::iterator
-       MI = Modules.begin(), ME = Modules.end(); MI != ME; ++MI) {
-    Module *M = *MI;
-    StoreModule(*M, DirName, M->getModuleIdentifier());
-  }
-}
-
-class NonAffineScopDetection : public FunctionPass {
-public:
-  static char ID;
-  explicit NonAffineScopDetection() : FunctionPass(ID) {}
-
-  typedef std::vector<const SCEV *> ParamList;
-  typedef std::map<const Region *, ParamList> ParamMap;
-  typedef ParamMap::iterator iterator;
-  typedef ParamMap::const_iterator const_iterator;
-
-  iterator begin()  { return RequiredParams.begin(); }
-  iterator end()    { return RequiredParams.end();   }
-
-  const_iterator begin() const { return RequiredParams.begin(); }
-  const_iterator end()   const { return RequiredParams.end();   }
-
-  /// @name FunctionPass interface
-  //@{
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<ScopDetection>();
-    AU.addRequired<ScalarEvolution>();
-    AU.addRequired<DominatorTree>();
-    AU.addRequired<RegionInfo>();
-    AU.setPreservesAll();
-  };
-
-  virtual void releaseMemory() {
-    RequiredParams.clear();
-  };
-
-  virtual bool runOnFunction(Function &F) {
-    SD = &getAnalysis<ScopDetection>();
-    SE = &getAnalysis<ScalarEvolution>();
-    DT = &getAnalysis<DominatorTree>();
-    RI = &getAnalysis<RegionInfo>();
-    M = F.getParent();
-
-    polly::RejectedLog rl = SD->getRejectedLog();
-    for (polly::RejectedLog::iterator
-         i = rl.begin(), ie = rl.end(); i != ie; ++i) {
-      const Region *R              = (*i).first;
-      std::vector<RejectInfo> rlog = (*i).second;
-      RequiredParams[R] = ParamList();
-
-      bool isValid = true;
-      for (unsigned j=0; j < rlog.size(); ++j) {
-        const SCEV *lhs = rlog[j].Failed_LHS;
-        const SCEV *rhs = rlog[j].Failed_RHS;
-        RejectKind kind = rlog[j].Reason;
-
-        // We do not handle these reject reasons here.
-        isValid &= (kind == NonAffineLoopBound ||
-                    kind == NonAffineCondition ||
-                    kind == NonAffineAccess);
-        if (!isValid) {
-          DEBUG(dbgs() << "[polli] reject reason was not related to affinity;"
-                       << " continuing.\n");
-          break;
-        }
-
-        ParamList params;
-        if (kind == NonAffineLoopBound) {
-          isValid &= polly::isNonAffineExpr(R, rhs, *SE);
-          params = getParamsInNonAffineExpr(R, rhs, *SE);
-          RequiredParams[R].insert(RequiredParams[R].end(),
-                                   params.begin(), params.end());
-        }
-
-        if (kind == NonAffineAccess || kind == NonAffineCondition) {
-          std::vector<const SCEV*> params;
-
-          isValid &= polly::isNonAffineExpr(R, lhs, *SE);
-          params = getParamsInNonAffineExpr(R, lhs, *SE);
-          RequiredParams[R].insert(RequiredParams[R].end(),
-                                   params.begin(), params.end());
-        }
-      }
-
-      if (isValid) {
-        DEBUG(dbgs() << "[polli] valid non affine SCoP! "
-               << R->getNameStr() << "\n");
-      } else {
-        DEBUG(dbgs() << "[polli] invalid non affine SCoP! "
-               << R->getNameStr() << "\n");
-      }
-    }
-
-    if (AnalyzeOnly)
-      print(dbgs(), F.getParent());
-
-    return true;
-  };
-
-  virtual void print(raw_ostream &OS, const Module *) const {
-    for (ParamMap::const_iterator r = RequiredParams.begin(),
-                                 RE = RequiredParams.end(); r != RE; ++r) {
-      const Region *R = r->first;
-      ParamList Params = r->second;
-
-      OS.indent(4) << R->getNameStr() << "(";
-      for (ParamList::iterator i = Params.begin(), e = Params.end();
-           i != e; ++i) {
-        (*i)->print(OS.indent(1));
-      }
-      OS << " )\n";
-    }
-  };
-  //@}
-private:
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  NonAffineScopDetection(const NonAffineScopDetection &);
-  // DO NOT IMPLEMENT
-  const NonAffineScopDetection &operator=(const NonAffineScopDetection &);
-
-  ScopDetection *SD;
-  ScalarEvolution *SE;
-  DominatorTree *DT;
-  RegionInfo *RI;
-
-  Module *M;
-
-  ParamMap RequiredParams;
-};
-char NonAffineScopDetection::ID = 0;
-
-struct ScopMapper : public FunctionPass {
-public:
-  typedef std::set<Function *> FunctionSet;
-  typedef FunctionSet::iterator iterator;
-
-  iterator begin() { return CreatedFunctions.begin(); }
-  iterator end() { return CreatedFunctions.end(); }
-
-  typedef std::set<Module *> ModuleSet;
-  typedef ModuleSet::iterator module_iterator;
-
-  module_iterator modules_begin() { return CreatedModules.begin(); }
-  module_iterator modules_end() { return CreatedModules.end(); }
-
-  static char ID;
-  explicit ScopMapper() : FunctionPass(ID) {}
-  /// @name FunctionPass interface
-  //@{
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<NonAffineScopDetection>();
-    AU.addRequired<DominatorTree>();
-    AU.addRequired<RegionInfo>();
-    AU.setPreservesAll();
-  };
-
-  virtual void releaseMemory() {};
-
-  void moveFunctionIntoModule(Function *F, Module *Dest) {
-    /* Create a new function for cloning, based on the properties
-     * of our source function, but set linkage to external. */
-    Function *NewF = Function::Create(F->getFunctionType(),
-                                      F->getLinkage(),
-                                      F->getName(),
-                                      Dest);
-    NewF->copyAttributesFrom(F);
-
-    /* Copy function body ExtractedF over to ClonedF */
-    Function::arg_iterator NewArg = NewF->arg_begin();
-    for (Function::const_arg_iterator
-         Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
-      NewArg->setName(Arg->getName());
-      VMap[Arg] = NewArg++;
-    }
-
-    SmallVector<ReturnInst*, 8> Returns;
-    CloneFunctionInto(NewF, F, VMap,/* ModuleLevelChanges=*/false, Returns);
-
-    // No need for the mapping anymore.
-    for (Function::const_arg_iterator
-         Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
-      VMap.erase(Arg);
-    }
-
-    VMap[F] = NewF;
-  };
-
-  virtual bool runOnFunction(Function &F) {
-    NSD = &getAnalysis<NonAffineScopDetection>();
-    DT  = &getAnalysis<DominatorTree>();
-    RI  = &getAnalysis<RegionInfo>();
-
-    if (CreatedFunctions.count(&F))
-      return false;
-
-    /* Prepare a fresh module for this function. */
-    //LLVMContext &NewContext = *(new LLVMContext());
-    Module *M, *NewM;
-    M = F.getParent();
-
-    /* Copy properties of our source module */
-    NewM = new Module(M->getModuleIdentifier(), M->getContext());
-    //NewM = new Module(M->getModuleIdentifier(), NewContext);
-    NewM->setTargetTriple(M->getTargetTriple());
-    NewM->setDataLayout(M->getDataLayout());
-    NewM->setMaterializer(M->getMaterializer());
-    NewM->setModuleIdentifier(
-      (M->getModuleIdentifier() + "." + F.getName()).str());
-
-    /* Extract each SCoP in this function into a new one. */
-    CodeExtractor *Extractor;
-    for (NonAffineScopDetection::iterator RP = NSD->begin(), RE = NSD->end();
-         RP != RE; ++RP) {
-      const Region *R = RP->first;
-
-      Extractor = new CodeExtractor(*DT, *R);
-      Function *ExtractedF = Extractor->extractCodeRegion();
-
-      if (ExtractedF) {
-        ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
-        moveFunctionIntoModule(ExtractedF, NewM);
-
-        /* FIXME: Do not depend on this set. */
-        CreatedFunctions.insert(ExtractedF);
-        DEBUG(
-        if (verifyFunction(*ExtractedF))
-          report_fatal_error("Oops: verifyFunction failed")
-        );
-      }
-
-      delete Extractor;
-    }
-
-    DEBUG(StoreModule(*NewM,
-                      StringRef(DefaultDir.data(), DefaultDir.size()),
-                      M->getModuleIdentifier() + "." + F.getName()));
-
-    /* Keep track for the linker after cleaning the cloned functions. */
-    CreatedModules.insert(NewM);
-
-    return true;
-  };
-
-  virtual void print(raw_ostream &OS, const Module *) const {
-
-  };
-  //@}
-private:
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  ScopMapper(const ScopMapper&);
-  // DO NOT IMPLEMENT
-  const ScopMapper &operator=(const ScopMapper &);
-
-  ValueToValueMapTy VMap;
-  
-  NonAffineScopDetection *NSD;
-  DominatorTree *DT;
-  RegionInfo *RI;
-
-  Module *M;
-  FunctionSet CreatedFunctions;
-  ModuleSet CreatedModules;
-};
-
-char ScopMapper::ID = 0;
 
 template <class StorageT, class TypeT>
 struct RTParam {
@@ -659,8 +353,7 @@ public:
     Function *SpecF = cloneFunctionIntoModule(F, NewM);
 
     // TODO: 2. Substitute parameter values in the new function.
-    DEBUG(StoreModule(*NewM, StringRef(DefaultDir.data(), DefaultDir.size()),
-                                       NewM->getModuleIdentifier()));
+    DEBUG(StoreModule(*NewM, NewM->getModuleIdentifier()));
 
     return SpecF;
   };
@@ -689,7 +382,8 @@ public:
 
 static FunctionDispatcher *Disp = new FunctionDispatcher();
 
-void pjit_callback(const char *fName, unsigned paramc,
+extern "C" {
+static void pjit_callback(const char *fName, unsigned paramc,
                    void** params) {
   /* Let's hope that we have called it before ;-)
    * Otherwise it will blow up. FIXME: Don't blow up. */
@@ -717,6 +411,7 @@ void pjit_callback(const char *fName, unsigned paramc,
 
   GenericValue Ret = EE->runFunction(NewF, ArgValues);
 };
+}
 
 class ScopDetectionResultsViewer : public FunctionPass {
   //===--------------------------------------------------------------------===//
@@ -781,6 +476,7 @@ public:
 
 char ScopDetectionResultsViewer::ID = 0;
 
+namespace llvm {
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   outs() << "[polli] Phase III: Injecting call to JIT\n";
   LLVMContext &Ctx = M.getContext();
@@ -917,14 +613,12 @@ void PolyJIT::extractJitableScops(Module &M) {
   FPM->doFinalization();
   delete FPM;
 
-  StringRef OutDir = StringRef(DefaultDir.data(), DefaultDir.size());
-  StoreModule(M, OutDir, M.getModuleIdentifier() + ".extr");
+  StoreModule(M, M.getModuleIdentifier() + ".extr");
 };
 
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char * const *envp) {
   Function *Main = M.getFunction(EntryFn);
-  StringRef OutDir = StringRef(DefaultDir.data(), DefaultDir.size());
 
   if (!Main) {
     errs() << '\'' << EntryFn << "\' function not found in module.\n";
@@ -947,13 +641,13 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   instrumentScops(M, Mods);
 
   /* Store temporary files */
-  StoreModules(OutDir, Mods);
+  StoreModules(Mods);
 
   /* Get the Scops back */
   linkJitableScops(Mods, M);
 
   /* Store module before execution */
-  StoreModule(M, OutDir, M.getModuleIdentifier() + ".final");
+  StoreModule(M, M.getModuleIdentifier() + ".final");
 
   /* Add a mapping to our JIT callback function. */
   return EE.runFunctionAsMain(Main, inputArgs, envp);
@@ -1010,3 +704,4 @@ PolyJIT* PolyJIT::Get(ExecutionEngine *EE, Module *M) {
   }
   return Instance; 
 };
+} // end of llvm namespace

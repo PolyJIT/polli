@@ -29,7 +29,10 @@ set(LLVM_USED_LIBS
   )
 
 add_polli_library(PolyJIT
+  NonAffineScopDetection.cpp
   PolyJIT.cpp
+  ScopMapper.cpp
+  Utils.cpp
   )
 
 add_dependencies(PolyJIT

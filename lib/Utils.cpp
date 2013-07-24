@@ -1,0 +1,62 @@
+//===-- Utils.h -------------------------------------------------*- C++ -*-===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+//
+//===----------------------------------------------------------------------===//
+#define DEBUG_TYPE "polyjit"
+#include "llvm/Support/Debug.h"
+
+#include "llvm/ADT/Twine.h"
+#include "llvm/ADT/StringRef.h"
+
+#include "polli/Utils.h"
+using namespace llvm;
+
+static SmallVector<char, 255> DefaultDir;
+
+void initializeOutputDir() {
+  SmallVector<char, 255> cwd;
+  fs::current_path(cwd);
+
+  p::append(cwd, "polli");
+  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), DefaultDir);
+  outs() << "DefaultDir = "
+         << StringRef(DefaultDir.data(), DefaultDir.size())
+         << "\n";
+}
+
+void StoreModule(Module &M, const Twine &Name) {
+  llvm::error_code err;
+  SmallVector<char, 255> destPath = DefaultDir;
+
+  std::string ErrorInfo;
+  PassManager PM;
+  OwningPtr<tool_output_file> Out;
+
+  M.setModuleIdentifier(Name.str());
+
+  p::append(destPath, Name);
+
+  std::string path = StringRef(destPath.data(), destPath.size()).str();
+  DEBUG(dbgs().indent(2) << "Storing: " << path << "\n");
+  Out.reset(new tool_output_file(path.c_str(), ErrorInfo,
+                                 raw_fd_ostream::F_Binary));
+  PM.add(new DataLayout(M.getDataLayout()));
+  PM.add(createPrintModulePass(&Out->os()));
+  PM.run(M);
+  Out->keep();
+}
+
+void StoreModules(std::set<Module *> Modules) {
+  for (std::set<Module *>::iterator
+       MI = Modules.begin(), ME = Modules.end(); MI != ME; ++MI) {
+    Module *M = *MI;
+    StoreModule(*M, M->getModuleIdentifier());
+  }
+}
