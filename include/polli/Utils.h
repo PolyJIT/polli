@@ -32,6 +32,8 @@ using namespace llvm::sys::fs;
 namespace fs = llvm::sys::fs;
 namespace p  = llvm::sys::path;
 
+extern SmallVector<char, 255> *DefaultDir;
+
 void initializeOutputDir();
 void StoreModule(Module &M, const Twine &Name);
 void StoreModules(std::set<Module *> Modules);

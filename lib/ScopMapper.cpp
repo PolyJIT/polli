@@ -36,8 +36,6 @@ using namespace llvm;
 using namespace polli;
 using namespace polly;
 
-extern SmallVector<char, 255> DefaultDir;
-
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<NonAffineScopDetection>();
   AU.addRequired<DominatorTree>();
@@ -76,25 +74,22 @@ void ScopMapper::moveFunctionIntoModule(Function *F, Module *Dest) {
 
 bool ScopMapper::runOnFunction(Function &F) {
   DominatorTree *DT  = &getAnalysis<DominatorTree>();
-  RegionInfo *RI = &getAnalysis<RegionInfo>();
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
 
   if (CreatedFunctions.count(&F))
     return false;
 
   /* Prepare a fresh module for this function. */
-  //LLVMContext &NewContext = *(new LLVMContext());
   Module *M, *NewM;
   M = F.getParent();
 
   /* Copy properties of our source module */
   NewM = new Module(M->getModuleIdentifier(), M->getContext());
-  //NewM = new Module(M->getModuleIdentifier(), NewContext);
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
   NewM->setMaterializer(M->getMaterializer());
   NewM->setModuleIdentifier(
-    (M->getModuleIdentifieR() + "." + F.getName()).str());
+    (M->getModuleIdentifier() + "." + F.getName()).str());
 
   /* Extract each SCoP in this function into a new one. */
   CodeExtractor *Extractor;
@@ -107,14 +102,16 @@ bool ScopMapper::runOnFunction(Function &F) {
 
     if (ExtractedF) {
       ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
-      moveFunctionIntoModule(ExtractedF, NewM);
+
+      DefaultFunctionCloner Cloner(VMap, NewM); 
+      Cloner.setSource(ExtractedF);
+      
+      InstrumentingFunctionCloner InstCloner(VMap);
+      InstCloner.setSource(Cloner.start());
+      InstCloner.start(); 
 
       /* FIXME: Do not depend on this set. */
       CreatedFunctions.insert(ExtractedF);
-      DEBUG(
-      if (verifyFunction(*ExtractedF))
-        report_fatal_error("Oops: verifyFunction failed")
-      );
     }
 
     delete Extractor;

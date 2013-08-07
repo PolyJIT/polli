@@ -37,6 +37,8 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
   RI = &getAnalysis<RegionInfo>();
   M = F.getParent();
 
+  DEBUG(dbgs() << "[polli] Running on: " << F.getName() << "\n");
+
   polly::RejectedLog rl = SD->getRejectedLog();
   for (polly::RejectedLog::iterator
        i = rl.begin(), ie = rl.end(); i != ie; ++i) {
@@ -78,13 +80,12 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
       }
     }
 
-    if (isValid) {
+    if (isValid)
       DEBUG(dbgs() << "[polli] valid non affine SCoP! "
-             << R->getNameStr() << "\n");
-    } else {
+                   << R->getNameStr() << "\n");
+    else
       DEBUG(dbgs() << "[polli] invalid non affine SCoP! "
-             << R->getNameStr() << "\n");
-    }
+                   << R->getNameStr() << "\n");
   }
 
   if (AnalyzeOnly)

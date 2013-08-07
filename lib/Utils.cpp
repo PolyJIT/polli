@@ -18,22 +18,23 @@
 #include "polli/Utils.h"
 using namespace llvm;
 
-static SmallVector<char, 255> DefaultDir;
+SmallVector<char, 255> *DefaultDir; 
 
 void initializeOutputDir() {
+  DefaultDir = new SmallVector<char, 255>();
   SmallVector<char, 255> cwd;
   fs::current_path(cwd);
 
   p::append(cwd, "polli");
-  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), DefaultDir);
+  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
   outs() << "DefaultDir = "
-         << StringRef(DefaultDir.data(), DefaultDir.size())
+         << StringRef(DefaultDir->data(), DefaultDir->size())
          << "\n";
 }
 
 void StoreModule(Module &M, const Twine &Name) {
   llvm::error_code err;
-  SmallVector<char, 255> destPath = DefaultDir;
+  SmallVector<char, 255> destPath = *DefaultDir;
 
   std::string ErrorInfo;
   PassManager PM;

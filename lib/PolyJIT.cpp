@@ -64,6 +64,7 @@
 
 #include "llvm/Linker.h"
 
+#include "polli/FunctionDispatcher.h"
 #include "polli/NonAffineScopDetection.h"
 #include "polli/ScopMapper.h"
 #include "polli/Utils.h"
@@ -90,296 +91,6 @@ public:
 };
 }
 static StaticInitializer InitializeEverything;
-
-template <class StorageT, class TypeT>
-struct RTParam {
-  explicit RTParam(StorageT val, TypeT *type, const StringRef name = "_") {
-    Value = val;
-    Type = type;
-    Name = name;
-  }
-
-  bool operator<(RTParam const& rhs)       { return Value < rhs.Value; }
-  bool operator<(RTParam const& rhs) const { return Value < rhs.Value; }
-
-  bool operator>(RTParam const& rhs)       { return Value > rhs.Value; }
-  bool operator>(RTParam const& rhs) const { return Value > rhs.Value; }
-
-  void print(raw_ostream &out) const {
-    Type->print(out);
-    out << " " << Name << " = " << Value;
-  }
-
-private:
-  StorageT Value;
-  TypeT *Type;
-  StringRef Name;
-};
-
-template <class StorageT, class TypeT> 
-raw_ostream& operator<< (raw_ostream &out,
-                         const RTParam<StorageT, TypeT> &p) {
-  p.print(out);
-  return out;
-};
-
-/* Specialize to APInt. We do not have a proper lt operator there. */
-template <class TypeT>
-struct RTParam<APInt, TypeT> {
-  explicit RTParam(APInt val, TypeT *type, const StringRef name = "_") {
-    Value = val;
-    Type = type;
-    Name = name;
-  }
-
-  bool operator<(RTParam<APInt, TypeT> const& rhs) {
-    return Value.ult(rhs.Value);
-  }
-
-  bool operator<(RTParam<APInt, TypeT> const& rhs) const {
-    return Value.ult(rhs.Value);
-  }
-
-  bool operator>(RTParam<APInt, TypeT> const& rhs) {
-    return Value.ugt(rhs.Value);
-  }
-
-  bool operator>(RTParam<APInt, TypeT> const& rhs) const {
-    return Value.ugt(rhs.Value);
-  }
-  
-  void print(raw_ostream &out) const {
-    Type->print(out);
-    out << " " << Name << " = " << Value;
-  }
-private:
-  APInt Value;
-  TypeT *Type;
-  StringRef Name;
-};
-
-template <class RTParam>
-struct ParamVector {
-  /* Convert a std::vector of RTParams to a ParamArray. */
-  ParamVector(std::vector<RTParam> const& ParamVector) {
-    Params = ParamVector;
-  };
-
-  typedef typename std::vector<RTParam>::iterator iterator;
-  typedef typename std::vector<RTParam>::const_iterator const_iterator;
-
-  iterator begin() { return Params.begin(); };
-  iterator end() { return Params.end(); };
-
-  const_iterator begin() const { return Params.cbegin(); };
-  const_iterator end() const { return Params.cend(); };
-  
-  inline size_t size() const { return Params.size(); };
-
-  RTParam &operator[](unsigned const& index) {
-    return Params[index];
-  };
- 
-  const RTParam &operator[](unsigned const& index) const {
-    return Params[index];
-  };
-
-  bool operator< (ParamVector<RTParam> const& rhs) {
-    bool isLess = false;
-    bool isGrtr = false;
-    unsigned i = 0;
-    unsigned n = Params.size();
-    
-    do {
-      isLess = Params[i] < rhs[i];
-      isGrtr = Params[i] > rhs[i];
-      ++i;
-    } while ((isLess || !isGrtr) && (i < n));
-
-    return isLess;
-  }
-  
-  bool operator< (ParamVector<RTParam> const& rhs) const {
-    bool isLess = false;
-    bool isGrtr = false;
-    unsigned i = 0;
-    unsigned n = Params.size();
-    
-    do {
-      isLess = Params[i] < rhs[i];
-      isGrtr = Params[i] > rhs[i];
-      ++i;
-    } while ((isLess || !isGrtr) && (i < n));
-
-    return isLess;
-  }
- 
-private:
-  std::vector<RTParam> Params;
-};
-
-template <class RTParam> 
-raw_ostream& operator<< (raw_ostream &out,
-                         const ParamVector<RTParam> &Params) {
-  out << "[";
-  for (size_t i=0; i < Params.size(); ++i) {
-    out << Params[i];
-  }
-
-  out << "]";
-  return out;
-};
-
-/* For now we only deal with APInt storage of IntegerType parameter values. */
-typedef RTParam<APInt, IntegerType> RuntimeParam;
-typedef std::vector<RuntimeParam> RTParams;
-
-/* The ParamVector is our key for indexing specialized functions at runtime. */
-typedef ParamVector<RuntimeParam> RTParValuesKey;
-
-/* ValToFun Relation: { [Parameter values] -> [Specialized Function] } */
-typedef std::map<RTParValuesKey, Function *> ValKeyToFunction;
-
-/* Specialize Relation: { [SrcFun] -> [ValToFun] } */ 
-typedef std::map<Function *, ValKeyToFunction> SpecializedFuncs;
-
-static inline
-void printParameters(const Function *F, RTParams &Params) {
-  dbgs() << "[" << F->getName() << "] Argument-Value Table:\n";
-
-  dbgs() << "{\n";
-  for (RTParams::iterator P = Params.begin(), PE = Params.end(); P != PE; ++P) {
-    dbgs() << *P << "\n";
-  
-  }
-  dbgs() << "}\n";
-};
-
-RTParams getRuntimeParameters(Function *F, unsigned paramc,
-                              void** params) {
-  RTParams RuntimeParams;
-  int i = 0;
-  for (Function::arg_iterator Arg = F->arg_begin(), ArgE= F->arg_end();
-       Arg != ArgE; ++Arg, ++i) {
-    Type *ArgTy = Arg->getType();
-
-    /* TODO: Add more types to be suitable for spawning new functions. */
-    if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
-      APInt val = APInt(IntTy->getBitWidth(),
-                        (uint64_t)(*(uint64_t *)params[i]),
-                        IntTy->getSignBit());
-      RuntimeParams.push_back(RuntimeParam(val, IntTy, Arg->getName()));
-    }
-  }
-
-  return RuntimeParams;
-}
-
-//===----------------------------------------------------------------------===//
-/// @brief Implement a function dispatch to reroute calls to parametrized
-/// functions to their possible specializations.
-class FunctionDispatcher {
-  FunctionDispatcher (const FunctionDispatcher &)
-    LLVM_DELETED_FUNCTION;
-  const FunctionDispatcher &operator=(const FunctionDispatcher &)
-    LLVM_DELETED_FUNCTION;
-
-  /// @brief Maps source Functions to specialized functions,
-  //         based on the input parameters.
-  SpecializedFuncs SpecFuns;
-
-  /// @brief Store all specialized modules.
-  //         We want to store each specialized functions in a separate module.
-  //         TODO: Maybe we will need a mapping from Source Function
-  //               to all modules of it's specializations.
-  std::vector<Module *> SpecializedModules;
-public:
-  explicit FunctionDispatcher() {};
- 
-  /// @brief Use LLVM's Cloning utilities to create a copy of a source function
-  //         in a new module. 
-  Function *cloneFunctionIntoModule(Function *F, Module *Dest) {
-    /* Create a new function for cloning, based on the properties
-     * of our source function, but set linkage to external. */
-    Function *NewF = Function::Create(F->getFunctionType(),
-                                      F->getLinkage(),
-                                      F->getName(),
-                                      Dest);
-    NewF->copyAttributesFrom(F);
-
-    /* Copy function body ExtractedF over to ClonedF */
-    ValueToValueMapTy VMap;
-    VMap[F] = NewF;
-    
-    Function::arg_iterator NewArg = NewF->arg_begin();
-    for (Function::const_arg_iterator
-         Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
-      NewArg->setName(Arg->getName());
-      VMap[Arg] = NewArg++;
-    }
-
-    SmallVector<ReturnInst*, 8> Returns;
-    CloneFunctionInto(NewF, F, VMap,/* ModuleLevelChanges=*/false, Returns);
-
-    // No need for the mapping anymore. TODO: Think about that more.
-    for (Function::const_arg_iterator
-         Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
-      VMap.erase(Arg);
-    }
-
-    return NewF;
-  };
-
-  template<class ParamT>
-  Function *specialize(Function *F,
-                       ParamVector<ParamT> &Values) {
-    Module *M     = F->getParent();
-    Module *NewM;
-
-    // 0. Prepare a new module to host the specialized function
-    
-    NewM = new Module(M->getModuleIdentifier(), M->getContext());
-    NewM->setTargetTriple(M->getTargetTriple());
-    NewM->setDataLayout(M->getDataLayout());
-    NewM->setMaterializer(M->getMaterializer());
-
-    // TODO: Set this to the specialized functions name:
-    //       F->getName() + "_param1_param2_..._paramn
-    NewM->setModuleIdentifier(("spec-" + M->getModuleIdentifier() +
-                               "." + F->getName()).str());
-    
-    // 1. Create a clone of F in the new Module.
-    //    FIXME: One copy of SpecF remains in NewM
-    Function *SpecF = cloneFunctionIntoModule(F, NewM);
-
-    // TODO: 2. Substitute parameter values in the new function.
-    DEBUG(StoreModule(*NewM, NewM->getModuleIdentifier()));
-
-    return SpecF;
-  };
-
-  template<class ParamT>
-  Function *getFunctionForValues(Function *F,
-                                 ParamVector<ParamT> &Values) {
-    if (!SpecFuns.count(F))
-      SpecFuns[F] = ValKeyToFunction();
-    
-    ValKeyToFunction ValToFun = SpecFuns[F];
-    
-    /* TODO: We need to be a bit more smart than: Specialize everything. */
-    if (!ValToFun.count(Values)) {
-      ValToFun[Values] = specialize(F, Values);
-    }
-      
-    outs() << "\nSrcF:   " << F->getName()
-           << "\nParams: " << Values
-           << "\nDestF:  " << ValToFun[Values]->getName()
-           << "\n";;
-
-    return ValToFun[Values];
-  };
-};
-
 static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
@@ -396,7 +107,7 @@ static void pjit_callback(const char *fName, unsigned paramc,
   Function *F = M.getFunction(fName);
 
   if (!F)
-    llvm_unreachable("Function not in this module. It must be there!");
+    llvm_unreachable("Function not in this module. It has to be there!");
 
   RTParams RuntimeParams = getRuntimeParameters(F, paramc, params);  
   ParamVector<RuntimeParam> PArr = RuntimeParams;
@@ -407,9 +118,10 @@ static void pjit_callback(const char *fName, unsigned paramc,
     ArgValues[i] = PTOGV(params[i]);
 
   Function *NewF = Disp->getFunctionForValues(F, PArr);
-  ExecutionEngine *EE = JIT->GetEngine();
 
-  GenericValue Ret = EE->runFunction(NewF, ArgValues);
+  DEBUG(dbgs() << "Dispatching to: " << NewF->getName());
+  //ExecutionEngine *EE = JIT->GetEngine();
+  //GenericValue Ret = EE->runFunction(NewF, ArgValues);
 };
 }
 
@@ -456,6 +168,7 @@ public:
             rlog[n].Failed_LHS->print(outs());
             outs() << "\n";
           }
+
           if (rlog[n].Failed_RHS) {
             outs() << "                 ";
             rlog[n].Failed_RHS->print(outs());
@@ -500,6 +213,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
     EE.addGlobalMapping(PJITCB, (void *)&pjit_callback);
 
     std::vector<Value *> Args(3);
+
     /* Inject call to callback declaration into every function */
     for (Module::iterator
          F = ScopM->begin(), FE = ScopM->end(); F != FE; ++F) {
@@ -584,7 +298,6 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   /* Add ScopDetection, ResultsViewer and NonAffineScopDetection */
   FPM->add(SD);
-  DEBUG(FPM->add(new ScopDetectionResultsViewer()));
   FPM->add(NaSD);
   FPM->add(SM);
 
@@ -638,7 +351,7 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   extractJitableScops(M);
 
   /* Instrument extracted Scops with a callback */
-  instrumentScops(M, Mods);
+//  instrumentScops(M, Mods);
 
   /* Store temporary files */
   StoreModules(Mods);
