@@ -45,7 +45,7 @@ void StoreModule(Module &M, const Twine &Name) {
   p::append(destPath, Name);
 
   std::string path = StringRef(destPath.data(), destPath.size()).str();
-  DEBUG(dbgs().indent(2) << "Storing: " << path << "\n");
+  DEBUG(dbgs().indent(2) << "Storing: " << M.getModuleIdentifier() << "\n");
   Out.reset(new tool_output_file(path.c_str(), ErrorInfo,
                                  raw_fd_ostream::F_Binary));
   PM.add(new DataLayout(M.getDataLayout()));

@@ -43,35 +43,6 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
 };
 
-void ScopMapper::moveFunctionIntoModule(Function *F, Module *Dest) {
-  /* Create a new function for cloning, based on the properties
-   * of our source function, but set linkage to external. */
-  Function *NewF = Function::Create(F->getFunctionType(),
-                                    F->getLinkage(),
-                                    F->getName(),
-                                    Dest);
-  NewF->copyAttributesFrom(F);
-
-  /* Copy function body ExtractedF over to ClonedF */
-  Function::arg_iterator NewArg = NewF->arg_begin();
-  for (Function::const_arg_iterator
-       Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
-    NewArg->setName(Arg->getName());
-    VMap[Arg] = NewArg++;
-  }
-
-  SmallVector<ReturnInst*, 8> Returns;
-  CloneFunctionInto(NewF, F, VMap,/* ModuleLevelChanges=*/false, Returns);
-
-  // No need for the mapping anymore.
-  for (Function::const_arg_iterator
-       Arg = F->arg_begin(), AE = F->arg_end(); Arg != AE; ++Arg) {
-    VMap.erase(Arg);
-  }
-
-  VMap[F] = NewF;
-};
-
 bool ScopMapper::runOnFunction(Function &F) {
   DominatorTree *DT  = &getAnalysis<DominatorTree>();
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
@@ -79,20 +50,9 @@ bool ScopMapper::runOnFunction(Function &F) {
   if (CreatedFunctions.count(&F))
     return false;
 
-  /* Prepare a fresh module for this function. */
-  Module *M, *NewM;
-  M = F.getParent();
-
-  /* Copy properties of our source module */
-  NewM = new Module(M->getModuleIdentifier(), M->getContext());
-  NewM->setTargetTriple(M->getTargetTriple());
-  NewM->setDataLayout(M->getDataLayout());
-  NewM->setMaterializer(M->getMaterializer());
-  NewM->setModuleIdentifier(
-    (M->getModuleIdentifier() + "." + F.getName()).str());
-
   /* Extract each SCoP in this function into a new one. */
   CodeExtractor *Extractor;
+  int i=0;
   for (NonAffineScopDetection::iterator RP = NSD->begin(), RE = NSD->end();
        RP != RE; ++RP) {
     const Region *R = RP->first;
@@ -102,25 +62,12 @@ bool ScopMapper::runOnFunction(Function &F) {
 
     if (ExtractedF) {
       ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
-
-      DefaultFunctionCloner Cloner(VMap, NewM); 
-      Cloner.setSource(ExtractedF);
-      
-      InstrumentingFunctionCloner InstCloner(VMap);
-      InstCloner.setSource(Cloner.start());
-      InstCloner.start(); 
-
+      ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
       /* FIXME: Do not depend on this set. */
       CreatedFunctions.insert(ExtractedF);
     }
-
     delete Extractor;
   }
-
-  DEBUG(StoreModule(*NewM, M->getModuleIdentifier() + "." + F.getName()));
-
-  /* Keep track for the linker after cleaning the cloned functions. */
-  CreatedModules.insert(NewM);
 
   return true;
 };
