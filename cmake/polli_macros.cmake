@@ -15,8 +15,11 @@ macro(add_polli_library name)
     list( GET split_path -1 dir)
     file( GLOB_RECURSE headers
       ../../include/polli${dir}/*.h)
-    set(srcs ${srcs} ${headers})
+    file( GLOB_RECURSE headers ../include/polli/*.h)
   endif(MSVC_IDE OR XCODE)
+
+  file( GLOB_RECURSE headers ../include/polli/*.h)
+  set(srcs ${srcs} ${headers})
   if (MODULE)
     set(libkind MODULE)
   elseif (SHARED_LIBRARY)
