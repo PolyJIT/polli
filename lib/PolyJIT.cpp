@@ -207,7 +207,6 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   IRBuilder<> Builder(Ctx);
 
   PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
-
   StringRef cbName = StringRef("polli.enter.runtime");
 
   /* Insert callback declaration & call into each extracted module */
@@ -260,7 +259,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
         /* Allocate a slot on the stack for the i'th argument and store it */
         Value *Slot   = Builder.CreateAlloca(Arg->getType(), One,
                                              "params." + Twine(i));
-        Builder.CreateAlignedStore(Arg, Slot, 4);
+        Builder.CreateStore(Arg, Slot);
 
         /* Bitcast the allocated stack slot to i8* */
         Value *Slot8 = Builder.CreateBitCast(Slot, Type::getInt8PtrTy(Ctx),
@@ -270,7 +269,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
          * the stack slot in form of a i8*. */
         Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
         Value *Dest   = Builder.CreateGEP(Params, ArrIdx, "p." + Twine(i));
-        Builder.CreateAlignedStore(Slot8, Dest, 8);
+        Builder.CreateStore(Slot8, Dest);
 
         i++;
       }

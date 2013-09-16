@@ -293,73 +293,48 @@ struct MainCreator {
     BasicBlock *EntryBB = BasicBlock::Create(Context, "entry.param", TgtF);
     Builder.SetInsertPoint(EntryBB);
 
-    Module *M = TgtF->getParent();
-    std::vector<Type *> PrintfArgs(1);
-    PrintfArgs[0] = PointerType::getInt8PtrTy(Context);
-    Function *PrintF = cast<Function>(M->getOrInsertFunction("printf",
-        FunctionType::get(Type::getVoidTy(Context),
-                          PrintfArgs, /*isVarArg=*/true)));
-
-    {
-        std::vector<Value *> PrintfArgs(3);
-        Value *FormatStr = Builder.CreateGlobalStringPtr("[ %d ] Loading from memory %d.\n");
-
-        PrintfArgs[0] = FormatStr;
-        PrintfArgs[1] = ConstantInt::get(IntegerType::getInt32Ty(Context), 0);
-        PrintfArgs[2] = ConstantInt::get(IntegerType::getInt32Ty(Context), 0);
-
-        Builder.CreateCall(PrintF, PrintfArgs);
-    }
-
     // 2nd argument is our array, 1st is argc
-    Value *ParamArr = Builder.CreateLoad(++TgtF->arg_begin());
+    Value *One    = ConstantInt::get(Type::getInt32Ty(Context), 1);
     Function::const_arg_iterator Arg = SrcF->arg_begin();
 
     Argument *ArgC = TgtF->arg_begin();
     Argument *ArgV = ++TgtF->arg_begin();
+
     ArgC->setName("argc");
     ArgV->setName("argv");
 
+    Value *StArgC = Builder.CreateAlloca(ArgC->getType(), One,
+                                         ArgC->getName() + ".addr");
+    Value *StArgV = Builder.CreateAlloca(ArgV->getType(), One,
+                                         ArgV->getName() + ".addr");
+
+    Builder.CreateStore(ArgC, StArgC);
+    Builder.CreateStore(ArgV, StArgV);
+
+    // Unpack params. Allocate space on the stack and store the pointers.
+    // This is very inefficient, because some parameters are not required
+    // anymore.
     for (unsigned i = 0; i < SrcF->arg_size(); ++i) {
-        std::vector<Value *> PrintfArgs(3);
-        Value *FormatStr = Builder.CreateGlobalStringPtr("[ %d ] Loading from memory %d.\n");
+        Constant *ParamIdx = ConstantInt::get(Type::getInt32Ty(Context), i);
 
-        PrintfArgs[0] = FormatStr;
-        PrintfArgs[1] = ConstantInt::get(IntegerType::getInt32Ty(Context), i);
-        PrintfArgs[2] = ConstantInt::get(IntegerType::getInt32Ty(Context), i);
+        Value *LoadPtr = Builder.CreateLoad(StArgV);
+        Value *ArrIdx  = Builder.CreateGEP(LoadPtr, ParamIdx, "arrayidx");
+        Value *LoadVal = Builder.CreateLoad(ArrIdx);
 
-        Builder.CreateCall(PrintF, PrintfArgs);
+        Type  *ArgTy = Arg->getType();
+        Value *CastVal = Builder.CreateBitCast(LoadVal,
+                                               ArgTy->getPointerTo());
+        Value *LoadPtrVal = Builder.CreateLoad(CastVal);
+        Value *ParamVal = Builder.CreateAlloca(ArgTy, One);
 
-        Value *NewArg = Builder.CreateLoad(Builder.CreateExtractValue(ParamArr, i));
-        Type *ArgTy = Arg->getType();
-
-        if (CastInst::isCastable(NewArg->getType(), ArgTy)) {
-            Instruction::CastOps opCode =
-                CastInst::getCastOpcode(NewArg, /*srcIsSigned=*/true,
-                                        ArgTy, /*dstIsSigned=*/true);
-
-            NewArg = Builder.CreateCast(opCode, NewArg, ArgTy);
-        }
-
-        FormatStr = Builder.CreateGlobalStringPtr("[ %d ] = %d\n");
-
-        PrintfArgs[0] = FormatStr;
-        PrintfArgs[1] = ConstantInt::get(IntegerType::getInt32Ty(Context), i);
-        PrintfArgs[2] = NewArg;
-
-        Builder.CreateCall(PrintF, PrintfArgs);
-
-
-        VMap[Arg++] = NewArg;
+        Builder.CreateStore(LoadPtrVal, ParamVal);
+        VMap[Arg++] = Builder.CreateLoad(ParamVal);
     }
   }
 
   static Function *Create(Function *SrcF, Module *TgtM) {
     LLVMContext &Context = TgtM->getContext();
-    //PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context), 0);
-    Type *PtoArr = PointerType::getUnqual(ArrayType::get(Type::getInt8PtrTy(Context),
-                                       SrcF->arg_size()));
-
+    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context), 0);
     Function *F = cast<Function>(TgtM->getOrInsertFunction(
                                    SrcF->getName(), SrcF->getReturnType(),
                                    Type::getInt32Ty(Context), PtoArr, NULL));
@@ -441,24 +416,25 @@ public:
   template<class ParamT>
   Function *getFunctionForValues(Function *F,
                                  ParamVector<ParamT> &Values) {
+    ValKeyToFunction ValToFun;
     if (!SpecFuns.count(F))
-      SpecFuns[F] = ValKeyToFunction();
-
-    ValKeyToFunction ValToFun = SpecFuns[F];
+      ValToFun = ValKeyToFunction();
+    else
+      ValToFun = SpecFuns[F];
 
     /* TODO: We need to be a bit more smart than: Specialize everything. */
+    outs() << "[polli] ";
     if (!ValToFun.count(Values)) {
+      outs() << "(new) ";
       ValToFun[Values] = specialize(F, Values);
+    } else {
+      outs() << "(cached) ";
     }
 
     Function *SpecF = ValToFun[Values];
-    outs() << "[polli] Source function:   " << F->getName()
-           << " Params: " << Values
-           << "\n[polli] Specialized function: "
-           << SpecF->getName() << " in "
-           << SpecF->getParent()->getModuleIdentifier() << "\n";
-
-    return ValToFun[Values];
+    SpecFuns[F] = ValToFun;
+    outs() << SpecF->getName() << " (" << Values << ")\n";
+    return SpecF;
   };
 };
 #endif
