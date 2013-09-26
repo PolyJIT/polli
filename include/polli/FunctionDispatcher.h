@@ -12,6 +12,11 @@
 #include "polli/FunctionCloner.h"
 #include "polli/Utils.h"
 
+#include "llvm/LinkAllPasses.h"
+#include "llvm/Analysis/RegionInfo.h"
+
+#include "llvm/Support/Debug.h"
+
 using namespace polli;
 
 template <class StorageT, class TypeT>
@@ -245,6 +250,22 @@ public:
       ++result;
 
     return result;
+  }
+
+  ParamVector<ParamT> getSpecValues(ParamVector<ParamT> &AllValues,
+                                    Function *TgtF) {
+    ParamVector<ParamT> SpecVals(AllValues.size());
+    Module *M = TgtF->getParent();
+    FunctionPassManager *FPM = new FunctionPassManager(M);
+    RegionInfo *RI = llvm::createRegionInfoPass();
+
+    FPM->add(RI);
+    FPM->run(*TgtF);
+
+    delete FPM;
+    delete RI;
+
+    return SpecVals;
   }
 
   void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {

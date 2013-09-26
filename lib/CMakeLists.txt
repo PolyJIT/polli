@@ -6,6 +6,7 @@ set(LLVM_LINK_COMPONENTS
   codegen
   executionengine
   interpreter
+  instrumentation
   ipo
   jit 
   linker 

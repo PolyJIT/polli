@@ -227,6 +227,7 @@ static void pjit_callback(const char *fName, unsigned paramc,
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   Function *NewF = Disp->getFunctionForValues(F, PArr);
+  DEBUG(dbgs() << "[polli] Preparing " << NewF->getName() << " for launch!\n");
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
@@ -351,11 +352,14 @@ ExecutionEngine* PolyJIT::GetEngine(Module *M, bool NoLazyCompilation) {
 void PolyJIT::runSpecializedFunction(Function *NewF,
                                      const std::vector<GenericValue> &ArgValues)
 {
+  assert(NewF && "Cannot execute a NULL function!");
   Module   *NewM = NewF->getParent();
   ExecutionEngine *NewEE = PolyJIT::GetEngine(NewM);
 
+  assert(NewM && "Passed function parameter has no parent module!");
+  assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
+
   // Run the selected function.
-  DEBUG(dbgs() << "[polli] Applying DCE\n");
   FunctionPassManager *FPM = new FunctionPassManager(NewM);
 
 //  registerCanonicalicationPasses(*FPM);
@@ -539,6 +543,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     NewFPM->run(*InstF);
     NewFPM->doFinalization();
 
+    delete NewFPM;
     // Set up the mapping for this prototype.
     Disp->setPrototypeMapping(InstF, OrigF);
   }
