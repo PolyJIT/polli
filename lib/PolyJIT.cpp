@@ -82,21 +82,131 @@ namespace fs = llvm::sys::fs;
 namespace p  = llvm::sys::path;
 
 namespace {
-class StaticInitializer {
-public:
-    StaticInitializer() {
-      PassRegistry &Registry = *PassRegistry::getPassRegistry();
-      initializePollyPasses(Registry);
-      initializeOutputDir();
-    }
-};
+  // Determine optimization level.
+  cl::opt<char>
+  OptLevel("O",
+           cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
+                    "(default = '-O2')"),
+           cl::Prefix,
+           cl::ZeroOrMore,
+           cl::init(' '));
+
+  cl::opt<std::string>
+  TargetTriple("mtriple", cl::desc("Override target triple for module"));
+
+  cl::opt<std::string>
+  MArch("march",
+        cl::desc("Architecture to generate assembly for (see --version)"));
+
+  cl::opt<std::string>
+  MCPU("mcpu",
+       cl::desc("Target a specific cpu type (-mcpu=help for details)"),
+       cl::value_desc("cpu-name"),
+       cl::init(""));
+
+  cl::list<std::string>
+  MAttrs("mattr",
+         cl::CommaSeparated,
+         cl::desc("Target specific attributes (-mattr=help for details)"),
+         cl::value_desc("a1,+a2,-a3,..."));
+
+  cl::opt<Reloc::Model>
+  RelocModel("relocation-model",
+             cl::desc("Choose relocation model"),
+             cl::init(Reloc::Default),
+             cl::values(
+            clEnumValN(Reloc::Default, "default",
+                       "Target default relocation model"),
+            clEnumValN(Reloc::Static, "static",
+                       "Non-relocatable code"),
+            clEnumValN(Reloc::PIC_, "pic",
+                       "Fully relocatable, position independent code"),
+            clEnumValN(Reloc::DynamicNoPIC, "dynamic-no-pic",
+                       "Relocatable external references, non-relocatable code"),
+            clEnumValEnd));
+
+  cl::opt<llvm::CodeModel::Model>
+  CMModel("code-model",
+          cl::desc("Choose code model"),
+          cl::init(CodeModel::JITDefault),
+          cl::values(clEnumValN(CodeModel::JITDefault, "default",
+                                "Target default JIT code model"),
+                     clEnumValN(CodeModel::Small, "small",
+                                "Small code model"),
+                     clEnumValN(CodeModel::Kernel, "kernel",
+                                "Kernel code model"),
+                     clEnumValN(CodeModel::Medium, "medium",
+                                "Medium code model"),
+                     clEnumValN(CodeModel::Large, "large",
+                                "Large code model"),
+                     clEnumValEnd));
+
+  cl::opt<bool>
+  EnableJITExceptionHandling("jit-enable-eh",
+    cl::desc("Emit exception handling information"),
+    cl::init(false));
+
+  cl::opt<bool>
+  GenerateSoftFloatCalls("soft-float",
+    cl::desc("Generate software floating point library calls"),
+    cl::init(false));
+
+  cl::opt<llvm::FloatABI::ABIType>
+  FloatABIForCalls("float-abi",
+                   cl::desc("Choose float ABI type"),
+                   cl::init(FloatABI::Default),
+                   cl::values(
+                     clEnumValN(FloatABI::Default, "default",
+                                "Target default float ABI type"),
+                     clEnumValN(FloatABI::Soft, "soft",
+                                "Soft float ABI (implied by -soft-float)"),
+                     clEnumValN(FloatABI::Hard, "hard",
+                                "Hard float ABI (uses FP registers)"),
+                     clEnumValEnd));
+
+  cl::opt<bool>
+// In debug builds, make this default to true.
+#ifdef NDEBUG
+#define EMIT_DEBUG false
+#else
+#define EMIT_DEBUG true
+#endif
+  EmitJitDebugInfo("jit-emit-debug",
+    cl::desc("Emit debug information to debugger"),
+    cl::init(EMIT_DEBUG));
+#undef EMIT_DEBUG
+
+  static cl::opt<bool>
+  EmitJitDebugInfoToDisk("jit-emit-debug-to-disk",
+    cl::Hidden,
+    cl::desc("Emit debug info objfiles to disk"),
+    cl::init(false));
+
+  cl::opt<bool> ForceInterpreter("force-interpreter",
+                                 cl::desc("Force interpretation: disable JIT"),
+                                 cl::init(false));
+
+  static cl::opt<bool>
+  UseMCJIT("mcjit",
+    cl::desc("Use MCJIT instead of old JIT"),
+    cl::init(false));
+
+  class StaticInitializer {
+  public:
+      StaticInitializer() {
+        PassRegistry &Registry = *PassRegistry::getPassRegistry();
+        initializePollyPasses(Registry);
+        initializeOutputDir();
+      }
+  };
 }
+
 static StaticInitializer InitializeEverything;
 static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
 static void pjit_callback(const char *fName, unsigned paramc,
-                   void** params) {
+                   char** params) {
   DEBUG(dbgs() << "[polli] Entering JIT runtime environment...\n");
   /* Let's hope that we have called it before ;-)
    * Otherwise it will blow up. FIXME: Don't blow up. */
@@ -117,23 +227,15 @@ static void pjit_callback(const char *fName, unsigned paramc,
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   Function *NewF = Disp->getFunctionForValues(F, PArr);
-  DEBUG(
-    Module   *NewM = NewF->getParent();
-    StoreModule(*NewM, NewM->getModuleIdentifier())
-  );
-
-  // Run the selected function.
-  ExecutionEngine *EE = JIT->GetEngine();
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
-  ArgC.IntVal = F->arg_size();
+  ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
   ArgValues[0] = ArgC;
-  ArgValues[1] = PTOGV(&params);
+  ArgValues[1] = PTOGV(params);
 
-  DEBUG(dbgs() << "[polli] Leaving JIT runtime environment...\n");
-  EE->runFunction(NewF, ArgValues);
-};
+  JIT->runSpecializedFunction(NewF, ArgValues);
+}
 }
 
 class ScopDetectionResultsViewer : public FunctionPass {
@@ -201,6 +303,78 @@ public:
 char ScopDetectionResultsViewer::ID = 0;
 
 namespace llvm {
+
+ExecutionEngine* PolyJIT::GetEngine(Module *M, bool NoLazyCompilation) {
+  EngineBuilder builder(M);
+  std::string ErrorMsg;
+
+  builder.setMArch(MArch);
+  builder.setMCPU(MCPU);
+  builder.setMAttrs(MAttrs);
+  builder.setRelocationModel(RelocModel);
+  builder.setCodeModel(CMModel);
+  builder.setErrorStr(&ErrorMsg);
+  builder.setEngineKind(ForceInterpreter
+                        ? EngineKind::Interpreter
+                        : EngineKind::JIT);
+  builder.setUseMCJIT(UseMCJIT);
+  builder.setJITMemoryManager(ForceInterpreter ? 0 :
+                              JITMemoryManager::CreateDefaultMemManager());
+
+  CodeGenOpt::Level OLvl = CodeGenOpt::Default;
+  switch (OptLevel) {
+  default:
+      OLvl = CodeGenOpt::Default; break;
+  case ' ': break;
+  case '0': OLvl = CodeGenOpt::None; break;
+  case '1': OLvl = CodeGenOpt::Less; break;
+  case '2': OLvl = CodeGenOpt::Default; break;
+  case '3': OLvl = CodeGenOpt::Aggressive; break;
+  }
+  builder.setOptLevel(OLvl);
+
+  TargetOptions Options;
+  Options.UseSoftFloat = GenerateSoftFloatCalls;
+  if (FloatABIForCalls != FloatABI::Default)
+    Options.FloatABIType = FloatABIForCalls;
+  if (GenerateSoftFloatCalls)
+    FloatABIForCalls = FloatABI::Soft;
+
+  // Remote target execution doesn't handle EH or debug registration.
+  Options.JITEmitDebugInfo = EmitJitDebugInfo;
+  Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
+
+  builder.setTargetOptions(Options);
+  return builder.create(builder.selectTarget());
+}
+
+void PolyJIT::runSpecializedFunction(Function *NewF,
+                                     const std::vector<GenericValue> &ArgValues)
+{
+  Module   *NewM = NewF->getParent();
+  ExecutionEngine *NewEE = PolyJIT::GetEngine(NewM);
+
+  // Run the selected function.
+  DEBUG(dbgs() << "[polli] Applying DCE\n");
+  FunctionPassManager *FPM = new FunctionPassManager(NewM);
+
+//  registerCanonicalicationPasses(*FPM);
+  FPM->add(createDeadCodeEliminationPass());
+  FPM->doInitialization();
+  FPM->run(*NewF);
+  FPM->doFinalization();
+
+  DEBUG(StoreModule(*NewM, NewM->getModuleIdentifier()));
+  DEBUG(dbgs() << "[polli] Leaving JIT runtime environment\n");
+
+  NewEE->runFunction(NewF, ArgValues);
+
+  DEBUG(dbgs() << "[polli] Executed: " << NewF->getName() << " from " <<
+        NewM->getModuleIdentifier() << "\n");
+
+  delete FPM;
+}
+
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   outs() << "[polli] Phase III: Injecting call to JIT\n";
   LLVMContext &Ctx = M.getContext();
@@ -281,7 +455,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
       Builder.CreateCall(PJITCB, Args);
     }
   }
-};
+}
 
 void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   Linker L(&M);
@@ -299,7 +473,7 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   /* Register our callback with the system linker, so the MCJIT can find it
    * during object compilation */
   sys::DynamicLibrary::AddSymbol(cbName, (void *)&pjit_callback);
-};
+}
 
 void PolyJIT::extractJitableScops(Module &M) {
   ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
@@ -350,11 +524,20 @@ void PolyJIT::extractJitableScops(Module &M) {
     Function *OrigF = MoveCloner.start();
 
     InstCloner.setSource(OrigF);
+    InstCloner.setSinkHostPass(SM);
     Function *InstF = InstCloner.start();
 
     // This maps the function name in the source module to the instrumented
     // version in the extracted version.
     F->setName(InstF->getName());
+
+    // Remove the mess we made during instrumentation.
+    FunctionPassManager *NewFPM = new FunctionPassManager(NewM);
+
+    NewFPM->add(llvm::createDeadCodeEliminationPass());
+    NewFPM->doInitialization();
+    NewFPM->run(*InstF);
+    NewFPM->doFinalization();
 
     // Set up the mapping for this prototype.
     Disp->setPrototypeMapping(InstF, OrigF);
@@ -364,7 +547,7 @@ void PolyJIT::extractJitableScops(Module &M) {
   delete FPM;
 
   StoreModule(M, M.getModuleIdentifier() + ".extr");
-};
+}
 
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char * const *envp) {
@@ -446,8 +629,21 @@ int PolyJIT::shutdown(int result) {
 };
 
 PolyJIT* PolyJIT::Instance = NULL;
-PolyJIT* PolyJIT::Get(ExecutionEngine *EE, Module *M) {
+PolyJIT* PolyJIT::Get(Module *M, bool NoLazyCompilation) {
   if (!Instance) {
+    ExecutionEngine *EE = PolyJIT::GetEngine(M);
+
+    if (!EE)
+      return NULL;
+
+    // The following functions have no effect if their respective profiling
+    // support wasn't enabled in the build configuration.
+    EE->RegisterJITEventListener(
+                  JITEventListener::createOProfileJITEventListener());
+    EE->RegisterJITEventListener(
+                  JITEventListener::createIntelJITEventListener());
+    EE->DisableLazyCompilation(NoLazyCompilation);
+
     Instance = new PolyJIT(EE, M);
   }
   return Instance;

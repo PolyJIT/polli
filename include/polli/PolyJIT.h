@@ -38,13 +38,14 @@ class TargetMachine;
 
 class PolyJIT {
 public:
-  static PolyJIT* Get(ExecutionEngine *EE = 0, Module *M = 0);
+  static PolyJIT* Get(Module *M = 0, bool NoLazyCompilation = false);
+
+  // Creates a fresh ExecutionEngine for the given Module.
+  static ExecutionEngine* GetEngine(Module *M, bool NoLazyCompilation = false);
 
   void setEntryFunction(std::string name) {
     EntryFn = name;
   };
-
-  ExecutionEngine *GetEngine() { return &EE; }
 
   // JIT and run the Main function.
   //
@@ -58,9 +59,11 @@ public:
   int shutdown(int result);
 
   Module &getExecutedModule() { return M; }
+  void runSpecializedFunction(Function *NewF,
+                              const std::vector<GenericValue> &ArgValues);
 private:
   static PolyJIT* Instance;
-  
+
   PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {
     FPM = new FunctionPassManager(&M);
   };
@@ -90,7 +93,7 @@ private:
 
   /* Instrument extracted Scops with a callback to the JIT */
   void instrumentScops(Module &, ManagedModules &);
-  
+
   void extractJitableScops(Module &);
   void runPollyPreoptimizationPasses(Module &);
 };

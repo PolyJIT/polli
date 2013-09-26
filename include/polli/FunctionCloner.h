@@ -28,6 +28,29 @@
 using namespace llvm;
 
 namespace polli {
+void DEBUG_printArgumentUseChain(const Twine &LocStr, Function *F) {
+  dbgs() << LocStr << "\n";
+  dbgs() << "Checking def-use chain for: "
+         << F->getName() << "\n";
+  for (Function::arg_iterator Arg = F->arg_begin(),
+       ArgE = F->arg_end(); Arg != ArgE; ++Arg) {
+      for (Value::use_iterator i = Arg->use_begin(), ie = Arg->use_end();
+           i != ie; ++ i) {
+        dbgs() << Arg->getName() << " is used in ";
+        if (Instruction *Inst = dyn_cast<Instruction>(*i)) {
+            if (BasicBlock *BB = Inst->getParent()) {
+                if (Function *F = BB->getParent())
+                    dbgs() << " Function: " << F->getName() << "\n";
+                dbgs() << " BB: " << BB->getName() << "\n";
+            }
+            dbgs() << " Instruction: "; Inst->dump();
+            dbgs() << "\n";
+        } else
+          dbgs() << "Iterator value not an instruction\n";
+      }
+  }
+}
+
 template
 <
   class CreationPolicy,
@@ -52,6 +75,13 @@ public:
 
   void setTarget(Function *F) { TgtF = F; }
   void setSource(Function *F) { SrcF = F; }
+
+  /* Optional: Set the pass we piggy-back ourself on. This enables
+   * access to BasicBlockUtils which require Passes to operate on. */
+  void setSinkHostPass(Pass *HostP) {
+    SinkPolicy &pPolicy = *this;
+    pPolicy.setPass(HostP);
+  }
 
   /* Clone the source function into the target function.
    * If target function does not exist, create one in
@@ -134,7 +164,15 @@ struct DestroyEndpoint {
 };
 
 struct InstrumentEndpoint {
-  static void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  void setPass(Pass *HostPass) {
+    P = HostPass;
+  }
+
+  Pass *getPass() {
+    return P;
+  }
+
+  void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
     if (TgtF->isDeclaration())
       return;
 
@@ -161,7 +199,7 @@ struct InstrumentEndpoint {
      * void foo(int n, int A[42]) {
      *  void *params[2];
      *  params[0] = &n;
-     *  params[1] = &A;
+     *  params[1] = A;
      *
      *  pjit_callback("foo", 2, params);
      * }
@@ -173,6 +211,7 @@ struct InstrumentEndpoint {
     Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc, true);
     Value *Params = Builder.CreateAlloca(Type::getInt8PtrTy(Ctx),
                                          ParamC, "params");
+
     /* Store each parameter as pointer in the params array */
     int i = 0;
     Value *One    = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
@@ -181,21 +220,17 @@ struct InstrumentEndpoint {
                                 Arg != ArgE; ++Arg) {
 
       /* Allocate a slot on the stack for the i'th argument and store it */
-      Value *Slot   = Builder.CreateAlloca(Arg->getType(), One,
-                                           "params." + Twine(i));
+      Value *Slot   = Builder.CreateAlloca(Arg->getType(), One);
       Builder.CreateStore(Arg, Slot);
-
-      /* Bitcast the allocated stack slot to i8* */
-      Value *Slot8 = Builder.CreateBitCast(Slot, Type::getInt8PtrTy(Ctx),
-                                           "ps.i8ptr." + Twine(i));
 
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
       Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
-      Value *Dest   = Builder.CreateGEP(Params, ArrIdx, "p." + Twine(i));
-      //Builder.CreateAlignedStore(Slot8, Dest, 8);
-      Builder.CreateStore(Slot8, Dest);
+      Value *Dest   = Builder.CreateGEP(Params, ArrIdx);
 
+      //Builder.CreateAlignedStore(Slot8, Dest, 8);
+      Builder.CreateStore(Builder.CreateBitCast(Slot,
+                                                Type::getInt8PtrTy(Ctx)), Dest);
       i++;
     }
 
@@ -207,16 +242,27 @@ struct InstrumentEndpoint {
     CallInst *CallPolyJIT = Builder.CreateCall(PJITCB, Args);
     BasicBlock *CallBB = CallPolyJIT->getParent();
 
-    // Purge everything after the call.
-    BasicBlock *CurBB = CallBB->getNextNode();
-    while (CurBB != TgtF->end()) {
-        BasicBlock *EraseBB = CurBB;
-        CurBB = CurBB->getNextNode();
-        EraseBB->removeFromParent();
-    }
+    // Split the old stuff away to get one clean edge to jump to.
+    BasicBlock::iterator SplitIt = CallBB->getTerminator();
+    BasicBlock *NewBB;
 
-    ReplaceInstWithInst(CallBB->getTerminator(), ReturnInst::Create(Ctx));
+    NewBB = CallBB->splitBasicBlock(SplitIt, CallBB->getName() + ".p.split");
+
+    // We will fail (more or less silent) if this is not true.
+    if (NewBB) {
+      // Prepare the new exit BB;
+      BasicBlock *ExitBB = BasicBlock::Create(Ctx, "exit", TgtF);
+      Builder.SetInsertPoint(ExitBB);
+      Builder.CreateRetVoid();
+
+      Value *True = ConstantInt::get(Type::getInt1Ty(Ctx), 1);
+      ReplaceInstWithInst(CallBB->getTerminator(),
+                          BranchInst::Create(ExitBB, NewBB, True));
+    }
   }
+
+private:
+  Pass *P;
 };
 
 typedef

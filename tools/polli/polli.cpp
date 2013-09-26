@@ -69,38 +69,6 @@ namespace {
   cl::list<std::string>
   InputArgv(cl::ConsumeAfter, cl::desc("<program arguments>..."));
 
-  cl::opt<bool> ForceInterpreter("force-interpreter",
-                                 cl::desc("Force interpretation: disable JIT"),
-                                 cl::init(false));
-
-  // Determine optimization level.
-  cl::opt<char>
-  OptLevel("O",
-           cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
-                    "(default = '-O2')"),
-           cl::Prefix,
-           cl::ZeroOrMore,
-           cl::init(' '));
-
-  cl::opt<std::string>
-  TargetTriple("mtriple", cl::desc("Override target triple for module"));
-
-  cl::opt<std::string>
-  MArch("march",
-        cl::desc("Architecture to generate assembly for (see --version)"));
-
-  cl::opt<std::string>
-  MCPU("mcpu",
-       cl::desc("Target a specific cpu type (-mcpu=help for details)"),
-       cl::value_desc("cpu-name"),
-       cl::init(""));
-
-  cl::list<std::string>
-  MAttrs("mattr",
-         cl::CommaSeparated,
-         cl::desc("Target specific attributes (-mattr=help for details)"),
-         cl::value_desc("a1,+a2,-a3,..."));
-
   cl::opt<std::string>
   EntryFunc("entry-function",
             cl::desc("Specify the entry function (default = 'main') "
@@ -122,81 +90,6 @@ namespace {
                   cl::desc("Disable JIT lazy compilation"),
                   cl::init(false));
 
-  cl::opt<Reloc::Model>
-  RelocModel("relocation-model",
-             cl::desc("Choose relocation model"),
-             cl::init(Reloc::Default),
-             cl::values(
-            clEnumValN(Reloc::Default, "default",
-                       "Target default relocation model"),
-            clEnumValN(Reloc::Static, "static",
-                       "Non-relocatable code"),
-            clEnumValN(Reloc::PIC_, "pic",
-                       "Fully relocatable, position independent code"),
-            clEnumValN(Reloc::DynamicNoPIC, "dynamic-no-pic",
-                       "Relocatable external references, non-relocatable code"),
-            clEnumValEnd));
-
-  cl::opt<llvm::CodeModel::Model>
-  CMModel("code-model",
-          cl::desc("Choose code model"),
-          cl::init(CodeModel::JITDefault),
-          cl::values(clEnumValN(CodeModel::JITDefault, "default",
-                                "Target default JIT code model"),
-                     clEnumValN(CodeModel::Small, "small",
-                                "Small code model"),
-                     clEnumValN(CodeModel::Kernel, "kernel",
-                                "Kernel code model"),
-                     clEnumValN(CodeModel::Medium, "medium",
-                                "Medium code model"),
-                     clEnumValN(CodeModel::Large, "large",
-                                "Large code model"),
-                     clEnumValEnd));
-
-  cl::opt<bool>
-  EnableJITExceptionHandling("jit-enable-eh",
-    cl::desc("Emit exception handling information"),
-    cl::init(false));
-
-  cl::opt<bool>
-  GenerateSoftFloatCalls("soft-float",
-    cl::desc("Generate software floating point library calls"),
-    cl::init(false));
-
-  cl::opt<llvm::FloatABI::ABIType>
-  FloatABIForCalls("float-abi",
-                   cl::desc("Choose float ABI type"),
-                   cl::init(FloatABI::Default),
-                   cl::values(
-                     clEnumValN(FloatABI::Default, "default",
-                                "Target default float ABI type"),
-                     clEnumValN(FloatABI::Soft, "soft",
-                                "Soft float ABI (implied by -soft-float)"),
-                     clEnumValN(FloatABI::Hard, "hard",
-                                "Hard float ABI (uses FP registers)"),
-                     clEnumValEnd));
-  cl::opt<bool>
-// In debug builds, make this default to true.
-#ifdef NDEBUG
-#define EMIT_DEBUG false
-#else
-#define EMIT_DEBUG true
-#endif
-  EmitJitDebugInfo("jit-emit-debug",
-    cl::desc("Emit debug information to debugger"),
-    cl::init(EMIT_DEBUG));
-#undef EMIT_DEBUG
-
-  static cl::opt<bool>
-  EmitJitDebugInfoToDisk("jit-emit-debug-to-disk",
-    cl::Hidden,
-    cl::desc("Emit debug info objfiles to disk"),
-    cl::init(false));
-  
-  static cl::opt<bool>
-  UseMCJIT("mcjit",
-    cl::desc("Use MCJIT instead of old JIT"),
-    cl::init(false));
 }
 
 static ExecutionEngine *EE = 0;
@@ -327,68 +220,6 @@ int main(int argc, char **argv, char * const *envp) {
     }
   }
 
-  EngineBuilder builder(Mod.get());
-  builder.setMArch(MArch);
-  builder.setMCPU(MCPU);
-  builder.setMAttrs(MAttrs);
-  builder.setRelocationModel(RelocModel);
-  builder.setCodeModel(CMModel);
-  builder.setErrorStr(&ErrorMsg);
-  builder.setEngineKind(ForceInterpreter
-                        ? EngineKind::Interpreter
-                        : EngineKind::JIT);
-  builder.setUseMCJIT(UseMCJIT);
-
-  // If we are supposed to override the target triple, do so now.
-  if (!TargetTriple.empty())
-    Mod->setTargetTriple(Triple::normalize(TargetTriple));
-
-  builder.setJITMemoryManager(ForceInterpreter ? 0 :
-                              JITMemoryManager::CreateDefaultMemManager());
-
-  CodeGenOpt::Level OLvl = CodeGenOpt::Default;
-  switch (OptLevel) {
-  default:
-    errs() << argv[0] << ": invalid optimization level.\n";
-    return 1;
-  case ' ': break;
-  case '0': OLvl = CodeGenOpt::None; break;
-  case '1': OLvl = CodeGenOpt::Less; break;
-  case '2': OLvl = CodeGenOpt::Default; break;
-  case '3': OLvl = CodeGenOpt::Aggressive; break;
-  }
-  builder.setOptLevel(OLvl);
-
-  TargetOptions Options;
-  Options.UseSoftFloat = GenerateSoftFloatCalls;
-  if (FloatABIForCalls != FloatABI::Default)
-    Options.FloatABIType = FloatABIForCalls;
-  if (GenerateSoftFloatCalls)
-    FloatABIForCalls = FloatABI::Soft;
-
-  // Remote target execution doesn't handle EH or debug registration.
-  Options.JITEmitDebugInfo = EmitJitDebugInfo;
-  Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
-
-  builder.setTargetOptions(Options);
-
-  EE = builder.create(builder.selectTarget());
-  if (!EE) {
-    if (!ErrorMsg.empty())
-      errs() << argv[0] << ": error creating EE: " << ErrorMsg << "\n";
-    else
-      errs() << argv[0] << ": unknown error creating EE!\n";
-    exit(1);
-  }
-
-  // The following functions have no effect if their respective profiling
-  // support wasn't enabled in the build configuration.
-  EE->RegisterJITEventListener(
-                JITEventListener::createOProfileJITEventListener());
-  EE->RegisterJITEventListener(
-                JITEventListener::createIntelJITEventListener());
-  EE->DisableLazyCompilation(NoLazyCompilation);
-
   // If the user specifically requested an argv[0] to pass into the program,
   // do it now.
   if (!FakeArgv0.empty()) {
@@ -406,7 +237,16 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  PolyJIT *pjit = PolyJIT::Get(EE, Mod.get());
+  PolyJIT *pjit = PolyJIT::Get(Mod.get());
+
+  if (!pjit) {
+    if (!ErrorMsg.empty())
+      errs() << argv[0] << ": error creating EE: " << ErrorMsg << "\n";
+    else
+      errs() << argv[0] << ": unknown error creating EE!\n";
+    exit(1);
+  }
+
   pjit->setEntryFunction(EntryFunc);
 
   // Run main.

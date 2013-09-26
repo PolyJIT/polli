@@ -208,7 +208,7 @@ void printParameters(const Function *F, RTParams &Params) {
 };
 
 RTParams getRuntimeParameters(Function *F, unsigned paramc,
-                              void** params) {
+                              char** params) {
   RTParams RuntimeParams;
   int i = 0;
   for (Function::arg_iterator Arg = F->arg_begin(), ArgE= F->arg_end();
@@ -248,6 +248,16 @@ public:
   }
 
   void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+    // Connect Entry block of TgtF with Cloned version of SrcF's entry block.
+    LLVMContext &Context = TgtF->getContext();
+    IRBuilder<> Builder(Context);
+    BasicBlock *EntryBB = &TgtF->getEntryBlock();
+    BasicBlock *SrcEntryBB = &SrcF->getEntryBlock();
+    BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
+
+    Builder.SetInsertPoint(EntryBB);
+    Builder.CreateBr(ClonedEntryBB);
+
     for (unsigned i=0; i < SpecValues->size(); ++i) {
       ParamT P = (*SpecValues)[i];
       Function::arg_iterator Arg = getArgument(SrcF, P.getName());
@@ -259,7 +269,7 @@ public:
         continue;
       }
 
-      // We only support int types for now.
+      // Get a constant value for P.
       Constant *replacement = P.getAsConstant();
       if (replacement) {
         Value *NewArg = VMap[Arg];
@@ -267,14 +277,14 @@ public:
       }
     }
 
-    // Connect Entry block of TgtF with Cloned version of SrcF's entry block.
-    IRBuilder<> Builder(TgtF->getContext());
-    BasicBlock *EntryBB = &TgtF->getEntryBlock();
-    BasicBlock *SrcEntryBB = &SrcF->getEntryBlock();
-    BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
-
-    Builder.SetInsertPoint(EntryBB);
-    Builder.CreateBr(ClonedEntryBB);
+    // We assume that we use the MainCreator policy, so we replace all
+    // returns with return 0;
+    Constant *Zero = ConstantInt::get(IntegerType::getInt32Ty(Context), 0);
+    for (Function::iterator BB = TgtF->begin(), BE = TgtF->end(); BB != BE;
+         ++BB)
+      if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB->getTerminator())) {
+          ReplaceInstWithInst(Ret, ReturnInst::Create(Context, Zero));
+      }
   }
 };
 
@@ -285,13 +295,38 @@ public:
 // The parameters are unpacked inside the function again, maybe it does not
 // get too inefficient ;-).
 struct MainCreator {
-  static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
-                                                    Function *TgtF) {
-    LLVMContext &Context = TgtF->getContext();
-    IRBuilder<> Builder(Context);
+  static void CreateUnpackParamsO2(IRBuilder<> &Builder,
+                                   ValueToValueMapTy &VMap, Function *SrcF,
+                                   Function *TgtF) {
+    // 2nd argument is our array, 1st is argc
+    Function::const_arg_iterator Arg = SrcF->arg_begin();
+    Function::arg_iterator TgtArg = TgtF->arg_begin();
+    Argument *ArgC = TgtArg;
+    Value    *ArgV = ++TgtArg;
 
-    BasicBlock *EntryBB = BasicBlock::Create(Context, "entry.param", TgtF);
-    Builder.SetInsertPoint(EntryBB);
+    ArgC->setName("argc");
+    ArgV->setName("argv");
+
+    // Unpack params. Allocate space on the stack and store the pointers.
+    // This is very inefficient, because some parameters are not required
+    // anymore.
+    for (unsigned i = 0; i < SrcF->arg_size(); ++i) {
+      Type  *ArgTy   = Arg->getType();
+      Value *ArrIdx  = Builder.CreateConstInBoundsGEP2_64(ArgV, 0, i,
+                                                          "arrayidx");
+      Value *LoadArr = Builder.CreateLoad(ArrIdx);
+      Value *CastVal = Builder.CreateBitCast(LoadArr, ArgTy->getPointerTo());
+
+      CastVal = Builder.CreateLoad(CastVal);
+
+      VMap[Arg++] = CastVal;
+    }
+  }
+
+  static void CreateUnpackParamsO0(IRBuilder<> &Builder,
+                                   ValueToValueMapTy &VMap, Function *SrcF,
+                                   Function *TgtF) {
+    LLVMContext &Context = TgtF->getContext();
 
     // 2nd argument is our array, 1st is argc
     Value *One    = ConstantInt::get(Type::getInt32Ty(Context), 1);
@@ -332,13 +367,32 @@ struct MainCreator {
     }
   }
 
+  static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
+                                                    Function *TgtF) {
+    LLVMContext &Context = TgtF->getContext();
+    IRBuilder<> Builder(Context);
+
+    BasicBlock *EntryBB = BasicBlock::Create(Context, "entry.param", TgtF);
+    Builder.SetInsertPoint(EntryBB);
+
+    //CreateUnpackParamsO0(Builder, VMap, SrcF, TgtF);
+    CreateUnpackParamsO2(Builder, VMap, SrcF, TgtF);
+  }
+
   static Function *Create(Function *SrcF, Module *TgtM) {
     LLVMContext &Context = TgtM->getContext();
-    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context), 0);
-    Function *F = cast<Function>(TgtM->getOrInsertFunction(
-                                   SrcF->getName(), SrcF->getReturnType(),
-                                   Type::getInt32Ty(Context), PtoArr, NULL));
+    Type *RetType = IntegerType::getInt32Ty(Context);
+//    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context), 0);
 
+    ArrayType *PtoArr = ArrayType::get(Type::getInt8PtrTy(Context),
+                                       SrcF->arg_size());
+
+    Constant *C = TgtM->getOrInsertFunction(SrcF->getName(), RetType,
+                                            Type::getInt32Ty(Context),
+                                            PointerType::get(PtoArr, 0),
+                                            NULL);
+
+    Function *F = cast<Function>(C);
     F->setLinkage(SrcF->getLinkage());
     return F;
   }
@@ -427,9 +481,8 @@ public:
     if (!ValToFun.count(Values)) {
       outs() << "(new) ";
       ValToFun[Values] = specialize(F, Values);
-    } else {
+    } else
       outs() << "(cached) ";
-    }
 
     Function *SpecF = ValToFun[Values];
     SpecFuns[F] = ValToFun;
