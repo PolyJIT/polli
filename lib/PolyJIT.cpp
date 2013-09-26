@@ -377,6 +377,10 @@ void PolyJIT::runSpecializedFunction(Function *NewF,
         NewM->getModuleIdentifier() << "\n");
 
   delete FPM;
+
+  // Remove the module before deleting, or it will be destroyed!
+  NewEE->removeModule(NewM);
+  delete NewEE;
 }
 
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {

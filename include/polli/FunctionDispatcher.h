@@ -491,24 +491,25 @@ public:
   template<class ParamT>
   Function *getFunctionForValues(Function *F,
                                  ParamVector<ParamT> &Values) {
-    ValKeyToFunction ValToFun;
-    if (!SpecFuns.count(F))
-      ValToFun = ValKeyToFunction();
-    else
-      ValToFun = SpecFuns[F];
+    ValKeyToFunction ValToFun = (!SpecFuns.count(F)) ? ValKeyToFunction()
+                                                     : SpecFuns[F];
 
     /* TODO: We need to be a bit more smart than: Specialize everything. */
-    outs() << "[polli] ";
+    dbgs() << "[polli] ";
     if (!ValToFun.count(Values)) {
-      outs() << "(new) ";
+      dbgs() << "(new) ";
       ValToFun[Values] = specialize(F, Values);
     } else
-      outs() << "(cached) ";
+      dbgs() << "(cached) ";
 
     Function *SpecF = ValToFun[Values];
+    assert(SpecF &&
+           "Specializing failed. No mapping from values to a function!");
+
     SpecFuns[F] = ValToFun;
-    outs() << SpecF->getName() << " (" << Values << ")\n";
+    outs() << SpecF->getName() /*<< " (" << Values << ")*/ << "\n";
+
     return SpecF;
-  };
+  }
 };
 #endif
