@@ -18,7 +18,7 @@
 #include "polli/Utils.h"
 using namespace llvm;
 
-SmallVector<char, 255> *DefaultDir; 
+SmallVector<char, 255> *DefaultDir;
 
 void initializeOutputDir() {
   DefaultDir = new SmallVector<char, 255>();
@@ -54,10 +54,10 @@ void StoreModule(Module &M, const Twine &Name) {
   Out->keep();
 }
 
-void StoreModules(std::set<Module *> Modules) {
-  for (std::set<Module *>::iterator
+void StoreModules(ManagedModules & Modules) {
+  for (ManagedModules::iterator
        MI = Modules.begin(), ME = Modules.end(); MI != ME; ++MI) {
-    Module *M = *MI;
+    Module *M = (*MI).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
 }

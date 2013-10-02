@@ -8,9 +8,9 @@ set(LLVM_LINK_COMPONENTS
   interpreter
   instrumentation
   ipo
-  jit 
-  linker 
-  mcjit 
+  jit
+  linker
+  mcjit
   native
   nativecodegen
   scalarOpts
@@ -32,6 +32,7 @@ set(LLVM_USED_LIBS
 add_polli_library(PolyJIT
   NonAffineScopDetection.cpp
   PolyJIT.cpp
+  RuntimeOptimizer.cpp
   ScopMapper.cpp
   Utils.cpp
   )

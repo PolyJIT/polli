@@ -25,6 +25,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "polli/Utils.h"
+
 #include <set>
 
 namespace llvm {
@@ -59,8 +61,18 @@ public:
   int shutdown(int result);
 
   Module &getExecutedModule() { return M; }
+
+  /* Execute a function with the given arguments.
+     The function needs to follow the "main" format:
+
+     i32 main(i32 argc, i8** params);
+
+     The function dispatcher is capable of providing this
+     structure. */
   void runSpecializedFunction(Function *NewF,
                               const std::vector<GenericValue> &ArgValues);
+
+
 private:
   static PolyJIT* Instance;
 
@@ -84,8 +96,7 @@ private:
   std::string EntryFn;
   FunctionPassManager *FPM;
 
-  typedef std::set<Module *> ManagedModules;
-  /* The module we create & manage during execution of the main module M. */
+  /* The modules we create & manage during execution of the main module M. */
   ManagedModules Mods;
 
   /* Link extracted Scops into a module for execution. */

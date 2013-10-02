@@ -10,6 +10,7 @@
 #define POLLI_FUNCTION_DISPATCHER_H
 
 #include "polli/FunctionCloner.h"
+#include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 
 #include "llvm/LinkAllPasses.h"
@@ -344,50 +345,6 @@ struct MainCreator {
     }
   }
 
-  static void CreateUnpackParamsO0(IRBuilder<> &Builder,
-                                   ValueToValueMapTy &VMap, Function *SrcF,
-                                   Function *TgtF) {
-    LLVMContext &Context = TgtF->getContext();
-
-    // 2nd argument is our array, 1st is argc
-    Value *One    = ConstantInt::get(Type::getInt32Ty(Context), 1);
-    Function::const_arg_iterator Arg = SrcF->arg_begin();
-
-    Argument *ArgC = TgtF->arg_begin();
-    Argument *ArgV = ++TgtF->arg_begin();
-
-    ArgC->setName("argc");
-    ArgV->setName("argv");
-
-    Value *StArgC = Builder.CreateAlloca(ArgC->getType(), One,
-                                         ArgC->getName() + ".addr");
-    Value *StArgV = Builder.CreateAlloca(ArgV->getType(), One,
-                                         ArgV->getName() + ".addr");
-
-    Builder.CreateStore(ArgC, StArgC);
-    Builder.CreateStore(ArgV, StArgV);
-
-    // Unpack params. Allocate space on the stack and store the pointers.
-    // This is very inefficient, because some parameters are not required
-    // anymore.
-    for (unsigned i = 0; i < SrcF->arg_size(); ++i) {
-        Constant *ParamIdx = ConstantInt::get(Type::getInt32Ty(Context), i);
-
-        Value *LoadPtr = Builder.CreateLoad(StArgV);
-        Value *ArrIdx  = Builder.CreateGEP(LoadPtr, ParamIdx, "arrayidx");
-        Value *LoadVal = Builder.CreateLoad(ArrIdx);
-
-        Type  *ArgTy = Arg->getType();
-        Value *CastVal = Builder.CreateBitCast(LoadVal,
-                                               ArgTy->getPointerTo());
-        Value *LoadPtrVal = Builder.CreateLoad(CastVal);
-        Value *ParamVal = Builder.CreateAlloca(ArgTy, One);
-
-        Builder.CreateStore(LoadPtrVal, ParamVal);
-        VMap[Arg++] = Builder.CreateLoad(ParamVal);
-    }
-  }
-
   static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
                                                     Function *TgtF) {
     LLVMContext &Context = TgtF->getContext();
@@ -396,7 +353,6 @@ struct MainCreator {
     BasicBlock *EntryBB = BasicBlock::Create(Context, "entry.param", TgtF);
     Builder.SetInsertPoint(EntryBB);
 
-    //CreateUnpackParamsO0(Builder, VMap, SrcF, TgtF);
     CreateUnpackParamsO2(Builder, VMap, SrcF, TgtF);
   }
 
@@ -488,6 +444,11 @@ public:
     FMap[F->getName()] = MapTo;
   }
 
+  /// @brief Get the appropriate function for the given input parameters.
+  //  If it is beneficial, a specialized version for the given set
+  //  of input parameters is generated.
+  //
+  //  Apply all necessary optimization steps here.
   template<class ParamT>
   Function *getFunctionForValues(Function *F,
                                  ParamVector<ParamT> &Values) {
@@ -495,20 +456,19 @@ public:
                                                      : SpecFuns[F];
 
     /* TODO: We need to be a bit more smart than: Specialize everything. */
-    dbgs() << "[polli] ";
     if (!ValToFun.count(Values)) {
-      dbgs() << "(new) ";
-      ValToFun[Values] = specialize(F, Values);
-    } else
-      dbgs() << "(cached) ";
+      DEBUG(dbgs() << "[polli] (new)\n");
+      Function *NewF  = specialize(F, Values);
+      RuntimeOptimizer RTOpt;
+
+      RTOpt.Optimize(*NewF);
+
+      ValToFun[Values] = NewF;
+      SpecFuns[F]      = ValToFun;
+    }
 
     Function *SpecF = ValToFun[Values];
-    assert(SpecF &&
-           "Specializing failed. No mapping from values to a function!");
-
-    SpecFuns[F] = ValToFun;
-    outs() << SpecF->getName() /*<< " (" << Values << ")*/ << "\n";
-
+    DEBUG(dbgs() << "[polli] " << SpecF->getName() << " (" << Values << ")\n");
     return SpecF;
   }
 };

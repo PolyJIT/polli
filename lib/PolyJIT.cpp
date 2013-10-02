@@ -26,6 +26,7 @@
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/ValueMap.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/JITCodeEmitter.h"
@@ -227,7 +228,6 @@ static void pjit_callback(const char *fName, unsigned paramc,
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   Function *NewF = Disp->getFunctionForValues(F, PArr);
-  DEBUG(dbgs() << "[polli] Preparing " << NewF->getName() << " for launch!\n");
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
@@ -322,6 +322,10 @@ ExecutionEngine* PolyJIT::GetEngine(Module *M, bool NoLazyCompilation) {
   builder.setJITMemoryManager(ForceInterpreter ? 0 :
                               JITMemoryManager::CreateDefaultMemManager());
 
+  // If we are supposed to override the target triple, do so now.
+  if (!TargetTriple.empty())
+    M->setTargetTriple(Triple::normalize(TargetTriple));
+
   CodeGenOpt::Level OLvl = CodeGenOpt::Default;
   switch (OptLevel) {
   default:
@@ -353,34 +357,20 @@ void PolyJIT::runSpecializedFunction(Function *NewF,
                                      const std::vector<GenericValue> &ArgValues)
 {
   assert(NewF && "Cannot execute a NULL function!");
+
   Module   *NewM = NewF->getParent();
-  ExecutionEngine *NewEE = PolyJIT::GetEngine(NewM);
+  ExecutionEngine *NewEE;
 
   assert(NewM && "Passed function parameter has no parent module!");
+
+  // Fetch or Create a new ExecutionEngine for this Module.
+  if (!Mods.count(NewM))
+    Mods[NewM] = PolyJIT::GetEngine(NewM);
+  NewEE = Mods[NewM];
+
   assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
 
-  // Run the selected function.
-  FunctionPassManager *FPM = new FunctionPassManager(NewM);
-
-//  registerCanonicalicationPasses(*FPM);
-  FPM->add(createDeadCodeEliminationPass());
-  FPM->doInitialization();
-  FPM->run(*NewF);
-  FPM->doFinalization();
-
-  DEBUG(StoreModule(*NewM, NewM->getModuleIdentifier()));
-  DEBUG(dbgs() << "[polli] Leaving JIT runtime environment\n");
-
   NewEE->runFunction(NewF, ArgValues);
-
-  DEBUG(dbgs() << "[polli] Executed: " << NewF->getName() << " from " <<
-        NewM->getModuleIdentifier() << "\n");
-
-  delete FPM;
-
-  // Remove the module before deleting, or it will be destroyed!
-  NewEE->removeModule(NewM);
-  delete NewEE;
 }
 
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
@@ -394,7 +384,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   /* Insert callback declaration & call into each extracted module */
   for (ManagedModules::iterator
        i = Mods.begin(), ie = Mods.end(); i != ie; ++i) {
-    Module *ScopM = (*i);
+    Module *ScopM = (*i).first;
     Function *PJITCB = cast<Function>(
       ScopM->getOrInsertFunction(cbName, Type::getVoidTy(Ctx),
                                          Type::getInt8PtrTy(Ctx),
@@ -472,8 +462,9 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   std::string ErrorMsg;
   for (ManagedModules::iterator
        src = Mods.begin(), se = Mods.end(); src != se; ++src) {
-    outs().indent(2) << "Linking: " << (*src)->getModuleIdentifier() << "\n";
-    if(L.linkInModule(*src, Linker::PreserveSource, &ErrorMsg))
+    Module *M = (*src).first;
+    outs().indent(2) << "Linking: " << M->getModuleIdentifier() << "\n";
+    if(L.linkInModule(M, Linker::PreserveSource, &ErrorMsg))
       errs().indent(2) << "ERROR while linking. MESSAGE: " << ErrorMsg << "\n";
   }
 
@@ -501,7 +492,6 @@ void PolyJIT::extractJitableScops(Module &M) {
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe ; ++f) {
     if (f->isDeclaration())
       continue;
-    DEBUG(dbgs().indent(2) << "Extract: " << (*f).getName() << "\n");
     FPM->run(*f);
   }
 
@@ -523,7 +513,8 @@ void PolyJIT::extractJitableScops(Module &M) {
     NewM->setModuleIdentifier(
       (M->getModuleIdentifier() + "." + F->getName()).str());
 
-    Mods.insert(NewM);
+    // FIXME: Work around the one module per engine model of MCJIT/JIT for now.
+    Mods[NewM] = &EE;
 
     MovingFunctionCloner MoveCloner(VMap, NewM);
     InstrumentingFunctionCloner InstCloner(VMap, NewM);
@@ -566,6 +557,11 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     errs() << '\'' << EntryFn << "\' function not found in module.\n";
     return -1;
   }
+
+  //TODO: Link OpenMP (bit ugly, but whatever.
+  std::string ErrorMsg;
+  if (sys::DynamicLibrary::LoadLibraryPermanently("libgomp.so", &ErrorMsg))
+    errs() << "ERROR: " << ErrorMsg << "\n";
 
   // Run static constructors.
   EE.runStaticConstructorsDestructors(false);
@@ -634,6 +630,12 @@ int PolyJIT::shutdown(int result) {
   } else {
     errs() << "ERROR: exit defined with wrong prototype!\n";
     abort();
+  }
+
+  for (ManagedModules::iterator I = Mods.begin(), ME = Mods.end(); I != ME;
+       ++I) {
+    ExecutionEngine *EE = (*I).second;
+    delete EE;
   }
 };
 
