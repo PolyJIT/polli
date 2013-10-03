@@ -20,19 +20,18 @@
 
 using namespace polli;
 
-template <class StorageT, class TypeT>
-struct RTParam {
+template <class StorageT, class TypeT> struct RTParam {
   explicit RTParam(StorageT val, TypeT *type, const StringRef name = "_") {
     Value = val;
     Type = type;
     Name = name;
   }
 
-  bool operator<(RTParam const& rhs)       { return Value < rhs.Value; }
-  bool operator<(RTParam const& rhs) const { return Value < rhs.Value; }
+  bool operator<(RTParam const &rhs) { return Value < rhs.Value; }
+  bool operator<(RTParam const &rhs) const { return Value < rhs.Value; }
 
-  bool operator>(RTParam const& rhs)       { return Value > rhs.Value; }
-  bool operator>(RTParam const& rhs) const { return Value > rhs.Value; }
+  bool operator>(RTParam const &rhs) { return Value > rhs.Value; }
+  bool operator>(RTParam const &rhs) const { return Value > rhs.Value; }
 
   void print(raw_ostream &out) const {
     Type->print(out);
@@ -40,12 +39,11 @@ struct RTParam {
   }
 
   // Not implemented. Specialize me.
-  Constant *getAsConstant() {
-    return NULL;
-  }
+  Constant *getAsConstant() { return NULL; }
 
   // Get the name of this argument.
   StringRef &getName() { return Name; }
+
 private:
   StorageT Value;
   TypeT *Type;
@@ -53,34 +51,33 @@ private:
 };
 
 template <class StorageT, class TypeT>
-raw_ostream& operator<< (raw_ostream &out,
-                         const RTParam<StorageT, TypeT> &p) {
+raw_ostream &operator<<(raw_ostream &out, const RTParam<StorageT, TypeT> &p) {
   p.print(out);
   return out;
-};
+}
+;
 
 /* Specialize to APInt. We do not have a proper lt operator there. */
-template <class TypeT>
-struct RTParam<APInt, TypeT> {
+template <class TypeT> struct RTParam<APInt, TypeT> {
   explicit RTParam(APInt val, TypeT *type, const StringRef name = "_") {
     Value = val;
     Type = type;
     Name = name;
   }
 
-  bool operator<(RTParam<APInt, TypeT> const& rhs) {
+  bool operator<(RTParam<APInt, TypeT> const &rhs) {
     return Value.ult(rhs.Value);
   }
 
-  bool operator<(RTParam<APInt, TypeT> const& rhs) const {
+  bool operator<(RTParam<APInt, TypeT> const &rhs) const {
     return Value.ult(rhs.Value);
   }
 
-  bool operator>(RTParam<APInt, TypeT> const& rhs) {
+  bool operator>(RTParam<APInt, TypeT> const &rhs) {
     return Value.ugt(rhs.Value);
   }
 
-  bool operator>(RTParam<APInt, TypeT> const& rhs) const {
+  bool operator>(RTParam<APInt, TypeT> const &rhs) const {
     return Value.ugt(rhs.Value);
   }
 
@@ -89,9 +86,7 @@ struct RTParam<APInt, TypeT> {
     out << " " << Name << " = " << Value;
   }
 
-  Constant *getAsConstant() {
-    return ConstantInt::get(Type, Value);
-  }
+  Constant *getAsConstant() { return ConstantInt::get(Type, Value); }
 
   // Get the name of this argument.
   StringRef &getName() { return Name; }
@@ -102,12 +97,10 @@ private:
   StringRef Name;
 };
 
-template <class RTParam>
-struct ParamVector {
+template <class RTParam> struct ParamVector {
   /* Convert a std::vector of RTParams to a ParamArray. */
-  ParamVector(std::vector<RTParam> const& ParamVector) {
-    Params = ParamVector;
-  };
+  ParamVector(std::vector<RTParam> const &ParamVector) { Params = ParamVector; }
+  ;
 
   typedef typename std::vector<RTParam>::iterator iterator;
   typedef typename std::vector<RTParam>::const_iterator const_iterator;
@@ -120,15 +113,15 @@ struct ParamVector {
 
   inline size_t size() const { return Params.size(); }
 
-  RTParam &operator[](unsigned const& index) {
-    return Params[index];
-  };
+  RTParam &operator[](unsigned const &index) { return Params[index]; }
+  ;
 
-  const RTParam &operator[](unsigned const& index) const {
+  const RTParam &operator[](unsigned const &index) const {
     return Params[index];
-  };
+  }
+  ;
 
-  bool operator< (ParamVector<RTParam> const& rhs) {
+  bool operator<(ParamVector<RTParam> const &rhs) {
     bool isLess = false;
     bool isGrtr = false;
     unsigned i = 0;
@@ -143,7 +136,7 @@ struct ParamVector {
     return isLess;
   }
 
-  bool operator< (ParamVector<RTParam> const& rhs) const {
+  bool operator<(ParamVector<RTParam> const &rhs) const {
     bool isLess = false;
     bool isGrtr = false;
     unsigned i = 0;
@@ -161,7 +154,7 @@ struct ParamVector {
   StringRef getShortName() {
     std::string res = "";
 
-    for (unsigned i=0; i < Params.size(); ++i)
+    for (unsigned i = 0; i < Params.size(); ++i)
       if (Constant *c = Params[i].getAsConstant()) {
         const APInt &val = c->getUniqueInteger();
         SmallVector<char, 2> str;
@@ -170,21 +163,22 @@ struct ParamVector {
       }
     return res;
   }
+
 private:
   std::vector<RTParam> Params;
 };
 
 template <class RTParam>
-raw_ostream& operator<< (raw_ostream &out,
-                         const ParamVector<RTParam> &Params) {
+raw_ostream &operator<<(raw_ostream &out, const ParamVector<RTParam> &Params) {
   out << "[";
-  for (size_t i=0; i < Params.size(); ++i) {
+  for (size_t i = 0; i < Params.size(); ++i) {
     out << Params[i] << " ";
   }
 
   out << "]";
   return out;
-};
+}
+;
 
 /* For now we only deal with APInt storage of IntegerType parameter values. */
 typedef RTParam<APInt, IntegerType> RuntimeParam;
@@ -201,31 +195,29 @@ typedef std::map<Function *, ValKeyToFunction> SpecializedFuncs;
 /* Map instrumented function to original function. */
 typedef std::map<StringRef, Function *> FunctionNameToFunctionMapTy;
 
-static inline
-void printParameters(const Function *F, RTParams &Params) {
+static inline void printParameters(const Function *F, RTParams &Params) {
   dbgs() << "[" << F->getName() << "] Argument-Value Table:\n";
 
   dbgs() << "{\n";
   for (RTParams::iterator P = Params.begin(), PE = Params.end(); P != PE; ++P) {
     dbgs() << *P << "\n";
-
   }
   dbgs() << "}\n";
-};
+}
+;
 
-RTParams getRuntimeParameters(Function *F, unsigned paramc,
-                              char** params) {
+RTParams getRuntimeParameters(Function *F, unsigned paramc, char **params) {
   RTParams RuntimeParams;
   int i = 0;
-  for (Function::arg_iterator Arg = F->arg_begin(), ArgE= F->arg_end();
+  for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
        Arg != ArgE; ++Arg, ++i) {
     Type *ArgTy = Arg->getType();
 
     /* TODO: Add more types to be suitable for spawning new functions. */
     if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
-      APInt val = APInt(IntTy->getBitWidth(),
-                        (uint64_t)(*(uint64_t *)params[i]),
-                        IntTy->getSignBit());
+      APInt val =
+          APInt(IntTy->getBitWidth(), (uint64_t)(*(uint64_t *)params[i]),
+                IntTy->getSignBit());
       RuntimeParams.push_back(RuntimeParam(val, IntTy, Arg->getName()));
     }
   }
@@ -233,15 +225,12 @@ RTParams getRuntimeParameters(Function *F, unsigned paramc,
   return RuntimeParams;
 }
 
-template <class ParamT>
-class SpecializeEndpoint {
+template <class ParamT> class SpecializeEndpoint {
 private:
   ParamVector<ParamT> *SpecValues;
 
 public:
-  void setParameters(ParamVector<ParamT> *Values) {
-    SpecValues = Values;
-  }
+  void setParameters(ParamVector<ParamT> *Values) { SpecValues = Values; }
 
   Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
     Function::arg_iterator result = F->arg_begin(), end = F->arg_end();
@@ -280,7 +269,7 @@ public:
     Builder.SetInsertPoint(EntryBB);
     Builder.CreateBr(ClonedEntryBB);
 
-    for (unsigned i=0; i < SpecValues->size(); ++i) {
+    for (unsigned i = 0; i < SpecValues->size(); ++i) {
       ParamT P = (*SpecValues)[i];
       Function::arg_iterator Arg = getArgument(SrcF, P.getName());
 
@@ -305,7 +294,7 @@ public:
     for (Function::iterator BB = TgtF->begin(), BE = TgtF->end(); BB != BE;
          ++BB)
       if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB->getTerminator())) {
-          ReplaceInstWithInst(Ret, ReturnInst::Create(Context, Zero));
+        ReplaceInstWithInst(Ret, ReturnInst::Create(Context, Zero));
       }
   }
 };
@@ -324,7 +313,7 @@ struct MainCreator {
     Function::const_arg_iterator Arg = SrcF->arg_begin();
     Function::arg_iterator TgtArg = TgtF->arg_begin();
     Argument *ArgC = TgtArg;
-    Value    *ArgV = ++TgtArg;
+    Value *ArgV = ++TgtArg;
 
     ArgC->setName("argc");
     ArgV->setName("argv");
@@ -333,9 +322,9 @@ struct MainCreator {
     // This is very inefficient, because some parameters are not required
     // anymore.
     for (unsigned i = 0; i < SrcF->arg_size(); ++i) {
-      Type  *ArgTy   = Arg->getType();
-      Value *ArrIdx  = Builder.CreateConstInBoundsGEP2_64(ArgV, 0, i,
-                                                          "arrayidx");
+      Type *ArgTy = Arg->getType();
+      Value *ArrIdx =
+          Builder.CreateConstInBoundsGEP2_64(ArgV, 0, i, "arrayidx");
       Value *LoadArr = Builder.CreateLoad(ArrIdx);
       Value *CastVal = Builder.CreateBitCast(LoadArr, ArgTy->getPointerTo());
 
@@ -346,7 +335,7 @@ struct MainCreator {
   }
 
   static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
-                                                    Function *TgtF) {
+                           Function *TgtF) {
     LLVMContext &Context = TgtF->getContext();
     IRBuilder<> Builder(Context);
 
@@ -359,15 +348,15 @@ struct MainCreator {
   static Function *Create(Function *SrcF, Module *TgtM) {
     LLVMContext &Context = TgtM->getContext();
     Type *RetType = IntegerType::getInt32Ty(Context);
-//    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context), 0);
+    //    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context),
+    // 0);
 
-    ArrayType *PtoArr = ArrayType::get(Type::getInt8PtrTy(Context),
-                                       SrcF->arg_size());
+    ArrayType *PtoArr =
+        ArrayType::get(Type::getInt8PtrTy(Context), SrcF->arg_size());
 
     Constant *C = TgtM->getOrInsertFunction(SrcF->getName(), RetType,
                                             Type::getInt32Ty(Context),
-                                            PointerType::get(PtoArr, 0),
-                                            NULL);
+                                            PointerType::get(PtoArr, 0), NULL);
 
     Function *F = cast<Function>(C);
     F->setLinkage(SrcF->getLinkage());
@@ -379,10 +368,10 @@ struct MainCreator {
 /// @brief Implement a function dispatch to reroute calls to parametrized
 /// functions to their possible specializations.
 class FunctionDispatcher {
-  FunctionDispatcher (const FunctionDispatcher &)
-    LLVM_DELETED_FUNCTION;
-  const FunctionDispatcher &operator=(const FunctionDispatcher &)
-    LLVM_DELETED_FUNCTION;
+  FunctionDispatcher(const FunctionDispatcher &)
+  LLVM_DELETED_FUNCTION;
+  const FunctionDispatcher &operator=(
+      const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
 
   /// @brief Maps source Functions to specialized functions,
   //         based on the input parameters.
@@ -397,12 +386,12 @@ class FunctionDispatcher {
   // Map instrumented functions to uninstrumented functions. Used to resolve
   // to the uninstrumented function when coming from the JIT callback function.
   FunctionNameToFunctionMapTy FMap;
+
 public:
   explicit FunctionDispatcher() {}
 
-  template<class ParamT>
-  Function *specialize(Function *F,
-                       ParamVector<ParamT> &Values) {
+  template <class ParamT>
+  Function *specialize(Function *F, ParamVector<ParamT> &Values) {
     ValueToValueMapTy VMap;
 
     /* Copy properties of our source module */
@@ -414,16 +403,15 @@ public:
     NewM->setDataLayout(M->getDataLayout());
     NewM->setMaterializer(M->getMaterializer());
     NewM->setModuleIdentifier(
-      (M->getModuleIdentifier() + "." + F->getName()).str()
-                                + Values.getShortName().str()
-                                + ".ll");
+        (M->getModuleIdentifier() + "." + F->getName()).str() +
+        Values.getShortName().str() + ".ll");
 
     FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<ParamT> >
-      Specializer(VMap, NewM);
+    Specializer(VMap, NewM);
 
     // Fetch the uninstrumented function for specialization.
     Function *OrigF = NULL;
-    Function *NewF  = NULL;
+    Function *NewF = NULL;
 
     OrigF = FMap[F->getName()];
     if (OrigF && !OrigF->isDeclaration()) {
@@ -436,7 +424,8 @@ public:
     }
 
     return NewF;
-  };
+  }
+  ;
 
   /// @brief Set up a mapping between an uninstrumented and an instrumented
   //         function.
@@ -449,22 +438,21 @@ public:
   //  of input parameters is generated.
   //
   //  Apply all necessary optimization steps here.
-  template<class ParamT>
-  Function *getFunctionForValues(Function *F,
-                                 ParamVector<ParamT> &Values) {
-    ValKeyToFunction ValToFun = (!SpecFuns.count(F)) ? ValKeyToFunction()
-                                                     : SpecFuns[F];
+  template <class ParamT>
+  Function *getFunctionForValues(Function *F, ParamVector<ParamT> &Values) {
+    ValKeyToFunction ValToFun =
+        (!SpecFuns.count(F)) ? ValKeyToFunction() : SpecFuns[F];
 
     /* TODO: We need to be a bit more smart than: Specialize everything. */
     if (!ValToFun.count(Values)) {
       DEBUG(dbgs() << "[polli] (new)\n");
-      Function *NewF  = specialize(F, Values);
+      Function *NewF = specialize(F, Values);
       RuntimeOptimizer RTOpt;
 
       RTOpt.Optimize(*NewF);
 
       ValToFun[Values] = NewF;
-      SpecFuns[F]      = ValToFun;
+      SpecFuns[F] = ValToFun;
     }
 
     Function *SpecF = ValToFun[Values];

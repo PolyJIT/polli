@@ -29,6 +29,7 @@ public:
   explicit RuntimeOptimizer() {};
 
   bool Optimize(Function &F);
+
 private:
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT

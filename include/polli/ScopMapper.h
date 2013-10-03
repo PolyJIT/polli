@@ -9,8 +9,8 @@
 //
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_SCOP_MAPPER_H 
-#define POLLI_SCOP_MAPPER_H 
+#ifndef POLLI_SCOP_MAPPER_H
+#define POLLI_SCOP_MAPPER_H
 
 #include "llvm/Pass.h"
 #include "llvm/IR/Function.h"
@@ -29,10 +29,11 @@ public:
 
   iterator begin() { return CreatedFunctions.begin(); }
   iterator end() { return CreatedFunctions.end(); }
+  FunctionSet &getCreatedFunctions() { return CreatedFunctions; }
 
   static char ID;
   explicit ScopMapper() : FunctionPass(ID) {}
-  
+
   /// @name FunctionPass interface
   //@{
   virtual void getAnalysisUsage(AnalysisUsage &AU) const;
@@ -43,11 +44,11 @@ public:
 private:
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
-  ScopMapper(const ScopMapper&);
+  ScopMapper(const ScopMapper &);
   // DO NOT IMPLEMENT
   const ScopMapper &operator=(const ScopMapper &);
-  
+
   FunctionSet CreatedFunctions;
 };
 }
-#endif //POLLI_SCOP_MAPPER_H
+#endif // POLLI_SCOP_MAPPER_H

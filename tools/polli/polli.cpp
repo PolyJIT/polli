@@ -63,6 +63,19 @@
 using namespace llvm;
 
 namespace {
+  // Runtime Options
+  cl::OptionCategory PolliCategory("Polli Options",
+                                   "Configure the runtime options of polli");
+
+  cl::list<std::string> LibPaths("L", cl::Prefix,
+    cl::desc("Specify a library search path"),
+    cl::value_desc("directory"), cl::ZeroOrMore, cl::cat(PolliCategory));
+
+  cl::list<std::string> Libraries("l", cl::Prefix,
+    cl::desc("Specify libraries to link to"),
+    cl::value_desc("library prefix"), cl::ZeroOrMore,
+    cl::cat(PolliCategory));
+
   cl::opt<std::string>
   InputFile(cl::desc("<input bitcode>"), cl::Positional, cl::init("-"));
 

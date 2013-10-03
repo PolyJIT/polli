@@ -9,8 +9,8 @@
 //
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_NON_AFFINE_SCOP_DETECTION_H 
-#define POLLI_NON_AFFINE_SCOP_DETECTION_H 
+#ifndef POLLI_NON_AFFINE_SCOP_DETECTION_H
+#define POLLI_NON_AFFINE_SCOP_DETECTION_H
 
 #include "polly/Support/SCEVValidator.h"
 
@@ -41,19 +41,18 @@ public:
   typedef ParamMap::iterator iterator;
   typedef ParamMap::const_iterator const_iterator;
 
-  iterator begin()  { return RequiredParams.begin(); }
-  iterator end()    { return RequiredParams.end();   }
+  iterator begin() { return RequiredParams.begin(); }
+  iterator end() { return RequiredParams.end(); }
 
   const_iterator begin() const { return RequiredParams.begin(); }
-  const_iterator end()   const { return RequiredParams.end();   }
+  const_iterator end() const { return RequiredParams.end(); }
 
   /// @name FunctionPass interface
   //@{
   virtual void getAnalysisUsage(AnalysisUsage &AU) const;
 
-  virtual void releaseMemory() {
-    RequiredParams.clear();
-  };
+  virtual void releaseMemory() { RequiredParams.clear(); }
+  ;
 
   virtual bool runOnFunction(Function &F);
 

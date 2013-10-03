@@ -70,7 +70,7 @@ bool RuntimeOptimizer::Optimize(Function &F) {
   bool result = FPM.run(F);
   FPM.doFinalization();
 
-  //DEBUG(StoreModule(*M, M->getModuleIdentifier()));
+  // DEBUG(StoreModule(*M, M->getModuleIdentifier()));
   StoreModule(*M, M->getModuleIdentifier());
   return result;
 }

@@ -27,8 +27,7 @@ void initializeOutputDir() {
 
   p::append(cwd, "polli");
   fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
-  outs() << "DefaultDir = "
-         << StringRef(DefaultDir->data(), DefaultDir->size())
+  outs() << "DefaultDir = " << StringRef(DefaultDir->data(), DefaultDir->size())
          << "\n";
 }
 
@@ -46,18 +45,16 @@ void StoreModule(Module &M, const Twine &Name) {
 
   std::string path = StringRef(destPath.data(), destPath.size()).str();
   DEBUG(dbgs().indent(2) << "Storing: " << M.getModuleIdentifier() << "\n");
-  Out.reset(new tool_output_file(path.c_str(), ErrorInfo,
-                                 raw_fd_ostream::F_Binary));
+  Out.reset(new tool_output_file(path.c_str(), ErrorInfo, F_Binary));
   PM.add(new DataLayout(M.getDataLayout()));
   PM.add(createPrintModulePass(&Out->os()));
   PM.run(M);
   Out->keep();
 }
 
-void StoreModules(ManagedModules & Modules) {
-  for (ManagedModules::iterator
-       MI = Modules.begin(), ME = Modules.end(); MI != ME; ++MI) {
-    Module *M = (*MI).first;
+void StoreModules(ManagedModules &Modules) {
+  for (auto &Modules_MI : Modules) {
+    Module *M = (Modules_MI).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
 }

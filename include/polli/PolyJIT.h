@@ -1,4 +1,5 @@
-//===-- PolyJIT.h - Class definition for the JIT --------------------*- C++ -*-===//
+//===-- PolyJIT.h - Class definition for the JIT --------------------*- C++
+//-*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -40,14 +41,13 @@ class TargetMachine;
 
 class PolyJIT {
 public:
-  static PolyJIT* Get(Module *M = 0, bool NoLazyCompilation = false);
+  static PolyJIT *Get(Module *M = 0, bool NoLazyCompilation = false);
 
   // Creates a fresh ExecutionEngine for the given Module.
-  static ExecutionEngine* GetEngine(Module *M, bool NoLazyCompilation = false);
+  static ExecutionEngine *GetEngine(Module *M, bool NoLazyCompilation = false);
 
-  void setEntryFunction(std::string name) {
-    EntryFn = name;
-  };
+  void setEntryFunction(std::string name) { EntryFn = name; }
+  ;
 
   // JIT and run the Main function.
   //
@@ -56,7 +56,7 @@ public:
   // Afterwards n phases are executed:
   //
   int runMain(const std::vector<std::string> &inputArgs,
-              const char * const *envp);
+              const char *const *envp);
 
   int shutdown(int result);
 
@@ -72,21 +72,22 @@ public:
   void runSpecializedFunction(Function *NewF,
                               const std::vector<GenericValue> &ArgValues);
 
-
 private:
-  static PolyJIT* Instance;
+  static PolyJIT *Instance;
 
   PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {
     FPM = new FunctionPassManager(&M);
-  };
+  }
+  ;
 
   PolyJIT(const PolyJIT &);
   ~PolyJIT() {}
 
   struct Sentinel {
-  public: ~Sentinel() {
-    if (PolyJIT::Instance)
-      delete PolyJIT::Instance;
+  public:
+    ~Sentinel() {
+      if (PolyJIT::Instance)
+        delete PolyJIT::Instance;
     }
   };
   friend struct Sentinel;

@@ -30,48 +30,45 @@ using namespace llvm;
 namespace polli {
 void DEBUG_printArgumentUseChain(const Twine &LocStr, Function *F) {
   dbgs() << LocStr << "\n";
-  dbgs() << "Checking def-use chain for: "
-         << F->getName() << "\n";
-  for (Function::arg_iterator Arg = F->arg_begin(),
-       ArgE = F->arg_end(); Arg != ArgE; ++Arg) {
-      for (Value::use_iterator i = Arg->use_begin(), ie = Arg->use_end();
-           i != ie; ++ i) {
-        dbgs() << Arg->getName() << " is used in ";
-        if (Instruction *Inst = dyn_cast<Instruction>(*i)) {
-            if (BasicBlock *BB = Inst->getParent()) {
-                if (Function *F = BB->getParent())
-                    dbgs() << " Function: " << F->getName() << "\n";
-                dbgs() << " BB: " << BB->getName() << "\n";
-            }
-            dbgs() << " Instruction: "; Inst->dump();
-            dbgs() << "\n";
-        } else
-          dbgs() << "Iterator value not an instruction\n";
-      }
+  dbgs() << "Checking def-use chain for: " << F->getName() << "\n";
+  for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
+       Arg != ArgE; ++Arg) {
+    for (Value::use_iterator i = Arg->use_begin(), ie = Arg->use_end(); i != ie;
+         ++i) {
+      dbgs() << Arg->getName() << " is used in ";
+      if (Instruction *Inst = dyn_cast<Instruction>(*i)) {
+        if (BasicBlock *BB = Inst->getParent()) {
+          if (Function *F = BB->getParent())
+            dbgs() << " Function: " << F->getName() << "\n";
+          dbgs() << " BB: " << BB->getName() << "\n";
+        }
+        dbgs() << " Instruction: ";
+        Inst->dump();
+        dbgs() << "\n";
+      } else
+        dbgs() << "Iterator value not an instruction\n";
+    }
   }
 }
 
-template
-<
-  class CreationPolicy,
-  class DrainPolicy,
-  class SinkPolicy
->
+template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
 class FunctionCloner : public CreationPolicy,
                        public DrainPolicy,
                        public SinkPolicy {
   ValueToValueMapTy &VMap;
-  Module   *TgtM;
+  Module *TgtM;
 
   Function *SrcF;
   Function *TgtF;
 
 public:
-  explicit FunctionCloner<CreationPolicy, DrainPolicy, SinkPolicy>
-    (ValueToValueMapTy& map, Module *m = NULL) : VMap(map), TgtM(m) {
-      SrcF = NULL;
-      TgtF = NULL;
-    };
+  explicit FunctionCloner<CreationPolicy, DrainPolicy, SinkPolicy>(
+      ValueToValueMapTy &map, Module *m = NULL)
+      : VMap(map), TgtM(m) {
+    SrcF = NULL;
+    TgtF = NULL;
+  }
+  ;
 
   void setTarget(Function *F) { TgtF = F; }
   void setSource(Function *F) { SrcF = F; }
@@ -93,15 +90,15 @@ public:
       TgtM = SrcF->getParent();
 
     if (!TgtF)
-     TgtF = CreationPolicy::Create(SrcF, TgtM);
+      TgtF = CreationPolicy::Create(SrcF, TgtM);
 
     TgtF->copyAttributesFrom(SrcF);
 
     CreationPolicy::MapArguments(VMap, SrcF, TgtF);
 
     /* Copy function body ExtractedF over to ClonedF */
-    SmallVector<ReturnInst*, 8> Returns;
-    CloneFunctionInto(TgtF, SrcF, VMap,/* ModuleLevelChanges=*/false, Returns);
+    SmallVector<ReturnInst *, 8> Returns;
+    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
 
     // Store function mapping for the linker.
     VMap[SrcF] = TgtF;
@@ -110,8 +107,9 @@ public:
     SinkPolicy::Apply(TgtF, SrcF, VMap);
 
     // No need for the mapping anymore.
-    for (Function::const_arg_iterator
-         Arg = SrcF->arg_begin(), AE = SrcF->arg_end(); Arg != AE; ++Arg) {
+    for (Function::const_arg_iterator Arg = SrcF->arg_begin(),
+                                      AE = SrcF->arg_end();
+         Arg != AE; ++Arg) {
       VMap.erase(Arg);
     }
 
@@ -124,20 +122,19 @@ public:
  */
 struct CopyCreator {
   static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
-                                                    Function *TgtF) {
+                           Function *TgtF) {
     Function::arg_iterator NewArg = TgtF->arg_begin();
-    for (Function::const_arg_iterator
-         Arg = SrcF->arg_begin(), AE = SrcF->arg_end(); Arg != AE; ++Arg) {
+    for (Function::const_arg_iterator Arg = SrcF->arg_begin(),
+                                      AE = SrcF->arg_end();
+         Arg != AE; ++Arg) {
       NewArg->setName(Arg->getName());
       VMap[Arg] = NewArg++;
     }
   }
 
   static Function *Create(Function *SrcF, Module *TgtM) {
-    return Function::Create(SrcF->getFunctionType(),
-                            SrcF->getLinkage(),
-                            SrcF->getName(),
-                            TgtM);
+    return Function::Create(SrcF->getFunctionType(), SrcF->getLinkage(),
+                            SrcF->getName(), TgtM);
   }
 };
 
@@ -157,20 +154,16 @@ struct IgnoreTarget {
 };
 
 struct DestroyEndpoint {
-  static void Apply(Function* TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  static void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
     VMap.erase(TgtF);
   }
 };
 
 struct InstrumentEndpoint {
-  void setPass(Pass *HostPass) {
-    P = HostPass;
-  }
+  void setPass(Pass *HostPass) { P = HostPass; }
 
-  Pass *getPass() {
-    return P;
-  }
+  Pass *getPass() { return P; }
 
   void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
     if (TgtF->isDeclaration())
@@ -182,12 +175,9 @@ struct InstrumentEndpoint {
 
     StringRef cbName = StringRef("polli.enter.runtime");
     PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
-    Function *PJITCB = cast<Function>(
-      M->getOrInsertFunction(cbName, Type::getVoidTy(Ctx),
-                                     Type::getInt8PtrTy(Ctx),
-                                     Type::getInt32Ty(Ctx),
-                                     PtoArr,
-                                     NULL));
+    Function *PJITCB = cast<Function>(M->getOrInsertFunction(
+        cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
+        Type::getInt32Ty(Ctx), PtoArr, NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
     std::vector<Value *> Args(3);
@@ -209,28 +199,27 @@ struct InstrumentEndpoint {
      * this array into our callback function. */
     int argc = TgtF->arg_size();
     Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc, true);
-    Value *Params = Builder.CreateAlloca(Type::getInt8PtrTy(Ctx),
-                                         ParamC, "params");
+    Value *Params =
+        Builder.CreateAlloca(Type::getInt8PtrTy(Ctx), ParamC, "params");
 
     /* Store each parameter as pointer in the params array */
     int i = 0;
-    Value *One    = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
-    for (Function::arg_iterator Arg = TgtF->arg_begin(),
-                                ArgE = TgtF->arg_end();
-                                Arg != ArgE; ++Arg) {
+    Value *One = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
+    for (Function::arg_iterator Arg = TgtF->arg_begin(), ArgE = TgtF->arg_end();
+         Arg != ArgE; ++Arg) {
 
       /* Allocate a slot on the stack for the i'th argument and store it */
-      Value *Slot   = Builder.CreateAlloca(Arg->getType(), One);
+      Value *Slot = Builder.CreateAlloca(Arg->getType(), One);
       Builder.CreateStore(Arg, Slot);
 
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
       Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
-      Value *Dest   = Builder.CreateGEP(Params, ArrIdx);
+      Value *Dest = Builder.CreateGEP(Params, ArrIdx);
 
-      //Builder.CreateAlignedStore(Slot8, Dest, 8);
-      Builder.CreateStore(Builder.CreateBitCast(Slot,
-                                                Type::getInt8PtrTy(Ctx)), Dest);
+      // Builder.CreateAlignedStore(Slot8, Dest, 8);
+      Builder.CreateStore(Builder.CreateBitCast(Slot, Type::getInt8PtrTy(Ctx)),
+                          Dest);
       i++;
     }
 
@@ -265,13 +254,13 @@ private:
   Pass *P;
 };
 
-typedef
-FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget> DefaultFunctionCloner;
+typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
+DefaultFunctionCloner;
 
-typedef
-FunctionCloner<CopyCreator, DestroyEndpoint, IgnoreTarget> MovingFunctionCloner;
+typedef FunctionCloner<CopyCreator, DestroyEndpoint, IgnoreTarget>
+MovingFunctionCloner;
 
-typedef
-FunctionCloner<CopyCreator, IgnoreSource, InstrumentEndpoint> InstrumentingFunctionCloner;
+typedef FunctionCloner<CopyCreator, IgnoreSource, InstrumentEndpoint>
+InstrumentingFunctionCloner;
 }
-#endif //POLLI_FUNCTION_CLONER_H
+#endif // POLLI_FUNCTION_CLONER_H

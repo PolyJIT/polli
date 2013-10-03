@@ -32,7 +32,7 @@ using namespace llvm;
 using namespace llvm::sys::fs;
 
 namespace fs = llvm::sys::fs;
-namespace p  = llvm::sys::path;
+namespace p = llvm::sys::path;
 
 typedef std::map<Module *, ExecutionEngine *> ManagedModules;
 
@@ -40,5 +40,5 @@ extern SmallVector<char, 255> *DefaultDir;
 
 void initializeOutputDir();
 void StoreModule(Module &M, const Twine &Name);
-void StoreModules(ManagedModules & Modules);
-#endif //POLLI_UTILS_H
+void StoreModules(ManagedModules &Modules);
+#endif // POLLI_UTILS_H

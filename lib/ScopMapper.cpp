@@ -41,10 +41,11 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<DominatorTree>();
   AU.addRequired<RegionInfo>();
   AU.setPreservesAll();
-};
+}
+;
 
 bool ScopMapper::runOnFunction(Function &F) {
-  DominatorTree *DT  = &getAnalysis<DominatorTree>();
+  DominatorTree *DT = &getAnalysis<DominatorTree>();
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
 
   if (CreatedFunctions.count(&F))
@@ -52,7 +53,7 @@ bool ScopMapper::runOnFunction(Function &F) {
 
   /* Extract each SCoP in this function into a new one. */
   CodeExtractor *Extractor;
-  int i=0;
+  int i = 0;
   for (NonAffineScopDetection::iterator RP = NSD->begin(), RE = NSD->end();
        RP != RE; ++RP) {
     const Region *R = RP->first;
@@ -70,6 +71,7 @@ bool ScopMapper::runOnFunction(Function &F) {
   }
 
   return true;
-};
+}
+;
 
 char ScopMapper::ID = 0;
