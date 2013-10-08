@@ -59,13 +59,16 @@ bool ScopMapper::runOnFunction(Function &F) {
     const Region *R = RP->first;
 
     Extractor = new CodeExtractor(*DT, *R);
-    Function *ExtractedF = Extractor->extractCodeRegion();
 
-    if (ExtractedF) {
-      ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
-      ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
-      /* FIXME: Do not depend on this set. */
-      CreatedFunctions.insert(ExtractedF);
+    if (Extractor->isEligible()) {
+      Function *ExtractedF = Extractor->extractCodeRegion();
+
+      if (ExtractedF) {
+        ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
+        ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
+        /* FIXME: Do not depend on this set. */
+        CreatedFunctions.insert(ExtractedF);
+      }
     }
     delete Extractor;
   }
