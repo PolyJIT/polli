@@ -35,6 +35,8 @@ set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 include("polli_macros")
 
+FIND_PACKAGE(Papi)
+
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wno-unused-parameter -Wwrite-strings")
@@ -45,6 +47,11 @@ include_directories(
   ${POLLI_SOURCE_DIR}/include
   ${POLLI_BINARY_DIR}/include
   )
+
+if (PAPI_FOUND)
+  include_directories(${PAPI_INCLUDE_DIR})
+  link_directories(${PAPI_LIBRARY})
+endif()
 
 install(DIRECTORY include/
   DESTINATION include

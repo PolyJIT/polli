@@ -46,6 +46,7 @@ public:
 
   const_iterator begin() const { return RequiredParams.begin(); }
   const_iterator end() const { return RequiredParams.end(); }
+  int count(Region *R) { return RequiredParams.count(R); }
 
   /// @name FunctionPass interface
   //@{

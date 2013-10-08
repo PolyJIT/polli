@@ -66,6 +66,7 @@
 #include "polli/FunctionCloner.h"
 #include "polli/FunctionDispatcher.h"
 #include "polli/NonAffineScopDetection.h"
+#include "polli/PapiProfiling.h"
 #include "polli/ScopMapper.h"
 #include "polli/Utils.h"
 
@@ -81,6 +82,18 @@ namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
 
 namespace {
+static cl::opt<bool> EnablePapi("papi", cl::desc("Instrument SCoPs with PAPI"
+                                                 "counters."),
+                                cl::init(false));
+
+static cl::opt<bool>
+InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
+                  cl::init(false));
+
+static cl::opt<bool>
+DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
+                 cl::init(false));
+
 // Determine optimization level.
 cl::opt<char> OptLevel("O",
                        cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
@@ -465,7 +478,15 @@ void PolyJIT::extractJitableScops(Module &M) {
   /* Add ScopDetection, ResultsViewer and NonAffineScopDetection */
   FPM->add(SD);
   FPM->add(NaSD);
-  FPM->add(SM);
+ 
+  if (EnablePapi)
+    FPM->add(new PapiRegionPrepare());
+
+  if (InstrumentRegions)
+    FPM->add(new PapiRegionProfiling());
+
+  if (!DisableRecompile)
+    FPM->add(SM);
 
   FPM->doInitialization();
 
@@ -474,7 +495,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     if (f->isDeclaration())
       continue;
 
-    if (!SM->getCreatedFunctions().count(f))
+    if (DisableRecompile || !SM->getCreatedFunctions().count(f))
       FPM->run(*f);
   }
 

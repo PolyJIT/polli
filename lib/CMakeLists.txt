@@ -31,6 +31,7 @@ set(LLVM_USED_LIBS
 
 add_polli_library(PolyJIT
   NonAffineScopDetection.cpp
+  PapiProfiling.cpp
   PolyJIT.cpp
   RuntimeOptimizer.cpp
   ScopMapper.cpp
