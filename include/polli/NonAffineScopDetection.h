@@ -46,7 +46,9 @@ public:
 
   const_iterator begin() const { return RequiredParams.begin(); }
   const_iterator end() const { return RequiredParams.end(); }
-  int count(Region *R) { return RequiredParams.count(R); }
+
+  int count(const Region *R) { return AccumulatedScops.count(R); }
+  unsigned size() { return AccumulatedScops.size(); }
 
   /// @name FunctionPass interface
   //@{
@@ -73,6 +75,7 @@ private:
 
   Module *M;
 
+  std::set<const Region *> AccumulatedScops;
   ParamMap RequiredParams;
 };
 #endif

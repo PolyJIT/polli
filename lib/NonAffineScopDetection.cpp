@@ -39,6 +39,9 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
   M = F.getParent();
 
   DEBUG(dbgs() << "[polli] Running on: " << F.getName() << "\n");
+  for (ScopDetection::const_iterator i = SD->begin(), ie = SD->end(); i != ie;
+       ++i)
+    AccumulatedScops.insert(*i);
 
   polly::RejectedLog rl = SD->getRejectedLog();
   for (polly::RejectedLog::iterator i = rl.begin(), ie = rl.end(); i != ie;
@@ -76,6 +79,7 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
         isValid &= polly::isNonAffineExpr(R, check, *SE);
         params = getParamsInNonAffineExpr(R, check, *SE);
 
+        AccumulatedScops.insert(R);
         RequiredParams[R]
             .insert(RequiredParams[R].end(), params.begin(), params.end());
       }
