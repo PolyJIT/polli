@@ -569,16 +569,8 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     return -1;
   }
 
-  // TODO: Link OpenMP (bit ugly, but whatever.
-  std::string ErrorMsg;
-  if (sys::DynamicLibrary::LoadLibraryPermanently("libgomp.so", &ErrorMsg))
-    errs() << "ERROR: " << ErrorMsg << "\n";
-
   // Run static constructors.
   EE.runStaticConstructorsDestructors(false);
-  // Trigger compilation separately so code regions that need to be
-  // invalidated will be known.
-  //(void)EE.getPointerToFunction(Main);
 
   /* Preoptimize our module for polly */
   runPollyPreoptimizationPasses(M);
