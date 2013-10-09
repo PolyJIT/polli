@@ -8,6 +8,9 @@
 //===----------------------------------------------------------------------===//
 //
 //===----------------------------------------------------------------------===//
+#define DEBUG_TYPE "papi"
+#include "llvm/Support/Debug.h"
+
 #include "polli/PapiProfiling.h"
 #include "papi.h"
 #include "llvm/Analysis/LoopInfo.h"
@@ -42,17 +45,14 @@ using namespace polly;
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 
-static void PapiRegionEnterSCoP(Constant *ElemPtr,
-                                Instruction *InsertBefore, Module *M,
-                                std::string dbgs = "") {
+static void PapiRegionEnterSCoP(Constant *ElemPtr, Instruction *InsertBefore,
+                                Module *M, std::string dbgs = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
-  Constant *PapiScopEnterFn = M->getOrInsertFunction("papi_region_enter_scop",
-                                                     Builder.getVoidTy(),
-                                                     Type::getInt64PtrTy(Context),
-                                                     Builder.getInt8PtrTy(),
-                                                     NULL);
+  Constant *PapiScopEnterFn = M->getOrInsertFunction(
+      "papi_region_enter_scop", Builder.getVoidTy(),
+      Type::getInt64PtrTy(Context), Builder.getInt8PtrTy(), NULL);
 
   Builder.SetInsertPoint(InsertBefore);
   Args[0] = ElemPtr;
@@ -61,45 +61,40 @@ static void PapiRegionEnterSCoP(Constant *ElemPtr,
   Builder.CreateCall(PapiScopEnterFn, Args);
 }
 
-static void PapiRegionExitSCoP(Constant *ElemPtr,
-                               Instruction *InsertBefore, Module *M,
-                               std::string dbgs = "") {
+static void PapiRegionExitSCoP(Constant *ElemPtr, Instruction *InsertBefore,
+                               Module *M, std::string dbgs = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
-  Constant *PapiScopExitFn = M->getOrInsertFunction("papi_region_exit_scop",
-                                                     Builder.getVoidTy(),
-                                                     Type::getInt64PtrTy(Context),
-                                                     Builder.getInt8PtrTy(),
-                                                     NULL);
+  Constant *PapiScopExitFn = M->getOrInsertFunction(
+      "papi_region_exit_scop", Builder.getVoidTy(),
+      Type::getInt64PtrTy(Context), Builder.getInt8PtrTy(), NULL);
   Builder.SetInsertPoint(InsertBefore);
   Args[0] = ElemPtr;
   Args[1] = Builder.CreateGlobalStringPtr(dbgs);
 
   Builder.CreateCall(PapiScopExitFn, Args);
 }
-static void PapiRegionEnter(Constant *ElemPtr,
-                            Instruction *InsertBefore, Module *M) {
+static void PapiRegionEnter(Constant *ElemPtr, Instruction *InsertBefore,
+                            Module *M) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
-  Constant *PapiScopEnterFn = M->getOrInsertFunction("papi_region_enter",
-                                                     Builder.getVoidTy(),
-                                                     Type::getInt64PtrTy(Context),
-                                                     NULL);
+  Constant *PapiScopEnterFn =
+      M->getOrInsertFunction("papi_region_enter", Builder.getVoidTy(),
+                             Type::getInt64PtrTy(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(PapiScopEnterFn, ElemPtr);
 }
 
-static void PapiRegionExit(Constant *ElemPtr,
-                           Instruction *InsertBefore, Module *M) {
+static void PapiRegionExit(Constant *ElemPtr, Instruction *InsertBefore,
+                           Module *M) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
-  Constant *PapiScopEnterFn = M->getOrInsertFunction("papi_region_exit",
-                                                     Builder.getVoidTy(),
-                                                     Type::getInt64PtrTy(Context),
-                                                     NULL);
+  Constant *PapiScopEnterFn =
+      M->getOrInsertFunction("papi_region_exit", Builder.getVoidTy(),
+                             Type::getInt64PtrTy(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(PapiScopEnterFn, ElemPtr);
 }
@@ -108,10 +103,8 @@ static void PapiCreateInit(Function *F) {
   LLVMContext &Context = F->getContext();
   Module *M = F->getParent();
   IRBuilder<> Builder(Context);
-  Constant *PapiLibInitFn = M->getOrInsertFunction("PAPI_library_init",
-                            Builder.getInt32Ty(),
-                            Builder.getInt32Ty(),
-                            NULL);
+  Constant *PapiLibInitFn = M->getOrInsertFunction(
+      "PAPI_library_init", Builder.getInt32Ty(), Builder.getInt32Ty(), NULL);
 
   Instruction *Insert = F->getEntryBlock().getFirstInsertionPt();
   Builder.SetInsertPoint(Insert);
@@ -120,73 +113,69 @@ static void PapiCreateInit(Function *F) {
 }
 
 static void PapiCreateAdd(Instruction *InsertBefore, Constant *ElemPtr,
-                   Module *M, std::string prefix = "papi.counters.") {
+                          Module *M, std::string prefix = "papi.counters.") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
-  Constant *PapiGetTimeFn = M->getOrInsertFunction("PAPI_get_virt_usec",
-                            Builder.getInt64Ty(), NULL);
+  Constant *PapiGetTimeFn =
+      M->getOrInsertFunction("PAPI_get_virt_usec", Builder.getInt64Ty(), NULL);
   Value *OldVal, *NewVal, *Current;
 
   Builder.SetInsertPoint(InsertBefore);
-  OldVal     = Builder.CreateLoad(ElemPtr, prefix + "summand");
-  Current    = Builder.CreateCall(PapiGetTimeFn, prefix + "time");
-  NewVal     = Builder.CreateAdd(OldVal, Current, prefix + "sum");
+  OldVal = Builder.CreateLoad(ElemPtr, prefix + "summand");
+  Current = Builder.CreateCall(PapiGetTimeFn, prefix + "time");
+  NewVal = Builder.CreateAdd(OldVal, Current, prefix + "sum");
 
   Builder.CreateStore(NewVal, ElemPtr);
 }
 
 static void PapiCreateSub(Instruction *InsertBefore, Constant *ElemPtr,
-                   Module *M, std::string prefix = "papi.counters.") {
+                          Module *M, std::string prefix = "papi.counters.") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
-  Constant *PapiGetTimeFn = M->getOrInsertFunction("PAPI_get_virt_usec",
-                            Builder.getInt64Ty(), NULL);
+  Constant *PapiGetTimeFn =
+      M->getOrInsertFunction("PAPI_get_virt_usec", Builder.getInt64Ty(), NULL);
   Value *OldVal, *NewVal, *Current;
 
   Builder.SetInsertPoint(InsertBefore);
-  OldVal     = Builder.CreateLoad(ElemPtr, prefix + "minuend");
-  Current    = Builder.CreateCall(PapiGetTimeFn, prefix + "subtrahend");
-  NewVal     = Builder.CreateSub(OldVal, Current, prefix + "difference");
+  OldVal = Builder.CreateLoad(ElemPtr, prefix + "minuend");
+  Current = Builder.CreateCall(PapiGetTimeFn, prefix + "subtrahend");
+  NewVal = Builder.CreateSub(OldVal, Current, prefix + "difference");
   Builder.CreateStore(NewVal, ElemPtr);
 }
 
-static void InsertProfilingInitCall(
-    Function *MainFn, const char *FnName, GlobalValue *Array = 0,
-    PointerType *arrayType = 0) {
+static void InsertProfilingInitCall(Function *MainFn, const char *FnName,
+                                    GlobalValue *Array = 0,
+                                    PointerType *arrayType = 0) {
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
   Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
   PointerType *UIntPtr = arrayType ? arrayType : Type::getInt64PtrTy(Context);
-  Constant *InitFn = M.getOrInsertFunction(FnName,
-                                           Type::getInt32Ty(Context),
-                                           Type::getInt32Ty(Context),
-                                           ArgVTy,
-                                           UIntPtr,
-                                           Type::getInt32Ty(Context),
-                                           (Type *)0);
+  Constant *InitFn = M.getOrInsertFunction(
+      FnName, Type::getInt32Ty(Context), Type::getInt32Ty(Context), ArgVTy,
+      UIntPtr, Type::getInt32Ty(Context), (Type *)0);
 
-  Constant *PapiSetup = M.getOrInsertFunction("papi_region_setup",
-                                              Type::getVoidTy(Context),
-                                              (Type *)0);
+  Constant *PapiSetup = M.getOrInsertFunction(
+      "papi_region_setup", Type::getVoidTy(Context), (Type *)0);
 
   // Skip over any allocas in the entry block.
   BasicBlock *Entry = MainFn->begin();
   BasicBlock::iterator InsertPos = Entry->begin();
-  while (isa<AllocaInst>(InsertPos)) ++InsertPos;
+  while (isa<AllocaInst>(InsertPos))
+    ++InsertPos;
 
   // This could force argc and argv into programs that wouldn't otherwise have
   // them, but instead we just pass null values in.
-  std::vector<Value*> Args(4);
+  std::vector<Value *> Args(4);
   Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
   Args[1] = Constant::getNullValue(ArgVTy);
 
-  std::vector<Constant*>
-  GEPIndices(2, Constant::getNullValue(Type::getInt64Ty(Context)));
+  std::vector<Constant *> GEPIndices(
+      2, Constant::getNullValue(Type::getInt64Ty(Context)));
   unsigned NumElements = 0;
   if (Array) {
     Args[2] = ConstantExpr::getGetElementPtr(Array, GEPIndices);
     NumElements =
-      cast<ArrayType>(Array->getType()->getElementType())->getNumElements();
+        cast<ArrayType>(Array->getType()->getElementType())->getNumElements();
   } else {
     // If this profiling instrumentation doesn't have a constant array, just
     // pass null.
@@ -202,16 +191,17 @@ static void InsertProfilingInitCall(
   switch (MainFn->arg_size()) {
   default:
   case 2:
-    AI = MainFn->arg_begin(); ++AI;
+    AI = MainFn->arg_begin();
+    ++AI;
     if (AI->getType() != ArgVTy) {
-      Instruction::CastOps opcode = CastInst::getCastOpcode(AI, false, ArgVTy,
-                                                            false);
-      InitCall->setArgOperand(1,
-          CastInst::Create(opcode, AI, ArgVTy, "argv.cast", InitCall));
+      Instruction::CastOps opcode =
+          CastInst::getCastOpcode(AI, false, ArgVTy, false);
+      InitCall->setArgOperand(
+          1, CastInst::Create(opcode, AI, ArgVTy, "argv.cast", InitCall));
     } else {
       InitCall->setArgOperand(1, AI);
     }
-    /* FALL THROUGH */
+  /* FALL THROUGH */
   case 1:
     AI = MainFn->arg_begin();
     // If the program looked at argc, have it look at the return value of the
@@ -221,23 +211,24 @@ static void InsertProfilingInitCall(
       if (!AI->use_empty()) {
         opcode = CastInst::getCastOpcode(InitCall, true, AI->getType(), true);
         AI->replaceAllUsesWith(
-          CastInst::Create(opcode, InitCall, AI->getType(), "", InsertPos));
+            CastInst::Create(opcode, InitCall, AI->getType(), "", InsertPos));
       }
-      opcode = CastInst::getCastOpcode(AI, true,
-                                       Type::getInt32Ty(Context), true);
-      InitCall->setArgOperand(0,
-          CastInst::Create(opcode, AI, Type::getInt32Ty(Context),
-                           "argc.cast", InitCall));
+      opcode =
+          CastInst::getCastOpcode(AI, true, Type::getInt32Ty(Context), true);
+      InitCall->setArgOperand(
+          0, CastInst::Create(opcode, AI, Type::getInt32Ty(Context),
+                              "argc.cast", InitCall));
     } else {
       AI->replaceAllUsesWith(InitCall);
       InitCall->setArgOperand(0, AI);
     }
-  case 0: break;
+  case 0:
+    break;
   }
 }
 
-static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB,
-                      LoopInfo *LI, DominatorTree *DT) {
+static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,
+                      DominatorTree *DT) {
   Loop *L = LI->getLoopFor(BB);
   Loop *DomL = LI->getLoopFor(Dominator);
 
@@ -247,8 +238,7 @@ static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB,
   if (L && L->contains(Dominator))
     return true;
 
-  for (pred_iterator PI = pred_begin(BB),
-                      E = pred_end(BB); PI != E; ++PI) {
+  for (pred_iterator PI = pred_begin(BB), E = pred_end(BB); PI != E; ++PI) {
     if (!DomL || DomL != L) {
       if (L && L->contains(*PI))
         return false;
@@ -267,16 +257,17 @@ void PapiProfiling::instrumentFunction(int idx, Function *F,
   BasicBlock *EntryBB = F->begin();
   BasicBlock::iterator InsertPos;
   IRBuilder<> Builder(Context);
-  Constant *PapiGetTimeFn = M->getOrInsertFunction("PAPI_get_virt_usec",
-                            Builder.getInt64Ty(), NULL);
+  Constant *PapiGetTimeFn =
+      M->getOrInsertFunction("PAPI_get_virt_usec", Builder.getInt64Ty(), NULL);
 
   Indices[0] = Constant::getNullValue(Type::getInt64Ty(Context));
   Indices[1] = ConstantInt::get(Type::getInt64Ty(Context), idx);
-  ElemPtr    = ConstantExpr::getGetElementPtr(Array, Indices);
+  ElemPtr = ConstantExpr::getGetElementPtr(Array, Indices);
 
   // Store initial time in the array
   InsertPos = EntryBB->getFirstNonPHIOrDbgOrLifetime();
-  while (isa<AllocaInst>(InsertPos)) ++InsertPos;
+  while (isa<AllocaInst>(InsertPos))
+    ++InsertPos;
 
   PapiCreateSub(InsertPos, ElemPtr, M, "papi.functions.");
 
@@ -316,12 +307,13 @@ bool PapiProfiling::runOnModule(Module &M) {
   if (Main == 0) {
     errs() << "WARNING: cannot insert papi profiling into a module"
            << " with no main function!\n";
-    return false;  // No main, no instrumentation!
+    return false; // No main, no instrumentation!
   }
 
   // Calculate needed array space
-  for (Module::iterator i = M.begin(), e = M.end(); i != e; ++i) {
-    if (i->isDeclaration()) continue;
+  for (auto &elem : M) {
+    if (elem.isDeclaration())
+      continue;
     ++toInstrument;
   }
 
@@ -334,7 +326,8 @@ bool PapiProfiling::runOnModule(Module &M) {
   // Place the necessary PAPI calls.
   int num = 0;
   for (Module::iterator i = M.begin(), e = M.end(); i != e; ++i) {
-    if (i->isDeclaration()) continue;
+    if (i->isDeclaration())
+      continue;
 
     instrumentFunction(num, i, Counters);
     ++num;
@@ -344,8 +337,7 @@ bool PapiProfiling::runOnModule(Module &M) {
   return true;
 }
 
-void PapiProfiling::print(raw_ostream &OS, const llvm::Module *M) const {
-}
+void PapiProfiling::print(raw_ostream &OS, const llvm::Module *M) const {}
 
 //-----------------------------------------------------------------------------
 //
@@ -360,12 +352,10 @@ BasicBlock *PapiRegionProfiling::getSafeEntryFor(BasicBlock *Entry,
   std::vector<BasicBlock *> Preds;
   unsigned totalPreds = 0;
 
-  for (pred_iterator PI = pred_begin(Entry),
-                      E = pred_end(Entry); PI != E; ++PI) {
+  for (pred_iterator PI = pred_begin(Entry), E = pred_end(Entry); PI != E;
+       ++PI) {
     totalPreds++;
-    if (!L ||
-        !L->contains(*PI) ||
-        (L->contains(*PI) && (L == ExitL)))
+    if (!L || !L->contains(*PI) || (L->contains(*PI) && (L == ExitL)))
       Preds.push_back(*PI);
   }
 
@@ -377,7 +367,7 @@ BasicBlock *PapiRegionProfiling::getSafeEntryFor(BasicBlock *Entry,
   if (totalPreds == Preds.size())
     return Entry;
 
-  //outs() << "F:" << ":" << Entry->getName() << "->"
+  // outs() << "F:" << ":" << Entry->getName() << "->"
   //       << Exit->getName() << "\n";
   assert(Preds.size() == 1 &&
          "More than 1 predecessor outside of this region (-papi-prepare)!");
@@ -386,14 +376,14 @@ BasicBlock *PapiRegionProfiling::getSafeEntryFor(BasicBlock *Entry,
 
 BasicBlock *PapiRegionProfiling::getSafeExitFor(BasicBlock *Entry,
                                                 BasicBlock *Exit) {
-  if (!Exit) return 0;
+  if (!Exit)
+    return 0;
   if (isValidBB(Entry, Exit, LI, DT))
     return Exit;
 
   // Check our predecessors, there has to be a valid exit (after papi-prepare).
   std::vector<BasicBlock *> SafeExits;
-  for (pred_iterator PI = pred_begin(Exit),
-                      E = pred_end(Exit); PI != E; ++PI) {
+  for (pred_iterator PI = pred_begin(Exit), E = pred_end(Exit); PI != E; ++PI) {
     if (isValidBB(Entry, (*PI), LI, DT))
       SafeExits.push_back((*PI));
   }
@@ -411,6 +401,10 @@ bool PapiRegionProfiling::runOnFunction(Function &F) {
   JSD = &getAnalysis<NonAffineScopDetection>();
   DT = &getAnalysis<DominatorTree>();
 
+  DEBUG(dbgs() << "PapiRegionProfiling: " << JSD->size() << "\n");
+  if (JSD->size() == 0)
+    return false;
+
   Region *TopLevel = RI->getTopLevelRegion(), *Next;
   std::deque<Region *> ToVisit;
   bool isScop;
@@ -421,7 +415,9 @@ bool PapiRegionProfiling::runOnFunction(Function &F) {
 
   ToVisit.push_back(TopLevel);
   while (!ToVisit.empty()) {
-    Next = ToVisit.front(); ToVisit.pop_front(); EEs.clear();
+    Next = ToVisit.front();
+    ToVisit.pop_front();
+    EEs.clear();
 
     /* Use the curent Region-Exit, we will chose an appropriate place
      * for a PAPI counter later. */
@@ -429,7 +425,7 @@ bool PapiRegionProfiling::runOnFunction(Function &F) {
     Exit = getSafeExitFor(Entry, Next->getExit());
 
     tmp = std::make_pair(Entry, Exit);
-    isScop = JSD->count(Next);
+    isScop = JSD->count(Next) != 0;
 
     if (isScop || ((F.getName() == "main") && Next->isTopLevelRegion())) {
       p = std::make_pair(tmp, isScop);
@@ -438,8 +434,8 @@ bool PapiRegionProfiling::runOnFunction(Function &F) {
       BlocksToInstrument.push_back(EEs);
     }
 
-    for (Region::iterator i = Next->begin(), e = Next->end(); i != e; ++i)
-      ToVisit.push_back(*i);
+    for (auto &elem : *Next)
+      ToVisit.push_back(elem);
   }
 
   return true;
@@ -453,7 +449,7 @@ bool PapiRegionProfiling::doFinalization(Module &M) {
   if (Main == 0) {
     errs() << "WARNING: cannot insert papi profiling into a module"
            << " with no main function!\n";
-    return false;  // No main, no instrumentation!
+    return false; // No main, no instrumentation!
   }
 
   // Calculate needed array space
@@ -475,7 +471,8 @@ bool PapiRegionProfiling::doFinalization(Module &M) {
   return true;
 }
 
-void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M, SubRegions Edges,
+void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M,
+                                           SubRegions Edges,
                                            GlobalValue *Array) {
   LLVMContext &Context = M->getContext();
   Constant *ElemPtr;
@@ -491,35 +488,44 @@ void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M, SubRegions E
   BasicBlock::iterator InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
 
   // Adjust insertion point for landing pads / allocas
-  if (BB->isLandingPad()) ++InsertPos;
-  while (isa<AllocaInst>(InsertPos)) { ++InsertPos; }
+  if (BB->isLandingPad())
+    ++InsertPos;
+  while (isa<AllocaInst>(InsertPos)) {
+    ++InsertPos;
+  }
 
   // Prepare GEP for accessing the proper array element.
   Indices[0] = Constant::getNullValue(Type::getInt64Ty(Context));
   Indices[1] = ConstantInt::get(Type::getInt64Ty(Context), idx);
-  ElemPtr    = ConstantExpr::getGetElementPtr(Array, Indices);
+  ElemPtr = ConstantExpr::getGetElementPtr(Array, Indices);
 
   // If it's a SCoP
   bool isSCoP = AnEdge.second;
 
   // Store initial time in the array
-  //PapiCreateSub(InsertPos, ElemPtr, M, "papi.regions.");
+  // PapiCreateSub(InsertPos, ElemPtr, M, "papi.regions.");
   Function *F = BB->getParent();
-  std::string name = F->getName().str() + "::"+ BB->getName().str();
+  std::string name = F->getName().str() + "::" + BB->getName().str();
   if (isSCoP) {
     /* Preserve the correct order for stack tracing.
      * This will make us "sneak" past a previously entered
      * call to ExitSCoP.*/
-    while (isa<CallInst>(InsertPos)) { ++InsertPos; }
+    while (isa<CallInst>(InsertPos)) {
+      ++InsertPos;
+    }
     PapiRegionEnterSCoP(ElemPtr, InsertPos, M, name);
+  } else {
+    PapiRegionEnter(ElemPtr, InsertPos, M);
   }
-  else        { PapiRegionEnter(ElemPtr, InsertPos, M); }
 
   // Store final time at exit of the region.
   if (R.second) {
     InsertPos = R.second->getFirstNonPHIOrDbgOrLifetime();
-    if (isSCoP) { PapiRegionExitSCoP(ElemPtr, InsertPos, M, name); }
-    else        { PapiRegionExit(ElemPtr, InsertPos, M); }
+    if (isSCoP) {
+      PapiRegionExitSCoP(ElemPtr, InsertPos, M, name);
+    } else {
+      PapiRegionExit(ElemPtr, InsertPos, M);
+    }
   } else {
     // If we are the TopLevel-Region, we don't have an exit block.
     Function *F = R.first->getParent();
@@ -527,8 +533,11 @@ void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M, SubRegions E
       BasicBlock *bb = i;
       for (BasicBlock::iterator j = bb->begin(), f = bb->end(); j != f; ++j)
         if (isa<ReturnInst>(j)) {
-          if (isSCoP) { PapiRegionExitSCoP(ElemPtr, j, M); }
-          else { PapiRegionExit(ElemPtr, j, M); }
+          if (isSCoP) {
+            PapiRegionExitSCoP(ElemPtr, j, M);
+          } else {
+            PapiRegionExit(ElemPtr, j, M);
+          }
         }
     }
   }
@@ -543,15 +552,13 @@ void PapiRegionPrepare::createPapiEntry(Region *R) {
   std::vector<BasicBlock *> Preds;
 
   unsigned totalPreds = 0;
-  for (pred_iterator PI = pred_begin(Entry),
-                      E = pred_end(Entry); PI != E; ++PI) {
+  for (pred_iterator PI = pred_begin(Entry), E = pred_end(Entry); PI != E;
+       ++PI) {
 
     BasicBlock *PredBB = (*PI);
     totalPreds++;
     // Don't include loop backedges in the predecessor split.
-    if (!L ||
-        !L->contains(PredBB) ||
-        (L->contains(PredBB) && (L == ExitL)))
+    if (!L || !L->contains(PredBB) || (L->contains(PredBB) && (L == ExitL)))
       Preds.push_back(PredBB);
   }
 
@@ -563,14 +570,13 @@ void PapiRegionPrepare::createPapiEntry(Region *R) {
   if (totalPreds == Preds.size())
     return;
 
-
-  SmallVector<BasicBlock*, 2> SplitBBs;
+  SmallVector<BasicBlock *, 2> SplitBBs;
   if (Entry->isLandingPad())
     SplitLandingPadPredecessors(Entry, Preds, ".papi.exit", ".papi.others",
                                 this, SplitBBs);
   else
-    SplitBBs.push_back(SplitBlockPredecessors(Entry, Preds, ".papi.entry",
-                                              this));
+    SplitBBs.push_back(
+        SplitBlockPredecessors(Entry, Preds, ".papi.entry", this));
   RI->splitBlock(SplitBBs[0], Entry);
 
   /* Update the region exits for siblings of our current region.
@@ -578,8 +584,8 @@ void PapiRegionPrepare::createPapiEntry(Region *R) {
    & Check if the region of our predecessors shares it's Exit
    * BB with our EntryBB. If yes, update the exit block.
    */
-  for (unsigned i = 0; i < Preds.size(); i++) {
-    Region *PredR = RI->getRegionFor(Preds[i]);
+  for (auto &Pred : Preds) {
+    Region *PredR = RI->getRegionFor(Pred);
 
     if (PredR->getExit() == Entry)
       PredR->replaceExit(*(SplitBBs.begin()));
@@ -603,16 +609,17 @@ void PapiRegionPrepare::createPapiExit(Region *R) {
   std::vector<BasicBlock *> Preds;
 
   // Function exit, no problem.
-  if (!Exit) return;
+  if (!Exit)
+    return;
   // Already an unique exit.
-  if (Exit->getUniquePredecessor()) return;
+  if (Exit->getUniquePredecessor())
+    return;
 
   if (isValidBB(R->getEntry(), Exit, LI, DT))
     return;
 
   /* Not sure about this anymore, recheck */
-  for (pred_iterator PI = pred_begin(Exit),
-                      E = pred_end(Exit); PI != E; ++PI) {
+  for (pred_iterator PI = pred_begin(Exit), E = pred_end(Exit); PI != E; ++PI) {
     Region *PredR = RI->getRegionFor((*PI));
 
     if (PredR && (R == PredR || isParent(R, PredR)))
@@ -621,13 +628,13 @@ void PapiRegionPrepare::createPapiExit(Region *R) {
 
   assert(Preds.size() > 0 && "No predecessors found!");
   if (Preds.size() > 0) {
-    SmallVector<BasicBlock*, 2> SplitBBs;
+    SmallVector<BasicBlock *, 2> SplitBBs;
     if (Exit->isLandingPad())
       SplitLandingPadPredecessors(Exit, Preds, ".papi.exit", ".papi.others",
                                   this, SplitBBs);
     else
-      SplitBBs.push_back(SplitBlockPredecessors(Exit, Preds, ".papi.exit",
-                                                this));
+      SplitBBs.push_back(
+          SplitBlockPredecessors(Exit, Preds, ".papi.exit", this));
     RI->setRegionFor(SplitBBs[0], R);
   }
 }
@@ -649,19 +656,17 @@ INITIALIZE_PASS_BEGIN(PapiRegionPrepare, "papi-prepare",
                       "Insert Entry/Exit blocks for PAPI region counters",
                       false, false)
 INITIALIZE_PASS_END(PapiRegionPrepare, "papi-prepare",
-                      "Insert Entry/Exit blocks for PAPI region counters",
-                      false, false)
-
-INITIALIZE_PASS_BEGIN(PapiProfiling, "insert-papi-profiling",
-                      "Insert PAPI timing information", false,
-                      false)
-INITIALIZE_PASS_END(PapiProfiling, "insert-papi-profiling",
-                    "Insert PAPI timing information", false,
+                    "Insert Entry/Exit blocks for PAPI region counters", false,
                     false)
 
+INITIALIZE_PASS_BEGIN(PapiProfiling, "insert-papi-profiling",
+                      "Insert PAPI timing information", false, false)
+INITIALIZE_PASS_END(PapiProfiling, "insert-papi-profiling",
+                    "Insert PAPI timing information", false, false)
+
 INITIALIZE_PASS_BEGIN(PapiRegionProfiling, "insert-papi-region-profiling",
-                      "Insert PAPI timing information into region entries.", false,
-                      false)
+                      "Insert PAPI timing information into region entries.",
+                      false, false)
 INITIALIZE_PASS_END(PapiRegionProfiling, "insert-papi-region-profiling",
-                      "Insert PAPI timing information into region entries.", false,
-                      false)
+                    "Insert PAPI timing information into region entries.",
+                    false, false)
