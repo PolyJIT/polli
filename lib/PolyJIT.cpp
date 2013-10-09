@@ -94,6 +94,11 @@ static cl::opt<bool>
 DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
                  cl::init(false));
 
+static cl::opt<bool> DisableExecution(
+    "no-execution",
+    cl::desc("Disable execution just produce all intermediate files"),
+    cl::init(false));
+
 // Determine optimization level.
 cl::opt<char> OptLevel("O",
                        cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
@@ -589,8 +594,13 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   StoreModule(M, M.getModuleIdentifier() + ".final");
 
   /* Add a mapping to our JIT callback function. */
-  DEBUG(dbgs() << "[polli] Starting execution...\n");
-  return EE.runFunctionAsMain(Main, inputArgs, envp);
+  int ret = 0;
+  if (!DisableExecution) {
+    DEBUG(dbgs() << "[polli] Starting execution...\n");
+    ret = EE.runFunctionAsMain(Main, inputArgs, envp);
+  }
+
+  return ret;
 }
 
 void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
