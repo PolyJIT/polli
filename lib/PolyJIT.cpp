@@ -193,6 +193,8 @@ public:
   StaticInitializer() {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializePollyPasses(Registry);
+    initializePapiRegionPreparePass(Registry);
+    initializePapiRegionProfilingPass(Registry);
     initializeOutputDir();
   }
 };
