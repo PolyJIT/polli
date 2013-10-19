@@ -62,58 +62,63 @@ STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 static uint64_t EventID = 0;
 
 static void PapiRegionEnterSCoP(Instruction *InsertBefore,
-                                Module *M, std::string dbgs = "") {
+                                Module *M, std::string dbgStr = "") {
+  DEBUG(dbgs() << "Profiling Scop Enter Call\n");
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
   Constant *PapiScopEnterFn = M->getOrInsertFunction(
       "papi_region_enter_scop", Builder.getVoidTy(),
-      Type::getInt64PtrTy(Context), Builder.getInt8PtrTy(), NULL);
+      Type::getInt64Ty(Context), Builder.getInt8PtrTy(), NULL);
 
   Builder.SetInsertPoint(InsertBefore);
   Args[0] = ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false);
-  Args[1] = Builder.CreateGlobalStringPtr(dbgs);
+  Args[1] = Builder.CreateGlobalStringPtr(dbgStr);
 
   Builder.CreateCall(PapiScopEnterFn, Args);
 }
 
 static void PapiRegionExitSCoP(Instruction *InsertBefore,
-                               Module *M, std::string dbgs = "") {
+                               Module *M, std::string dbgStr = "") {
+  DEBUG(dbgs() << "Profiling Scop Exit Call\n");
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
   Constant *PapiScopExitFn = M->getOrInsertFunction(
       "papi_region_exit_scop", Builder.getVoidTy(),
-      Type::getInt64PtrTy(Context), Builder.getInt8PtrTy(), NULL);
+      Type::getInt64Ty(Context), Builder.getInt8PtrTy(), NULL);
+
   Builder.SetInsertPoint(InsertBefore);
-  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), EventID, false);
-  Args[1] = Builder.CreateGlobalStringPtr(dbgs);
+  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), EventID--, false);
+  Args[1] = Builder.CreateGlobalStringPtr(dbgStr);
 
   Builder.CreateCall(PapiScopExitFn, Args);
 }
 
 static void PapiRegionEnter(Instruction *InsertBefore, Module *M) {
+  DEBUG(dbgs() << "Profiling Region Enter Call\n");
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
   Constant *PapiScopEnterFn =
       M->getOrInsertFunction("papi_region_enter", Builder.getVoidTy(),
-                             Type::getInt64PtrTy(Context), NULL);
+                             Type::getInt64Ty(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(PapiScopEnterFn,
                      ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false));
 }
 
 static void PapiRegionExit(Instruction *InsertBefore, Module *M) {
+  DEBUG(dbgs() << "Profiling Region Exit Call\n");
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
   Constant *PapiScopEnterFn =
       M->getOrInsertFunction("papi_region_exit", Builder.getVoidTy(),
-                             Type::getInt64PtrTy(Context), NULL);
+                             Type::getInt64Ty(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(PapiScopEnterFn,
-                     ConstantInt::get(Type::getInt64Ty(Context), EventID, false));
+                     ConstantInt::get(Type::getInt64Ty(Context), EventID--, false));
 }
 
 //static void PapiRegionEnterSCoP(Constant *ElemPtr, Instruction *InsertBefore,
@@ -172,6 +177,7 @@ static void PapiRegionExit(Instruction *InsertBefore, Module *M) {
 //}
 
 static void PapiCreateInit(Function *F) {
+  DEBUG(dbgs() << "Profiling PAPI Init Call\n");
   LLVMContext &Context = F->getContext();
   Module *M = F->getParent();
   IRBuilder<> Builder(Context);
@@ -185,14 +191,14 @@ static void PapiCreateInit(Function *F) {
 }
 
 static void InsertProfilingInitCall(Function *MainFn) {
+  DEBUG(dbgs() << "Profiling Init Call\n");
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
   Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
+  
   Constant *PapiSetup = M.getOrInsertFunction(
       "papi_region_setup",
       Type::getVoidTy(Context),
-      Type::getInt32Ty(Context),
-      ArgVTy,
       (Type *)0);
 
   // Skip over any allocas in the entry block.
@@ -201,25 +207,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   while (isa<AllocaInst>(InsertPos))
     ++InsertPos;
 
-  // This could force argc and argv into programs that wouldn't otherwise have
-  // them, but instead we just pass null values in.
-  std::vector<Value *> Args(2);
-  Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
-  Args[1] = Constant::getNullValue(ArgVTy);
-
   CallInst *PapiSetupCall = CallInst::Create(PapiSetup, "", InsertPos);
-
-  // If argc or argv are not available in main, just pass null values in.
-  Function::arg_iterator AI = MainFn->arg_begin();
-
-  // Let's hope we have a proper main fn ;-).
-  unsigned i = 0;
-  unsigned argCnt = MainFn->arg_size();
-
-  if (argCnt > 0)
-    PapiSetupCall->setArgOperand(i++, AI++);
-  if (argCnt > 1)
-    PapiSetupCall->setArgOperand(i, AI);
 }
 
 static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,

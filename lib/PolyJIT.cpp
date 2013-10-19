@@ -494,8 +494,10 @@ void PolyJIT::extractJitableScops(Module &M) {
   if (EnablePapi)
     FPM->add(new PapiRegionPrepare());
 
-  if (InstrumentRegions)
+  if (InstrumentRegions) {
+    DEBUG(dbgs() << "Insert PAPI Profiling\n");
     FPM->add(polli::createPapiRegionProfilingPass());
+  }
 
   if (!DisableRecompile)
     FPM->add(SM);
