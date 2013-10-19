@@ -43,8 +43,6 @@
 using namespace llvm;
 using namespace polly;
 
-STATISTIC(InstrumentedRegions, "Number of instrumented regions");
-
 static void PapiCreateInit(Function *F) {
   LLVMContext &Context = F->getContext();
   Module *M = F->getParent();
