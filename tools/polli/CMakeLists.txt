@@ -37,8 +37,6 @@ set(LLVM_USED_LIBS
 
 add_polli_executable(polli
   polli.cpp
-  RecordingMemoryManager.cpp
-  RemoteTarget.cpp
   )
 
 target_link_libraries(polli PolyJIT)

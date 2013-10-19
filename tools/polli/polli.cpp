@@ -20,18 +20,9 @@
 #include "llvm/Support/Debug.h"
 
 #include "llvm/IR/LLVMContext.h"
-#include "RecordingMemoryManager.h"
-#include "RemoteTarget.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/ExecutionEngine/Interpreter.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/ExecutionEngine/JIT.h"
-#include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/ExecutionEngine/JITMemoryManager.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IRReader/IRReader.h"
@@ -113,82 +104,6 @@ static void do_shutdown() {
   delete EE;
   llvm_shutdown();
 #endif
-}
-
-void layoutRemoteTargetMemory(RemoteTarget *T, RecordingMemoryManager *JMM) {
-  // Lay out our sections in order, with all the code sections first, then
-  // all the data sections.
-  uint64_t CurOffset = 0;
-  unsigned MaxAlign = T->getPageAlignment();
-  SmallVector<std::pair<const void*, uint64_t>, 16> Offsets;
-  SmallVector<unsigned, 16> Sizes;
-  for (RecordingMemoryManager::const_code_iterator I = JMM->code_begin(),
-                                                   E = JMM->code_end();
-       I != E; ++I) {
-    DEBUG(dbgs() << "code region: size " << I->first.size()
-                 << ", alignment " << I->second << "\n");
-    // Align the current offset up to whatever is needed for the next
-    // section.
-    unsigned Align = I->second;
-    CurOffset = (CurOffset + Align - 1) / Align * Align;
-    // Save off the address of the new section and allocate its space.
-    Offsets.push_back(std::pair<const void*,uint64_t>(I->first.base(), CurOffset));
-    Sizes.push_back(I->first.size());
-    CurOffset += I->first.size();
-  }
-  // Adjust to keep code and data aligned on seperate pages.
-  CurOffset = (CurOffset + MaxAlign - 1) / MaxAlign * MaxAlign;
-  unsigned FirstDataIndex = Offsets.size();
-  for (RecordingMemoryManager::const_data_iterator I = JMM->data_begin(),
-                                                   E = JMM->data_end();
-       I != E; ++I) {
-    DEBUG(dbgs() << "data region: size " << I->first.size()
-                 << ", alignment " << I->second << "\n");
-    // Align the current offset up to whatever is needed for the next
-    // section.
-    unsigned Align = I->second;
-    CurOffset = (CurOffset + Align - 1) / Align * Align;
-    // Save off the address of the new section and allocate its space.
-    Offsets.push_back(std::pair<const void*,uint64_t>(I->first.base(), CurOffset));
-    Sizes.push_back(I->first.size());
-    CurOffset += I->first.size();
-  }
-
-  // Allocate space in the remote target.
-  uint64_t RemoteAddr;
-  if (T->allocateSpace(CurOffset, MaxAlign, RemoteAddr))
-    report_fatal_error(T->getErrorMsg());
-  // Map the section addresses so relocations will get updated in the local
-  // copies of the sections.
-  for (unsigned i = 0, e = Offsets.size(); i != e; ++i) {
-    uint64_t Addr = RemoteAddr + Offsets[i].second;
-    EE->mapSectionAddress(const_cast<void*>(Offsets[i].first), Addr);
-
-    DEBUG(dbgs() << "  Mapping local: " << Offsets[i].first
-                 << " to remote: " << format("%p", Addr) << "\n");
-
-  }
-
-  // Trigger application of relocations
-  EE->finalizeObject();
-
-  // Now load it all to the target.
-  for (unsigned i = 0, e = Offsets.size(); i != e; ++i) {
-    uint64_t Addr = RemoteAddr + Offsets[i].second;
-
-    if (i < FirstDataIndex) {
-      T->loadCode(Addr, Offsets[i].first, Sizes[i]);
-
-      DEBUG(dbgs() << "  loading code: " << Offsets[i].first
-            << " to remote: " << format("%p", Addr) << "\n");
-    } else {
-      T->loadData(Addr, Offsets[i].first, Sizes[i]);
-
-      DEBUG(dbgs() << "  loading data: " << Offsets[i].first
-            << " to remote: " << format("%p", Addr) << "\n");
-    }
-
-  }
 }
 
 //===----------------------------------------------------------------------===//
