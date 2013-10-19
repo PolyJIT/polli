@@ -120,3 +120,12 @@ void NonAffineScopDetection::print(raw_ostream &OS, const Module *) const {
 ;
 
 char NonAffineScopDetection::ID = 0;
+
+INITIALIZE_PASS_BEGIN(NonAffineScopDetection, "polli-detect",
+                      "Polli JIT ScopDetection", false, false);
+INITIALIZE_PASS_DEPENDENCY(ScopDetection);
+INITIALIZE_PASS_DEPENDENCY(ScalarEvolution);
+INITIALIZE_PASS_DEPENDENCY(DominatorTree);
+INITIALIZE_PASS_DEPENDENCY(RegionInfo);
+INITIALIZE_PASS_END(NonAffineScopDetection, "polli-detect",
+                      "Polli JIT ScopDetection", false, false);

@@ -30,6 +30,7 @@ set(LLVM_USED_LIBS
   )
 
 add_polli_library(PolyJIT
+  InstrumentRegions.cpp
   NonAffineScopDetection.cpp
   PapiProfiling.cpp
   PolyJIT.cpp

@@ -78,4 +78,9 @@ private:
   std::set<const Region *> AccumulatedScops;
   ParamMap RequiredParams;
 };
+
+namespace llvm {
+  class PassRegistry;
+  void initializeNonAffineScopDetectionPass(llvm::PassRegistry&);
+}
 #endif

@@ -67,6 +67,7 @@
 #include "polli/FunctionDispatcher.h"
 #include "polli/NonAffineScopDetection.h"
 #include "polli/PapiProfiling.h"
+#include "polli/InstrumentRegions.h"
 #include "polli/ScopMapper.h"
 #include "polli/Utils.h"
 
@@ -80,6 +81,10 @@ using namespace llvm::sys::fs;
 
 namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
+
+namespace polli {
+Pass *createPapiRegionProfilingPass() { return new PapiRegionProfiling(); }
+}
 
 namespace {
 static cl::opt<bool> EnablePapi("papi", cl::desc("Instrument SCoPs with PAPI"
@@ -490,7 +495,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     FPM->add(new PapiRegionPrepare());
 
   if (InstrumentRegions)
-    FPM->add(new PapiRegionProfiling());
+    FPM->add(polli::createPapiRegionProfilingPass());
 
   if (!DisableRecompile)
     FPM->add(SM);

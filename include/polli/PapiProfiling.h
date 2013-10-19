@@ -66,50 +66,11 @@ private:
                           GlobalValue *Array);
 };
 
-class PapiRegionProfiling : public FunctionPass {
-public:
-  static char ID;
-
-  explicit PapiRegionProfiling() : FunctionPass(ID) {}
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<DominatorTree>();
-    AU.addRequired<LoopInfo>();
-    AU.addRequired<RegionInfo>();
-    // Only if we're profiling SCoPs. Make this an option!
-    AU.addRequired<ScopDetection>();
-    AU.addRequired<NonAffineScopDetection>();
-    AU.setPreservesAll();
-  }
-
-  virtual bool runOnFunction(Function &F);
-  virtual bool doFinalization(Module &M);
-  virtual void print(raw_ostream &OS, const Module *) const {};
-private:
-  RegionInfo *RI;
-  LoopInfo *LI;
-  NonAffineScopDetection *JSD;
-  DominatorTree *DT;
-
-  typedef std::pair<BasicBlock*,BasicBlock*> Edge;
-  typedef std::pair<Edge, bool> AnnotatedEdge;
-  typedef std::vector<AnnotatedEdge> SubRegions;
-  typedef std::vector<SubRegions> BlockList;
-
-  BlockList BlocksToInstrument;
-  void instrumentRegion(unsigned idx, Module *M, SubRegions Edges,
-                          GlobalValue *Array);
-  BasicBlock *getSafeEntryFor(BasicBlock *Entry,
-                              BasicBlock *Exit);
-  BasicBlock *getSafeExitFor(BasicBlock *Entry,
-                             BasicBlock *Exit);
-//  bool isValidBB(BasicBlock *Dominator, BasicBlock *BB);
-};
 }
 
 namespace llvm {
   class PassRegistry;
   void initializePapiProfilingPass(llvm::PassRegistry&);
-  void initializePapiRegionProfilingPass(llvm::PassRegistry&);
   void initializePapiRegionPreparePass(llvm::PassRegistry&);
 }
 #endif // LLVM_PAPI_PROFILING_H
