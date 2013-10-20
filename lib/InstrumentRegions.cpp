@@ -174,32 +174,8 @@ static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,
   return true;
 }
 
-//-----------------------------------------------------------------------------
-//
-// PapiCScopProfilingPass 
-//
-//-----------------------------------------------------------------------------
-bool PapiCScopProfiling::runOnScop(CScop &S) { return false; }
-
-void PapiCScopProfiling::print(raw_ostream &OS, const Module *M) const {}
-
-void PapiCScopProfiling::instrumentRegion(unsigned idx, Module *M,
-                                          SubRegions Edges,
-                                          GlobalValue *Array) {}
-
-BasicBlock *PapiCScopProfiling::getSafeEntryFor(BasicBlock *Entry,
-                                                BasicBlock *Exit) { return 0; }
-BasicBlock *PapiCScopProfiling::getSafeExitFor(BasicBlock *Entry,
-                                               BasicBlock *Exit) { return 0; }
-
-//-----------------------------------------------------------------------------
-//
-// PapiRegionProfilingPass
-//
-//-----------------------------------------------------------------------------
-
-BasicBlock *PapiRegionProfiling::getSafeEntryFor(BasicBlock *Entry,
-                                                 BasicBlock *Exit) {
+static BasicBlock *getSafeEntryFor(BasicBlock *Entry, BasicBlock *Exit,
+                                   LoopInfo *LI) {
   Loop *L = LI->getLoopFor(Entry);
   Loop *ExitL = LI->getLoopFor(Exit);
   std::vector<BasicBlock *> Preds;
@@ -227,8 +203,8 @@ BasicBlock *PapiRegionProfiling::getSafeEntryFor(BasicBlock *Entry,
   return Preds.at(0);
 }
 
-BasicBlock *PapiRegionProfiling::getSafeExitFor(BasicBlock *Entry,
-                                                BasicBlock *Exit) {
+static BasicBlock *getSafeExitFor(BasicBlock *Entry, BasicBlock *Exit,
+                                  LoopInfo *LI, DominatorTree *DT) {
   if (!Exit)
     return 0;
   if (isValidBB(Entry, Exit, LI, DT))
@@ -246,6 +222,68 @@ BasicBlock *PapiRegionProfiling::getSafeExitFor(BasicBlock *Entry,
   assert((SafeExits.size() > 0) && "Couldn't find a safe place for a counter.");
   return SafeExits.at(0);
 }
+
+//-----------------------------------------------------------------------------
+//
+// PapiCScopProfilingPass 
+//
+//-----------------------------------------------------------------------------
+bool PapiCScopProfiling::runOnScop(CScop &S) {
+  DEBUG(dbgs() << "PapiCScop $ CScop: " << S.getRegion().getNameStr() << "\n");
+  LI = &getAnalysis<LoopInfo>();
+  DT = &getAnalysis<DominatorTree>();
+  
+  const Region &R = S.getRegion();
+  BasicBlock *Entry, *Exit;
+  
+  /* Use the curent Region-Exit, we will chose an appropriate place
+   * for a PAPI counter later. */
+  Entry = getSafeEntryFor(R.getEntry(), R.getExit(), LI);
+  Exit = getSafeExitFor(Entry, R.getExit(), LI, DT);
+
+  Module *M = R.getEntry()->getParent()->getParent();
+  instrumentRegion(M, *Entry, *Exit);
+  DEBUG(dbgs() << "PapiCScop $ Entry: " << Entry->getName()
+               << " Exit: " << Exit->getName() << "\n");
+  return false;
+}
+
+void PapiCScopProfiling::print(raw_ostream &OS, const Module *M) const {}
+
+void PapiCScopProfiling::instrumentRegion(Module *M, BasicBlock &Entry,
+                                          BasicBlock &Exit) {
+  // The first entry is always(!) the region we want to time.
+  // All following edges are subregions and have to be treated
+  // like function calls.
+  BasicBlock::iterator InsertPos = Entry.getFirstNonPHIOrDbgOrLifetime();
+
+  // Adjust insertion point for landing pads / allocas
+  if (Entry.isLandingPad())
+    ++InsertPos;
+  while (isa<AllocaInst>(InsertPos))
+    ++InsertPos;
+
+  Function *F = Entry.getParent();
+  std::string name = F->getName().str() + "::" + Entry.getName().str();
+  PapiRegionEnterSCoP(InsertPos, M, name);
+
+  /* Preserve the correct order for stack tracing.
+   * This will make us "sneak" past a previously entered
+   * call to ExitSCoP.*/
+  while (isa<CallInst>(InsertPos))
+    ++InsertPos;
+
+  InsertPos = Exit.getFirstNonPHIOrDbgOrLifetime();
+  PapiRegionExitSCoP(InsertPos, M, name);
+
+  ++InstrumentedRegions;
+}
+
+//-----------------------------------------------------------------------------
+//
+// PapiRegionProfilingPass
+//
+//-----------------------------------------------------------------------------
 
 // Scan the available regions for profiling and track insert positions.
 bool PapiRegionProfiling::runOnFunction(Function &F) {
@@ -273,8 +311,8 @@ bool PapiRegionProfiling::runOnFunction(Function &F) {
 
     /* Use the curent Region-Exit, we will chose an appropriate place
      * for a PAPI counter later. */
-    Entry = getSafeEntryFor(Next->getEntry(), Next->getExit());
-    Exit = getSafeExitFor(Entry, Next->getExit());
+    Entry = getSafeEntryFor(Next->getEntry(), Next->getExit(), LI);
+    Exit = getSafeExitFor(Entry, Next->getExit(), LI, DT);
 
     tmp = std::make_pair(Entry, Exit);
     isScop = JSD->count(Next) != 0;

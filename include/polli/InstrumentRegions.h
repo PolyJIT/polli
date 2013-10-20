@@ -76,15 +76,9 @@ private:
   typedef std::vector<SubRegions> BlockList;
   
   BlockList BlocksToInstrument;
-  void instrumentRegion(unsigned idx, Module *M, SubRegions Edges,
-                          GlobalValue *Array);
-  BasicBlock *getSafeEntryFor(BasicBlock *Entry,
-                              BasicBlock *Exit);
-  BasicBlock *getSafeExitFor(BasicBlock *Entry,
-                             BasicBlock *Exit);
-  
+  void instrumentRegion(Module *M, BasicBlock &Entry, BasicBlock &Exit);
+
   void print(raw_ostream &OS, const Module *) const;
-  virtual bool runOnRegion(Region *R, RGPassManager &RGM) { return false; }
   virtual void printScop(raw_ostream &OS) const {}
 };
 
@@ -120,11 +114,6 @@ private:
   BlockList BlocksToInstrument;
   void instrumentRegion(unsigned idx, Module *M, SubRegions Edges,
                           GlobalValue *Array);
-  BasicBlock *getSafeEntryFor(BasicBlock *Entry,
-                              BasicBlock *Exit);
-  BasicBlock *getSafeExitFor(BasicBlock *Entry,
-                             BasicBlock *Exit);
-//  bool isValidBB(BasicBlock *Dominator, BasicBlock *BB);
 };
 }
 

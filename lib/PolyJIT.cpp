@@ -495,17 +495,21 @@ void PolyJIT::extractJitableScops(Module &M) {
   FPM->add(llvm::createBasicAliasAnalysisPass());
   FPM->add(SD);
 
-  if (EnableCaddy)
+  if (EnableCaddy) {
     FPM->add(polly::createCScopInfoPass());
-  else
+    if (InstrumentRegions)
+      FPM->add(polli::createPapiCScopProfilingPass());
+  }
+  else {
+    if (EnablePapi)
+      FPM->add(new PapiRegionPrepare());
+   
     FPM->add(new NonAffineScopDetection());
+    
+    if (InstrumentRegions)
+      FPM->add(polli::createPapiRegionProfilingPass());
+  }
  
-  if (EnablePapi)
-    FPM->add(new PapiRegionPrepare());
-
-  if (InstrumentRegions)
-    FPM->add(polli::createPapiRegionProfilingPass());
-
   if (!DisableRecompile)
     FPM->add(SM);
 
