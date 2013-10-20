@@ -84,12 +84,16 @@ namespace p = llvm::sys::path;
 
 namespace polli {
 Pass *createPapiRegionProfilingPass() { return new PapiRegionProfiling(); }
+Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
 static cl::opt<bool> EnablePapi("papi", cl::desc("Instrument SCoPs with PAPI"
                                                  "counters."),
                                 cl::init(false));
+
+static cl::opt<bool>
+EnableCaddy("caddy", cl::desc("Enable Caddy"), cl::init(false));
 
 static cl::opt<bool>
 InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
@@ -200,6 +204,7 @@ public:
     initializePollyPasses(Registry);
     initializePapiRegionPreparePass(Registry);
     initializePapiRegionProfilingPass(Registry);
+    initializePapiCScopProfilingPass(Registry);
     initializeOutputDir();
   }
 };

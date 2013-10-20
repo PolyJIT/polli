@@ -233,6 +233,24 @@ static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,
 
 //-----------------------------------------------------------------------------
 //
+// PapiCScopProfilingPass 
+//
+//-----------------------------------------------------------------------------
+bool PapiCScopProfiling::runOnScop(CScop &S) { return false; }
+
+void PapiCScopProfiling::print(raw_ostream &OS, const Module *M) const {}
+
+void PapiCScopProfiling::instrumentRegion(unsigned idx, Module *M,
+                                          SubRegions Edges,
+                                          GlobalValue *Array) {}
+
+BasicBlock *PapiCScopProfiling::getSafeEntryFor(BasicBlock *Entry,
+                                                BasicBlock *Exit) { return 0; }
+BasicBlock *PapiCScopProfiling::getSafeExitFor(BasicBlock *Entry,
+                                               BasicBlock *Exit) { return 0; }
+
+//-----------------------------------------------------------------------------
+//
 // PapiRegionProfilingPass
 //
 //-----------------------------------------------------------------------------
@@ -433,6 +451,15 @@ void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M,
 }
 
 char PapiRegionProfiling::ID = 0;
+char PapiCScopProfiling::ID = 0;
+
+INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy",
+                      "PAPI CScop Profiling", false, false);
+INITIALIZE_PASS_DEPENDENCY(LoopInfo);
+INITIALIZE_PASS_DEPENDENCY(DominatorTree);
+INITIALIZE_PASS_DEPENDENCY(CScopInfo);
+INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy",
+                      "PAPI CScop Profiling", false, false);
 
 INITIALIZE_PASS_BEGIN(PapiRegionProfiling, "pprof",
                       "PAPI Region Profiling", false, false);

@@ -31,6 +31,9 @@
 
 #include "polly/LinkAllPasses.h"
 
+#include "polly/CScopInfo.h"
+#include "polly/CScopPass.h"
+
 namespace llvm {
 class Value;
 class Instruction;
@@ -46,6 +49,44 @@ class Region;
 typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
 
 namespace polli {
+
+class PapiCScopProfiling : public CScopPass {
+public:
+  static char ID;
+
+  explicit PapiCScopProfiling() : CScopPass(ID) {}
+
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.addRequired<DominatorTree>();
+    AU.addRequired<LoopInfo>();
+    AU.addRequired<CScopInfo>();
+    AU.setPreservesAll();
+  }
+  
+  virtual bool runOnScop(CScop &S);
+
+private:
+  LoopInfo *LI;
+  CScopInfo *CS;
+  DominatorTree *DT;
+  
+  typedef std::pair<BasicBlock*,BasicBlock*> Edge;
+  typedef std::pair<Edge, bool> AnnotatedEdge;
+  typedef std::vector<AnnotatedEdge> SubRegions;
+  typedef std::vector<SubRegions> BlockList;
+  
+  BlockList BlocksToInstrument;
+  void instrumentRegion(unsigned idx, Module *M, SubRegions Edges,
+                          GlobalValue *Array);
+  BasicBlock *getSafeEntryFor(BasicBlock *Entry,
+                              BasicBlock *Exit);
+  BasicBlock *getSafeExitFor(BasicBlock *Entry,
+                             BasicBlock *Exit);
+  
+  void print(raw_ostream &OS, const Module *) const;
+  virtual bool runOnRegion(Region *R, RGPassManager &RGM) { return false; }
+  virtual void printScop(raw_ostream &OS) const {}
+};
 
 class PapiRegionProfiling : public FunctionPass {
 public:
@@ -91,6 +132,7 @@ private:
 namespace llvm {
   class PassRegistry;
   void initializePapiRegionProfilingPass(llvm::PassRegistry&);
+  void initializePapiCScopProfilingPass(llvm::PassRegistry&);
 }
 #endif // POLLI_INSTRUMENT_REGIONS_H
 
