@@ -492,40 +492,46 @@ void PolyJIT::extractJitableScops(Module &M) {
   ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
   ScopMapper *SM = new ScopMapper();
 
-  FPM = new FunctionPassManager(&M);
-  FPM->add(new DataLayout(&M));
-  FPM->add(llvm::createTypeBasedAliasAnalysisPass());
-  FPM->add(llvm::createBasicAliasAnalysisPass());
-  FPM->add(SD);
+  PassManager PM;
+
+  PM.add(new DataLayout(&M));
+  if (InstrumentRegions)
+    PM.add(new PapiCScopProfilingInit());
+
+  PM.add(new DataLayout(&M));
+  PM.add(llvm::createTypeBasedAliasAnalysisPass());
+  PM.add(llvm::createBasicAliasAnalysisPass());
+  PM.add(SD);
 
   if (EnableCaddy) {
-    FPM->add(polly::createCScopInfoPass());
+    PM.add(polly::createCScopInfoPass());
     if (InstrumentRegions)
-      FPM->add(polli::createPapiCScopProfilingPass());
+      PM.add(polli::createPapiCScopProfilingPass());
   }
   else {
     if (EnablePapi)
-      FPM->add(new PapiRegionPrepare());
+      PM.add(new PapiRegionPrepare());
    
-    FPM->add(new NonAffineScopDetection());
+    PM.add(new NonAffineScopDetection());
     
     if (InstrumentRegions)
-      FPM->add(polli::createPapiRegionProfilingPass());
+      PM.add(polli::createPapiRegionProfilingPass());
   }
  
   if (!DisableRecompile)
-    FPM->add(SM);
-
-  FPM->doInitialization();
+    PM.add(SM);
 
   outs() << "[polli] Phase II: Extracting NonAffine Scops\n";
-  for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
-    if (f->isDeclaration())
-      continue;
+  PM.run(M);
 
-    if (DisableRecompile || !SM->getCreatedFunctions().count(f))
-      FPM->run(*f);
-  }
+  // TODO: Maybe we need to take care of the ScopMapper again.
+  //for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
+  //  if (f->isDeclaration())
+  //    continue;
+
+  //  if (DisableRecompile || !SM->getCreatedFunctions().count(f))
+  //    FPM->run(*f);
+  //}
 
   ValueToValueMapTy VMap;
 
