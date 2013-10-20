@@ -141,9 +141,24 @@ static void InsertProfilingInitCall(Function *MainFn) {
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
   
+  Argument *Arg = MainFn->arg_begin();
+  size_t ArgSize = MainFn->arg_size();
+
+  std::vector<Value *> Args(2);
+  Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
+  Args[1] = Constant::getNullValue(Type::getInt8PtrTy(Context));
+
+  // We only want 2 args.
+  //if (ArgSize > 0)
+  //  Args[0] = Arg++;
+  //if (ArgSize > 1)
+  //  Args[1] = Arg;
+  
   Constant *PapiSetup = M.getOrInsertFunction(
       "papi_region_setup",
       Type::getVoidTy(Context),
+      Args[0]->getType(),
+      Args[1]->getType(),
       (Type *)0);
 
   // Skip over any allocas in the entry block.
@@ -152,7 +167,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   while (isa<AllocaInst>(InsertPos))
     ++InsertPos;
 
-  CallInst::Create(PapiSetup, "", InsertPos);
+  CallInst::Create(PapiSetup, Args, "", InsertPos);
 }
 
 static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,

@@ -25,10 +25,10 @@ void initializeOutputDir() {
   SmallVector<char, 255> cwd;
   fs::current_path(cwd);
 
-  p::append(cwd, "polli");
-  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
-  outs() << "DefaultDir = " << StringRef(DefaultDir->data(), DefaultDir->size())
-         << "\n";
+  //p::append(cwd, "polli");
+  //fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
+  //outs() << "DefaultDir = " << StringRef(DefaultDir->data(), DefaultDir->size())
+  //       << "\n";
 }
 
 void StoreModule(Module &M, const Twine &Name) {
