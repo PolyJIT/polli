@@ -110,11 +110,16 @@ static cl::opt<bool> DisableExecution(
     cl::desc("Disable execution just produce all intermediate files"),
     cl::init(false));
 
+
 // Determine optimization level.
 cl::opt<char> OptLevel("O",
                        cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
                                 "(default = '-O2')"),
                        cl::Prefix, cl::ZeroOrMore, cl::init(' '));
+
+static cl::opt<std::string>
+OutputFilename("o", cl::desc("Override output filename"),
+               cl::value_desc("filename"));
 
 cl::opt<std::string>
 TargetTriple("mtriple", cl::desc("Override target triple for module"));
@@ -584,7 +589,8 @@ void PolyJIT::extractJitableScops(Module &M) {
   FPM->doFinalization();
   delete FPM;
 
-  StoreModule(M, M.getModuleIdentifier() + ".extr");
+  if (OutputFilename.size() == 0)
+    StoreModule(M, M.getModuleIdentifier() + ".extr");
 }
 
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
@@ -612,7 +618,8 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   linkJitableScops(Mods, M);
 
   /* Store module before execution */
-  StoreModule(M, M.getModuleIdentifier() + ".final");
+  if (OutputFilename.size() > 0)
+    StoreModule(M, OutputFilename);
 
   /* Add a mapping to our JIT callback function. */
   int ret = 0;
