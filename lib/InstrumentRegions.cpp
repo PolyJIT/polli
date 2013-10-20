@@ -60,42 +60,44 @@ using namespace polly;
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 
 static uint64_t EventID = 0;
-static void PapiRegionEnterSCoP(Instruction *InsertBefore,
-                                Module *M, std::string dbgStr = "") {
-  DEBUG(dbgs() << "Profiling Scop Enter Call\n");
+static std::vector<uint64_t> IDStack;
+
+static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M,
+                                std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
   Constant *PapiScopEnterFn = M->getOrInsertFunction(
-      "papi_region_enter_scop", Builder.getVoidTy(),
-      Type::getInt64Ty(Context), Builder.getInt8PtrTy(), NULL);
+      "papi_region_enter_scop", Builder.getVoidTy(), Type::getInt64Ty(Context),
+      Builder.getInt8PtrTy(), NULL);
 
   Builder.SetInsertPoint(InsertBefore);
   Args[0] = ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false);
   Args[1] = Builder.CreateGlobalStringPtr(dbgStr);
 
   Builder.CreateCall(PapiScopEnterFn, Args);
+
+  IDStack.push_back(EventID);
 }
 
-static void PapiRegionExitSCoP(Instruction *InsertBefore,
-                               Module *M, std::string dbgStr = "") {
-  DEBUG(dbgs() << "Profiling Scop Exit Call\n");
+static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M,
+                               std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
   Constant *PapiScopExitFn = M->getOrInsertFunction(
-      "papi_region_exit_scop", Builder.getVoidTy(),
-      Type::getInt64Ty(Context), Builder.getInt8PtrTy(), NULL);
+      "papi_region_exit_scop", Builder.getVoidTy(), Type::getInt64Ty(Context),
+      Builder.getInt8PtrTy(), NULL);
 
   Builder.SetInsertPoint(InsertBefore);
-  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), EventID--, false);
+  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), IDStack.back(), false);
   Args[1] = Builder.CreateGlobalStringPtr(dbgStr);
 
   Builder.CreateCall(PapiScopExitFn, Args);
+  IDStack.pop_back();
 }
 
 static void PapiRegionEnter(Instruction *InsertBefore, Module *M) {
-  DEBUG(dbgs() << "Profiling Region Enter Call\n");
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
@@ -103,25 +105,26 @@ static void PapiRegionEnter(Instruction *InsertBefore, Module *M) {
       M->getOrInsertFunction("papi_region_enter", Builder.getVoidTy(),
                              Type::getInt64Ty(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
-  Builder.CreateCall(PapiScopEnterFn,
-                     ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false));
+  Builder.CreateCall(
+      PapiScopEnterFn,
+      ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false));
+  IDStack.push_back(EventID);
 }
 
 static void PapiRegionExit(Instruction *InsertBefore, Module *M) {
-  DEBUG(dbgs() << "Profiling Region Exit Call\n");
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
-  Constant *PapiScopEnterFn =
-      M->getOrInsertFunction("papi_region_exit", Builder.getVoidTy(),
-                             Type::getInt64Ty(Context), NULL);
+  Constant *PapiScopEnterFn = M->getOrInsertFunction(
+      "papi_region_exit", Builder.getVoidTy(), Type::getInt64Ty(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
-  Builder.CreateCall(PapiScopEnterFn,
-                     ConstantInt::get(Type::getInt64Ty(Context), EventID--, false));
+  Builder.CreateCall(
+      PapiScopEnterFn,
+      ConstantInt::get(Type::getInt64Ty(Context), IDStack.back(), false));
+  IDStack.pop_back();
 }
 
 static void PapiCreateInit(Function *F) {
-  DEBUG(dbgs() << "Profiling PAPI Init Call\n");
   LLVMContext &Context = F->getContext();
   Module *M = F->getParent();
   IRBuilder<> Builder(Context);
@@ -135,7 +138,6 @@ static void PapiCreateInit(Function *F) {
 }
 
 static void InsertProfilingInitCall(Function *MainFn) {
-  DEBUG(dbgs() << "Profiling Init Call\n");
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
   
