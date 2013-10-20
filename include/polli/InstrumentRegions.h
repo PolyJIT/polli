@@ -50,6 +50,18 @@ typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
 
 namespace polli {
 
+class PapiCScopProfilingInit : public ModulePass {
+public:
+  static char ID;
+  explicit PapiCScopProfilingInit() : ModulePass(ID) {};
+
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.setPreservesAll();
+  }
+
+  virtual bool runOnModule(Module &M);
+};
+
 class PapiCScopProfiling : public CScopPass {
 public:
   static char ID;
@@ -122,6 +134,7 @@ namespace llvm {
   class PassRegistry;
   void initializePapiRegionProfilingPass(llvm::PassRegistry&);
   void initializePapiCScopProfilingPass(llvm::PassRegistry&);
+  void initializePapiCScopProfilingInitPass(llvm::PassRegistry&);
 }
 #endif // POLLI_INSTRUMENT_REGIONS_H
 

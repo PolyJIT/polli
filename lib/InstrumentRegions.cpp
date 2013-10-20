@@ -225,6 +225,27 @@ static BasicBlock *getSafeExitFor(BasicBlock *Entry, BasicBlock *Exit,
 
 //-----------------------------------------------------------------------------
 //
+// PapiCScopProfilingInitPasss
+//
+//-----------------------------------------------------------------------------
+bool PapiCScopProfilingInit::runOnModule(Module &M) {
+  DEBUG(dbgs() << "PapiCScop $ Initializing module\n");
+  Function *Main = M.getFunction("main");
+  if (Main == 0) {
+    errs() << "WARNING: cannot insert papi profiling into a module"
+           << " with no main function!\n";
+    return false; // No main, no instrumentation!
+  }
+
+  // Just place our atexit call and initialize papi library calls.
+  InsertProfilingInitCall(Main);
+  PapiCreateInit(Main);
+
+  return false;
+}
+
+//-----------------------------------------------------------------------------
+//
 // PapiCScopProfilingPass 
 //
 //-----------------------------------------------------------------------------
@@ -432,6 +453,12 @@ void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M,
 
 char PapiRegionProfiling::ID = 0;
 char PapiCScopProfiling::ID = 0;
+char PapiCScopProfilingInit::ID = 0;
+
+INITIALIZE_PASS_BEGIN(PapiCScopProfilingInit, "pprof-init",
+                      "PAPI CScop Profiling (Initialization)", false, false);
+INITIALIZE_PASS_END(PapiCScopProfilingInit, "pprof-init",
+                      "PAPI CScop Profiling (Initialization)", false, false);
 
 INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy",
                       "PAPI CScop Profiling", false, false);

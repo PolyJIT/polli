@@ -19,6 +19,8 @@
 #include "polly/RegisterPasses.h"
 #include "polly/LinkAllPasses.h"
 
+#include "llvm/PassManager.h"
+
 #include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/Verifier.h"
@@ -205,6 +207,7 @@ public:
     initializePapiRegionPreparePass(Registry);
     initializePapiRegionProfilingPass(Registry);
     initializePapiCScopProfilingPass(Registry);
+    initializePapiCScopProfilingInitPass(Registry);
     initializeOutputDir();
   }
 };
