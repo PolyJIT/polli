@@ -487,22 +487,24 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
 
 void PolyJIT::extractJitableScops(Module &M) {
   ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
-  NonAffineScopDetection *NaSD = new NonAffineScopDetection();
   ScopMapper *SM = new ScopMapper();
 
   FPM = new FunctionPassManager(&M);
-
-  /* Add ScopDetection, ResultsViewer and NonAffineScopDetection */
+  FPM->add(new DataLayout(&M));
+  FPM->add(llvm::createTypeBasedAliasAnalysisPass());
+  FPM->add(llvm::createBasicAliasAnalysisPass());
   FPM->add(SD);
-  FPM->add(NaSD);
+
+  if (EnableCaddy)
+    FPM->add(polly::createCScopInfoPass());
+  else
+    FPM->add(new NonAffineScopDetection());
  
   if (EnablePapi)
     FPM->add(new PapiRegionPrepare());
 
-  if (InstrumentRegions) {
-    DEBUG(dbgs() << "Insert PAPI Profiling\n");
+  if (InstrumentRegions)
     FPM->add(polli::createPapiRegionProfilingPass());
-  }
 
   if (!DisableRecompile)
     FPM->add(SM);
