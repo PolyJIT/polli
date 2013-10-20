@@ -60,7 +60,6 @@ using namespace polly;
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 
 static uint64_t EventID = 0;
-
 static void PapiRegionEnterSCoP(Instruction *InsertBefore,
                                 Module *M, std::string dbgStr = "") {
   DEBUG(dbgs() << "Profiling Scop Enter Call\n");
@@ -121,61 +120,6 @@ static void PapiRegionExit(Instruction *InsertBefore, Module *M) {
                      ConstantInt::get(Type::getInt64Ty(Context), EventID--, false));
 }
 
-//static void PapiRegionEnterSCoP(Constant *ElemPtr, Instruction *InsertBefore,
-//                                Module *M, std::string dbgs = "") {
-//  LLVMContext &Context = M->getContext();
-//  IRBuilder<> Builder(Context);
-//  std::vector<Value *> Args(2);
-//  Constant *PapiScopEnterFn = M->getOrInsertFunction(
-//      "papi_region_enter_scop", Builder.getVoidTy(),
-//      Type::getInt64PtrTy(Context), Builder.getInt8PtrTy(), NULL);
-//
-//  Builder.SetInsertPoint(InsertBefore);
-//  Args[0] = ElemPtr;
-//  Args[1] = Builder.CreateGlobalStringPtr(dbgs);
-//
-//  Builder.CreateCall(PapiScopEnterFn, Args);
-//}
-
-//static void PapiRegionExitSCoP(Constant *ElemPtr, Instruction *InsertBefore,
-//                               Module *M, std::string dbgs = "") {
-//  LLVMContext &Context = M->getContext();
-//  IRBuilder<> Builder(Context);
-//  std::vector<Value *> Args(2);
-//  Constant *PapiScopExitFn = M->getOrInsertFunction(
-//      "papi_region_exit_scop", Builder.getVoidTy(),
-//      Type::getInt64PtrTy(Context), Builder.getInt8PtrTy(), NULL);
-//  Builder.SetInsertPoint(InsertBefore);
-//  Args[0] = ElemPtr;
-//  Args[1] = Builder.CreateGlobalStringPtr(dbgs);
-//
-//  Builder.CreateCall(PapiScopExitFn, Args);
-//}
-
-//static void PapiRegionEnter(Constant *ElemPtr, Instruction *InsertBefore,
-//                            Module *M) {
-//  LLVMContext &Context = M->getContext();
-//  IRBuilder<> Builder(Context);
-//
-//  Constant *PapiScopEnterFn =
-//      M->getOrInsertFunction("papi_region_enter", Builder.getVoidTy(),
-//                             Type::getInt64PtrTy(Context), NULL);
-//  Builder.SetInsertPoint(InsertBefore);
-//  Builder.CreateCall(PapiScopEnterFn, ElemPtr);
-//}
-//
-//static void PapiRegionExit(Constant *ElemPtr, Instruction *InsertBefore,
-//                           Module *M) {
-//  LLVMContext &Context = M->getContext();
-//  IRBuilder<> Builder(Context);
-//
-//  Constant *PapiScopEnterFn =
-//      M->getOrInsertFunction("papi_region_exit", Builder.getVoidTy(),
-//                             Type::getInt64PtrTy(Context), NULL);
-//  Builder.SetInsertPoint(InsertBefore);
-//  Builder.CreateCall(PapiScopEnterFn, ElemPtr);
-//}
-
 static void PapiCreateInit(Function *F) {
   DEBUG(dbgs() << "Profiling PAPI Init Call\n");
   LLVMContext &Context = F->getContext();
@@ -194,7 +138,6 @@ static void InsertProfilingInitCall(Function *MainFn) {
   DEBUG(dbgs() << "Profiling Init Call\n");
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
-  Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
   
   Constant *PapiSetup = M.getOrInsertFunction(
       "papi_region_setup",
@@ -207,7 +150,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   while (isa<AllocaInst>(InsertPos))
     ++InsertPos;
 
-  CallInst *PapiSetupCall = CallInst::Create(PapiSetup, "", InsertPos);
+  CallInst::Create(PapiSetup, "", InsertPos);
 }
 
 static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,
@@ -311,8 +254,7 @@ bool PapiRegionProfiling::runOnFunction(Function &F) {
   JSD = &getAnalysis<NonAffineScopDetection>();
   DT = &getAnalysis<DominatorTree>();
 
-  DEBUG(dbgs() << "PapiRegionProfiling: " << JSD->size() << "\n");
-  if (JSD->size() == 0)
+  if (!JSD->size())
     return false;
 
   Region *TopLevel = RI->getTopLevelRegion(), *Next;
@@ -468,6 +410,5 @@ INITIALIZE_PASS_DEPENDENCY(LoopInfo);
 INITIALIZE_PASS_DEPENDENCY(RegionInfo);
 INITIALIZE_PASS_DEPENDENCY(ScopDetection);
 INITIALIZE_PASS_DEPENDENCY(NonAffineScopDetection);
-INITIALIZE_PASS_DEPENDENCY(DominatorTree);
 INITIALIZE_PASS_END(PapiRegionProfiling, "pprof",
                       "PAPI Region Profiling", false, false);
