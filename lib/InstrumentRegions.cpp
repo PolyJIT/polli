@@ -58,6 +58,8 @@ using namespace polli;
 using namespace polly;
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
+STATISTIC(NoSingleExit, "Number of regions without single exit edge");
+STATISTIC(NoSingleEntry, "Number of regions without single exit edge");
 
 static uint64_t EventID = 0;
 static std::vector<uint64_t> IDStack;
@@ -238,7 +240,12 @@ static BasicBlock *getSafeEntryFor(BasicBlock *Entry, BasicBlock *Exit,
   //       << Exit->getName() << "\n";
   assert(Preds.size() == 1 &&
          "More than 1 predecessor outside of this region (-papi-prepare)!");
-  return Preds.at(0);
+  if (Preds.size() != 1) {
+    DEBUG(dbgs() << "More than 1 predecessor outside of this region (-papi-prepare)!");
+    ++NoSingleEntry;
+  }
+
+  return Preds[0];
 }
 
 static BasicBlock *getSafeExitFor(BasicBlock *Entry, BasicBlock *Exit,
@@ -256,9 +263,21 @@ static BasicBlock *getSafeExitFor(BasicBlock *Entry, BasicBlock *Exit,
   }
 
   // Validate our candidates.
-  assert((SafeExits.size() < 2) && "Too many exit candidates found.");
-  assert((SafeExits.size() > 0) && "Couldn't find a safe place for a counter.");
-  return SafeExits.at(0);
+  int exits = SafeExits.size();
+  if (exits > 1) {
+    DEBUG(dbgs() << "Too many exit candidates found.");
+    ++NoSingleExit;
+  }
+
+  if (exits == 0) {
+    DEBUG(dbgs() << "Couldn't find a safe place for a counter.");
+    ++NoSingleExit;
+  }
+
+  if (!exits)
+   return NULL;
+
+  return SafeExits[0];
 }
 
 //-----------------------------------------------------------------------------
@@ -284,26 +303,26 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 
 //-----------------------------------------------------------------------------
 //
-// PapiCScopProfilingPass 
+// PapiCScopProfilingPass
 //
 //-----------------------------------------------------------------------------
 bool PapiCScopProfiling::runOnScop(CScop &S) {
   DEBUG(dbgs() << "PapiCScop $ CScop: " << S.getRegion().getNameStr() << "\n");
   LI = &getAnalysis<LoopInfo>();
   DT = &getAnalysis<DominatorTree>();
-  
+
   const Region &R = S.getRegion();
   BasicBlock *Entry, *Exit;
-  
+
   /* Use the curent Region-Exit, we will chose an appropriate place
    * for a PAPI counter later. */
-  Entry = getSafeEntryFor(R.getEntry(), R.getExit(), LI);
-  Exit = getSafeExitFor(Entry, R.getExit(), LI, DT);
-
-  Module *M = R.getEntry()->getParent()->getParent();
-  instrumentRegion(M, *Entry, *Exit);
-  DEBUG(dbgs() << "PapiCScop $ Entry: " << Entry->getName()
-               << " Exit: " << Exit->getName() << "\n");
+  if ((Entry = getSafeEntryFor(R.getEntry(), R.getExit(), LI)) &&
+      (Exit = getSafeExitFor(Entry, R.getExit(), LI, DT))) {
+    Module *M = R.getEntry()->getParent()->getParent();
+    instrumentRegion(M, *Entry, *Exit);
+    DEBUG(dbgs() << "PapiCScop $ Entry: " << Entry->getName()
+                 << " Exit: " << Exit->getName() << "\n");
+  }
   return false;
 }
 
