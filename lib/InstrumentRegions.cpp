@@ -140,26 +140,6 @@ static void PapiCreateInit(Function *F) {
 static void InsertProfilingInitCall(Function *MainFn) {
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
-  
-  Argument *Arg = MainFn->arg_begin();
-  size_t ArgSize = MainFn->arg_size();
-
-  std::vector<Value *> Args(2);
-  Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
-  Args[1] = Constant::getNullValue(Type::getInt8PtrTy(Context));
-
-  // We only want 2 args.
-  //if (ArgSize > 0)
-  //  Args[0] = Arg++;
-  //if (ArgSize > 1)
-  //  Args[1] = Arg;
-  
-  Constant *PapiSetup = M.getOrInsertFunction(
-      "papi_region_setup",
-      Type::getVoidTy(Context),
-      Args[0]->getType(),
-      Args[1]->getType(),
-      (Type *)0);
 
   // Skip over any allocas in the entry block.
   BasicBlock *Entry = MainFn->begin();
@@ -167,7 +147,48 @@ static void InsertProfilingInitCall(Function *MainFn) {
   while (isa<AllocaInst>(InsertPos))
     ++InsertPos;
 
-  CallInst::Create(PapiSetup, Args, "", InsertPos);
+  Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
+  Constant *PapiSetup =
+      M.getOrInsertFunction("papi_region_setup", Type::getVoidTy(Context),
+                            IntegerType::getInt32Ty(Context), ArgVTy, (Type *)0);
+
+  std::vector<Value *> Args(2);
+  Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
+  Args[1] = Constant::getNullValue(ArgVTy);
+
+  CallInst *InitCall = CallInst::Create(PapiSetup, Args, "", InsertPos);
+
+  // If argc or argv are not available in main, just pass null values in.
+  Function::arg_iterator AI;
+  switch (MainFn->arg_size()) {
+  default:
+  case 2:
+    AI = MainFn->arg_begin();
+    ++AI;
+    if (AI->getType() != ArgVTy) {
+      Instruction::CastOps opcode =
+          CastInst::getCastOpcode(AI, false, ArgVTy, false);
+      InitCall->setArgOperand(
+          1, CastInst::Create(opcode, AI, ArgVTy, "argv.cast", InitCall));
+    } else {
+      InitCall->setArgOperand(1, AI);
+    }
+  /* FALL THROUGH */
+  case 1:
+    AI = MainFn->arg_begin();
+    // If the program looked at argc, have it look at the return value of the
+    // init call instead.
+    if (!AI->getType()->isIntegerTy(32)) {
+      Instruction::CastOps opcode =
+          CastInst::getCastOpcode(AI, true, Type::getInt32Ty(Context), true);
+      InitCall->setArgOperand(
+          0, CastInst::Create(opcode, AI, Type::getInt32Ty(Context),
+                              "argc.cast", InitCall));
+    } else
+      InitCall->setArgOperand(0, AI);
+  case 0:
+    break;
+  }
 }
 
 static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,
