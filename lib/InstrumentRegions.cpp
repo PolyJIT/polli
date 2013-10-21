@@ -351,6 +351,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M, BasicBlock &Entry,
   while (isa<CallInst>(InsertPos))
     ++InsertPos;
 
+  name = F->getName().str() + "::" + Exit.getName().str();
   InsertPos = Exit.getFirstNonPHIOrDbgOrLifetime();
   PapiRegionExitSCoP(InsertPos, M, name);
 
