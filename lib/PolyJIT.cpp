@@ -90,10 +90,6 @@ Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
-static cl::opt<bool> EnablePapi("papi", cl::desc("Instrument SCoPs with PAPI"
-                                                 "counters."),
-                                cl::init(false));
-
 static cl::opt<bool>
 EnableCaddy("caddy", cl::desc("Enable Caddy"), cl::init(false));
 
@@ -509,35 +505,17 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(SD);
 
-  if (EnableCaddy) {
-    PM.add(polly::createCScopInfoPass());
-    if (InstrumentRegions)
-      PM.add(polli::createPapiCScopProfilingPass());
-  }
-  else {
-    if (EnablePapi)
-      PM.add(new PapiRegionPrepare());
-   
-    PM.add(new NonAffineScopDetection());
-    
-    if (InstrumentRegions)
-      PM.add(polli::createPapiRegionProfilingPass());
-  }
+  if (EnableCaddy && InstrumentRegions)
+    PM.add(polli::createPapiCScopProfilingPass());
+  else if (InstrumentRegions)
+    //TODO: Swap to CSCopProfilingPass.
+    PM.add(polli::createPapiRegionProfilingPass());
  
   if (!DisableRecompile)
     PM.add(SM);
 
-  outs() << "[polli] Phase II: Extracting NonAffine Scops\n";
+  outs() << "[polli] Phase II: Create final module\n";
   PM.run(M);
-
-  // TODO: Maybe we need to take care of the ScopMapper again.
-  //for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
-  //  if (f->isDeclaration())
-  //    continue;
-
-  //  if (DisableRecompile || !SM->getCreatedFunctions().count(f))
-  //    FPM->run(*f);
-  //}
 
   ValueToValueMapTy VMap;
 

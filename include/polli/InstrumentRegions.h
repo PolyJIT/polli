@@ -31,9 +31,6 @@
 
 #include "polly/LinkAllPasses.h"
 
-#include "polly/CScopInfo.h"
-#include "polly/CScopPass.h"
-
 namespace llvm {
 class Value;
 class Instruction;
@@ -56,42 +53,35 @@ public:
   explicit PapiCScopProfilingInit() : ModulePass(ID) {};
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.setPreservesAll();
+    //AU.setPreservesAll();
   }
 
   virtual bool runOnModule(Module &M);
 };
 
-class PapiCScopProfiling : public CScopPass {
+class PapiCScopProfiling : public FunctionPass {
 public:
   static char ID;
 
-  explicit PapiCScopProfiling() : CScopPass(ID) {}
+  explicit PapiCScopProfiling() : FunctionPass(ID) {}
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<DominatorTree>();
     AU.addRequired<LoopInfo>();
-    AU.addRequired<CScopInfo>();
-    AU.setPreservesAll();
+    AU.addRequired<ScopDetection>();
   }
   
-  virtual bool runOnScop(CScop &S);
+  virtual bool runOnFunction(Function &F);
 
 private:
   LoopInfo *LI;
-  CScopInfo *CS;
+  ScopDetection *SD;
   DominatorTree *DT;
-  
-  typedef std::pair<BasicBlock*,BasicBlock*> Edge;
-  typedef std::pair<Edge, bool> AnnotatedEdge;
-  typedef std::vector<AnnotatedEdge> SubRegions;
-  typedef std::vector<SubRegions> BlockList;
-  
-  BlockList BlocksToInstrument;
-  void instrumentRegion(Module *M, BasicBlock &Entry, BasicBlock &Exit);
 
-  void print(raw_ostream &OS, const Module *) const;
-  virtual void printScop(raw_ostream &OS) const {}
+  void instrumentRegion(Module *M, BasicBlock &Entry, BasicBlock &Exit,
+                        const Region *R);
+
+  void print(raw_ostream &OS, const Module *) const {}
 };
 
 class PapiRegionProfiling : public FunctionPass {
@@ -106,7 +96,7 @@ public:
     // Only if we're profiling SCoPs. Make this an option!
     AU.addRequired<ScopDetection>();
     AU.addRequired<NonAffineScopDetection>();
-    AU.setPreservesAll();
+    //AU.setPreservesAll();
   }
 
   virtual bool runOnFunction(Function &F);

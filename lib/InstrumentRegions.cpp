@@ -298,7 +298,7 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
   InsertProfilingInitCall(Main);
   PapiCreateInit(Main);
 
-  return false;
+  return true;
 }
 
 //-----------------------------------------------------------------------------
@@ -306,30 +306,42 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 // PapiCScopProfilingPass
 //
 //-----------------------------------------------------------------------------
-bool PapiCScopProfiling::runOnScop(CScop &S) {
-  DEBUG(dbgs() << "PapiCScop $ CScop: " << S.getRegion().getNameStr() << "\n");
+bool PapiCScopProfiling::runOnFunction(Function &F) {
   LI = &getAnalysis<LoopInfo>();
   DT = &getAnalysis<DominatorTree>();
+  SD = &getAnalysis<ScopDetection>();
 
-  const Region &R = S.getRegion();
-  BasicBlock *Entry, *Exit;
+  for (ScopDetection::iterator RI = SD->begin(), SE = SD->end(); RI != SE;
+       ++RI) {
+    const Region *R = (*RI);
 
-  /* Use the curent Region-Exit, we will chose an appropriate place
-   * for a PAPI counter later. */
-  if ((Entry = getSafeEntryFor(R.getEntry(), R.getExit(), LI)) &&
-      (Exit = getSafeExitFor(Entry, R.getExit(), LI, DT))) {
-    Module *M = R.getEntry()->getParent()->getParent();
-    instrumentRegion(M, *Entry, *Exit);
+    BasicBlock *Entry, *Exit;
+    DEBUG(dbgs() << "PapiCScop $ CScop: " << R->getNameStr() << "\n");
+
+    Entry = getSafeEntryFor(R->getEntry(), R->getExit(), LI);
+    if (!Entry) {
+      ++NoSingleEntry;
+      return false;
+    }
+
+    Exit = getSafeExitFor(Entry, R->getExit(), LI, DT);
+    if (!Exit) {
+      ++NoSingleEntry;
+      return false;
+    }
+
+    /* Use the curent Region-Exit, we will chose an appropriate place
+     * for a PAPI counter later. */
+    Module *M = Entry->getParent()->getParent();
+    instrumentRegion(M, *Entry, *Exit, R);
     DEBUG(dbgs() << "PapiCScop $ Entry: " << Entry->getName()
                  << " Exit: " << Exit->getName() << "\n");
   }
-  return false;
+  return true;
 }
 
-void PapiCScopProfiling::print(raw_ostream &OS, const Module *M) const {}
-
 void PapiCScopProfiling::instrumentRegion(Module *M, BasicBlock &Entry,
-                                          BasicBlock &Exit) {
+                                          BasicBlock &Exit, const Region *R) {
   // The first entry is always(!) the region we want to time.
   // All following edges are subregions and have to be treated
   // like function calls.
@@ -342,7 +354,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M, BasicBlock &Entry,
     ++InsertPos;
 
   Function *F = Entry.getParent();
-  std::string name = F->getName().str() + "::" + Entry.getName().str();
+  std::string name = F->getName().str() + "::" + R->getEntry()->getName().str();
   PapiRegionEnterSCoP(InsertPos, M, name);
 
   /* Preserve the correct order for stack tracing.
@@ -351,7 +363,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M, BasicBlock &Entry,
   while (isa<CallInst>(InsertPos))
     ++InsertPos;
 
-  name = F->getName().str() + "::" + Exit.getName().str();
+  name = F->getName().str() + "::" + R->getExit()->getName().str();
   InsertPos = Exit.getFirstNonPHIOrDbgOrLifetime();
   PapiRegionExitSCoP(InsertPos, M, name);
 
@@ -522,7 +534,6 @@ INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy",
                       "PAPI CScop Profiling", false, false);
 INITIALIZE_PASS_DEPENDENCY(LoopInfo);
 INITIALIZE_PASS_DEPENDENCY(DominatorTree);
-INITIALIZE_PASS_DEPENDENCY(CScopInfo);
 INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy",
                       "PAPI CScop Profiling", false, false);
 
