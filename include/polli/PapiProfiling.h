@@ -33,8 +33,6 @@ public:
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<LoopInfo>();
     AU.addRequired<DominatorTree>();
-    AU.addRequired<ScopDetection>();
-    AU.addRequired<NonAffineScopDetection>();
     AU.setPreservesAll();
   }
 

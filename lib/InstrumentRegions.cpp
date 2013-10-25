@@ -58,13 +58,10 @@ using namespace polli;
 using namespace polly;
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
-STATISTIC(NoSingleExit, "Number of regions without single exit edge");
-STATISTIC(NoSingleEntry, "Number of regions without single exit edge");
+STATISTIC(MoreEntries, "Number of regions with more than one entry edge");
+STATISTIC(MoreExits, "Number of regions with more than one exit edge");
 
-static uint64_t EventID = 0;
-static std::vector<uint64_t> IDStack;
-
-static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M,
+static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M, uint64_t id,
                                 std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
@@ -74,15 +71,13 @@ static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M,
       Builder.getInt8PtrTy(), NULL);
 
   Builder.SetInsertPoint(InsertBefore);
-  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false);
+  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), id, false);
   Args[1] = Builder.CreateGlobalStringPtr(dbgStr);
 
   Builder.CreateCall(PapiScopEnterFn, Args);
-
-  IDStack.push_back(EventID);
 }
 
-static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M,
+static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M, uint64_t id,
                                std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
@@ -92,14 +87,13 @@ static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M,
       Builder.getInt8PtrTy(), NULL);
 
   Builder.SetInsertPoint(InsertBefore);
-  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), IDStack.back(), false);
+  Args[0] = ConstantInt::get(Type::getInt64Ty(Context), id, false);
   Args[1] = Builder.CreateGlobalStringPtr(dbgStr);
 
   Builder.CreateCall(PapiScopExitFn, Args);
-  IDStack.pop_back();
 }
 
-static void PapiRegionEnter(Instruction *InsertBefore, Module *M) {
+static void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
@@ -109,11 +103,10 @@ static void PapiRegionEnter(Instruction *InsertBefore, Module *M) {
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(
       PapiScopEnterFn,
-      ConstantInt::get(Type::getInt64Ty(Context), ++EventID, false));
-  IDStack.push_back(EventID);
+      ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
-static void PapiRegionExit(Instruction *InsertBefore, Module *M) {
+static void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
@@ -122,8 +115,7 @@ static void PapiRegionExit(Instruction *InsertBefore, Module *M) {
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(
       PapiScopEnterFn,
-      ConstantInt::get(Type::getInt64Ty(Context), IDStack.back(), false));
-  IDStack.pop_back();
+      ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
 static void PapiCreateInit(Function *F) {
@@ -242,7 +234,6 @@ static BasicBlock *getSafeEntryFor(BasicBlock *Entry, BasicBlock *Exit,
          "More than 1 predecessor outside of this region (-papi-prepare)!");
   if (Preds.size() != 1) {
     DEBUG(dbgs() << "More than 1 predecessor outside of this region (-papi-prepare)!");
-    ++NoSingleEntry;
   }
 
   return Preds[0];
@@ -266,16 +257,15 @@ static BasicBlock *getSafeExitFor(BasicBlock *Entry, BasicBlock *Exit,
   int exits = SafeExits.size();
   if (exits > 1) {
     DEBUG(dbgs() << "Too many exit candidates found.");
-    ++NoSingleExit;
   }
 
   if (exits == 0) {
     DEBUG(dbgs() << "Couldn't find a safe place for a counter.");
-    ++NoSingleExit;
   }
 
   if (!exits)
    return NULL;
+    
 
   return SafeExits[0];
 }
@@ -307,8 +297,6 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 //
 //-----------------------------------------------------------------------------
 bool PapiCScopProfiling::runOnFunction(Function &F) {
-  LI = &getAnalysis<LoopInfo>();
-  DT = &getAnalysis<DominatorTree>();
   SD = &getAnalysis<ScopDetection>();
 
   for (ScopDetection::iterator RI = SD->begin(), SE = SD->end(); RI != SE;
@@ -318,210 +306,96 @@ bool PapiCScopProfiling::runOnFunction(Function &F) {
     BasicBlock *Entry, *Exit;
     DEBUG(dbgs() << "PapiCScop $ CScop: " << R->getNameStr() << "\n");
 
-    Entry = getSafeEntryFor(R->getEntry(), R->getExit(), LI);
-    if (!Entry) {
-      ++NoSingleEntry;
-      return false;
+    Entry = R->getEntry();
+    Exit = R->getExit();
+
+    std::vector<BasicBlock *> EntrySplits;
+    std::vector<BasicBlock *> ExitSplits;
+    BasicBlock *SplitBB;
+    // Iterate over all predecessors and split the edge, if BB is not
+    // contained in the region.
+    for (pred_iterator BB = pred_begin(Entry), BE = pred_end(Entry); BB != BE;
+         ++BB) {
+      BasicBlock *PredBB = *BB;
+      if (!R->contains(PredBB))
+        if ((SplitBB = SplitEdge(PredBB, Entry, this)))
+          EntrySplits.push_back(SplitBB);
     }
 
-    Exit = getSafeExitFor(Entry, R->getExit(), LI, DT);
-    if (!Exit) {
-      ++NoSingleEntry;
-      return false;
+    for (pred_iterator BB = pred_begin(Exit), BE = pred_end(Exit); BB != BE;
+         ++BB) {
+      BasicBlock *PredBB = *BB;
+      if (R->contains(PredBB))
+        if ((SplitBB = SplitEdge(PredBB, Exit, this)))
+          ExitSplits.push_back(SplitBB);
     }
 
+    if (EntrySplits.size() > 1) {
+      dbgs() << "Entries: ";
+      for (auto &Entry : EntrySplits) {
+        dbgs() << Entry->getName().str() << " ; ";
+      }
+      dbgs() << "\n";
+      ++MoreEntries;
+    }
+    if (ExitSplits.size() > 1) {
+      dbgs() << "Exits: ";
+      for (auto &Exit: ExitSplits) {
+        dbgs() << Exit->getName().str() << " ; ";
+      }
+      dbgs() << "\n";
+      ++MoreExits;
+    }
     /* Use the curent Region-Exit, we will chose an appropriate place
      * for a PAPI counter later. */
     Module *M = Entry->getParent()->getParent();
-    instrumentRegion(M, *Entry, *Exit, R);
-    DEBUG(dbgs() << "PapiCScop $ Entry: " << Entry->getName()
-                 << " Exit: " << Exit->getName() << "\n");
+    instrumentRegion(M, EntrySplits, ExitSplits, R);
   }
   return true;
 }
 
-void PapiCScopProfiling::instrumentRegion(Module *M, BasicBlock &Entry,
-                                          BasicBlock &Exit, const Region *R) {
-  // The first entry is always(!) the region we want to time.
-  // All following edges are subregions and have to be treated
-  // like function calls.
-  BasicBlock::iterator InsertPos = Entry.getFirstNonPHIOrDbgOrLifetime();
+static uint64_t EvID = 1;
+void PapiCScopProfiling::instrumentRegion(Module *M,
+                                          std::vector<BasicBlock *> &EntryBBs,
+                                          std::vector<BasicBlock *> &ExitBBs,
+                                          const Region *R) {
+  Function *F = R->getEntry()->getParent();
+  std::string baseName = F->getName().str() + "::";
 
-  // Adjust insertion point for landing pads / allocas
-  if (Entry.isLandingPad())
-    ++InsertPos;
-  while (isa<AllocaInst>(InsertPos))
-    ++InsertPos;
-
-  Function *F = Entry.getParent();
-  std::string name = F->getName().str() + "::" + R->getEntry()->getName().str();
-  PapiRegionEnterSCoP(InsertPos, M, name);
-
-  /* Preserve the correct order for stack tracing.
-   * This will make us "sneak" past a previously entered
-   * call to ExitSCoP.*/
-  while (isa<CallInst>(InsertPos))
-    ++InsertPos;
-
-  name = F->getName().str() + "::" + R->getExit()->getName().str();
-  InsertPos = Exit.getFirstNonPHIOrDbgOrLifetime();
-  PapiRegionExitSCoP(InsertPos, M, name);
-
-  ++InstrumentedRegions;
-}
-
-//-----------------------------------------------------------------------------
-//
-// PapiRegionProfilingPass
-//
-//-----------------------------------------------------------------------------
-
-// Scan the available regions for profiling and track insert positions.
-bool PapiRegionProfiling::runOnFunction(Function &F) {
-  RI = &getAnalysis<RegionInfo>();
-  LI = &getAnalysis<LoopInfo>();
-  JSD = &getAnalysis<NonAffineScopDetection>();
-  DT = &getAnalysis<DominatorTree>();
-
-  if (!JSD->size())
-    return false;
-
-  Region *TopLevel = RI->getTopLevelRegion(), *Next;
-  std::deque<Region *> ToVisit;
-  bool isScop;
-  Edge tmp;
-  AnnotatedEdge p;
-  BasicBlock *Entry, *Exit;
-  SubRegions EEs;
-
-  ToVisit.push_back(TopLevel);
-  while (!ToVisit.empty()) {
-    Next = ToVisit.front();
-    ToVisit.pop_front();
-    EEs.clear();
-
-    /* Use the curent Region-Exit, we will chose an appropriate place
-     * for a PAPI counter later. */
-    Entry = getSafeEntryFor(Next->getEntry(), Next->getExit(), LI);
-    Exit = getSafeExitFor(Entry, Next->getExit(), LI, DT);
-
-    tmp = std::make_pair(Entry, Exit);
-    isScop = JSD->count(Next) != 0;
-
-    if (isScop || ((F.getName() == "main") && Next->isTopLevelRegion())) {
-      p = std::make_pair(tmp, isScop);
-      EEs.push_back(p);
-      InstrumentedRegions++;
-      BlocksToInstrument.push_back(EEs);
-    }
-
-    for (auto &elem : *Next)
-      ToVisit.push_back(elem);
-  }
-
-  return true;
-}
-
-bool PapiRegionProfiling::doFinalization(Module &M) {
-  int toInstrument = 0;
-  LLVMContext &Context = M.getContext();
-
-  Function *Main = M.getFunction("main");
-  if (Main == 0) {
-    errs() << "WARNING: cannot insert papi profiling into a module"
-           << " with no main function!\n";
-    return false; // No main, no instrumentation!
-  }
-
-  // Calculate needed array space
-  toInstrument = BlocksToInstrument.size();
-
-  // Create a global array to hold the results.
-  Type *ATy = ArrayType::get(Type::getInt64Ty(Context), toInstrument);
-  GlobalVariable *Counters =
-      new GlobalVariable(M, ATy, false, GlobalValue::InternalLinkage,
-                         Constant::getNullValue(ATy), "PapiRegionProfTime");
-
-  // Place the necessary PAPI calls.
-  for (unsigned i = 0; i < BlocksToInstrument.size(); ++i)
-    instrumentRegion(i, &M, BlocksToInstrument.at(i), Counters);
-
-  InsertProfilingInitCall(Main);
-  PapiCreateInit(Main);
-
-  return true;
-}
-
-void PapiRegionProfiling::instrumentRegion(unsigned idx, Module *M,
-                                           SubRegions Edges,
-                                           GlobalValue *Array) {
-  LLVMContext &Context = M->getContext();
-  std::vector<Constant *> Indices(2);
-
-  // The first entry is always(!) the region we want to time.
-  // All following edges are subregions and have to be treated
-  // like function calls.
-  AnnotatedEdge AnEdge = Edges[0];
-  Edge R = AnEdge.first;
-  BasicBlock *BB = R.first;
-  BB->getTerminator();
-  BasicBlock::iterator InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
-
-  // Adjust insertion point for landing pads / allocas
-  if (BB->isLandingPad())
-    ++InsertPos;
-  while (isa<AllocaInst>(InsertPos)) {
-    ++InsertPos;
-  }
-
-  // Prepare GEP for accessing the proper array element.
-  Indices[0] = Constant::getNullValue(Type::getInt64Ty(Context));
-  Indices[1] = ConstantInt::get(Type::getInt64Ty(Context), idx);
-
-  // If it's a SCoP
-  bool isSCoP = AnEdge.second;
-
-  // Store initial time in the array
-  Function *F = BB->getParent();
-  std::string name = F->getName().str() + "::" + BB->getName().str();
-  if (isSCoP) {
+  BasicBlock::iterator InsertPos;
+  for (auto &BB : EntryBBs) {
+    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
+    // Adjust insertion point for landing pads / allocas
+    if (BB->isLandingPad())
+      ++InsertPos;
+    while (isa<AllocaInst>(InsertPos))
+      ++InsertPos;
     /* Preserve the correct order for stack tracing.
      * This will make us "sneak" past a previously entered
      * call to ExitSCoP.*/
-    while (isa<CallInst>(InsertPos)) {
+    while (isa<CallInst>(InsertPos))
       ++InsertPos;
-    }
-    PapiRegionEnterSCoP(InsertPos, M, name);
-  } else {
-    PapiRegionEnter(InsertPos, M);
+
+    std::string name = baseName + BB->getName().str();
+    PapiRegionEnterSCoP(InsertPos, M, EvID, name);
   }
 
-  // Store final time at exit of the region.
-  if (R.second) {
-    InsertPos = R.second->getFirstNonPHIOrDbgOrLifetime();
-    if (isSCoP) {
-      PapiRegionExitSCoP(InsertPos, M, name);
-    } else {
-      PapiRegionExit(InsertPos, M);
-    }
-  } else {
-    // If we are the TopLevel-Region, we don't have an exit block.
-    Function *F = R.first->getParent();
-    for (Function::iterator i = F->begin(), e = F->end(); i != e; ++i) {
-      BasicBlock *bb = i;
-      for (BasicBlock::iterator j = bb->begin(), f = bb->end(); j != f; ++j)
-        if (isa<ReturnInst>(j)) {
-          if (isSCoP) {
-            PapiRegionExitSCoP(j, M, name);
-          } else {
-            PapiRegionExit(j, M);
-          }
-        }
-    }
+  for (auto &BB : ExitBBs) {
+    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
+    // Adjust insertion point for landing pads / allocas
+    if (BB->isLandingPad())
+      ++InsertPos;
+    while (isa<AllocaInst>(InsertPos))
+      ++InsertPos;
+
+    std::string name = baseName + BB->getName().str();
+    PapiRegionExitSCoP(InsertPos, M, EvID, name);
   }
+
+  ++InstrumentedRegions;
+  ++EvID;
 }
 
-char PapiRegionProfiling::ID = 0;
 char PapiCScopProfiling::ID = 0;
 char PapiCScopProfilingInit::ID = 0;
 
@@ -532,17 +406,6 @@ INITIALIZE_PASS_END(PapiCScopProfilingInit, "pprof-init",
 
 INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy",
                       "PAPI CScop Profiling", false, false);
-INITIALIZE_PASS_DEPENDENCY(LoopInfo);
-INITIALIZE_PASS_DEPENDENCY(DominatorTree);
+INITIALIZE_PASS_DEPENDENCY(ScopDetection);
 INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy",
                       "PAPI CScop Profiling", false, false);
-
-INITIALIZE_PASS_BEGIN(PapiRegionProfiling, "pprof",
-                      "PAPI Region Profiling", false, false);
-INITIALIZE_PASS_DEPENDENCY(DominatorTree);
-INITIALIZE_PASS_DEPENDENCY(LoopInfo);
-INITIALIZE_PASS_DEPENDENCY(RegionInfo);
-INITIALIZE_PASS_DEPENDENCY(ScopDetection);
-INITIALIZE_PASS_DEPENDENCY(NonAffineScopDetection);
-INITIALIZE_PASS_END(PapiRegionProfiling, "pprof",
-                      "PAPI Region Profiling", false, false);

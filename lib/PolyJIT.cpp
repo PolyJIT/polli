@@ -85,7 +85,6 @@ namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
 
 namespace polli {
-Pass *createPapiRegionProfilingPass() { return new PapiRegionProfiling(); }
 Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
@@ -206,7 +205,6 @@ public:
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializePollyPasses(Registry);
     initializePapiRegionPreparePass(Registry);
-    initializePapiRegionProfilingPass(Registry);
     initializePapiCScopProfilingPass(Registry);
     initializePapiCScopProfilingInitPass(Registry);
   
@@ -505,11 +503,8 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(SD);
 
-  if (EnableCaddy && InstrumentRegions)
+  if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
-  else if (InstrumentRegions)
-    //TODO: Swap to CSCopProfilingPass.
-    PM.add(polli::createPapiRegionProfilingPass());
  
   if (!DisableRecompile)
     PM.add(SM);

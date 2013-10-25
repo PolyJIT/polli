@@ -22,6 +22,7 @@
 
 #include "llvm/Pass.h"
 #include "llvm/Analysis/Dominators.h"
+#include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "polli/NonAffineScopDetection.h"
@@ -66,8 +67,6 @@ public:
   explicit PapiCScopProfiling() : FunctionPass(ID) {}
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<DominatorTree>();
-    AU.addRequired<LoopInfo>();
     AU.addRequired<ScopDetection>();
   }
   
@@ -78,51 +77,16 @@ private:
   ScopDetection *SD;
   DominatorTree *DT;
 
-  void instrumentRegion(Module *M, BasicBlock &Entry, BasicBlock &Exit,
-                        const Region *R);
+  void instrumentRegion(Module *M, std::vector<BasicBlock *> &EntryBBs,
+                        std::vector<BasicBlock *> &ExitBBs, const Region *R);
 
   void print(raw_ostream &OS, const Module *) const {}
-};
-
-class PapiRegionProfiling : public FunctionPass {
-public:
-  static char ID;
-
-  explicit PapiRegionProfiling() : FunctionPass(ID) {}
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<DominatorTree>();
-    AU.addRequired<LoopInfo>();
-    AU.addRequired<RegionInfo>();
-    // Only if we're profiling SCoPs. Make this an option!
-    AU.addRequired<ScopDetection>();
-    AU.addRequired<NonAffineScopDetection>();
-    //AU.setPreservesAll();
-  }
-
-  virtual bool runOnFunction(Function &F);
-  virtual bool doFinalization(Module &M);
-  virtual void print(raw_ostream &OS, const Module *) const {};
-private:
-  RegionInfo *RI;
-  LoopInfo *LI;
-  NonAffineScopDetection *JSD;
-  DominatorTree *DT;
-
-  typedef std::pair<BasicBlock*,BasicBlock*> Edge;
-  typedef std::pair<Edge, bool> AnnotatedEdge;
-  typedef std::vector<AnnotatedEdge> SubRegions;
-  typedef std::vector<SubRegions> BlockList;
-
-  BlockList BlocksToInstrument;
-  void instrumentRegion(unsigned idx, Module *M, SubRegions Edges,
-                          GlobalValue *Array);
 };
 }
 
 
 namespace llvm {
   class PassRegistry;
-  void initializePapiRegionProfilingPass(llvm::PassRegistry&);
   void initializePapiCScopProfilingPass(llvm::PassRegistry&);
   void initializePapiCScopProfilingInitPass(llvm::PassRegistry&);
 }
