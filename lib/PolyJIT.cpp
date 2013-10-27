@@ -96,6 +96,9 @@ static cl::opt<bool>
 InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
                   cl::init(false));
 
+cl::opt<bool> EnableJitable("jitable", cl::desc("Enable Non AffineSCoPs"), cl::init(false));
+
+
 static cl::opt<bool>
 DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
                  cl::init(false));
@@ -203,6 +206,7 @@ class StaticInitializer {
 public:
   StaticInitializer() {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
+    initializeNonAffineScopDetectionPass(Registry);
     initializePollyPasses(Registry);
     initializePapiRegionPreparePass(Registry);
     initializePapiCScopProfilingPass(Registry);
@@ -498,10 +502,14 @@ void PolyJIT::extractJitableScops(Module &M) {
   if (InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
 
-  PM.add(new DataLayout(&M));
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
+
   PM.add(SD);
+  
+  NonAffineScopDetection *NSD = new NonAffineScopDetection();
+  NSD->enable(EnableJitable);
+  PM.add(NSD);
 
   if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());

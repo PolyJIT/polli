@@ -14,6 +14,7 @@
 
 #include "polli/NonAffineScopDetection.h"
 
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 
 static cl::opt<bool>
@@ -21,6 +22,12 @@ AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));
 
 using namespace llvm;
 using namespace polly;
+
+STATISTIC(JitScopsFound, "Number of jitable SCoPs");
+STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
+STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
+STATISTIC(JitNonAffineAccess, "Number of fixable non affine accesses");
+STATISTIC(AliasingIgnored, "Number of ignored aliasings");
 
 void NonAffineScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
@@ -44,6 +51,7 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
     AccumulatedScops.insert(*i);
 
   polly::RejectedLog rl = SD->getRejectedLog();
+
   for (polly::RejectedLog::iterator i = rl.begin(), ie = rl.end(); i != ie;
        ++i) {
     const Region *R = (*i).first;
@@ -51,54 +59,83 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
 
     bool isValid = true;
     ParamList params;
-
     for (unsigned j = 0; j < rlog.size(); ++j) {
       const SCEV *lhs = rlog[j].Failed_LHS;
       const SCEV *rhs = rlog[j].Failed_RHS;
       RejectKind kind = rlog[j].Reason;
+    
+      if (!isValid)
+        break;
 
       // Can we handle the reject reason?
       isValid &= (kind == NonAffineLoopBound || kind == NonAffineCondition ||
-                  kind == NonAffineAccess);
-      if (!isValid)
-        break;
+                  kind == NonAffineAccess || kind == Alias);
 
       // Extract parameters and insert in the map.
       if (!RequiredParams.count(R))
         RequiredParams[R] = ParamList();
 
-      const SCEV *check;
-
-      if (kind == NonAffineLoopBound)
-        check = rhs;
-
-      if (kind == NonAffineAccess || kind == NonAffineCondition)
-        check = lhs;
-
-      if (check) {
-        isValid &= polly::isNonAffineExpr(R, check, *SE);
-        params = getParamsInNonAffineExpr(R, check, *SE);
-
-        AccumulatedScops.insert(R);
-        RequiredParams[R]
-            .insert(RequiredParams[R].end(), params.begin(), params.end());
+      switch (kind) {
+      case NonAffineCondition:
+        isValid &= polly::isNonAffineExpr(R, rhs, *SE);
+        if (isValid) {
+          DEBUG(rhs->dump());
+          params = getParamsInNonAffineExpr(R, rhs, *SE);
+          RequiredParams[R]
+              .insert(RequiredParams[R].end(), params.begin(), params.end());
+        }
+      case NonAffineAccess:
+      case NonAffineLoopBound:
+        isValid &= polly::isNonAffineExpr(R, lhs, *SE);
+        if (isValid) {
+          DEBUG(lhs->dump());
+          params = getParamsInNonAffineExpr(R, lhs, *SE);
+          RequiredParams[R]
+              .insert(RequiredParams[R].end(), params.begin(), params.end());
+        }
+        break;
+      default: /* Nothing to check. */
+        break;
       }
+    }
+
+    if (isValid) {
+      for (auto &RI : rlog) {
+        switch (RI.Reason) {
+        case NonAffineCondition:
+          ++JitNonAffineCondition;
+          break;
+        case NonAffineAccess:
+          ++JitNonAffineAccess;
+          break;
+        case NonAffineLoopBound:
+          ++JitNonAffineLoopBound;
+          break;
+        case Alias:
+          ++AliasingIgnored;
+          break;
+        default: /* Nothing */;
+        }
+      }
+      AccumulatedScops.insert(R);
+      JitableScops.insert(R);
+      ++JitScopsFound;
     }
 
     // We know that the current detection errors can be fixed, so we need to
     // enter the expand phase.
-    if (isValid)
-      DEBUG(dbgs() << "[polli] valid non affine SCoP! " << R->getNameStr()
-                   << "\n");
-    else
-      DEBUG(dbgs() << "[polli] invalid non affine SCoP! " << R->getNameStr()
-                   << "\n");
+
+    DEBUG(
+      if (isValid)
+        dbgs() << " JITABLE SCoP! "
+               << R->getNameStr() << "\n";
+      else
+        dbgs() << " NON-JITABLE SCoP! "
+               << R->getNameStr() << "\n"
+    );
   }
 
-  if (AnalyzeOnly)
-    print(dbgs(), F.getParent());
-
-  return true;
+  return false;
 }
 ;
 
@@ -118,6 +155,12 @@ void NonAffineScopDetection::print(raw_ostream &OS, const Module *) const {
   }
 }
 ;
+
+void NonAffineScopDetection::releaseMemory() {
+  JitableScops.clear();
+  AccumulatedScops.clear();
+  RequiredParams.clear();
+}
 
 char NonAffineScopDetection::ID = 0;
 

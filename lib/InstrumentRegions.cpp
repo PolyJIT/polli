@@ -58,6 +58,7 @@ using namespace polli;
 using namespace polly;
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
+STATISTIC(InstrumentedJITScops, "Number of instrumented JIT SCoPs");
 STATISTIC(MoreEntries, "Number of regions with more than one entry edge");
 STATISTIC(MoreExits, "Number of regions with more than one exit edge");
 
@@ -93,7 +94,7 @@ static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M, uint64_t id
   Builder.CreateCall(PapiScopExitFn, Args);
 }
 
-static void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
+void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
@@ -106,7 +107,7 @@ static void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
       ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
-static void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
+void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
 
@@ -185,91 +186,6 @@ static void InsertProfilingInitCall(Function *MainFn) {
   }
 }
 
-static bool isValidBB(BasicBlock *Dominator, BasicBlock *BB, LoopInfo *LI,
-                      DominatorTree *DT) {
-  Loop *L = LI->getLoopFor(BB);
-  Loop *DomL = LI->getLoopFor(Dominator);
-
-  if (!DT->dominates(Dominator, BB))
-    return false;
-
-  if (L && L->contains(Dominator))
-    return true;
-
-  for (pred_iterator PI = pred_begin(BB), E = pred_end(BB); PI != E; ++PI) {
-    if (!DomL || DomL != L) {
-      if (L && L->contains(*PI))
-        return false;
-    }
-  }
-
-  return true;
-}
-
-static BasicBlock *getSafeEntryFor(BasicBlock *Entry, BasicBlock *Exit,
-                                   LoopInfo *LI) {
-  Loop *L = LI->getLoopFor(Entry);
-  Loop *ExitL = LI->getLoopFor(Exit);
-  std::vector<BasicBlock *> Preds;
-  unsigned totalPreds = 0;
-
-  for (pred_iterator PI = pred_begin(Entry), E = pred_end(Entry); PI != E;
-       ++PI) {
-    totalPreds++;
-    if (!L || !L->contains(*PI) || (L->contains(*PI) && (L == ExitL)))
-      Preds.push_back(*PI);
-  }
-
-  // Function entry.
-  if (Preds.size() == 0)
-    return Entry;
-
-  // Unique predecessor not required.
-  if (totalPreds == Preds.size())
-    return Entry;
-
-  // outs() << "F:" << ":" << Entry->getName() << "->"
-  //       << Exit->getName() << "\n";
-  assert(Preds.size() == 1 &&
-         "More than 1 predecessor outside of this region (-papi-prepare)!");
-  if (Preds.size() != 1) {
-    DEBUG(dbgs() << "More than 1 predecessor outside of this region (-papi-prepare)!");
-  }
-
-  return Preds[0];
-}
-
-static BasicBlock *getSafeExitFor(BasicBlock *Entry, BasicBlock *Exit,
-                                  LoopInfo *LI, DominatorTree *DT) {
-  if (!Exit)
-    return 0;
-  if (isValidBB(Entry, Exit, LI, DT))
-    return Exit;
-
-  // Check our predecessors, there has to be a valid exit (after papi-prepare).
-  std::vector<BasicBlock *> SafeExits;
-  for (pred_iterator PI = pred_begin(Exit), E = pred_end(Exit); PI != E; ++PI) {
-    if (isValidBB(Entry, (*PI), LI, DT))
-      SafeExits.push_back((*PI));
-  }
-
-  // Validate our candidates.
-  int exits = SafeExits.size();
-  if (exits > 1) {
-    DEBUG(dbgs() << "Too many exit candidates found.");
-  }
-
-  if (exits == 0) {
-    DEBUG(dbgs() << "Couldn't find a safe place for a counter.");
-  }
-
-  if (!exits)
-   return NULL;
-    
-
-  return SafeExits[0];
-}
-
 //-----------------------------------------------------------------------------
 //
 // PapiCScopProfilingInitPasss
@@ -298,59 +214,76 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 //-----------------------------------------------------------------------------
 bool PapiCScopProfiling::runOnFunction(Function &F) {
   SD = &getAnalysis<ScopDetection>();
+  NSD = getAnalysisIfAvailable<NonAffineScopDetection>();
+  RI = &getAnalysis<RegionInfo>();
 
-  for (ScopDetection::iterator RI = SD->begin(), SE = SD->end(); RI != SE;
-       ++RI) {
-    const Region *R = (*RI);
-
-    BasicBlock *Entry, *Exit;
-    DEBUG(dbgs() << "PapiCScop $ CScop: " << R->getNameStr() << "\n");
-
-    Entry = R->getEntry();
-    Exit = R->getExit();
-
-    std::vector<BasicBlock *> EntrySplits;
-    std::vector<BasicBlock *> ExitSplits;
-    BasicBlock *SplitBB;
-    // Iterate over all predecessors and split the edge, if BB is not
-    // contained in the region.
-    for (pred_iterator BB = pred_begin(Entry), BE = pred_end(Entry); BB != BE;
-         ++BB) {
-      BasicBlock *PredBB = *BB;
-      if (!R->contains(PredBB))
-        if ((SplitBB = SplitEdge(PredBB, Entry, this)))
-          EntrySplits.push_back(SplitBB);
-    }
-
-    for (pred_iterator BB = pred_begin(Exit), BE = pred_end(Exit); BB != BE;
-         ++BB) {
-      BasicBlock *PredBB = *BB;
-      if (R->contains(PredBB))
-        if ((SplitBB = SplitEdge(PredBB, Exit, this)))
-          ExitSplits.push_back(SplitBB);
-    }
-
-    if (EntrySplits.size() > 1) {
-      dbgs() << "Entries: ";
-      for (auto &Entry : EntrySplits) {
-        dbgs() << Entry->getName().str() << " ; ";
-      }
-      dbgs() << "\n";
-      ++MoreEntries;
-    }
-    if (ExitSplits.size() > 1) {
-      dbgs() << "Exits: ";
-      for (auto &Exit: ExitSplits) {
-        dbgs() << Exit->getName().str() << " ; ";
-      }
-      dbgs() << "\n";
-      ++MoreExits;
-    }
-    /* Use the curent Region-Exit, we will chose an appropriate place
-     * for a PAPI counter later. */
-    Module *M = Entry->getParent()->getParent();
-    instrumentRegion(M, EntrySplits, ExitSplits, R);
+  for (ScopDetection::iterator It = SD->begin(), SE = SD->end(); It != SE;
+       ++It) {
+    if (processRegion(*It))
+      ++InstrumentedRegions;
   }
+
+  if (NSD) {
+    for (ScopSet::iterator It = NSD->jit_begin(),
+                                          SE = NSD->jit_end();
+         It != SE; ++It) {
+      if (processRegion(*It)) {
+        ++InstrumentedRegions;
+        ++InstrumentedJITScops;
+      }
+    }
+  }
+
+  return true;
+}
+
+bool PapiCScopProfiling::processRegion(const Region *R) {
+  BasicBlock *Entry, *Exit;
+
+  Entry = R->getEntry();
+  Exit = R->getExit();
+
+  std::vector<BasicBlock *> EntrySplits;
+  std::vector<BasicBlock *> ExitSplits;
+  BasicBlock *SplitBB;
+  // Iterate over all predecessors and split the edge, if BB is not
+  // contained in the region.
+  for (pred_iterator BB = pred_begin(Entry), BE = pred_end(Entry); BB != BE;
+       ++BB) {
+    BasicBlock *PredBB = *BB;
+    if (!R->contains(PredBB))
+      if ((SplitBB = SplitEdge(PredBB, Entry, this)))
+        EntrySplits.push_back(SplitBB);
+  }
+
+  for (pred_iterator BB = pred_begin(Exit), BE = pred_end(Exit); BB != BE;
+       ++BB) {
+    BasicBlock *PredBB = *BB;
+    if (R->contains(PredBB))
+      if ((SplitBB = SplitEdge(PredBB, Exit, this)))
+        ExitSplits.push_back(SplitBB);
+  }
+
+  if (EntrySplits.size() > 1) {
+    dbgs() << "Entries: ";
+    for (auto &Entry : EntrySplits) {
+      dbgs() << Entry->getName().str() << " ; ";
+    }
+    dbgs() << "\n";
+    ++MoreEntries;
+  }
+  if (ExitSplits.size() > 1) {
+    dbgs() << "Exits: ";
+    for (auto &Exit : ExitSplits) {
+      dbgs() << Exit->getName().str() << " ; ";
+    }
+    dbgs() << "\n";
+    ++MoreExits;
+  }
+  /* Use the curent Region-Exit, we will chose an appropriate place
+   * for a PAPI counter later. */
+  Module *M = Entry->getParent()->getParent();
+  instrumentRegion(M, EntrySplits, ExitSplits, R);
   return true;
 }
 
@@ -392,7 +325,6 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
     PapiRegionExitSCoP(InsertPos, M, EvID, name);
   }
 
-  ++InstrumentedRegions;
   ++EvID;
 }
 

@@ -68,6 +68,8 @@ public:
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
+    AU.addRequired<NonAffineScopDetection>();
+    AU.addRequired<RegionInfo>();
   }
   
   virtual bool runOnFunction(Function &F);
@@ -75,8 +77,11 @@ public:
 private:
   LoopInfo *LI;
   ScopDetection *SD;
+  NonAffineScopDetection *NSD;
   DominatorTree *DT;
+  RegionInfo *RI;
 
+  bool processRegion(const Region *R);
   void instrumentRegion(Module *M, std::vector<BasicBlock *> &EntryBBs,
                         std::vector<BasicBlock *> &ExitBBs, const Region *R);
 
