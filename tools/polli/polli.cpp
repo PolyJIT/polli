@@ -188,7 +188,7 @@ int main(int argc, char **argv, char * const *envp) {
     Lib.append(Libraries[i]);
     Lib.append(".so");
 
-    outs().indent(2) << "Linking: " << Lib << "\n";
+    DEBUG(dbgs().indent(2) << "Linking: " << Lib << "\n");
     if (sys::DynamicLibrary::LoadLibraryPermanently(Lib.c_str(), &ErrorMsg))
       errs() << "ERROR: " << ErrorMsg << "\n";
   }

@@ -287,20 +287,20 @@ public:
       std::vector<RejectInfo> rlog = (*i).second;
 
       if (R) {
-        outs() << "[polli] rejected region: " << R->getNameStr() << "\n";
+        DEBUG(dbgs() << "[polli] rejected region: " << R->getNameStr() << "\n");
 
         for (unsigned n = 0; n < rlog.size(); ++n) {
-          outs() << "        reason:  " << rlog[n].getRejectReason() << "\n";
+          DEBUG(dbgs() << "        reason:  " << rlog[n].getRejectReason() << "\n");
           if (rlog[n].Failed_LHS) {
-            outs() << "        details: ";
-            rlog[n].Failed_LHS->print(outs());
-            outs() << "\n";
+            DEBUG(dbgs() << "        details: ");
+            DEBUG(rlog[n].Failed_LHS->print(dbgs()));
+            DEBUG(dbgs() << "\n");
           }
 
           if (rlog[n].Failed_RHS) {
-            outs() << "                 ";
+            DEBUG(dbgs() << "                 ");
             rlog[n].Failed_RHS->print(outs());
-            outs() << "\n";
+            DEBUG(dbgs() << "\n");
           }
         }
       }
@@ -396,7 +396,7 @@ PolyJIT::runSpecializedFunction(Function *NewF,
 }
 
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
-  outs() << "[polli] Phase III: Injecting call to JIT\n";
+  DEBUG(dbgs() << "[polli] Phase III: Injecting call to JIT\n");
   LLVMContext &Ctx = M.getContext();
   IRBuilder<> Builder(Ctx);
 
@@ -481,7 +481,7 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   for (ManagedModules::iterator src = Mods.begin(), se = Mods.end(); src != se;
        ++src) {
     Module *M = (*src).first;
-    outs().indent(2) << "Linking: " << M->getModuleIdentifier() << "\n";
+    DEBUG(dbgs().indent(2) << "Linking: " << M->getModuleIdentifier() << "\n");
     if (L.linkInModule(M, Linker::PreserveSource, &ErrorMsg))
       errs().indent(2) << "ERROR while linking. MESSAGE: " << ErrorMsg << "\n";
   }
@@ -517,7 +517,7 @@ void PolyJIT::extractJitableScops(Module &M) {
   if (!DisableRecompile)
     PM.add(SM);
 
-  outs() << "[polli] Phase II: Create final module\n";
+  DEBUG(dbgs() << "[polli] Phase II: Create final module\n");
   PM.run(M);
 
   ValueToValueMapTy VMap;
@@ -618,7 +618,7 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
 
   FPM->doInitialization();
 
-  outs() << "[polli] Phase I: Applying Preoptimization:\n";
+  DEBUG(dbgs() << "[polli] Phase I: Applying Preoptimization:\n");
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
     if (f->isDeclaration())
       continue;

@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
+#include "llvm/Assembly/PrintModulePass.h"
+#include "llvm/Bitcode/ReaderWriter.h"
+
 #include "llvm/Support/Debug.h"
 
 #include "llvm/ADT/Twine.h"
@@ -47,7 +50,7 @@ void StoreModule(Module &M, const Twine &Name) {
   DEBUG(dbgs().indent(2) << "Storing: " << M.getModuleIdentifier() << "\n");
   Out.reset(new tool_output_file(path.c_str(), ErrorInfo, F_Binary));
   PM.add(new DataLayout(M.getDataLayout()));
-  PM.add(createPrintModulePass(&Out->os()));
+  PM.add(createBitcodeWriterPass(Out->os()));
   PM.run(M);
   Out->keep();
 }
