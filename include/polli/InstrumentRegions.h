@@ -83,7 +83,7 @@ private:
 
   bool processRegion(const Region *R);
   void instrumentRegion(Module *M, std::vector<BasicBlock *> &EntryBBs,
-                        std::vector<BasicBlock *> &ExitBBs, const Region *R);
+                        std::vector<BasicBlock *> &ExitBBs, const Region *R, std::string entryName, std::string exitName);
 
   void print(raw_ostream &OS, const Module *) const {}
 };

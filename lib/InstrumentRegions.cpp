@@ -239,6 +239,11 @@ bool PapiCScopProfiling::runOnFunction(Function &F) {
 
 bool PapiCScopProfiling::processRegion(const Region *R) {
   BasicBlock *Entry, *Exit;
+  Function *F = R->getEntry()->getParent();
+  std::string baseName = F->getName().str() + "::";
+
+  std::string entryName = baseName + R->getEntry()->getName().str();
+  std::string exitName = baseName + R->getExit()->getName().str();
 
   Entry = R->getEntry();
   Exit = R->getExit();
@@ -283,7 +288,7 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
   /* Use the curent Region-Exit, we will chose an appropriate place
    * for a PAPI counter later. */
   Module *M = Entry->getParent()->getParent();
-  instrumentRegion(M, EntrySplits, ExitSplits, R);
+  instrumentRegion(M, EntrySplits, ExitSplits, R, entryName, exitName);
   return true;
 }
 
@@ -291,10 +296,7 @@ static uint64_t EvID = 1;
 void PapiCScopProfiling::instrumentRegion(Module *M,
                                           std::vector<BasicBlock *> &EntryBBs,
                                           std::vector<BasicBlock *> &ExitBBs,
-                                          const Region *R) {
-  Function *F = R->getEntry()->getParent();
-  std::string baseName = F->getName().str() + "::";
-
+                                          const Region *R, std::string entryName, std::string exitName) {
   BasicBlock::iterator InsertPos;
   for (auto &BB : EntryBBs) {
     InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
@@ -309,8 +311,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
     while (isa<CallInst>(InsertPos))
       ++InsertPos;
 
-    std::string name = baseName + BB->getName().str();
-    PapiRegionEnterSCoP(InsertPos, M, EvID, name);
+    PapiRegionEnterSCoP(InsertPos, M, EvID, entryName);
   }
 
   for (auto &BB : ExitBBs) {
@@ -321,8 +322,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
     while (isa<AllocaInst>(InsertPos))
       ++InsertPos;
 
-    std::string name = baseName + BB->getName().str();
-    PapiRegionExitSCoP(InsertPos, M, EvID, name);
+    PapiRegionExitSCoP(InsertPos, M, EvID, exitName);
   }
 
   ++EvID;
