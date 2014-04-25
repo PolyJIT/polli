@@ -21,8 +21,6 @@
 #define POLLI_INSTRUMENT_REGIONS_H
 
 #include "llvm/Pass.h"
-#include "llvm/Analysis/Dominators.h"
-#include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "polli/NonAffineScopDetection.h"

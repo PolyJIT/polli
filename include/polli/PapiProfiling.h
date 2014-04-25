@@ -2,7 +2,6 @@
 #define LLVM_PAPI_PROFILING_H
 
 #include "llvm/Pass.h"
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "polli/NonAffineScopDetection.h"
@@ -32,7 +31,7 @@ public:
   explicit PapiRegionPrepare() : RegionPass (ID) {}
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<LoopInfo>();
-    AU.addRequired<DominatorTree>();
+    AU.addRequired<DominatorTreeWrapperPass>();
     AU.setPreservesAll();
   }
 

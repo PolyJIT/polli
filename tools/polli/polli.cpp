@@ -20,6 +20,7 @@
 #include "llvm/Support/Debug.h"
 
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
@@ -139,11 +140,10 @@ int main(int argc, char **argv, char * const *envp) {
   }
 
   // If not jitting lazily, load the whole bitcode file eagerly too.
-  std::string ErrorMsg;
   if (NoLazyCompilation) {
-    if (Mod->MaterializeAllPermanently(&ErrorMsg)) {
+    if (error_code EC = Mod->materializeAllPermanently()) {
       errs() << argv[0] << ": bitcode didn't read correctly.\n";
-      errs() << "Reason: " << ErrorMsg << "\n";
+      errs() << "Reason: " << EC.message() << "\n";
       exit(1);
     }
   }
@@ -168,10 +168,7 @@ int main(int argc, char **argv, char * const *envp) {
   PolyJIT *pjit = PolyJIT::Get(Mod.get());
 
   if (!pjit) {
-    if (!ErrorMsg.empty())
-      errs() << argv[0] << ": error creating EE: " << ErrorMsg << "\n";
-    else
-      errs() << argv[0] << ": unknown error creating EE!\n";
+    errs() << argv[0] << ": error creating PolyJIT\n";
     exit(1);
   }
 

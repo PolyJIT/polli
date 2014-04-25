@@ -1,41 +1,34 @@
 project(polli)
 cmake_minimum_required(VERSION 2.8)
 
-# Where is LLVM installed?
-set(LLVM_INSTALL_ROOT "" CACHE PATH "Root of LLVM install.")
-
-# Check if the LLVM_INSTALL_ROOT valid.
-if( NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm )
-  message(FATAL_ERROR "LLVM_INSTALL_ROOT (${LLVM_INSTALL_ROOT}) is not a valid LLVM installation.")
-endif(NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm)
-
-# FileCheck is not install by default, warn the user to Copy FileCheck
-if( NOT EXISTS ${LLVM_INSTALL_ROOT}/bin/FileCheck
-    OR NOT EXISTS ${LLVM_INSTALL_ROOT}/bin/not)
-  message(WARNING "FileCheck or not are required by running regress tests, "
-                  "but they are not installed! Please copy it to "
-                  "${LLVM_INSTALL_ROOT}/bin.")
-endif(NOT EXISTS ${LLVM_INSTALL_ROOT}/bin/FileCheck
-      OR NOT EXISTS ${LLVM_INSTALL_ROOT}/bin/not)
-
-# Add LLVM CMake features
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_INSTALL_ROOT}/share/llvm/cmake")
-include(LLVMConfig)
-include(AddLLVM)
-
-include_directories( ${LLVM_INCLUDE_DIRS} )
-link_directories( ${LLVM_LIBRARY_DIRS} )
-add_definitions( ${LLVM_DEFINITIONS} )
-
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+## Find LLVM
+find_package(LLVM REQUIRED)
+include_directories( ${LLVM_INCLUDE_DIRS} )
+link_directories( ${LLVM_LIBRARY_DIRS} )
+add_definitions( ${LLVM_DEFINITIONS} )
+
+# Add LLVM's cmake modules
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_DIR}")
+include(AddLLVM)
+
 # Add path for polli custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
-include("polli_macros")
+include(polli_macros)
 
-FIND_PACKAGE(Papi)
+## Find Polly
+find_package(Polly REQUIRED)
+include_directories ( ${POLLY_INCLUDE_DIRS} )
+link_directories( ${POLLY_LINK_DIRS} )
+add_definitions( ${POLLY_DEFINITIONS} )
+
+# Find PAPI
+find_package(Papi REQUIRED)
+include_directories(${PAPI_INCLUDE_DIR})
+link_directories(${PAPI_LIBRARY})
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -45,13 +38,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti -std=c++0x")
 
 include_directories(
   ${POLLI_SOURCE_DIR}/include
-  ${POLLI_BINARY_DIR}/include
-  )
-
-if (PAPI_FOUND)
-  include_directories(${PAPI_INCLUDE_DIR})
-  link_directories(${PAPI_LIBRARY})
-endif()
+)
 
 install(DIRECTORY include/
   DESTINATION include

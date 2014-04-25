@@ -13,21 +13,13 @@ set(LLVM_LINK_COMPONENTS
   mcjit
   native
   nativecodegen
+  objcarcopts
   scalarOpts
   selectiondag
   support
   transformutils
   vectorize
 )
-
-set(LLVM_USED_LIBS
-  PollyAnalysis
-  PollyCodeGen
-  PollyExchange
-  PollyJSON
-  PollyTransform
-  PollySupport
-  )
 
 add_polli_library(PolyJIT
   InstrumentRegions.cpp
@@ -40,12 +32,7 @@ add_polli_library(PolyJIT
   )
 
 add_dependencies(PolyJIT
-  PollyAnalysis
-  PollyCodeGen
-  PollyExchange
-  PollySupport
-  PollyJSON
-  PollyTransform
+  Polly
   )
 
 set_target_properties(PolyJIT

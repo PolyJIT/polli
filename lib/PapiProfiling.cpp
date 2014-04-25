@@ -23,7 +23,6 @@
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/CFG.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Debug.h"
@@ -382,7 +381,7 @@ void PapiRegionPrepare::createPapiExit(Region *R) {
 
 bool PapiRegionPrepare::runOnRegion(Region *R, RGPassManager &RGM) {
   LI = &getAnalysis<LoopInfo>();
-  DT = &getAnalysis<DominatorTree>();
+  DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
   createPapiExit(R);
   createPapiEntry(R);

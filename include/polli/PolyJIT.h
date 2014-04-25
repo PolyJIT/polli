@@ -18,7 +18,6 @@
 #include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/PassManager.h"
-#include "llvm/Support/ValueHandle.h"
 
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"

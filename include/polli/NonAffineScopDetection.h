@@ -16,9 +16,7 @@
 
 #include "polly/ScopDetection.h"
 
-#include "llvm/ADT/ValueMap.h"
 #include "llvm/Analysis/ScalarEvolution.h"
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Pass.h"

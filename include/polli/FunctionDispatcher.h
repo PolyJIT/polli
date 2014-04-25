@@ -13,8 +13,8 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 
-#include "llvm/LinkAllPasses.h"
 #include "llvm/Analysis/RegionInfo.h"
+#include "llvm/LinkAllPasses.h"
 
 #include "llvm/Support/Debug.h"
 
@@ -247,7 +247,7 @@ public:
     ParamVector<ParamT> SpecVals(AllValues.size());
     Module *M = TgtF->getParent();
     FunctionPassManager *FPM = new FunctionPassManager(M);
-    RegionInfo *RI = llvm::createRegionInfoPass();
+    FunctionPass *RI = llvm::createRegionInfoPass();
 
     FPM->add(RI);
     FPM->run(*TgtF);

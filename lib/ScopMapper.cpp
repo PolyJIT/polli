@@ -19,10 +19,8 @@
 #include "polli/NonAffineScopDetection.h"
 
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/Verifier.h"
-
 #include "llvm/IR/Module.h"
 
 #include "llvm/Transforms/Scalar.h"
@@ -38,15 +36,15 @@ using namespace polly;
 
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<NonAffineScopDetection>();
-  AU.addRequired<DominatorTree>();
+  AU.addRequired<DominatorTreeWrapperPass>();
   AU.addRequired<RegionInfo>();
   AU.setPreservesAll();
 }
 ;
 
 bool ScopMapper::runOnFunction(Function &F) {
-  DominatorTree *DT = &getAnalysis<DominatorTree>();
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
+  DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
   if (CreatedFunctions.count(&F))
     return false;

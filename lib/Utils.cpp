@@ -10,15 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Assembly/PrintModulePass.h"
-#include "llvm/Bitcode/ReaderWriter.h"
-
-#include "llvm/Support/Debug.h"
-
+#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/StringRef.h"
-
+#include "llvm/Assembly/PrintModulePass.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/Support/Debug.h"
 #include "polli/Utils.h"
+
 using namespace llvm;
 
 SmallVector<char, 255> *DefaultDir;
@@ -48,8 +48,11 @@ void StoreModule(Module &M, const Twine &Name) {
 
   std::string path = StringRef(destPath.data(), destPath.size()).str();
   DEBUG(dbgs().indent(2) << "Storing: " << M.getModuleIdentifier() << "\n");
-  Out.reset(new tool_output_file(path.c_str(), ErrorInfo, F_Binary));
-  PM.add(new DataLayout(M.getDataLayout()));
+  Out.reset(new tool_output_file(path.c_str(), ErrorInfo, F_RW));
+
+  const DataLayout *DL = M.getDataLayout();
+
+  PM.add(new DataLayoutPass(&M));
   PM.add(createBitcodeWriterPass(Out->os()));
   PM.run(M);
   Out->keep();

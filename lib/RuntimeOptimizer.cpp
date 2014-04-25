@@ -20,12 +20,12 @@
 
 #include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
+#include "polly/Canonicalization.h"
 
 #include "polly/ScopDetection.h"
 
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
-#include "llvm/PassManagers.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -43,7 +43,6 @@ bool RuntimeOptimizer::Optimize(Function &F) {
   Module *M = F.getParent();
   FunctionPassManager FPM = FunctionPassManager(M);
 
-  FPM.add(new DataLayout(M));
   FPM.add(llvm::createTypeBasedAliasAnalysisPass());
   FPM.add(llvm::createBasicAliasAnalysisPass());
 
@@ -59,7 +58,7 @@ bool RuntimeOptimizer::Optimize(Function &F) {
   FPM.add(polly::createIslScheduleOptimizerPass());
   //  FPM.add(polly::createJSONExporterPass());
 
-  FPM.add(polly::createCodeGenerationPass());
+  FPM.add(polly::createIslCodeGenerationPass());
   //  VectorizeConfig C;
   //    C.FastDep = true;
   //  FPM.add(createBBVectorizePass(C));

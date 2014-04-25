@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
+#include "polly/Support/SCEVValidator.h"
 
 #include "polli/NonAffineScopDetection.h"
 
@@ -32,16 +33,15 @@ STATISTIC(AliasingIgnored, "Number of ignored aliasings");
 void NonAffineScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolution>();
-  AU.addRequired<DominatorTree>();
+  AU.addRequired<DominatorTreeWrapperPass>();
   AU.addRequired<RegionInfo>();
   AU.setPreservesAll();
 }
-;
 
 bool NonAffineScopDetection::runOnFunction(Function &F) {
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
-  DT = &getAnalysis<DominatorTree>();
+  DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   RI = &getAnalysis<RegionInfo>();
   M = F.getParent();
 
@@ -50,94 +50,89 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
        ++i)
     AccumulatedScops.insert(*i);
 
-  polly::RejectedLog rl = SD->getRejectedLog();
-
-  for (polly::RejectedLog::iterator i = rl.begin(), ie = rl.end(); i != ie;
-       ++i) {
+  for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
+                                            ie = SD->reject_end();
+       i != ie; ++i) {
     const Region *R = (*i).first;
-    std::vector<RejectInfo> rlog = (*i).second;
+    RejectLog Log = (*i).second;
 
     bool isValid = true;
     ParamList params;
-    for (unsigned j = 0; j < rlog.size(); ++j) {
-      const SCEV *lhs = rlog[j].Failed_LHS;
-      const SCEV *rhs = rlog[j].Failed_RHS;
-      RejectKind kind = rlog[j].Reason;
-    
+    for (auto Reason : Log) {
       if (!isValid)
         break;
 
-      // Can we handle the reject reason?
-      isValid &= (kind == NonAffineLoopBound || kind == NonAffineCondition ||
-                  kind == NonAffineAccess || kind == Alias);
-
-      // Extract parameters and insert in the map.
       if (!RequiredParams.count(R))
         RequiredParams[R] = ParamList();
 
-      switch (kind) {
-      case NonAffineCondition:
-        isValid &= polly::isNonAffineExpr(R, rhs, *SE);
-        if (isValid) {
-          DEBUG(rhs->dump());
-          params = getParamsInNonAffineExpr(R, rhs, *SE);
-          RequiredParams[R]
-              .insert(RequiredParams[R].end(), params.begin(), params.end());
-        }
-      case NonAffineAccess:
-      case NonAffineLoopBound:
-        isValid &= polly::isNonAffineExpr(R, lhs, *SE);
-        if (isValid) {
-          DEBUG(lhs->dump());
-          params = getParamsInNonAffineExpr(R, lhs, *SE);
-          RequiredParams[R]
-              .insert(RequiredParams[R].end(), params.begin(), params.end());
-        }
-        break;
-      default: /* Nothing to check. */
-        break;
-      }
-    }
+      RejectReason *ReasonPtr = Reason.get();
 
-    if (isValid) {
-      for (auto &RI : rlog) {
-        switch (RI.Reason) {
-        case NonAffineCondition:
-          ++JitNonAffineCondition;
-          break;
-        case NonAffineAccess:
+      if (ReportNonAffineAccess *NonAffAccess =
+              dyn_cast<ReportNonAffineAccess>(ReasonPtr)) {
+        isValid &= polly::isNonAffineExpr(R, NonAffAccess->get(), *SE);
+        if (isValid) {
+          DEBUG(NonAffAccess->get()->dump());
+          params = getParamsInNonAffineExpr(R, NonAffAccess->get(), *SE);
+          RequiredParams[R]
+              .insert(RequiredParams[R].end(), params.begin(), params.end());
           ++JitNonAffineAccess;
-          break;
-        case NonAffineLoopBound:
-          ++JitNonAffineLoopBound;
-          break;
-        case Alias:
-          ++AliasingIgnored;
-          break;
-        default: /* Nothing */;
         }
       }
-      AccumulatedScops.insert(R);
-      JitableScops.insert(R);
-      ++JitScopsFound;
+
+      if (ReportNonAffBranch *NonAffBranch =
+              dyn_cast<ReportNonAffBranch>(ReasonPtr)) {
+        isValid &= polly::isNonAffineExpr(R, NonAffBranch->lhs(), *SE);
+        if (isValid) {
+          DEBUG(NonAffBranch->lhs()->dump());
+          params = getParamsInNonAffineExpr(R, NonAffBranch->lhs(), *SE);
+          RequiredParams[R]
+              .insert(RequiredParams[R].end(), params.begin(), params.end());
+          ++JitNonAffineCondition;
+        }
+        isValid &= polly::isNonAffineExpr(R, NonAffBranch->rhs(), *SE);
+        if (isValid) {
+          DEBUG(NonAffBranch->rhs()->dump());
+          params = getParamsInNonAffineExpr(R, NonAffBranch->rhs(), *SE);
+          RequiredParams[R]
+              .insert(RequiredParams[R].end(), params.begin(), params.end());
+        }
+      }
+
+      if (ReportLoopBound *NonAffLoopBound =
+              dyn_cast<ReportLoopBound>(ReasonPtr)) {
+        isValid &= polly::isNonAffineExpr(R, NonAffLoopBound->loopCount(), *SE);
+        if (isValid) {
+          DEBUG(NonAffLoopBound->loopCount()->dump());
+          params =
+              getParamsInNonAffineExpr(R, NonAffLoopBound->loopCount(), *SE);
+          RequiredParams[R]
+              .insert(RequiredParams[R].end(), params.begin(), params.end());
+          ++JitNonAffineLoopBound;
+        }
+      }
+
+      if (ReportAlias *Alias = dyn_cast<ReportAlias>(ReasonPtr)) {
+        DEBUG(dbgs() << Alias->getMessage() << "\n");
+        ++AliasingIgnored;
+      }
+
+      // Extract parameters and insert in the map.
+      if (isValid) {
+        AccumulatedScops.insert(R);
+        JitableScops.insert(R);
+        ++JitScopsFound;
+      }
     }
 
     // We know that the current detection errors can be fixed, so we need to
     // enter the expand phase.
 
-    DEBUG(
-      if (isValid)
-        dbgs() << " JITABLE SCoP! "
-               << R->getNameStr() << "\n";
-      else
-        dbgs() << " NON-JITABLE SCoP! "
-               << R->getNameStr() << "\n"
-    );
+    DEBUG(if (isValid) dbgs() << " JITABLE SCoP! " << R->getNameStr() << "\n";
+          else dbgs() << " NON-JITABLE SCoP! " << R->getNameStr() << "\n");
   }
 
   return false;
-}
-;
+};
 
 void NonAffineScopDetection::print(raw_ostream &OS, const Module *) const {
   for (ParamMap::const_iterator r = RequiredParams.begin(),
@@ -153,8 +148,7 @@ void NonAffineScopDetection::print(raw_ostream &OS, const Module *) const {
     }
     OS << " )\n";
   }
-}
-;
+};
 
 void NonAffineScopDetection::releaseMemory() {
   JitableScops.clear();
@@ -168,7 +162,7 @@ INITIALIZE_PASS_BEGIN(NonAffineScopDetection, "polli-detect",
                       "Polli JIT ScopDetection", false, false);
 INITIALIZE_PASS_DEPENDENCY(ScopDetection);
 INITIALIZE_PASS_DEPENDENCY(ScalarEvolution);
-INITIALIZE_PASS_DEPENDENCY(DominatorTree);
+INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass);
 INITIALIZE_PASS_DEPENDENCY(RegionInfo);
 INITIALIZE_PASS_END(NonAffineScopDetection, "polli-detect",
-                      "Polli JIT ScopDetection", false, false);
+                    "Polli JIT ScopDetection", false, false);

@@ -16,16 +16,15 @@
 
 #include "polli/PolyJIT.h"
 
+#include "polly/Canonicalization.h"
 #include "polly/RegisterPasses.h"
 #include "polly/LinkAllPasses.h"
 
 #include "llvm/PassManager.h"
 
-#include "llvm/Analysis/Dominators.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/ValueMap.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/Bitcode/ReaderWriter.h"
@@ -63,7 +62,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FileUtilities.h"
 
-#include "llvm/Linker.h"
+#include "llvm/Linker/Linker.h"
 
 #include "polli/FunctionCloner.h"
 #include "polli/FunctionDispatcher.h"
@@ -89,15 +88,15 @@ Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
-static cl::opt<bool>
-EnableCaddy("caddy", cl::desc("Enable Caddy"), cl::init(false));
+static cl::opt<bool> EnableCaddy("caddy", cl::desc("Enable Caddy"),
+                                 cl::init(false));
 
 static cl::opt<bool>
 InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
                   cl::init(false));
 
-cl::opt<bool> EnableJitable("jitable", cl::desc("Enable Non AffineSCoPs"), cl::init(false));
-
+cl::opt<bool> EnableJitable("jitable", cl::desc("Enable Non AffineSCoPs"),
+                            cl::init(false));
 
 static cl::opt<bool>
 DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
@@ -108,16 +107,15 @@ static cl::opt<bool> DisableExecution(
     cl::desc("Disable execution just produce all intermediate files"),
     cl::init(false));
 
-
 // Determine optimization level.
 cl::opt<char> OptLevel("O",
                        cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
                                 "(default = '-O2')"),
                        cl::Prefix, cl::ZeroOrMore, cl::init(' '));
 
-static cl::opt<std::string>
-OutputFilename("o", cl::desc("Override output filename"),
-               cl::value_desc("filename"));
+static cl::opt<std::string> OutputFilename("o",
+                                           cl::desc("Override output filename"),
+                                           cl::value_desc("filename"));
 
 cl::opt<std::string>
 TargetTriple("mtriple", cl::desc("Override target triple for module"));
@@ -211,7 +209,7 @@ public:
     initializePapiRegionPreparePass(Registry);
     initializePapiCScopProfilingPass(Registry);
     initializePapiCScopProfilingInitPass(Registry);
-  
+
     initializeOutputDir();
   }
 };
@@ -258,8 +256,8 @@ class ScopDetectionResultsViewer : public FunctionPass {
   // DO NOT IMPLEMENT
   ScopDetectionResultsViewer(const ScopDetectionResultsViewer &);
   // DO NOT IMPLEMENT
-  const ScopDetectionResultsViewer &operator=(
-      const ScopDetectionResultsViewer &);
+  const ScopDetectionResultsViewer &
+  operator=(const ScopDetectionResultsViewer &);
 
   ScopDetection *SD;
 
@@ -272,43 +270,27 @@ public:
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
     AU.setPreservesAll();
-  }
-  ;
+  };
 
   virtual void releaseMemory() {};
 
   virtual bool runOnFunction(Function &F) {
     SD = &getAnalysis<ScopDetection>();
 
-    polly::RejectedLog rl = SD->getRejectedLog();
-    for (polly::RejectedLog::iterator i = rl.begin(), ie = rl.end(); i != ie;
-         ++i) {
+    for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
+                                              ie = SD->reject_end();
+         i != ie; ++i) {
       const Region *R = (*i).first;
-      std::vector<RejectInfo> rlog = (*i).second;
+      RejectLog Log = (*i).second;
 
-      if (R) {
-        DEBUG(dbgs() << "[polli] rejected region: " << R->getNameStr() << "\n");
-
-        for (unsigned n = 0; n < rlog.size(); ++n) {
-          DEBUG(dbgs() << "        reason:  " << rlog[n].getRejectReason() << "\n");
-          if (rlog[n].Failed_LHS) {
-            DEBUG(dbgs() << "        details: ");
-            DEBUG(rlog[n].Failed_LHS->print(dbgs()));
-            DEBUG(dbgs() << "\n");
-          }
-
-          if (rlog[n].Failed_RHS) {
-            DEBUG(dbgs() << "                 ");
-            rlog[n].Failed_RHS->print(outs());
-            DEBUG(dbgs() << "\n");
-          }
-        }
+      DEBUG(dbgs() << "[polli] rejected region: " << R->getNameStr() << "\n");
+      for (auto LogEntry : Log) {
+        DEBUG(dbgs() << LogEntry->getMessage() << "\n");
       }
     }
 
     return false;
-  }
-  ;
+  };
 
   virtual void print(raw_ostream &OS, const Module *) const {};
   //@}
@@ -498,7 +480,7 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   PassManager PM;
 
-  PM.add(new DataLayout(&M));
+  PM.add(new DataLayoutPass(&M));
   if (InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
 
@@ -506,14 +488,14 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
 
   PM.add(SD);
-  
+
   NonAffineScopDetection *NSD = new NonAffineScopDetection();
   NSD->enable(EnableJitable);
   PM.add(NSD);
 
   if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
- 
+
   if (!DisableRecompile)
     PM.add(SM);
 
@@ -660,8 +642,7 @@ int PolyJIT::shutdown(int result) {
     ExecutionEngine *EE = (*I).second;
     delete EE;
   }
-}
-;
+};
 
 PolyJIT *PolyJIT::Instance = NULL;
 PolyJIT *PolyJIT::Get(Module *M, bool NoLazyCompilation) {
@@ -682,6 +663,5 @@ PolyJIT *PolyJIT::Get(Module *M, bool NoLazyCompilation) {
     Instance = new PolyJIT(EE, M);
   }
   return Instance;
-}
-;
+};
 } // end of llvm namespace
