@@ -64,6 +64,7 @@
 
 #include "llvm/Linker/Linker.h"
 
+#include "polli/Options.h"
 #include "polli/FunctionCloner.h"
 #include "polli/FunctionDispatcher.h"
 #include "polli/NonAffineScopDetection.h"
@@ -75,6 +76,9 @@
 #include <set>
 #include <map>
 
+cl::OptionCategory PolliCategory("Polli Options",
+                                 "Configure the runtime options of polli");
+
 using namespace polli;
 using namespace polly;
 using namespace llvm;
@@ -82,30 +86,29 @@ using namespace llvm::sys::fs;
 
 namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
-
 namespace polli {
 Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
 static cl::opt<bool> EnableCaddy("caddy", cl::desc("Enable Caddy"),
-                                 cl::init(false));
+                                 cl::init(false), cl::cat(PolliCategory));
 
 static cl::opt<bool>
 InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
-                  cl::init(false));
+                  cl::init(false), cl::cat(PolliCategory));
 
 cl::opt<bool> EnableJitable("jitable", cl::desc("Enable Non AffineSCoPs"),
-                            cl::init(false));
+                            cl::init(false), cl::cat(PolliCategory));
 
 static cl::opt<bool>
 DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
-                 cl::init(false));
+                 cl::init(false), cl::cat(PolliCategory));
 
 static cl::opt<bool> DisableExecution(
     "no-execution",
     cl::desc("Disable execution just produce all intermediate files"),
-    cl::init(false));
+    cl::init(false), cl::cat(PolliCategory));
 
 // Determine optimization level.
 cl::opt<char> OptLevel("O",

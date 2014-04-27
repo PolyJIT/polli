@@ -16,10 +16,16 @@
 #include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "polli/Utils.h"
 
+#include "polli/Options.h"
+#include "polli/Utils.h"
 using namespace llvm;
+
+cl::opt<bool> UniqueSubdir("tempdir",
+                           cl::desc("Place temporary files into unique subdir"),
+                           cl::init(false), cl::cat(PolliCategory));
 
 SmallVector<char, 255> *DefaultDir;
 
@@ -28,10 +34,12 @@ void initializeOutputDir() {
   SmallVector<char, 255> cwd;
   fs::current_path(cwd);
 
-  //p::append(cwd, "polli");
-  //fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
-  //outs() << "DefaultDir = " << StringRef(DefaultDir->data(), DefaultDir->size())
-  //       << "\n";
+  if (UniqueSubdir) {
+    p::append(cwd, "polli");
+    fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
+    outs() << "DefaultDir = " << StringRef(DefaultDir->data(),
+                                           DefaultDir->size()) << "\n";
+  }
 }
 
 void StoreModule(Module &M, const Twine &Name) {

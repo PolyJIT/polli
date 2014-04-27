@@ -43,6 +43,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <cerrno>
 
+#include "polli/Options.h"
 #include "polli/PolyJIT.h"
 
 #ifdef __CYGWIN__
@@ -56,9 +57,6 @@ using namespace llvm;
 
 namespace {
   // Runtime Options
-  cl::OptionCategory PolliCategory("Polli Options",
-                                   "Configure the runtime options of polli");
-
   cl::list<std::string> LibPaths("L", cl::Prefix,
     cl::desc("Specify a library search path"),
     cl::value_desc("directory"), cl::ZeroOrMore, cl::cat(PolliCategory));
