@@ -50,6 +50,9 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
        ++i)
     AccumulatedScops.insert(*i);
 
+  if (!Enabled)
+    return false;
+
   for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
                                             ie = SD->reject_end();
        i != ie; ++i) {
@@ -61,6 +64,8 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
     for (auto Reason : Log) {
       if (!isValid)
         break;
+
+      assert(R && "We logged a non existing region, what the hell.");
 
       if (!RequiredParams.count(R))
         RequiredParams[R] = ParamList();

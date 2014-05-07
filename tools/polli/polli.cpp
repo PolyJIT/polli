@@ -16,7 +16,7 @@
 // compiler, or through an interpreter if no JIT is available for this platform.
 //
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "polli"
+#define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
 #include "llvm/IR/LLVMContext.h"

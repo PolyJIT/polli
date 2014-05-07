@@ -18,6 +18,7 @@
 
 #include "polly/Canonicalization.h"
 #include "polly/RegisterPasses.h"
+#include "polly/ScopDetectionDiagnostic.h"
 #include "polly/LinkAllPasses.h"
 
 #include "llvm/PassManager.h"
@@ -286,9 +287,16 @@ public:
       const Region *R = (*i).first;
       RejectLog Log = (*i).second;
 
-      DEBUG(dbgs() << "[polli] rejected region: " << R->getNameStr() << "\n");
+      unsigned LineBegin, LineEnd;
+      std::string FileName;
+      getDebugLocation(R, LineBegin, LineEnd, FileName);
+
+      DEBUG(dbgs() << "[polli] rejected region: \n" << FileName << ":"
+                   << LineBegin << ":" << LineEnd << "\n");
+      int j=0;
       for (auto LogEntry : Log) {
-        DEBUG(dbgs() << LogEntry->getMessage() << "\n");
+        DEBUG(dbgs().indent(2) << "[" << j++ << "] " << LogEntry->getMessage()
+                               << "\n");
       }
     }
 
@@ -489,8 +497,10 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
-
+  polly::registerCanonicalicationPasses(PM);
   PM.add(SD);
+
+  PM.add(new ScopDetectionResultsViewer());
 
   NonAffineScopDetection *NSD = new NonAffineScopDetection();
   NSD->enable(EnableJitable);
