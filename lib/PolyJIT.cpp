@@ -293,7 +293,7 @@ public:
 
       DEBUG(dbgs() << "[polli] rejected region: \n" << FileName << ":"
                    << LineBegin << ":" << LineEnd << "\n");
-      int j=0;
+      int j = 0;
       for (auto LogEntry : Log) {
         DEBUG(dbgs().indent(2) << "[" << j++ << "] " << LogEntry->getMessage()
                                << "\n");
