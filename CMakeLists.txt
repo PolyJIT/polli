@@ -1,6 +1,8 @@
 project(polli)
 cmake_minimum_required(VERSION 2.8)
 
+option(POLLI_BUILD_SHARED_LIB "Build a shared libPolyJIT" ON)
+
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -34,7 +36,7 @@ link_directories(${PAPI_LIBRARY})
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wno-unused-parameter -Wwrite-strings")
 endif ()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti -std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-exceptions -fno-rtti -std=c++0x")
 
 include_directories(
   ${POLLI_SOURCE_DIR}/include

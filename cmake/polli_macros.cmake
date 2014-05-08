@@ -40,7 +40,7 @@ macro(add_polli_library name)
   endif( LLVM_USED_LIBS )
 
   target_link_libraries( ${name} ${POLLY_LIBRARY} )
-  
+
   if( LLVM_LINK_COMPONENTS )
     llvm_config(${name} ${LLVM_LINK_COMPONENTS})
   endif( LLVM_LINK_COMPONENTS )

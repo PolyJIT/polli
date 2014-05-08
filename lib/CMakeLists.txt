@@ -1,26 +1,29 @@
 set(LLVM_NO_RTTI 1)
 set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
-  asmparser
-  bitreader
-  codegen
-  executionengine
-  interpreter
-  instrumentation
+  AsmParser
+  BitReader
+  BitWriter
+  CodeGen
+  Core
+  ExecutionEngine
+  IRReader
+  Interpreter
+  Instrumentation
   ipo
-  jit
+  JIT
   linker
-  mcjit
+  MCJIT
   native
-  nativecodegen
   objcarcopts
   scalarOpts
-  selectiondag
-  support
+  SelectionDAG
+  Support
   transformutils
   vectorize
 )
 
+set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
 add_polli_library(PolyJIT
   InstrumentRegions.cpp
   NonAffineScopDetection.cpp
@@ -29,10 +32,6 @@ add_polli_library(PolyJIT
   RuntimeOptimizer.cpp
   ScopMapper.cpp
   Utils.cpp
-  )
-
-add_dependencies(PolyJIT
-  Polly
   )
 
 set_target_properties(PolyJIT
