@@ -13,12 +13,21 @@ flags and options to control the first code generation stage.
 
 ## Usage
 
-Polli Options:
-  -L=<directory>                                  - Specify a library search path
-  -caddy                                          - Enable Caddy
-  -instrument                                     - Enable instrumenting of SCoPs
-  -jitable                                        - Enable Non AffineSCoPs
-  -l=<library prefix>                             - Specify libraries to link to
-  -no-execution                                   - Disable execution just produce all intermediate files
-  -no-recompilation                               - Disable recompilation of SCoPs
-  -tempdir                                        - Place temporary files into unique subdir
+ * Polli Options:
+   - -L=<directory>
+     Specify a library search path
+   - -caddy
+     Enable Caddy (Requires a special build of Polly).
+   - -instrument
+     Enable instrumenting of SCoPs
+   - -jitable
+     Enable Non AffineSCoPs. Requires at least -polly-detect-track-failures.
+   - -l=<library prefix>
+     Specify libraries to link to. polli will load the library into its own address
+     space.
+   - -no-execution
+     Disable execution just produce all intermediate files.
+   - -no-recompilation
+     Disable recompilation of SCoPs.
+   - -tempdir
+     Place temporary files into unique subdir
