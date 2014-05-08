@@ -7,6 +7,10 @@ process to increase the number of valid SCoPs in a program.
 polli is derived from LLVM's lli implementation and provides similar
 flags and options to control the first code generation stage.
 
+* [PolyJIT](http://www.infosun.fim.uni-passau.de/cl/PolyJIT/)
+* [Polly](http://polly.llvm.org)
+* [LLVM](http://llvm.org)
+
 ## Build
 
   TODO.
