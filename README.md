@@ -1,12 +1,24 @@
-polli - PolyJIT's JIT compiler
-==============================
+# polli - PolyJIT's JIT compiler
 
 polli is a polyhedral JIT compiler. It enhances LLVM's Polly plugin by
 providing additional run-time information for Polly's SCoP detection
 process to increase the number of valid SCoPs in a program.
 
-Build
------
+polli is derived from LLVM's lli implementation and provides similar
+flags and options to control the first code generation stage.
 
-Usage
------
+## Build
+
+  TODO.
+
+## Usage
+
+Polli Options:
+  -L=<directory>                                  - Specify a library search path
+  -caddy                                          - Enable Caddy
+  -instrument                                     - Enable instrumenting of SCoPs
+  -jitable                                        - Enable Non AffineSCoPs
+  -l=<library prefix>                             - Specify libraries to link to
+  -no-execution                                   - Disable execution just produce all intermediate files
+  -no-recompilation                               - Disable recompilation of SCoPs
+  -tempdir                                        - Place temporary files into unique subdir
