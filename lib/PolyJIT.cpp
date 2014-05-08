@@ -597,13 +597,15 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   if (OutputFilename.size() > 0)
     StoreModule(M, OutputFilename);
 
-  /* Add a mapping to our JIT callback function. */
   int ret = 0;
   if (!DisableExecution) {
     // Run static constructors.
     EE.runStaticConstructorsDestructors(false);
 
     DEBUG(dbgs() << "[polli] Starting execution...\n");
+
+    // Make the object executable.
+    EE.finalizeObject();
     ret = EE.runFunctionAsMain(Main, inputArgs, envp);
   }
 
