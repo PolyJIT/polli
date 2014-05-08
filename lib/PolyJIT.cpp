@@ -486,8 +486,16 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
 }
 
 void PolyJIT::extractJitableScops(Module &M) {
+  FunctionPassManager FPM(&M);
+  NonAffineScopDetection NSD;
+  ScopMapper SM;
+
+  NSD.enable(EnableJitable);
+
+  registerCanonicalicationPasses(FPM);
+  FPM.doInitialization();
+
   ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
-  ScopMapper *SM = new ScopMapper();
 
   PassManager PM;
 
@@ -498,19 +506,15 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
   polly::registerCanonicalicationPasses(PM);
-  PM.add(SD);
-
+  PM.add(polly::createScopDetectionPass());
   PM.add(new ScopDetectionResultsViewer());
-
-  NonAffineScopDetection *NSD = new NonAffineScopDetection();
-  NSD->enable(EnableJitable);
-  PM.add(NSD);
+  PM.add(&NSD);
 
   if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
 
   if (!DisableRecompile)
-    PM.add(SM);
+    PM.add(&SM);
 
   DEBUG(dbgs() << "[polli] Phase II: Create final module\n");
   PM.run(M);
@@ -518,7 +522,7 @@ void PolyJIT::extractJitableScops(Module &M) {
   ValueToValueMapTy VMap;
 
   /* Move the extracted SCoP functions into separate modules. */
-  for (ScopMapper::iterator f = SM->begin(), fe = SM->end(); f != fe; ++f) {
+  for (ScopMapper::iterator f = SM.begin(), fe = SM.end(); f != fe; ++f) {
     Function *F = (*f);
 
     /* Prepare a fresh module for this function. */
@@ -543,7 +547,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     Function *OrigF = MoveCloner.start();
 
     InstCloner.setSource(OrigF);
-    InstCloner.setSinkHostPass(SM);
+    InstCloner.setSinkHostPass(&SM);
     Function *InstF = InstCloner.start();
 
     // This maps the function name in the source module to the instrumented
@@ -551,20 +555,18 @@ void PolyJIT::extractJitableScops(Module &M) {
     F->setName(InstF->getName());
 
     // Remove the mess we made during instrumentation.
-    FunctionPassManager *NewFPM = new FunctionPassManager(NewM);
+    FunctionPassManager NewFPM(NewM);
 
-    NewFPM->add(llvm::createDeadCodeEliminationPass());
-    NewFPM->doInitialization();
-    NewFPM->run(*InstF);
-    NewFPM->doFinalization();
+    NewFPM.add(llvm::createDeadCodeEliminationPass());
+    NewFPM.doInitialization();
+    NewFPM.run(*InstF);
+    NewFPM.doFinalization();
 
-    delete NewFPM;
     // Set up the mapping for this prototype.
     Disp->setPrototypeMapping(InstF, OrigF);
   }
 
-  FPM->doFinalization();
-  delete FPM;
+  FPM.doFinalization();
 
   if (OutputFilename.size() == 0)
     StoreModule(M, M.getModuleIdentifier() + ".extr");
@@ -609,9 +611,10 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 }
 
 void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
-  registerCanonicalicationPasses(*FPM);
+  FunctionPassManager FPM(&M);
 
-  FPM->doInitialization();
+  registerCanonicalicationPasses(FPM);
+  FPM.doInitialization();
 
   DEBUG(dbgs() << "[polli] Phase I: Applying Preoptimization:\n");
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
@@ -619,9 +622,9 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
       continue;
 
     DEBUG(dbgs().indent(2) << "PreOpt: " << (*f).getName() << "\n");
-    FPM->run(*f);
+    FPM.run(*f);
   }
-  FPM->doFinalization();
+  FPM.doFinalization();
 }
 
 int PolyJIT::shutdown(int result) {

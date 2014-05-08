@@ -46,20 +46,23 @@ bool ScopMapper::runOnFunction(Function &F) {
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
+  for (auto CF : CreatedFunctions) {
+    dbgs() << CF->getName() << "\n";
+  }
+
   if (CreatedFunctions.count(&F))
     return false;
 
   /* Extract each SCoP in this function into a new one. */
-  CodeExtractor *Extractor;
   int i = 0;
   for (NonAffineScopDetection::iterator RP = NSD->begin(), RE = NSD->end();
        RP != RE; ++RP) {
     const Region *R = RP->first;
 
-    Extractor = new CodeExtractor(*DT, *R);
+    CodeExtractor Extractor(*DT, (*R));
 
-    if (Extractor->isEligible()) {
-      Function *ExtractedF = Extractor->extractCodeRegion();
+    if (Extractor.isEligible()) {
+      Function *ExtractedF = Extractor.extractCodeRegion();
 
       if (ExtractedF) {
         ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
@@ -68,7 +71,6 @@ bool ScopMapper::runOnFunction(Function &F) {
         CreatedFunctions.insert(ExtractedF);
       }
     }
-    delete Extractor;
   }
 
   return true;

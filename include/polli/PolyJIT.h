@@ -74,10 +74,7 @@ public:
 private:
   static PolyJIT *Instance;
 
-  PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {
-    FPM = new FunctionPassManager(&M);
-  }
-  ;
+  PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {}
 
   PolyJIT(const PolyJIT &);
   ~PolyJIT() {}
@@ -94,7 +91,6 @@ private:
   ExecutionEngine &EE;
   Module &M;
   std::string EntryFn;
-  FunctionPassManager *FPM;
 
   /* The modules we create & manage during execution of the main module M. */
   ManagedModules Mods;
