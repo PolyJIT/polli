@@ -61,9 +61,14 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
 
     bool isValid = true;
     ParamList params;
+    int j = 0;
+
     for (auto Reason : Log) {
       if (!isValid)
         break;
+
+      DEBUG(dbgs().indent(2) << "[" << j++ << "] " << Reason->getMessage()
+                             << "\n");
 
       assert(R && "We logged a non existing region, what the hell.");
 
@@ -71,24 +76,19 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
         RequiredParams[R] = ParamList();
 
       RejectReason *ReasonPtr = Reason.get();
-
       if (ReportNonAffineAccess *NonAffAccess =
               dyn_cast<ReportNonAffineAccess>(ReasonPtr)) {
         isValid &= polly::isNonAffineExpr(R, NonAffAccess->get(), *SE);
         if (isValid) {
-          DEBUG(NonAffAccess->get()->dump());
           params = getParamsInNonAffineExpr(R, NonAffAccess->get(), *SE);
           RequiredParams[R]
               .insert(RequiredParams[R].end(), params.begin(), params.end());
           ++JitNonAffineAccess;
         }
-      }
-
-      if (ReportNonAffBranch *NonAffBranch =
-              dyn_cast<ReportNonAffBranch>(ReasonPtr)) {
+      } else if (ReportNonAffBranch *NonAffBranch =
+                     dyn_cast<ReportNonAffBranch>(ReasonPtr)) {
         isValid &= polly::isNonAffineExpr(R, NonAffBranch->lhs(), *SE);
         if (isValid) {
-          DEBUG(NonAffBranch->lhs()->dump());
           params = getParamsInNonAffineExpr(R, NonAffBranch->lhs(), *SE);
           RequiredParams[R]
               .insert(RequiredParams[R].end(), params.begin(), params.end());
@@ -96,30 +96,24 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
         }
         isValid &= polly::isNonAffineExpr(R, NonAffBranch->rhs(), *SE);
         if (isValid) {
-          DEBUG(NonAffBranch->rhs()->dump());
           params = getParamsInNonAffineExpr(R, NonAffBranch->rhs(), *SE);
           RequiredParams[R]
               .insert(RequiredParams[R].end(), params.begin(), params.end());
         }
-      }
-
-      if (ReportLoopBound *NonAffLoopBound =
-              dyn_cast<ReportLoopBound>(ReasonPtr)) {
+      } else if (ReportLoopBound *NonAffLoopBound =
+                     dyn_cast<ReportLoopBound>(ReasonPtr)) {
         isValid &= polly::isNonAffineExpr(R, NonAffLoopBound->loopCount(), *SE);
         if (isValid) {
-          DEBUG(NonAffLoopBound->loopCount()->dump());
           params =
               getParamsInNonAffineExpr(R, NonAffLoopBound->loopCount(), *SE);
           RequiredParams[R]
               .insert(RequiredParams[R].end(), params.begin(), params.end());
           ++JitNonAffineLoopBound;
         }
-      }
-
-      if (ReportAlias *Alias = dyn_cast<ReportAlias>(ReasonPtr)) {
-        DEBUG(dbgs() << Alias->getMessage() << "\n");
+      } else if (ReportAlias *Alias = dyn_cast<ReportAlias>(ReasonPtr)) {
         ++AliasingIgnored;
-      }
+      } else
+        isValid = false;
 
       // Extract parameters and insert in the map.
       if (isValid) {
@@ -129,11 +123,16 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
       }
     }
 
+    unsigned LineBegin, LineEnd;
+    std::string FileName;
+    getDebugLocation(R, LineBegin, LineEnd, FileName);
+
     // We know that the current detection errors can be fixed, so we need to
     // enter the expand phase.
-
-    DEBUG(if (isValid) dbgs() << " JITABLE SCoP! " << R->getNameStr() << "\n";
-          else dbgs() << " NON-JITABLE SCoP! " << R->getNameStr() << "\n");
+    DEBUG(if (isValid) dbgs().indent(2) << "JITABLE SCoP! in: \n";
+          else dbgs().indent(2) << "NON-JITABLE SCoP! in: \n";
+          dbgs().indent(2) << FileName << ":" << LineBegin << ":" << LineEnd << "\n";
+          dbgs().indent(4) << R->getNameStr() << "\n\n");
   }
 
   return false;

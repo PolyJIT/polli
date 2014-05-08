@@ -46,9 +46,8 @@ bool ScopMapper::runOnFunction(Function &F) {
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
-  for (auto CF : CreatedFunctions) {
+  for (auto CF : CreatedFunctions)
     dbgs() << CF->getName() << "\n";
-  }
 
   if (CreatedFunctions.count(&F))
     return false;

@@ -507,7 +507,6 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionPass());
-  PM.add(new ScopDetectionResultsViewer());
   PM.add(&NSD);
 
   if (InstrumentRegions)
