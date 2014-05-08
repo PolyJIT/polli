@@ -2,6 +2,7 @@ project(polli)
 cmake_minimum_required(VERSION 2.8)
 
 option(POLLI_BUILD_SHARED_LIB "Build a shared libPolyJIT" ON)
+set(POLLI_USE_SANITIZER "" CACHE STRING "Specify the sanitizer to use during build" )
 
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -36,7 +37,12 @@ link_directories(${PAPI_LIBRARY})
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wno-unused-parameter -Wwrite-strings")
 endif ()
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-exceptions -fno-rtti -std=c++0x")
+
+if (NOT POLLI_USE_SANITIZER STREQUAL "")
+  set(SANITIZER_OPTS "-fsanitize=${POLLI_USE_SANITIZER}")
+endif ()
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_OPTS} -fno-exceptions -fno-rtti -std=c++0x")
 
 include_directories(
   ${POLLI_SOURCE_DIR}/include
