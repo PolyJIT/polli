@@ -40,17 +40,15 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<RegionInfo>();
   AU.setPreservesAll();
 }
-;
 
 bool ScopMapper::runOnFunction(Function &F) {
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
-  for (auto CF : CreatedFunctions)
-    dbgs() << CF->getName() << "\n";
-
-  if (CreatedFunctions.count(&F))
+  if (CreatedFunctions.count(&F)) {
+    DEBUG(dbgs() << "SM - Ignoring: " << F.getName() << "\n");
     return false;
+  }
 
   /* Extract each SCoP in this function into a new one. */
   int i = 0;
@@ -68,6 +66,7 @@ bool ScopMapper::runOnFunction(Function &F) {
         ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
         /* FIXME: Do not depend on this set. */
         CreatedFunctions.insert(ExtractedF);
+        NSD->ignoreFunction(ExtractedF);
       }
     }
   }

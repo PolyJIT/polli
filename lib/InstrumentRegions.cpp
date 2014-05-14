@@ -17,7 +17,7 @@
 // edge and a single exit edge. Therefore, it is necessary to transform the
 // regions before we perform any instrumentation.
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "papi"
+#define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
 #include "polli/InstrumentRegions.h"
@@ -268,19 +268,19 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
   }
 
   if (EntrySplits.size() > 1) {
-    dbgs() << "Entries: ";
+    DEBUG(dbgs() << "Entries: ";
     for (auto &Entry : EntrySplits) {
       dbgs() << Entry->getName().str() << " ; ";
     }
-    dbgs() << "\n";
+    dbgs() << "\n");
     ++MoreEntries;
   }
   if (ExitSplits.size() > 1) {
-    dbgs() << "Exits: ";
+    DEBUG(dbgs() << "Exits: ";
     for (auto &Exit : ExitSplits) {
       dbgs() << Exit->getName().str() << " ; ";
     }
-    dbgs() << "\n";
+    dbgs() << "\n");
     ++MoreExits;
   }
   /* Use the curent Region-Exit, we will chose an appropriate place

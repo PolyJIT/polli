@@ -23,10 +23,6 @@
 #include "polli/Utils.h"
 using namespace llvm;
 
-cl::opt<bool> UniqueSubdir("tempdir",
-                           cl::desc("Place temporary files into unique subdir"),
-                           cl::init(false), cl::cat(PolliCategory));
-
 SmallVector<char, 255> *DefaultDir;
 
 void initializeOutputDir() {
@@ -34,12 +30,11 @@ void initializeOutputDir() {
   SmallVector<char, 255> cwd;
   fs::current_path(cwd);
 
-  if (UniqueSubdir) {
-    p::append(cwd, "polli");
-    fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
-    outs() << "DefaultDir = " << StringRef(DefaultDir->data(),
-                                           DefaultDir->size()) << "\n";
-  }
+  p::append(cwd, "polli");
+  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
+
+  outs() << "Storing results in: " << StringRef(DefaultDir->data(),
+                                                DefaultDir->size()) << "\n";
 }
 
 void StoreModule(Module &M, const Twine &Name) {
@@ -47,7 +42,6 @@ void StoreModule(Module &M, const Twine &Name) {
   SmallVector<char, 255> destPath = *DefaultDir;
 
   std::string ErrorInfo;
-  PassManager PM;
   OwningPtr<tool_output_file> Out;
 
   M.setModuleIdentifier(Name.str());
@@ -58,8 +52,7 @@ void StoreModule(Module &M, const Twine &Name) {
   DEBUG(dbgs().indent(2) << "Storing: " << M.getModuleIdentifier() << "\n");
   Out.reset(new tool_output_file(path.c_str(), ErrorInfo, F_RW));
 
-  const DataLayout *DL = M.getDataLayout();
-
+  PassManager PM;
   PM.add(new DataLayoutPass(&M));
   PM.add(createBitcodeWriterPass(Out->os()));
   PM.run(M);

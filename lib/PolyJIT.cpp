@@ -486,20 +486,11 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
 }
 
 void PolyJIT::extractJitableScops(Module &M) {
-  FunctionPassManager FPM(&M);
-  NonAffineScopDetection NSD;
-  ScopMapper SM;
-
-  NSD.enable(EnableJitable);
-
-  registerCanonicalicationPasses(FPM);
-  FPM.doInitialization();
-
-  ScopDetection *SD = (ScopDetection *)polly::createScopDetectionPass();
-
   PassManager PM;
+  ScopMapper *SM = new ScopMapper();
 
   PM.add(new DataLayoutPass(&M));
+
   if (InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
 
@@ -507,13 +498,13 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionPass());
-  PM.add(&NSD);
+  PM.add(new NonAffineScopDetection(EnableJitable));
+
+  if (!DisableRecompile)
+    PM.add(new ScopMapper());
 
   if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
-
-  if (!DisableRecompile)
-    PM.add(&SM);
 
   DEBUG(dbgs() << "[polli] Phase II: Create final module\n");
   PM.run(M);
@@ -521,7 +512,7 @@ void PolyJIT::extractJitableScops(Module &M) {
   ValueToValueMapTy VMap;
 
   /* Move the extracted SCoP functions into separate modules. */
-  for (ScopMapper::iterator f = SM.begin(), fe = SM.end(); f != fe; ++f) {
+  for (ScopMapper::iterator f = SM->begin(), fe = SM->end(); f != fe; ++f) {
     Function *F = (*f);
 
     /* Prepare a fresh module for this function. */
@@ -546,7 +537,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     Function *OrigF = MoveCloner.start();
 
     InstCloner.setSource(OrigF);
-    InstCloner.setSinkHostPass(&SM);
+    InstCloner.setSinkHostPass(SM);
     Function *InstF = InstCloner.start();
 
     // This maps the function name in the source module to the instrumented
@@ -555,7 +546,6 @@ void PolyJIT::extractJitableScops(Module &M) {
 
     // Remove the mess we made during instrumentation.
     FunctionPassManager NewFPM(NewM);
-
     NewFPM.add(llvm::createDeadCodeEliminationPass());
     NewFPM.doInitialization();
     NewFPM.run(*InstF);
@@ -564,8 +554,6 @@ void PolyJIT::extractJitableScops(Module &M) {
     // Set up the mapping for this prototype.
     Disp->setPrototypeMapping(InstF, OrigF);
   }
-
-  FPM.doFinalization();
 
   if (OutputFilename.size() == 0)
     StoreModule(M, M.getModuleIdentifier() + ".extr");
@@ -601,11 +589,18 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     // Run static constructors.
     EE.runStaticConstructorsDestructors(false);
 
+    // FIXME: Don't fail if we do not strip them.
+    PassManager PM;
+    PM.add(llvm::createStripSymbolsPass(true));
+    PM.run(M);
+
     DEBUG(dbgs() << "[polli] Starting execution...\n");
 
     // Make the object executable.
     EE.finalizeObject();
     ret = EE.runFunctionAsMain(Main, inputArgs, envp);
+
+    DEBUG(dbgs() << "[polli] Finished (" << ret << ")\n");
   }
 
   return ret;
