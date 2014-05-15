@@ -43,34 +43,23 @@ bool RuntimeOptimizer::Optimize(Function &F) {
   Module *M = F.getParent();
   FunctionPassManager FPM = FunctionPassManager(M);
 
+  FPM.add(new DataLayoutPass(M));
   FPM.add(llvm::createTypeBasedAliasAnalysisPass());
   FPM.add(llvm::createBasicAliasAnalysisPass());
 
   polly::registerCanonicalicationPasses(FPM);
 
   FPM.add(polly::createScopInfoPass());
-  FPM.add(polly::createDOTPrinterPass());
-
-  //  FPM.add(polly::createDeadCodeElimPass());
-
-  //  FPM.add(polly::createPoccPass());
-  //  FPM.add(polly::createPlutoOptimizerPass());
   FPM.add(polly::createIslScheduleOptimizerPass());
-  //  FPM.add(polly::createJSONExporterPass());
-
   FPM.add(polly::createIslCodeGenerationPass());
   //  VectorizeConfig C;
   //    C.FastDep = true;
   //  FPM.add(createBBVectorizePass(C));
   //  FPM.add(polly::createIslCodeGenerationPass());
 
-  FPM.add(llvm::createCFGPrinterPass());
-  FPM.doInitialization();
   bool result = FPM.run(F);
-  FPM.doFinalization();
 
-  // DEBUG(StoreModule(*M, M->getModuleIdentifier()));
-  StoreModule(*M, M->getModuleIdentifier());
+  DEBUG(StoreModule(*M, M->getModuleIdentifier()));
   return result;
 }
 }

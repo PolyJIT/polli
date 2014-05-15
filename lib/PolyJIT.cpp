@@ -379,8 +379,10 @@ PolyJIT::runSpecializedFunction(Function *NewF,
   assert(NewM && "Passed function parameter has no parent module!");
 
   // Fetch or Create a new ExecutionEngine for this Module.
-  if (!Mods.count(NewM))
+  if (!Mods.count(NewM)) {
     Mods[NewM] = PolyJIT::GetEngine(NewM);
+    Mods[NewM]->finalizeObject();
+  }
   NewEE = Mods[NewM];
 
   assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
@@ -487,8 +489,6 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
 
 void PolyJIT::extractJitableScops(Module &M) {
   PassManager PM;
-  ScopMapper *SM = new ScopMapper();
-
   PM.add(new DataLayoutPass(&M));
 
   if (InstrumentRegions)
@@ -496,12 +496,12 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
-  polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionPass());
   PM.add(new NonAffineScopDetection(EnableJitable));
 
+  ScopMapper *SM = new ScopMapper();
   if (!DisableRecompile)
-    PM.add(new ScopMapper());
+    PM.add(SM);
 
   if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
@@ -547,9 +547,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     // Remove the mess we made during instrumentation.
     FunctionPassManager NewFPM(NewM);
     NewFPM.add(llvm::createDeadCodeEliminationPass());
-    NewFPM.doInitialization();
     NewFPM.run(*InstF);
-    NewFPM.doFinalization();
 
     // Set up the mapping for this prototype.
     Disp->setPrototypeMapping(InstF, OrigF);
@@ -574,6 +572,11 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   /* Extract suitable Scops */
   extractJitableScops(M);
 
+  // FIXME: Why do we fail, if we do not strip them all off?!
+  PassManager PM;
+  PM.add(llvm::createStripSymbolsPass(true));
+  PM.run(M);
+
   /* Store temporary files */
   StoreModules(Mods);
 
@@ -588,11 +591,6 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   if (!DisableExecution) {
     // Run static constructors.
     EE.runStaticConstructorsDestructors(false);
-
-    // FIXME: Don't fail if we do not strip them.
-    PassManager PM;
-    PM.add(llvm::createStripSymbolsPass(true));
-    PM.run(M);
 
     DEBUG(dbgs() << "[polli] Starting execution...\n");
 

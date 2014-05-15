@@ -13,6 +13,8 @@
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
+#include "polly/ScopDetectionDiagnostic.h"
+
 #include "polli/ScopMapper.h"
 #include "polli/Utils.h"
 
@@ -58,8 +60,18 @@ bool ScopMapper::runOnFunction(Function &F) {
 
     CodeExtractor Extractor(*DT, (*R));
 
+    unsigned LineBegin, LineEnd;
+    std::string FileName;
+    getDebugLocation(R, LineBegin, LineEnd, FileName);
+ 
+    DEBUG(dbgs().indent(2) << "[ScopMapper] Extracting: ");
+    DEBUG(dbgs().indent(2) << FileName << ":"
+                           << LineBegin << ":" << LineEnd
+                           << " - " << R->getNameStr() << "\n");
+
     if (Extractor.isEligible()) {
       Function *ExtractedF = Extractor.extractCodeRegion();
+      DEBUG(dbgs().indent(4) << " into: " << ExtractedF->getName() << "\n");
 
       if (ExtractedF) {
         ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
@@ -68,7 +80,8 @@ bool ScopMapper::runOnFunction(Function &F) {
         CreatedFunctions.insert(ExtractedF);
         NSD->ignoreFunction(ExtractedF);
       }
-    }
+    } else
+      DEBUG(dbgs().indent(4) << " FAILED\n");
   }
 
   return true;

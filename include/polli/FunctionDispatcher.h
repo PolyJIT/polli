@@ -419,7 +419,6 @@ public:
       Specializer.setSource(OrigF);
 
       NewF = Specializer.start();
-
       SpecializedModules.push_back(NewM);
     }
 
