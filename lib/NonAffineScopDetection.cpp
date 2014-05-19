@@ -43,10 +43,24 @@ public:
       return lc->checkNonAffineBranch((ReportNonAffBranch *)Reason);
     case rrkLoopBound:
       return lc->checkLoopBound((ReportLoopBound *)Reason);
+    case rrkAlias:
+      return lc->checkAlias((ReportAlias *)Reason);
     default:
       return Invalid;
     }
   }
+};
+
+class AliasingLogChecker : public RejectLogChecker<AliasingLogChecker, bool> {
+  const Region *R;
+  ScalarEvolution *SE;
+public:
+  AliasingLogChecker(const Region *R) : R(R) {}
+
+  bool checkNonAffineAccess(ReportNonAffineAccess *Reason) { return false; }
+  bool checkNonAffineBranch(ReportNonAffBranch *Reason) { return false; }
+  bool checkLoopBound(ReportLoopBound *Reason) { return false; }
+  bool checkAlias(ReportAlias *Reason) { return true; }
 };
 
 class NonAffineLogChecker : public RejectLogChecker < NonAffineLogChecker,
@@ -97,6 +111,12 @@ public:
       ++JitNonAffineLoopBound;
     }
     return std::make_pair<>(isValid, Params);
+  }
+
+  std::pair<bool, ParamList>
+  checkAlias(ReportAlias *Reason) {
+    ParamList Params;
+    return std::make_pair<>(false, Params);
   }
 };
 
@@ -153,20 +173,28 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
 
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
-      //if (!isValid)
-      //  break;
+
       NonAffineLogChecker NonAffine(R, SE);
-      auto CheckResult =
+      AliasingLogChecker Aliasing(R);
+
+      auto NonAffineResult =
           NonAffine.check(Reason.get(), std::make_pair<>(false, ParamList()));
+
+      auto AliasResult = Aliasing.check(Reason.get(), false);
+      
+      bool IsFixable = false;
+      IsFixable |= NonAffineResult.first;
+      IsFixable |= AliasResult;
+          
       // We're invalid, cry about it.
-      if (!CheckResult.first)
+      if (!IsFixable)
         dbgs().indent(4) << "Can't deal with: " << Reason->getMessage() << "\n";
 
-      isValid &= CheckResult.first;
+      isValid &= IsFixable;
 
       // Extract parameters and insert in the map.
       if (isValid) {
-        ParamList params = CheckResult.second;
+        ParamList params = NonAffineResult.second;
         RequiredParams[R]
             .insert(RequiredParams[R].end(), params.begin(), params.end());
       }
