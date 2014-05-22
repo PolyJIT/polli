@@ -149,9 +149,19 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
   M = F.getParent();
 
   DEBUG(dbgs() << "[polli] Running on: " << F.getName() << "\n");
+  DEBUG(dbgs().indent(2) << "SCoPs already valid: \n");
   for (ScopDetection::const_iterator i = SD->begin(), ie = SD->end(); i != ie;
-       ++i)
-    AccumulatedScops.insert(*i);
+       ++i) {
+    const Region *R = (*i);
+    AccumulatedScops.insert(R);
+
+    unsigned LineBegin, LineEnd;
+    std::string FileName;
+    getDebugLocation(R, LineBegin, LineEnd, FileName);
+    DEBUG(dbgs().indent(4) << FileName << ":"
+                           << LineBegin << ":" << LineEnd
+                           << " - " << R->getNameStr() << "\n");
+  }
 
   if (!Enabled)
     return false;
@@ -173,7 +183,6 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
 
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
-
       NonAffineLogChecker NonAffine(R, SE);
       AliasingLogChecker Aliasing(R);
 
@@ -181,14 +190,14 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
           NonAffine.check(Reason.get(), std::make_pair<>(false, ParamList()));
 
       auto AliasResult = Aliasing.check(Reason.get(), false);
-      
+
       bool IsFixable = false;
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
-          
+
       // We're invalid, cry about it.
-      if (!IsFixable)
-        dbgs().indent(4) << "Can't deal with: " << Reason->getMessage() << "\n";
+      DEBUG(if (!IsFixable) dbgs().indent(4)
+            << "Can't deal with: " << Reason->getMessage() << "\n");
 
       isValid &= IsFixable;
 

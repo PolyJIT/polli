@@ -224,7 +224,7 @@ static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
 static void pjit_callback(const char *fName, unsigned paramc, char **params) {
-  DEBUG(dbgs() << "[polli] Entering JIT runtime environment...\n");
+  DEBUG(dbgs() << "\n[polli] Entering JIT runtime environment...\n");
   /* Let's hope that we have called it before ;-)
    * Otherwise it will blow up. FIXME: Don't blow up. */
   PolyJIT *JIT = PolyJIT::Get();
@@ -614,8 +614,6 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
     if (f->isDeclaration())
       continue;
-
-    DEBUG(dbgs().indent(2) << "PreOpt: " << (*f).getName() << "\n");
     FPM.run(*f);
   }
   FPM.doFinalization();

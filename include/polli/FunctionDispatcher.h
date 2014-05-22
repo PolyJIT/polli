@@ -275,8 +275,8 @@ public:
 
       // Could not find the argument, should not happen.
       if (Arg == TgtF->arg_end()) {
-        outs() << P.getName() << " was not in the argument list of "
-               << TgtF->getName() << "\n";
+        DEBUG(dbgs() << P.getName() << " was not in the argument list of "
+               << TgtF->getName() << "\n");
         continue;
       }
 
@@ -442,9 +442,8 @@ public:
     ValKeyToFunction ValToFun =
         (!SpecFuns.count(F)) ? ValKeyToFunction() : SpecFuns[F];
 
-    /* TODO: We need to be a bit more smart than: Specialize everything. */
+    /* TODO: We need to be a bit smarter than: Specialize everything. */
     if (!ValToFun.count(Values)) {
-      DEBUG(dbgs() << "[polli] (new)\n");
       Function *NewF = specialize(F, Values);
       RuntimeOptimizer RTOpt;
 
