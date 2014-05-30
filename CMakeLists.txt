@@ -63,6 +63,9 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/
   PATTERN ".svn" EXCLUDE
   )
 
+add_library(papi SHARED IMPORTED)
+set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+
 add_definitions( -D_GNU_SOURCE )
 
 add_subdirectory(include)

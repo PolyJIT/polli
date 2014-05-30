@@ -73,6 +73,8 @@
 #include "polli/ScopMapper.h"
 #include "polli/Utils.h"
 
+#include "papi.h"
+
 #include <set>
 #include <map>
 
@@ -249,7 +251,17 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   ArgValues[0] = ArgC;
   ArgValues[1] = PTOGV(params);
 
+  float rtime, ptime, mflops;
+  long long flpops;
+
+  PAPI_flops(&rtime, &ptime, &flpops, &mflops);
   JIT->runSpecializedFunction(NewF, ArgValues);
+  PAPI_flops(&rtime, &ptime, &flpops, &mflops);
+
+  DEBUG(dbgs().indent(2) << "Fn: " << NewF->getName() << " stats: \n");
+  DEBUG(dbgs().indent(4) << " RealTime: " << rtime << " ProcTime: " << ptime
+                         << " FlpOps: " << flpops << " MFLOPs: " << mflops
+                         << "\n");
 }
 }
 

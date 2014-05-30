@@ -34,6 +34,10 @@ add_polli_library(PolyJIT
   Utils.cpp
   )
 
+target_link_libraries(PolyJIT
+  papi
+  )
+
 set_target_properties(PolyJIT
   PROPERTIES
   LINKER_LANGUAGE CXX
