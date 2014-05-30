@@ -139,6 +139,39 @@ static void printParameters(ParamList &L) {
   dbgs() << "\n";
 }
 
+// Remove all direct and indirect children of region R from the region set Regs,
+// but do not recurse further if the first child has been found.
+//
+// Return the number of regions erased from Regs.
+static unsigned eraseAllChildren(std::set<const Region *> &Regs,
+                                 const Region &R) {
+  unsigned Count = 0;
+  for (auto &SubRegion : R) {
+    if (Regs.find(SubRegion.get()) != Regs.end()) {
+      ++Count;
+      Regs.erase(SubRegion.get());
+    } else {
+      Count += eraseAllChildren(Regs, *SubRegion);
+    }
+  }
+  return Count;
+}
+
+static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
+  dbgs().indent(2) << "SCoPs already valid: -\n";
+  for (ScopDetection::const_iterator i = SD.begin(), ie = SD.end(); i != ie;
+       ++i) {
+    const Region *R = (*i);
+    AllScops.insert(R);
+
+    unsigned LineBegin, LineEnd;
+    std::string FileName;
+    getDebugLocation(R, LineBegin, LineEnd, FileName);
+    DEBUG(dbgs().indent(4) << FileName << ":" << LineBegin << ":" << LineEnd
+                           << " - " << R->getNameStr() << "\n");
+  }
+}
+
 bool NonAffineScopDetection::runOnFunction(Function &F) {
   if (IgnoredFunctions.count(&F)) {
     DEBUG(dbgs() << "SD - Ignoring: " << F.getName() << "\n");
@@ -213,13 +246,36 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
     }
 
     if (isValid) {
+      /* The SCoP can be fixed at run time. However, we want need to make
+       * sure to fetch the largest parent region that is fixable.
+       * We need to do two steps:
+       *
+       * 1) Eliminate all children from the set of jitable Scops. */
+      eraseAllChildren(JitableScops, *R);
+
+      /* 2) Search for one of our parents (up to the function entry) in the
+       *    list of jitable Scops. If we find one in there, do not enter
+       *    the set of jitable Scops. */
+      const Region *Parent = R->getParent();
+      while (Parent && !JitableScops.count(Parent))
+        Parent = Parent->getParent();
+
+      // We found one of our parent regions in the set of jitable Scops.
+      if (!Parent) {
+        DEBUG(dbgs().indent(2) << "[NSD] " << R->getNameStr()
+                               << "is jitable\n");
         DEBUG(printParameters(RequiredParams[R]));
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
         ++JitScopsFound;
+      } else
+        DEBUG(dbgs().indent(4) << "Already covered: " << R->getNameStr()
+                               << "\n");
     }
   }
 
+  DEBUG(dbgs().indent(2) << "[NSD]: Number of jitable Scops "
+                        << JitableScops.size() << "\n");
   return false;
 };
 
