@@ -551,7 +551,7 @@ void PolyJIT::extractJitableScops(Module &M) {
 
     // This maps the function name in the source module to the instrumented
     // version in the extracted version.
-    //F->setName(InstF->getName());
+    F->setName(InstF->getName());
 
     // Remove the mess we made during instrumentation.
     FunctionPassManager NewFPM(NewM);
