@@ -60,7 +60,10 @@ public:
   bool checkNonAffineAccess(ReportNonAffineAccess *Reason) { return false; }
   bool checkNonAffineBranch(ReportNonAffBranch *Reason) { return false; }
   bool checkLoopBound(ReportLoopBound *Reason) { return false; }
-  bool checkAlias(ReportAlias *Reason) { return true; }
+  bool checkAlias(ReportAlias *Reason) {
+    ++AliasingIgnored;
+    return true;
+  }
 };
 
 class NonAffineLogChecker : public RejectLogChecker < NonAffineLogChecker,
