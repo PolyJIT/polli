@@ -24,7 +24,6 @@
 #include "llvm/PassManager.h"
 
 #include "llvm/Analysis/RegionInfo.h"
-#include "llvm/Analysis/Verifier.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Assembly/PrintModulePass.h"
@@ -224,7 +223,6 @@ static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
 static void pjit_callback(const char *fName, unsigned paramc, char **params) {
-  DEBUG(dbgs() << "\n[polli] Entering JIT runtime environment...\n");
   /* Let's hope that we have called it before ;-)
    * Otherwise it will blow up. FIXME: Don't blow up. */
   PolyJIT *JIT = PolyJIT::Get();
@@ -506,8 +504,8 @@ void PolyJIT::extractJitableScops(Module &M) {
   if (InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
 
-  DEBUG(dbgs() << "[polli] Phase II: Create final module\n");
   PM.run(M);
+  DEBUG(dbgs() << "[polli] Phase II: Create final module\n");
 
   ValueToValueMapTy VMap;
 
@@ -527,7 +525,6 @@ void PolyJIT::extractJitableScops(Module &M) {
     NewM->setModuleIdentifier(
         (M->getModuleIdentifier() + "." + F->getName()).str());
 
-    // FIXME: Work around the one module per engine model of MCJIT/JIT for now.
     Mods[NewM] = &EE;
 
     MovingFunctionCloner MoveCloner(VMap, NewM);
@@ -542,11 +539,15 @@ void PolyJIT::extractJitableScops(Module &M) {
 
     // This maps the function name in the source module to the instrumented
     // version in the extracted version.
-    F->setName(InstF->getName());
+    //F->setName(InstF->getName());
 
     // Remove the mess we made during instrumentation.
     FunctionPassManager NewFPM(NewM);
-    NewFPM.add(llvm::createDeadCodeEliminationPass());
+    NewFPM.add(llvm::createPromoteMemoryToRegisterPass());
+    NewFPM.add(llvm::createTypeBasedAliasAnalysisPass());
+    NewFPM.add(llvm::createBasicAliasAnalysisPass());
+    polly::registerCanonicalicationPasses(NewFPM);
+
     NewFPM.run(*InstF);
 
     // Set up the mapping for this prototype.

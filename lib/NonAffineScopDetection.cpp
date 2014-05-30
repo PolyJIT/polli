@@ -132,7 +132,6 @@ void NonAffineScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 static void printParameters(ParamList &L) {
-  dbgs().indent(2) << "[JIT] SCoP is valid\n";
   dbgs().indent(4) << "Parameters: ";
   for (const SCEV *S : L)
     S->print(dbgs().indent(2));
@@ -185,19 +184,7 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
   M = F.getParent();
 
   DEBUG(dbgs() << "[polli] Running on: " << F.getName() << "\n");
-  DEBUG(dbgs().indent(2) << "SCoPs already valid: \n");
-  for (ScopDetection::const_iterator i = SD->begin(), ie = SD->end(); i != ie;
-       ++i) {
-    const Region *R = (*i);
-    AccumulatedScops.insert(R);
-
-    unsigned LineBegin, LineEnd;
-    std::string FileName;
-    getDebugLocation(R, LineBegin, LineEnd, FileName);
-    DEBUG(dbgs().indent(4) << FileName << ":"
-                           << LineBegin << ":" << LineEnd
-                           << " - " << R->getNameStr() << "\n");
-  }
+  DEBUG(printValidScops(AccumulatedScops, *SD));
 
   if (!Enabled)
     return false;
@@ -211,11 +198,10 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
     unsigned LineBegin, LineEnd;
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
-    DEBUG(dbgs().indent(2) << "[Checking] " << FileName << ":"
-                           << LineBegin << ":" << LineEnd
-                           << " - " << R->getNameStr() << "\n");
-
-    DEBUG(Log.print(dbgs(), 4));
+    DEBUG(dbgs().indent(2) << "[Checking] " << FileName << ":" << LineBegin
+                           << ":" << LineEnd << " - " << R->getNameStr()
+                           << "\n");
+    DEBUG(R->dump());
 
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
@@ -227,17 +213,16 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
 
       auto AliasResult = Aliasing.check(Reason.get(), false);
 
+      // Ask the checkers for their oppinion.
       bool IsFixable = false;
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
 
-      // We're invalid, cry about it.
-      DEBUG(if (!IsFixable) dbgs().indent(4)
-            << "Can't deal with: " << Reason->getMessage() << "\n");
-
+      DEBUG(dbgs().indent(4) << ((IsFixable) ? "[ OK ]: " : "[FAIL]: ")
+                             << Reason->getMessage() << "\n");
       isValid &= IsFixable;
 
-      // Extract parameters and insert in the map.
+      // Record all necessary parameters for later use.
       if (isValid) {
         ParamList params = NonAffineResult.second;
         RequiredParams[R]

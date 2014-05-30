@@ -16,6 +16,7 @@
 #include "llvm/Assembly/PrintModulePass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -54,6 +55,7 @@ void StoreModule(Module &M, const Twine &Name) {
 
   PassManager PM;
   PM.add(new DataLayoutPass(&M));
+  PM.add(llvm::createVerifierPass());
   PM.add(createBitcodeWriterPass(Out->os()));
   PM.run(M);
   Out->keep();

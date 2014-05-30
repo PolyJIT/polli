@@ -156,7 +156,7 @@ struct IgnoreTarget {
 struct DestroyEndpoint {
   static void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
-    VMap.erase(TgtF);
+    //VMap.erase(TgtF);
   }
 };
 

@@ -54,19 +54,18 @@ bool ScopMapper::runOnFunction(Function &F) {
 
   /* Extract each SCoP in this function into a new one. */
   int i = 0;
-  for (NonAffineScopDetection::iterator RP = NSD->begin(), RE = NSD->end();
-       RP != RE; ++RP) {
-    const Region *R = RP->first;
+  for (ScopSet::iterator RP = NSD->jit_begin(), RE = NSD->jit_end(); RP != RE;
+       ++RP) {
+    const Region *R = *RP;
 
     CodeExtractor Extractor(*DT, (*R));
 
     unsigned LineBegin, LineEnd;
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
- 
+
     DEBUG(dbgs().indent(2) << "[ScopMapper] Extracting: ");
-    DEBUG(dbgs().indent(2) << FileName << ":"
-                           << LineBegin << ":" << LineEnd
+    DEBUG(dbgs().indent(2) << FileName << ":" << LineBegin << ":" << LineEnd
                            << " - " << R->getNameStr() << "\n");
 
     if (Extractor.isEligible()) {
@@ -86,6 +85,5 @@ bool ScopMapper::runOnFunction(Function &F) {
 
   return true;
 }
-;
 
 char ScopMapper::ID = 0;
