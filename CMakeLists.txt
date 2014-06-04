@@ -27,8 +27,8 @@ include(polli_macros)
 
 ## Find Polly
 find_package(Polly REQUIRED)
-include_directories ( ${POLLY_INCLUDE_DIRS} )
-link_directories( ${POLLY_LINK_DIRS} )
+include_directories ( ${POLLY_INCLUDE_DIR} )
+link_directories( ${POLLY_LINK_DIR} )
 add_definitions( ${POLLY_DEFINITIONS} )
 
 # Find PAPI
