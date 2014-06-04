@@ -213,7 +213,7 @@ public:
     initializePapiCScopProfilingPass(Registry);
     initializePapiCScopProfilingInitPass(Registry);
 
-    initializeOutputDir();
+//    initializeOutputDir();
   }
 };
 }

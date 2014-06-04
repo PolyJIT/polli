@@ -26,6 +26,13 @@ using namespace llvm;
 
 SmallVector<char, 255> *DefaultDir;
 
+static bool DirReady = false;
+
+static cl::opt<bool>
+GenerateOutput("polli-debug-ir",
+               cl::desc("Store all IR files inside a unique subdirectory."),
+               cl::init(false));
+
 void initializeOutputDir() {
   DefaultDir = new SmallVector<char, 255>();
   SmallVector<char, 255> cwd;
@@ -36,9 +43,16 @@ void initializeOutputDir() {
 
   outs() << "Storing results in: " << StringRef(DefaultDir->data(),
                                                 DefaultDir->size()) << "\n";
+  DirReady = true;
 }
 
 void StoreModule(Module &M, const Twine &Name) {
+  if (!GenerateOutput)
+    return;
+
+  if (!DirReady)
+    initializeOutputDir();
+
   llvm::error_code err;
   SmallVector<char, 255> destPath = *DefaultDir;
 
