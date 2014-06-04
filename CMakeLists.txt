@@ -8,8 +8,11 @@ set(POLLI_USE_SANITIZER "" CACHE STRING "Specify the sanitizer to use during bui
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+# Provide option for finding LLVM
+set(LLVM_INSTALL_ROOT "" CACHE STRING "Location of LLVM installation")
+
 ## Find LLVM
-find_package(LLVM REQUIRED)
+find_package(LLVM REQUIRED HINTS ${LLVM_INSTALL_ROOT})
 include_directories( ${LLVM_INCLUDE_DIRS} )
 link_directories( ${LLVM_LIBRARY_DIRS} )
 add_definitions( ${LLVM_DEFINITIONS} )
