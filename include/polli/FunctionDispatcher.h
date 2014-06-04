@@ -449,11 +449,14 @@ public:
     /* TODO: We need to be a bit smarter than: Specialize everything. */
     if (!ValToFun.count(Values)) {
       Function *NewF = specialize(F, Values);
-      RuntimeOptimizer RTOpt;
 
+      RuntimeOptimizer RTOpt;
       RTOpt.Optimize(*NewF);
 
-      ValToFun[Values] = NewF;
+      DEBUG(dbgs() << "( " << Values << " )\n");
+      auto Insert = ValToFun.insert(std::make_pair(Values, NewF));
+      assert(Insert.second &&
+             "Tried to replace an already specialized function!");
       SpecFuns[F] = ValToFun;
     }
 
