@@ -290,7 +290,9 @@ public:
       Constant *replacement = P.getAsConstant();
       if (replacement) {
         Value *NewArg = VMap[Arg];
-        NewArg->replaceAllUsesWith(replacement);
+
+        if (!isa<Constant>(NewArg))
+          NewArg->replaceAllUsesWith(replacement);
       }
     }
 
