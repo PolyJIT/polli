@@ -47,10 +47,9 @@ bool ScopMapper::runOnFunction(Function &F) {
   NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
-  if (CreatedFunctions.count(&F)) {
-    DEBUG(dbgs() << "SM - Ignoring: " << F.getName() << "\n");
+  // Ignore functions created by us.
+  if (CreatedFunctions.count(&F))
     return false;
-  }
 
   /* Extract each SCoP in this function into a new one. */
   int i = 0;

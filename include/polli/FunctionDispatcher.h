@@ -280,11 +280,8 @@ public:
       Function::arg_iterator Arg = getArgument(SrcF, P.getName());
 
       // Could not find the argument, should not happen.
-      if (Arg == TgtF->arg_end()) {
-        DEBUG(dbgs() << P.getName() << " was not in the argument list of "
-               << TgtF->getName() << "\n");
+      if (Arg == TgtF->arg_end())
         continue;
-      }
 
       // Get a constant value for P.
       Constant *replacement = P.getAsConstant();
@@ -432,7 +429,6 @@ public:
 
     return NewF;
   }
-  ;
 
   /// @brief Set up a mapping between an uninstrumented and an instrumented
   //         function.

@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
-
 #include "polli/PolyJIT.h"
 
 #include "polly/Canonicalization.h"
@@ -22,7 +21,6 @@
 #include "polly/LinkAllPasses.h"
 
 #include "llvm/PassManager.h"
-
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/Triple.h"

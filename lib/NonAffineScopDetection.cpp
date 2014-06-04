@@ -172,10 +172,8 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
 }
 
 bool NonAffineScopDetection::runOnFunction(Function &F) {
-  if (IgnoredFunctions.count(&F)) {
-    DEBUG(dbgs() << "SD - Ignoring: " << F.getName() << "\n");
+  if (IgnoredFunctions.count(&F))
     return false;
-  }
 
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
