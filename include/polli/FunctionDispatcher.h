@@ -127,6 +127,9 @@ template <class RTParam> struct ParamVector {
     unsigned i = 0;
     unsigned n = Params.size();
 
+    if (n == 0)
+      return false;
+
     do {
       isLess = Params[i] < rhs[i];
       isGrtr = Params[i] > rhs[i];
@@ -141,6 +144,9 @@ template <class RTParam> struct ParamVector {
     bool isGrtr = false;
     unsigned i = 0;
     unsigned n = Params.size();
+
+    if (n == 0)
+      return false;
 
     do {
       isLess = Params[i] < rhs[i];
