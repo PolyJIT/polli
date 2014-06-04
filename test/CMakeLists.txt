@@ -6,15 +6,21 @@ set(POLLI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(POLLI_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/..")
 set(LLVM_SHLIBEXT "${CMAKE_SHARED_MODULE_SUFFIX}")
 
-# We are building polli out of tree, adjust the settings.
-# FIXME: FileCheck is not available in llvm install directory at the moment.
-set(LLVM_LIT ${LLVM_INSTALL_ROOT}/bin/llvm-lit)
 set(POLLI_TEST_DEPENDS polli)
 
 set(LLVM_BINARY_DIR "${LLVM_INSTALL_ROOT}")
 set(LLVM_TOOLS_DIR "${LLVM_INSTALL_ROOT}/bin")
 set(LLVM_LIBS_DIR "${LLVM_INSTALL_ROOT}/lib")
 set(POLLI_LIB_DIR "${POLLI_BINARY_DIR}/lib")
+
+# We are building polli out of tree, adjust the settings.
+# FIXME: FileCheck is not available in llvm install directory at the moment.
+if(NOT LLVM_OBJ_ROOT)
+  exec_program(${LLVM_INSTALL_ROOT}/bin/llvm-config
+               ARGS --obj-root
+               OUTPUT_VARIABLE LLVM_OBJ_ROOT)
+endif(NOT LLVM_OBJ_ROOT)
+set(LLVM_LIT ${LLVM_OBJ_ROOT}/bin/llvm-lit)
 
 include(FindPythonInterp)
 if(PYTHONINTERP_FOUND)
