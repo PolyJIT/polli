@@ -114,12 +114,9 @@ template <class RTParam> struct ParamVector {
   inline size_t size() const { return Params.size(); }
 
   RTParam &operator[](unsigned const &index) { return Params[index]; }
-  ;
-
   const RTParam &operator[](unsigned const &index) const {
     return Params[index];
   }
-  ;
 
   bool operator<(ParamVector<RTParam> const &rhs) {
     bool isLess = false;
