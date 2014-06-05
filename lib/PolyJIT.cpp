@@ -233,8 +233,7 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   if (!F)
     llvm_unreachable("Function not in this module. It has to be there!");
 
-  RTParams RuntimeParams = getRuntimeParameters(F, paramc, params);
-  ParamVector<RuntimeParam> PArr = RuntimeParams;
+  ParamVector<RuntimeParam> PArr = getRuntimeParameters(F, paramc, params);
 
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.

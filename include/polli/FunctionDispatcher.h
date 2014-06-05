@@ -39,7 +39,7 @@ template <class StorageT, class TypeT> struct RTParam {
   }
 
   // Not implemented. Specialize me.
-  Constant *getAsConstant() { return NULL; }
+  Constant *getAsConstant() const { return NULL; }
 
   // Get the name of this argument.
   StringRef &getName() { return Name; }
@@ -86,7 +86,7 @@ template <class TypeT> struct RTParam<APInt, TypeT> {
     out << " " << Name << " = " << Value;
   }
 
-  Constant *getAsConstant() { return ConstantInt::get(Type, Value); }
+  Constant *getAsConstant() const { return ConstantInt::get(Type, Value); }
 
   // Get the name of this argument.
   StringRef &getName() { return Name; }
@@ -99,8 +99,8 @@ private:
 
 template <class RTParam> struct ParamVector {
   /* Convert a std::vector of RTParams to a ParamArray. */
-  ParamVector(std::vector<RTParam> const &ParamVector) { Params = ParamVector; }
-  ;
+  ParamVector(std::vector<RTParam> const &ParamVector) : Params(ParamVector) {}
+  ParamVector() {}
 
   typedef typename std::vector<RTParam>::iterator iterator;
   typedef typename std::vector<RTParam>::const_iterator const_iterator;
@@ -157,7 +157,7 @@ template <class RTParam> struct ParamVector {
     return isLess;
   }
 
-  StringRef getShortName() {
+  StringRef getShortName() const {
     std::string res = "";
 
     for (unsigned i = 0; i < Params.size(); ++i)
@@ -233,10 +233,10 @@ RTParams getRuntimeParameters(Function *F, unsigned paramc, char **params) {
 
 template <class ParamT> class SpecializeEndpoint {
 private:
-  ParamVector<ParamT> *SpecValues;
+  ParamVector<ParamT> SpecValues;
 
 public:
-  void setParameters(ParamVector<ParamT> *Values) { SpecValues = Values; }
+  void setParameters(ParamVector<ParamT> const &Values) { SpecValues = Values; }
 
   Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
     Function::arg_iterator result = F->arg_begin(), end = F->arg_end();
@@ -275,8 +275,8 @@ public:
     Builder.SetInsertPoint(EntryBB);
     Builder.CreateBr(ClonedEntryBB);
 
-    for (unsigned i = 0; i < SpecValues->size(); ++i) {
-      ParamT P = (*SpecValues)[i];
+    for (unsigned i = 0; i < SpecValues.size(); ++i) {
+      ParamT P = SpecValues[i];
       Function::arg_iterator Arg = getArgument(SrcF, P.getName());
 
       // Could not find the argument, should not happen.
@@ -396,7 +396,7 @@ public:
   explicit FunctionDispatcher() {}
 
   template <class ParamT>
-  Function *specialize(Function *F, ParamVector<ParamT> &Values) {
+  Function *specialize(Function *F, ParamVector<ParamT> const & Values) {
     ValueToValueMapTy VMap;
 
     /* Copy properties of our source module */
@@ -442,7 +442,8 @@ public:
   //
   //  Apply all necessary optimization steps here.
   template <class ParamT>
-  Function *getFunctionForValues(Function *F, ParamVector<ParamT> &Values) {
+  Function *getFunctionForValues(Function *F,
+                                 ParamVector<ParamT> const &Values) {
     ValKeyToFunction ValToFun =
         (!SpecFuns.count(F)) ? ValKeyToFunction() : SpecFuns[F];
 
