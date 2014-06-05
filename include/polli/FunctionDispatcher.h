@@ -196,7 +196,7 @@ typedef std::map<RTParValuesKey, Function *> ValKeyToFunction;
 typedef std::map<Function *, ValKeyToFunction> SpecializedFuncs;
 
 /* Map instrumented function to original function. */
-typedef std::map<StringRef, Function *> FunctionNameToFunctionMapTy;
+typedef std::map<std::string, Function *> FunctionNameToFunctionMapTy;
 
 static inline void printParameters(const Function *F, RTParams &Params) {
   dbgs() << "[" << F->getName() << "] Argument-Value Table:\n";
@@ -412,14 +412,21 @@ public:
     Specializer(VMap, NewM);
 
     // Fetch the uninstrumented function for specialization.
-    Function *OrigF = NULL;
-    Function *NewF = NULL;
+    Function *OrigF = nullptr;
+    Function *NewF = nullptr;
 
+    for (auto Elem : FMap) {
+      StringRef Key = Elem.first;
+      Function *MF = Elem.second;
+      dbgs().indent(8) << ">> " << Key.str() << " = " << MF->getName() << "\n";
+    }
+
+    dbgs().indent(8) << "<< " << F->getName() << "\n";
     OrigF = FMap[F->getName()];
 
-    bool Specializeable = OrigF && !OrigF->isDeclaration();
-
-    assert(Specializeable && "Function to be specialized is missing.");
+    assert(OrigF && "No uninstrumented function found in function map.");
+    assert(!OrigF->isDeclaration() &&
+           "Uninstrumented function is a declaration");
 
     Specializer.setParameters(Values);
     Specializer.setSource(OrigF);
@@ -433,7 +440,8 @@ public:
   /// @brief Set up a mapping between an uninstrumented and an instrumented
   //         function.
   void setPrototypeMapping(Function *F, Function *MapTo) {
-    FMap[F->getName()] = MapTo;
+    auto Result = FMap.insert(std::make_pair(F->getName().str(), MapTo));
+    assert(Result.second && "Tried to overwrite mapping.");
   }
 
   /// @brief Get the appropriate function for the given input parameters.
