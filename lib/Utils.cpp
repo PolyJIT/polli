@@ -10,18 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/ADT/OwningPtr.h"
-#include "llvm/ADT/Twine.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Assembly/PrintModulePass.h"
-#include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
+#include <string>                       // for string
+#include <utility>                      // for pair
+#include "llvm/ADT/OwningPtr.h"         // for OwningPtr
+#include "llvm/ADT/SmallVector.h"       // for SmallVector
+#include "llvm/ADT/Twine.h"             // for Twine
+#include "llvm/Bitcode/BitcodeWriterPass.h" // for BitcodeWriterPass
+#include "llvm/IR/LegacyPassManager.h"  // for PassManager
+#include "llvm/IR/Module.h"             // for Module
+#include "llvm/IR/Verifier.h"           // for createVerifierPass
+#include "llvm/Pass.h"                  // for FunctionPass
+#include "llvm/Support/CommandLine.h"   // for initializer, desc, init, etc
+#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
+#include "llvm/Support/FileSystem.h"    // for OpenFlags::F_RW
+#include "llvm/Support/ToolOutputFile.h"  // for tool_output_file
+#include "llvm/Support/raw_ostream.h"   // for raw_ostream
+#include "llvm/Support/system_error.h"  // for error_code
+#include "polli/Utils.h"                // for ManagedModules
 
-#include "polli/Options.h"
-#include "polli/Utils.h"
 using namespace llvm;
 
 SmallVector<char, 255> *DefaultDir;

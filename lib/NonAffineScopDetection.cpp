@@ -10,13 +10,28 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Support/Debug.h"
-#include "polly/Support/SCEVValidator.h"
-
-#include "polli/NonAffineScopDetection.h"
-
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Support/CommandLine.h"
+#include <map>                          // for _Rb_tree_const_iterator, etc
+#include <memory>                       // for unique_ptr
+#include <set>                          // for set
+#include <string>                       // for string
+#include <utility>                      // for make_pair, pair
+#include <vector>                       // for vector<>::iterator, vector
+#include "llvm/ADT/Statistic.h"         // for STATISTIC, Statistic
+#include "llvm/Analysis/RegionInfo.h"   // for Region, RegionInfo
+#include "llvm/Analysis/ScalarEvolution.h"  // for SCEV, ScalarEvolution
+#include "llvm/IR/Dominators.h"         // for DominatorTreeWrapperPass
+#include "llvm/InitializePasses.h"
+#include "llvm/PassAnalysisSupport.h"   // for AnalysisUsage, etc
+#include "llvm/PassSupport.h"           // for INITIALIZE_PASS_DEPENDENCY, etc
+#include "llvm/Support/CommandLine.h"   // for desc, opt
+#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
+#include "llvm/Support/raw_ostream.h"   // for raw_ostream
+#include "polli/NonAffineScopDetection.h"  // for ParamList, etc
+#include "polly/ScopDetection.h"        // for ScopDetection, etc
+#include "polly/ScopDetectionDiagnostic.h"  // for ReportNonAffBranch, etc
+#include "polly/Support/SCEVValidator.h"  // for getParamsInNonAffineExpr, etc
+namespace llvm { class Function; }
+namespace llvm { class Module; }
 
 static cl::opt<bool>
 AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));

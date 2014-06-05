@@ -11,26 +11,18 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Support/Debug.h"
-
-#include "polly/ScopDetectionDiagnostic.h"
-
-#include "polli/ScopMapper.h"
-#include "polli/Utils.h"
-
-#include "polli/NonAffineScopDetection.h"
-
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Analysis/RegionInfo.h"
-#include "llvm/Analysis/Verifier.h"
-#include "llvm/IR/Module.h"
-
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Utils/CodeExtractor.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
-
-#include <set>
+#include <set>                          // for _Rb_tree_const_iterator, etc
+#include <string>                       // for string
+#include "llvm/Analysis/RegionInfo.h"   // for Region, RegionInfo
+#include "llvm/IR/Dominators.h"         // for DominatorTreeWrapperPass, etc
+#include "llvm/PassAnalysisSupport.h"   // for AnalysisUsage, etc
+#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
+#include "llvm/Support/raw_ostream.h"   // for raw_ostream
+#include "llvm/Transforms/Utils/CodeExtractor.h"  // for CodeExtractor
+#include "polli/NonAffineScopDetection.h"  // for NonAffineScopDetection, etc
+#include "polli/ScopMapper.h"           // for ScopMapper, etc
+#include "polly/ScopDetectionDiagnostic.h"  // for getDebugLocation
+namespace llvm { class Function; }
 
 using namespace llvm;
 using namespace polli;

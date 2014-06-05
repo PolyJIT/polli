@@ -12,69 +12,69 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Support/Debug.h"
 #include "polli/PolyJIT.h"
-
-#include "polly/Canonicalization.h"
-#include "polly/RegisterPasses.h"
-#include "polly/ScopDetectionDiagnostic.h"
-#include "polly/LinkAllPasses.h"
-
-#include "llvm/PassManager.h"
-#include "llvm/Analysis/RegionInfo.h"
-#include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/Assembly/PrintModulePass.h"
-#include "llvm/Bitcode/ReaderWriter.h"
-#include "llvm/CodeGen/JITCodeEmitter.h"
-#include "llvm/CodeGen/MachineCodeInfo.h"
-#include "llvm/Config/config.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
+#include <assert.h>                     // for assert
+#include <ext/alloc_traits.h>
+#include <stddef.h>                     // for size_t
+#include <stdlib.h>                     // for NULL, abort
+#include <map>                          // for _Rb_tree_iterator, etc
+#include <memory>                       // for __shared_ptr, shared_ptr
+#include <utility>                      // for pair
+#include "llvm/ADT/APInt.h"             // for APInt, operator<<
+#include "llvm/ADT/StringRef.h"         // for StringRef, operator==
+#include "llvm/ADT/Triple.h"            // for Triple
+#include "llvm/ADT/Twine.h"             // for Twine, operator+
+#include "llvm/ADT/ilist.h"             // for ilist_iterator
+#include "llvm/Analysis/Passes.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"  // for EngineBuilder, etc
+#include "llvm/ExecutionEngine/GenericValue.h"  // for GenericValue, PTOGV
 #include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/ExecutionEngine/JITMemoryManager.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Dwarf.h"
-#include "llvm/Support/DynamicLibrary.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Format.h"
-#include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/MutexGuard.h"
-#include "llvm/Support/ToolOutputFile.h"
-#include "llvm/Target/TargetJITInfo.h"
-#include "llvm/Target/TargetMachine.h"
-
+#include "llvm/IR/Argument.h"           // for Argument
+#include "llvm/IR/BasicBlock.h"         // for BasicBlock::iterator, etc
+#include "llvm/IR/Constant.h"           // for Constant
+#include "llvm/IR/Constants.h"          // for ConstantInt
+#include "llvm/IR/DataLayout.h"         // for DataLayoutPass
+#include "llvm/IR/DerivedTypes.h"       // for PointerType
+#include "llvm/IR/Function.h"           // for Function, etc
+#include "llvm/IR/GlobalValue.h"        // for GlobalValue, etc
+#include "llvm/IR/IRBuilder.h"          // for IRBuilder
+#include "llvm/IR/Instructions.h"       // for AllocaInst
+#include "llvm/IR/LegacyPassManager.h"  // for PassManager, etc
+#include "llvm/IR/Module.h"             // for Module, Module::iterator
+#include "llvm/IR/Type.h"               // for Type
+#include "llvm/ExecutionEngine/JITMemoryManager.h" // for JITMemoryManager
+#include "llvm/Linker/Linker.h"         // for Linker, etc
+#include "llvm/Pass.h"                  // for ImmutablePass, FunctionPass, etc
+#include "llvm/PassAnalysisSupport.h"   // for AnalysisUsage, etc
+#include "llvm/PassManager.h"           // for PassManager, etc
+#include "llvm/PassRegistry.h"          // for PassRegistry
+#include "llvm/Support/Casting.h"       // for cast, dyn_cast
+#include "llvm/Support/CodeGen.h"       // for Model, Level::Default, etc
+#include "llvm/Support/CommandLine.h"   // for desc, initializer, opt, cat, etc
+#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
+#include "llvm/Support/DynamicLibrary.h"  // for DynamicLibrary
+#include "llvm/Support/ErrorHandling.h"  // for llvm_unreachable
+#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
+#include "llvm/Target/TargetOptions.h"  // for ABIType, TargetOptions, etc
+#include "llvm/Transforms/IPO.h"        // for createStripSymbolsPass
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Utils/CodeExtractor.h"
-#include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
-
-#include "llvm/Support/Path.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Support/FileUtilities.h"
-
-#include "llvm/Linker/Linker.h"
-
-#include "polli/Options.h"
-#include "polli/FunctionCloner.h"
-#include "polli/FunctionDispatcher.h"
-#include "polli/NonAffineScopDetection.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"  // for ValueToValueMapTy
+#include "papi.h"                       // for PAPI_flops
+#include "polli/FunctionCloner.h"       // for InstrumentingFunctionCloner, etc
+#include "polli/FunctionDispatcher.h"   // for RuntimeParam, etc
+#include "polli/InstrumentRegions.h"    // for PapiCScopProfiling, etc
+#include "polli/NonAffineScopDetection.h"  // for NonAffineScopDetection, etc
 #include "polli/PapiProfiling.h"
-#include "polli/InstrumentRegions.h"
-#include "polli/ScopMapper.h"
-#include "polli/Utils.h"
-
-#include "papi.h"
-
-#include <set>
-#include <map>
+#include "polli/ScopMapper.h"           // for ScopMapper, etc
+#include "polli/Utils.h"                // for ManagedModules, StoreModule, etc
+#include "polly/Canonicalization.h"
+#include "polly/LinkAllPasses.h"        // for createScopDetectionPass
+#include "polly/RegisterPasses.h"       // for initializePollyPasses
+#include "polly/ScopDetection.h"        // for ScopDetection, etc
+#include "polly/ScopDetectionDiagnostic.h"  // for getDebugLocation, etc
+namespace llvm { class LLVMContext; }  // lines 65-65
+namespace llvm { class Region; }  // lines 66-66
+namespace llvm { class Value; }  // lines 67-67
 
 cl::OptionCategory PolliCategory("Polli Options",
                                  "Configure the runtime options of polli");
@@ -82,10 +82,7 @@ cl::OptionCategory PolliCategory("Polli Options",
 using namespace polli;
 using namespace polly;
 using namespace llvm;
-using namespace llvm::sys::fs;
 
-namespace fs = llvm::sys::fs;
-namespace p = llvm::sys::path;
 namespace polli {
 Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }

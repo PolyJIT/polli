@@ -15,28 +15,16 @@
 #ifndef PolyJIT_H
 #define PolyJIT_H
 
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/PassManager.h"
-
-#include "llvm/IR/Module.h"
-#include "llvm/IR/Type.h"
-
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-
+#include <string>                       // for string
+#include <vector>                       // for vector
 #include "polli/Utils.h"
 
-#include <set>
+namespace llvm { class ExecutionEngine; }
+namespace llvm { class Module; }
+namespace llvm { struct GenericValue; }
 
 namespace llvm {
-
 class Function;
-struct JITEvent_EmittedFunctionDetails;
-class MachineCodeEmitter;
-class MachineCodeInfo;
-class TargetJITInfo;
-class TargetMachine;
 
 class PolyJIT {
 public:

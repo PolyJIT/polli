@@ -13,27 +13,16 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Support/Debug.h"
-
-#include "polli/RuntimeOptimizer.h"
-#include "polli/Utils.h"
-
-#include "polly/LinkAllPasses.h"
-#include "polly/RegisterPasses.h"
-#include "polly/Canonicalization.h"
-
-#include "polly/ScopDetection.h"
-
-#include "llvm/Pass.h"
-#include "llvm/PassManager.h"
-#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/Analysis/RegionInfo.h"
-#include "llvm/Analysis/RegionPass.h"
-#include "llvm/IR/DataLayout.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/Scalar.h"
+#include "llvm/IR/LegacyPassManager.h"  // for FunctionPassManager
+#include "llvm/IR/Module.h"             // for Module
+#include "llvm/Pass.h"                  // for ImmutablePass
+#include "llvm/Support/Debug.h"         // for DEBUG
+#include "polli/RuntimeOptimizer.h"     // for RuntimeOptimizer
+#include "polli/Utils.h"                // for StoreModule
+#include "polly/Canonicalization.h"
+#include "polly/LinkAllPasses.h"        // for createIslCodeGenerationPass, etc
+namespace llvm { class Function; }
 
 using namespace llvm;
 

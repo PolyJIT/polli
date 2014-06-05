@@ -9,35 +9,40 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "papi"
-#include "llvm/Support/Debug.h"
-
-#include "polli/PapiProfiling.h"
-#include "papi.h"
-#include "llvm/Analysis/LoopInfo.h"
-
-#include "llvm/Analysis/RegionPass.h"
-#include "llvm/Analysis/RegionInfo.h"
-#include "llvm/Analysis/RegionIterator.h"
-
-#include "llvm/Assembly/Writer.h"
-
-#include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/IR/IRBuilder.h"
-
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
-
-#include <string>
-#include <deque>
+#include <assert.h>                     // for assert
+#include <stddef.h>                     // for NULL
+#include <string>                       // for allocator, operator+, etc
+#include <vector>                       // for vector
+#include "llvm/ADT/SmallVector.h"       // for SmallVector, etc
+#include "llvm/ADT/ilist.h"             // for ilist_iterator
+#include "llvm/Analysis/LoopInfo.h"     // for Loop, LoopInfo
+#include "llvm/Analysis/RegionInfo.h"   // for Region, RegionInfo
+#include "llvm/IR/Argument.h"           // for Argument
+#include "llvm/IR/BasicBlock.h"         // for BasicBlock::iterator, etc
+#include "llvm/IR/CFG.h"                // for pred_iterator, PredIterator, etc
+#include "llvm/IR/Constant.h"           // for Constant
+#include "llvm/IR/Constants.h"          // for ConstantInt, ConstantExpr, etc
+#include "llvm/IR/DerivedTypes.h"       // for IntegerType, ArrayType, etc
+#include "llvm/IR/Dominators.h"         // for DominatorTree, etc
+#include "llvm/IR/Function.h"           // for Function, etc
+#include "llvm/IR/GlobalValue.h"        // for GlobalValue, etc
+#include "llvm/IR/GlobalVariable.h"     // for GlobalVariable
+#include "llvm/IR/IRBuilder.h"          // for IRBuilder
+#include "llvm/IR/InstrTypes.h"         // for CastInst
+#include "llvm/IR/Instruction.h"        // for Instruction, etc
+#include "llvm/IR/Instructions.h"       // for CallInst, AllocaInst, etc
+#include "llvm/IR/Module.h"             // for Module, Module::iterator
+#include "llvm/IR/Type.h"               // for Type
+#include "llvm/PassAnalysisSupport.h"   // for Pass::getAnalysis
+#include "llvm/PassSupport.h"           // for INITIALIZE_PASS_BEGIN, etc
+#include "llvm/Support/Casting.h"       // for isa, cast, dyn_cast
+#include "llvm/Support/raw_ostream.h"   // for errs, raw_ostream
+#include "llvm/Transforms/Utils/BasicBlockUtils.h" // Split* Methods
+#include "papi.h"                       // for PAPI_VER_CURRENT
+#include "polli/PapiProfiling.h"        // for PapiRegionPrepare, etc
+namespace llvm { class LLVMContext; }  // lines 39-39
+namespace llvm { class RGPassManager; }  // lines 40-40
+namespace llvm { class Value; }  // lines 41-41
 
 using namespace llvm;
 using namespace polly;
