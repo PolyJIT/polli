@@ -28,7 +28,7 @@ except KeyError,e:
     lit.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
 
 config.substitutions.append(('%polliBinDir', config.polli_obj_root +
-                                          '/tools/polli'))
+                                          '/bin'))
 config.substitutions.append(('%loadPolly', '-load '
                              + config.llvm_libs_dir + '/LLVMPolly@LLVM_SHLIBEXT@'))
 config.substitutions.append(('%defaultOpts', ' -basicaa -polly-prepare -polly-region-simplify'))
