@@ -416,13 +416,16 @@ public:
     Function *NewF = NULL;
 
     OrigF = FMap[F->getName()];
-    if (OrigF && !OrigF->isDeclaration()) {
-      Specializer.setParameters(&Values);
-      Specializer.setSource(OrigF);
 
-      NewF = Specializer.start();
-      SpecializedModules.push_back(NewM);
-    }
+    bool Specializeable = OrigF && !OrigF->isDeclaration();
+
+    assert(Specializeable && "Function to be specialized is missing.");
+
+    Specializer.setParameters(Values);
+    Specializer.setSource(OrigF);
+
+    NewF = Specializer.start();
+    SpecializedModules.push_back(NewM);
 
     return NewF;
   }
