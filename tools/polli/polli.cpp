@@ -160,6 +160,14 @@ int main(int argc, char **argv, char * const *envp) {
   // Add the module's name to the start of the vector of arguments to main().
   InputArgv.insert(InputArgv.begin(), InputFile);
 
+  DEBUG(
+    dbgs() << " Program arguments:\n";
+    dbgs() << "[";
+  for (std::string Arg : InputArgv) {
+    dbgs() << Arg << ", ";
+  }
+    dbgs() << "]\n");
+
   // Reset errno to zero on entry to main.
   errno = 0;
 

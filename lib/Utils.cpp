@@ -47,8 +47,8 @@ void initializeOutputDir() {
   p::append(cwd, "polli");
   fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
 
-  outs() << "Storing results in: " << StringRef(DefaultDir->data(),
-                                                DefaultDir->size()) << "\n";
+  DEBUG(dbgs() << "Storing results in: "
+               << StringRef(DefaultDir->data(), DefaultDir->size()) << "\n");
   DirReady = true;
 }
 

@@ -266,9 +266,7 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
         ++JitScopsFound;
-      } else
-        DEBUG(dbgs().indent(4) << "Already covered: " << R->getNameStr()
-                               << "\n");
+      }
     }
   }
 
