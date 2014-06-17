@@ -38,8 +38,7 @@ link_directories(${PAPI_LIBRARY})
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual
-  -Wno-long-long -Wall -W -Wwrite-strings")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
 endif ()
 
 if (NOT POLLI_USE_SANITIZER STREQUAL "")
