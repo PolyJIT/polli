@@ -595,14 +595,14 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     StoreModule(M, OutputFilename);
 
   int ret = 0;
-  if (!DisableExecution) {
-    // Run static constructors.
-    EE.runStaticConstructorsDestructors(false);
+  // Make the object executable.
+  EE.finalizeObject();
 
+  if (!DisableExecution) {
     DEBUG(dbgs() << "[polli] Starting execution...\n");
 
-    // Make the object executable.
-    EE.finalizeObject();
+    // Run static constructors.
+    EE.runStaticConstructorsDestructors(false);
     ret = EE.runFunctionAsMain(Main, inputArgs, envp);
 
     DEBUG(dbgs() << "[polli] Finished (" << ret << ")\n");
