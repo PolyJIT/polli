@@ -1,4 +1,4 @@
-//===-- NonAffineScopDetection.cpp ---------------------------- -----------===//
+//===-- JitScopDetection.cpp ---------------------------- -----------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -18,18 +18,26 @@
 #include <vector>                       // for vector<>::iterator, vector
 #include "llvm/ADT/Statistic.h"         // for STATISTIC, Statistic
 #include "llvm/Analysis/RegionInfo.h"   // for Region, RegionInfo
+#include "llvm/Analysis/RegionPass.h"   // for RGPassManager
 #include "llvm/Analysis/ScalarEvolution.h"  // for SCEV, ScalarEvolution
+#include "llvm/IR/DataLayout.h"
 #include "llvm/IR/Dominators.h"         // for DominatorTreeWrapperPass
 #include "llvm/InitializePasses.h"
+#include "llvm/Analysis/Passes.h"
+#include "llvm/PassManager.h"           // for FunctionPassManager
 #include "llvm/PassAnalysisSupport.h"   // for AnalysisUsage, etc
 #include "llvm/PassSupport.h"           // for INITIALIZE_PASS_DEPENDENCY, etc
 #include "llvm/Support/CommandLine.h"   // for desc, opt
 #include "llvm/Support/Debug.h"         // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h"   // for raw_ostream
-#include "polli/NonAffineScopDetection.h"  // for ParamList, etc
+#include "polli/JitScopDetection.h"  // for ParamList, etc
 #include "polly/ScopDetection.h"        // for ScopDetection, etc
 #include "polly/ScopDetectionDiagnostic.h"  // for ReportNonAffBranch, etc
 #include "polly/Support/SCEVValidator.h"  // for getParamsInNonAffineExpr, etc
+
+#include "polly/LinkAllPasses.h"
+#include "polly/Canonicalization.h"
+
 namespace llvm { class Function; }
 namespace llvm { class Module; }
 
@@ -68,9 +76,11 @@ public:
 
 class AliasingLogChecker : public RejectLogChecker<AliasingLogChecker, bool> {
   const Region *R;
+  Function &F;
+
   ScalarEvolution *SE;
 public:
-  AliasingLogChecker(const Region *R) : R(R) {}
+  AliasingLogChecker(Function &F, const Region *R) : R(R), F(F) {}
 
   bool checkNonAffineAccess(ReportNonAffineAccess *Reason) { return false; }
   bool checkNonAffineBranch(ReportNonAffBranch *Reason) { return false; }
@@ -138,7 +148,7 @@ public:
   }
 };
 
-void NonAffineScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
+void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolution>();
   AU.addRequired<DominatorTreeWrapperPass>();
@@ -186,7 +196,10 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
   }
 }
 
-bool NonAffineScopDetection::runOnFunction(Function &F) {
+bool JitScopDetection::runOnFunction(Function &F) {
+  if (F.isDeclaration())
+    return false;
+
   if (IgnoredFunctions.count(&F))
     return false;
 
@@ -219,7 +232,7 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
       NonAffineLogChecker NonAffine(R, SE);
-      AliasingLogChecker Aliasing(R);
+      AliasingLogChecker Aliasing(F, R);
 
       auto NonAffineResult =
           NonAffine.check(Reason.get(), std::make_pair<>(false, ParamList()));
@@ -231,8 +244,14 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
 
-      DEBUG(dbgs().indent(4) << ((IsFixable) ? "[ OK ]: " : "[FAIL]: ")
-                             << Reason->getMessage() << "\n");
+      DEBUG(
+        dbgs().indent(4) << ((IsFixable) ? "[ OK ]: " : "[FAIL]: ");
+        //if (ReportAlias *Alias = dyn_cast<ReportAlias>(Reason.get())) {
+        //  dbgs() << "-FIXME- no message generated --\n";
+        //} else {
+          dbgs() << Reason->getMessage() << "\n";
+        //}
+      );
       isValid &= IsFixable;
 
       // Record all necessary parameters for later use.
@@ -275,7 +294,7 @@ bool NonAffineScopDetection::runOnFunction(Function &F) {
   return false;
 };
 
-void NonAffineScopDetection::print(raw_ostream &OS, const Module *) const {
+void JitScopDetection::print(raw_ostream &OS, const Module *) const {
   for (ParamMap::const_iterator r = RequiredParams.begin(),
                                 RE = RequiredParams.end();
        r != RE; ++r) {
@@ -291,7 +310,7 @@ void NonAffineScopDetection::print(raw_ostream &OS, const Module *) const {
   }
 };
 
-void NonAffineScopDetection::releaseMemory() {
+void JitScopDetection::releaseMemory() {
   JitableScops.clear();
   AccumulatedScops.clear();
   RequiredParams.clear();
@@ -299,13 +318,13 @@ void NonAffineScopDetection::releaseMemory() {
   // Do not clear the ignored functions.
 }
 
-char NonAffineScopDetection::ID = 0;
+char JitScopDetection::ID = 0;
 
-INITIALIZE_PASS_BEGIN(NonAffineScopDetection, "polli-detect",
+INITIALIZE_PASS_BEGIN(JitScopDetection, "polli-detect",
                       "Polli JIT ScopDetection", false, false);
 INITIALIZE_PASS_DEPENDENCY(ScopDetection);
 INITIALIZE_PASS_DEPENDENCY(ScalarEvolution);
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass);
 INITIALIZE_PASS_DEPENDENCY(RegionInfo);
-INITIALIZE_PASS_END(NonAffineScopDetection, "polli-detect",
+INITIALIZE_PASS_END(JitScopDetection, "polli-detect",
                     "Polli JIT ScopDetection", false, false);

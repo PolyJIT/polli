@@ -36,6 +36,16 @@ find_package(Papi REQUIRED)
 include_directories(${PAPI_INCLUDE_DIR})
 link_directories(${PAPI_LIBRARY})
 
+# Find ISL
+find_package(Isl REQUIRED)
+include_directories(${ISL_INCLUDE_DIR})
+link_directories(${ISL_LIBRARY})
+
+# Find ISL
+find_package(Isl-cxx REQUIRED)
+include_directories(${ISL_CXX_INCLUDE_DIR})
+link_directories(${ISL_CXX_LIBRARY})
+
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
@@ -45,7 +55,7 @@ if (NOT POLLI_USE_SANITIZER STREQUAL "")
   set(SANITIZER_OPTS "-fsanitize=${POLLI_USE_SANITIZER}")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_OPTS} -fno-exceptions -fno-rtti -std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_OPTS} -fno-rtti -std=c++0x")
 
 include_directories(
   ${POLLI_SOURCE_DIR}/include
@@ -68,6 +78,12 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/
 
 add_library(papi SHARED IMPORTED)
 set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+
+add_library(isl SHARED IMPORTED)
+set_target_properties(isl PROPERTIES IMPORTED_LOCATION ${ISL_LIBRARY})
+
+add_library(isl-cxx SHARED IMPORTED)
+set_target_properties(isl-cxx PROPERTIES IMPORTED_LOCATION ${ISL_CXX_LIBRARY})
 
 add_definitions( -D_GNU_SOURCE )
 

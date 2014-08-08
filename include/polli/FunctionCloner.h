@@ -28,29 +28,6 @@
 using namespace llvm;
 
 namespace polli {
-void DEBUG_printArgumentUseChain(const Twine &LocStr, Function *F) {
-  dbgs() << LocStr << "\n";
-  dbgs() << "Checking def-use chain for: " << F->getName() << "\n";
-  for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
-       Arg != ArgE; ++Arg) {
-    for (Value::use_iterator i = Arg->use_begin(), ie = Arg->use_end(); i != ie;
-         ++i) {
-      dbgs() << Arg->getName() << " is used in ";
-      if (Instruction *Inst = dyn_cast<Instruction>(*i)) {
-        if (BasicBlock *BB = Inst->getParent()) {
-          if (Function *F = BB->getParent())
-            dbgs() << " Function: " << F->getName() << "\n";
-          dbgs() << " BB: " << BB->getName() << "\n";
-        }
-        dbgs() << " Instruction: ";
-        Inst->dump();
-        dbgs() << "\n";
-      } else
-        dbgs() << "Iterator value not an instruction\n";
-    }
-  }
-}
-
 template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
 class FunctionCloner : public CreationPolicy,
                        public DrainPolicy,

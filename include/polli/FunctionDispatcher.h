@@ -9,6 +9,8 @@
 #ifndef POLLI_FUNCTION_DISPATCHER_H
 #define POLLI_FUNCTION_DISPATCHER_H
 
+#define DEBUG_TYPE "polyjit"
+
 #include "polli/FunctionCloner.h"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
@@ -209,25 +211,50 @@ static inline void printParameters(const Function *F, RTParams &Params) {
 }
 ;
 
-RTParams getRuntimeParameters(Function *F, unsigned paramc, char **params) {
-  RTParams RuntimeParams;
-  int i = 0;
-  for (Function::arg_iterator Arg = F->arg_begin(), ArgE = F->arg_end();
-       Arg != ArgE; ++Arg, ++i) {
-    Type *ArgTy = Arg->getType();
+// @brief Extract parameters suitable for specialization.
+//
+// Extract the set of parameter values suitable for specialization from the
+// params array. This works on functions that have been transformed into a
+// main-like structure before.
+//
+// For now this function only extracts Integer types for specialization.
+//
+// @param F The function we extract parameter values for.
+// @param paramc The number of parameters this function has.
+// @param params The array of parameters we got as input.
+//
+// @return A list of runtime parameters.
+RTParams getRuntimeParameters(Function *F, unsigned paramc, char **params);
 
-    /* TODO: Add more types to be suitable for spawning new functions. */
-    if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
-      APInt val =
-          APInt(IntTy->getBitWidth(), (uint64_t)(*(uint64_t *)params[i]),
-                IntTy->getSignBit());
-      RuntimeParams.push_back(RuntimeParam(val, IntTy, Arg->getName()));
-    }
-  }
+//===----------------------------------------------------------------------===//
+// AliasCheckerEndpoint policy.
+//
+// Insert a run-time alias check into the extracted function. In the absence
+// of aliases we can generate more sophisticated code for this version.
+//
+// This may require to run polly with disabled alias checks just for these
+// endpoints.
+//
+template <class ParamT> class AliasCheckerEndpoint {
+private:
+  AliasSet &AS;
 
-  return RuntimeParams;
-}
+public:
+  // @brief Set the alias set for which we need to generate alias checks.
+  //
+  // @param Aliases The alias set to generate alias checks for.
+  void setAliasSet(AliasSet &Aliases);
 
+  void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap);
+};
+
+//===----------------------------------------------------------------------===//
+// SpecializeEndpoint policy.
+//
+// Specializes the endpoint with a list of parameter values.
+// All uses of the a Value are replaced with the parameter value associated
+// to this value.
+//
 template <class ParamT> class SpecializeEndpoint {
 private:
   ParamVector<ParamT> SpecValues;
@@ -393,35 +420,14 @@ public:
   explicit FunctionDispatcher() {}
 
   template <class ParamT>
-  Function *specialize(Function *F, ParamVector<ParamT> const & Values) {
-    ValueToValueMapTy VMap;
-
-    /* Copy properties of our source module */
-    Module *M, *NewM;
-
-    M = F->getParent();
-    NewM = new Module(M->getModuleIdentifier(), M->getContext());
-    NewM->setTargetTriple(M->getTargetTriple());
-    NewM->setDataLayout(M->getDataLayout());
-    NewM->setMaterializer(M->getMaterializer());
-    NewM->setModuleIdentifier(
-        (M->getModuleIdentifier() + "." + F->getName()).str() +
-        Values.getShortName().str() + ".ll");
-
+  Function *replaceParamValues(Function *F, ValueToValueMapTy &VMap, Module *M,
+                               ParamVector<ParamT> const &Values) {
     FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<ParamT> >
-    Specializer(VMap, NewM);
+    Specializer(VMap, M);
 
     // Fetch the uninstrumented function for specialization.
     Function *OrigF = nullptr;
-    Function *NewF = nullptr;
 
-    for (auto Elem : FMap) {
-      StringRef Key = Elem.first;
-      Function *MF = Elem.second;
-      dbgs().indent(8) << ">> " << Key.str() << " = " << MF->getName() << "\n";
-    }
-
-    dbgs().indent(8) << "<< " << F->getName() << "\n";
     OrigF = FMap[F->getName()];
 
     assert(OrigF && "No uninstrumented function found in function map.");
@@ -431,7 +437,29 @@ public:
     Specializer.setParameters(Values);
     Specializer.setSource(OrigF);
 
-    NewF = Specializer.start();
+    return Specializer.start();
+  }
+
+  template <class ParamT>
+  Function *specialize(Function *F, ParamVector<ParamT> const & Values) {
+    ValueToValueMapTy VMap;
+
+    /* Copy properties of our source module */
+    Module *M, *NewM;
+
+    // Prepare a new module to hold our new functions.
+    M = F->getParent();
+    NewM = new Module(M->getModuleIdentifier(), M->getContext());
+    NewM->setTargetTriple(M->getTargetTriple());
+    NewM->setDataLayout(M->getDataLayout());
+    NewM->setMaterializer(M->getMaterializer());
+    NewM->setModuleIdentifier(
+        (M->getModuleIdentifier() + "." + F->getName()).str() +
+        Values.getShortName().str() + ".ll");
+
+    // Perform parameter value substitution.
+    Function *NewF = replaceParamValues(F, VMap, NewM, Values);
+
     SpecializedModules.push_back(NewM);
 
     return NewF;

@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-// 
+//
 // This takes a region and instruments the Entry and Exit blocks with calls
 // to the PAPI library.
 //
@@ -23,7 +23,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "polli/NonAffineScopDetection.h"
+#include "polli/JitScopDetection.h"
 
 #include "polly/ScopDetection.h"
 #include "polly/Support/ScopHelper.h"
@@ -66,16 +66,16 @@ public:
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
-    AU.addRequired<NonAffineScopDetection>();
+    AU.addRequired<JitScopDetection>();
     AU.addRequired<RegionInfo>();
   }
-  
+
   virtual bool runOnFunction(Function &F);
 
 private:
   LoopInfo *LI;
   ScopDetection *SD;
-  NonAffineScopDetection *NSD;
+  JitScopDetection *NSD;
   DominatorTree *DT;
   RegionInfo *RI;
 

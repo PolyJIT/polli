@@ -48,7 +48,7 @@
 #include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
 #include "papi.h"                       // for PAPI_VER_CURRENT
 #include "polli/InstrumentRegions.h"    // for PapiCScopProfiling, etc
-#include "polli/NonAffineScopDetection.h"  // for NonAffineScopDetection, etc
+#include "polli/JitScopDetection.h"  // for JitScopDetection, etc
 #include "polly/ScopDetection.h"        // for ScopDetection, etc
 namespace llvm { class LLVMContext; }  // lines 49-49
 namespace llvm { class Value; }  // lines 50-50
@@ -214,7 +214,7 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 //-----------------------------------------------------------------------------
 bool PapiCScopProfiling::runOnFunction(Function &F) {
   SD = &getAnalysis<ScopDetection>();
-  NSD = getAnalysisIfAvailable<NonAffineScopDetection>();
+  NSD = getAnalysisIfAvailable<JitScopDetection>();
   RI = &getAnalysis<RegionInfo>();
 
   for (ScopDetection::iterator It = SD->begin(), SE = SD->end(); It != SE;

@@ -25,8 +25,10 @@ set(LLVM_LINK_COMPONENTS
 
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
 add_polli_library(PolyJIT
+  AliasCheckCodeGen.cpp
+  FunctionDispatcher.cpp
   InstrumentRegions.cpp
-  NonAffineScopDetection.cpp
+  JitScopDetection.cpp
   PapiProfiling.cpp
   PolyJIT.cpp
   RuntimeOptimizer.cpp
@@ -36,9 +38,12 @@ add_polli_library(PolyJIT
 
 target_link_libraries(PolyJIT
   papi
-  )
+  isl
+  isl-cxx
+)
 
 set_target_properties(PolyJIT
   PROPERTIES
   LINKER_LANGUAGE CXX
-  PREFIX "lib")
+  PREFIX "lib"
+)

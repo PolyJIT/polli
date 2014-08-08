@@ -19,7 +19,7 @@
 #include "llvm/Support/Debug.h"         // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h"   // for raw_ostream
 #include "llvm/Transforms/Utils/CodeExtractor.h"  // for CodeExtractor
-#include "polli/NonAffineScopDetection.h"  // for NonAffineScopDetection, etc
+#include "polli/JitScopDetection.h"  // for JitScopDetection, etc
 #include "polli/ScopMapper.h"           // for ScopMapper, etc
 #include "polly/ScopDetectionDiagnostic.h"  // for getDebugLocation
 namespace llvm { class Function; }
@@ -29,14 +29,14 @@ using namespace polli;
 using namespace polly;
 
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<NonAffineScopDetection>();
+  AU.addRequired<JitScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
   AU.addRequired<RegionInfo>();
   AU.setPreservesAll();
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
-  NonAffineScopDetection *NSD = &getAnalysis<NonAffineScopDetection>();
+  JitScopDetection *NSD = &getAnalysis<JitScopDetection>();
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
   // Ignore functions created by us.

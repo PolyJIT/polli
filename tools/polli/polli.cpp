@@ -41,7 +41,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include <cerrno>
 
 #include "polli/Options.h"
 #include "polli/PolyJIT.h"
@@ -87,12 +86,6 @@ namespace {
   cl::opt<bool>
   DisableCoreFiles("disable-core-files", cl::Hidden,
                    cl::desc("Disable emission of core files if possible"));
-
-  cl::opt<bool>
-  NoLazyCompilation("disable-lazy-compilation",
-                  cl::desc("Disable JIT lazy compilation"),
-                  cl::init(false));
-
 }
 
 static ExecutionEngine *EE = 0;
@@ -137,15 +130,6 @@ int main(int argc, char **argv, char * const *envp) {
     return 1;
   }
 
-  // If not jitting lazily, load the whole bitcode file eagerly too.
-  if (NoLazyCompilation) {
-    if (error_code EC = Mod->materializeAllPermanently()) {
-      errs() << argv[0] << ": bitcode didn't read correctly.\n";
-      errs() << "Reason: " << EC.message() << "\n";
-      exit(1);
-    }
-  }
-
   // If the user specifically requested an argv[0] to pass into the program,
   // do it now.
   if (!FakeArgv0.empty()) {
@@ -180,9 +164,6 @@ int main(int argc, char **argv, char * const *envp) {
 
   pjit->setEntryFunction(EntryFunc);
 
-  // Run main.
-  llvm_start_multithreaded();
-
   // Link libraries.
   for (unsigned i = 0; i < Libraries.size(); ++i) {
     std::string ErrorMsg;
@@ -198,8 +179,6 @@ int main(int argc, char **argv, char * const *envp) {
 
   int Result = pjit->runMain(InputArgv, envp);
   pjit->shutdown(Result);
-
-  llvm_stop_multithreaded();
 
   return Result;
 }

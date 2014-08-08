@@ -31,7 +31,7 @@ public:
   static PolyJIT *Get(Module *M = 0, bool NoLazyCompilation = false);
 
   // Creates a fresh ExecutionEngine for the given Module.
-  static ExecutionEngine *GetEngine(Module *M, bool NoLazyCompilation = false);
+  static ExecutionEngine *GetEngine(Module *M, bool = false);
 
   void setEntryFunction(std::string name) { EntryFn = name; }
   ;

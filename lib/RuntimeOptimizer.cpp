@@ -40,7 +40,9 @@ bool RuntimeOptimizer::Optimize(Function &F) {
 
   FPM.add(polly::createScopInfoPass());
   FPM.add(polly::createIslScheduleOptimizerPass());
-  FPM.add(polly::createIslCodeGenerationPass());
+  FPM.add(polly::createCodeGenerationPass());
+  //FPM.add(polly::createIslCodeGenerationPass());
+
   //  VectorizeConfig C;
   //    C.FastDep = true;
   //  FPM.add(createBBVectorizePass(C));

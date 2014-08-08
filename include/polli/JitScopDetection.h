@@ -1,4 +1,4 @@
-//===-- NonAffineScopDetection.h --------------------------------*- C++ -*-===//
+//===-- JitScopDetection.h --------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -33,10 +33,10 @@ typedef std::set<const Region *> ScopSet;
 typedef std::vector<const SCEV *> ParamList;
 typedef std::map<const Region *, ParamList> ParamMap;
 
-class NonAffineScopDetection : public FunctionPass {
+class JitScopDetection : public FunctionPass {
 public:
   static char ID;
-  explicit NonAffineScopDetection(bool enable = true)
+  explicit JitScopDetection(bool enable = true)
       : FunctionPass(ID), Enabled(enable) {}
 
   typedef ParamMap::iterator iterator;
@@ -76,9 +76,9 @@ public:
 private:
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
-  NonAffineScopDetection(const NonAffineScopDetection &);
+  JitScopDetection(const JitScopDetection &);
   // DO NOT IMPLEMENT
-  const NonAffineScopDetection &operator=(const NonAffineScopDetection &);
+  const JitScopDetection &operator=(const JitScopDetection &);
 
   ScopDetection *SD;
   ScalarEvolution *SE;
@@ -99,6 +99,6 @@ private:
 
 namespace llvm {
   class PassRegistry;
-  void initializeNonAffineScopDetectionPass(llvm::PassRegistry&);
+  void initializeJitScopDetectionPass(llvm::PassRegistry&);
 }
 #endif

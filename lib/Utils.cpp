@@ -25,7 +25,6 @@
 #include "llvm/Support/FileSystem.h"    // for OpenFlags::F_RW
 #include "llvm/Support/ToolOutputFile.h"  // for tool_output_file
 #include "llvm/Support/raw_ostream.h"   // for raw_ostream
-#include "llvm/Support/system_error.h"  // for error_code
 #include "polli/Utils.h"                // for ManagedModules
 
 using namespace llvm;
@@ -59,7 +58,6 @@ void StoreModule(Module &M, const Twine &Name) {
   if (!DirReady)
     initializeOutputDir();
 
-  llvm::error_code err;
   SmallVector<char, 255> destPath = *DefaultDir;
 
   std::string ErrorInfo;

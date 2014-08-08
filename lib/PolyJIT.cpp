@@ -13,68 +13,83 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/PolyJIT.h"
-#include <assert.h>                     // for assert
+#include <assert.h> // for assert
 #include <ext/alloc_traits.h>
-#include <stddef.h>                     // for size_t
-#include <stdlib.h>                     // for NULL, abort
-#include <map>                          // for _Rb_tree_iterator, etc
-#include <memory>                       // for __shared_ptr, shared_ptr
-#include <utility>                      // for pair
-#include "llvm/ADT/APInt.h"             // for APInt, operator<<
-#include "llvm/ADT/StringRef.h"         // for StringRef, operator==
-#include "llvm/ADT/Triple.h"            // for Triple
-#include "llvm/ADT/Twine.h"             // for Twine, operator+
-#include "llvm/ADT/ilist.h"             // for ilist_iterator
+#include <stddef.h>             // for size_t
+#include <stdlib.h>             // for NULL, abort
+#include <map>                  // for _Rb_tree_iterator, etc
+#include <memory>               // for __shared_ptr, shared_ptr
+#include <utility>              // for pair
+#include "llvm/ADT/APInt.h"     // for APInt, operator<<
+#include "llvm/ADT/StringRef.h" // for StringRef, operator==
+#include "llvm/ADT/Triple.h"    // for Triple
+#include "llvm/ADT/Twine.h"     // for Twine, operator+
+#include "llvm/ADT/ilist.h"     // for ilist_iterator
 #include "llvm/Analysis/Passes.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"  // for EngineBuilder, etc
-#include "llvm/ExecutionEngine/GenericValue.h"  // for GenericValue, PTOGV
+#include "llvm/ExecutionEngine/ExecutionEngine.h" // for EngineBuilder, etc
+#include "llvm/ExecutionEngine/GenericValue.h"    // for GenericValue, PTOGV
 #include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/IR/Argument.h"           // for Argument
-#include "llvm/IR/BasicBlock.h"         // for BasicBlock::iterator, etc
-#include "llvm/IR/Constant.h"           // for Constant
-#include "llvm/IR/Constants.h"          // for ConstantInt
-#include "llvm/IR/DataLayout.h"         // for DataLayoutPass
-#include "llvm/IR/DerivedTypes.h"       // for PointerType
-#include "llvm/IR/Function.h"           // for Function, etc
-#include "llvm/IR/GlobalValue.h"        // for GlobalValue, etc
-#include "llvm/IR/IRBuilder.h"          // for IRBuilder
-#include "llvm/IR/Instructions.h"       // for AllocaInst
-#include "llvm/IR/LegacyPassManager.h"  // for PassManager, etc
-#include "llvm/IR/Module.h"             // for Module, Module::iterator
-#include "llvm/IR/Type.h"               // for Type
+#include "llvm/IR/Argument.h"          // for Argument
+#include "llvm/IR/BasicBlock.h"        // for BasicBlock::iterator, etc
+#include "llvm/IR/Constant.h"          // for Constant
+#include "llvm/IR/Constants.h"         // for ConstantInt
+#include "llvm/IR/DataLayout.h"        // for DataLayoutPass
+#include "llvm/IR/DerivedTypes.h"      // for PointerType
+#include "llvm/IR/Function.h"          // for Function, etc
+#include "llvm/IR/GlobalValue.h"       // for GlobalValue, etc
+#include "llvm/IR/IRBuilder.h"         // for IRBuilder
+#include "llvm/IR/Instructions.h"      // for AllocaInst
+#include "llvm/IR/LegacyPassManager.h" // for PassManager, etc
+#include "llvm/IR/Module.h"            // for Module, Module::iterator
+#include "llvm/IR/Type.h"              // for Type
 #include "llvm/ExecutionEngine/JITMemoryManager.h" // for JITMemoryManager
-#include "llvm/Linker/Linker.h"         // for Linker, etc
-#include "llvm/Pass.h"                  // for ImmutablePass, FunctionPass, etc
-#include "llvm/PassAnalysisSupport.h"   // for AnalysisUsage, etc
-#include "llvm/PassManager.h"           // for PassManager, etc
-#include "llvm/PassRegistry.h"          // for PassRegistry
-#include "llvm/Support/Casting.h"       // for cast, dyn_cast
-#include "llvm/Support/CodeGen.h"       // for Model, Level::Default, etc
-#include "llvm/Support/CommandLine.h"   // for desc, initializer, opt, cat, etc
-#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
-#include "llvm/Support/DynamicLibrary.h"  // for DynamicLibrary
+#include "llvm/Linker/Linker.h"                    // for Linker, etc
+#include "llvm/Pass.h"                   // for ImmutablePass, FunctionPass, etc
+#include "llvm/PassAnalysisSupport.h"    // for AnalysisUsage, etc
+#include "llvm/PassManager.h"            // for PassManager, etc
+#include "llvm/PassRegistry.h"           // for PassRegistry
+#include "llvm/Support/Casting.h"        // for cast, dyn_cast
+#include "llvm/Support/CodeGen.h"        // for Model, Level::Default, etc
+#include "llvm/Support/CommandLine.h"    // for desc, initializer, opt, cat, etc
+#include "llvm/Support/Debug.h"          // for dbgs, DEBUG
+#include "llvm/Support/DynamicLibrary.h" // for DynamicLibrary
 #include "llvm/Support/ErrorHandling.h"  // for llvm_unreachable
-#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
-#include "llvm/Target/TargetOptions.h"  // for ABIType, TargetOptions, etc
-#include "llvm/Transforms/IPO.h"        // for createStripSymbolsPass
+#include "llvm/Support/raw_ostream.h"    // for raw_ostream, errs
+#include "llvm/Target/TargetOptions.h"   // for ABIType, TargetOptions, etc
+#include "llvm/Transforms/IPO.h"         // for createStripSymbolsPass
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"  // for ValueToValueMapTy
-#include "papi.h"                       // for PAPI_flops
-#include "polli/FunctionCloner.h"       // for InstrumentingFunctionCloner, etc
-#include "polli/FunctionDispatcher.h"   // for RuntimeParam, etc
-#include "polli/InstrumentRegions.h"    // for PapiCScopProfiling, etc
-#include "polli/NonAffineScopDetection.h"  // for NonAffineScopDetection, etc
+#include "llvm/Transforms/Utils/ValueMapper.h" // for ValueToValueMapTy
+#include "papi.h"                              // for PAPI_flops
+#include "polli/FunctionCloner.h"     // for InstrumentingFunctionCloner, etc
+#include "polli/FunctionDispatcher.h" // for RuntimeParam, etc
+#include "polli/InstrumentRegions.h"  // for PapiCScopProfiling, etc
+#include "polli/JitScopDetection.h"   // for JitScopDetection, etc
 #include "polli/PapiProfiling.h"
-#include "polli/ScopMapper.h"           // for ScopMapper, etc
-#include "polli/Utils.h"                // for ManagedModules, StoreModule, etc
+#include "polli/ScopMapper.h" // for ScopMapper, etc
+#include "polli/Utils.h"      // for ManagedModules, StoreModule, etc
 #include "polly/Canonicalization.h"
-#include "polly/LinkAllPasses.h"        // for createScopDetectionPass
-#include "polly/RegisterPasses.h"       // for initializePollyPasses
-#include "polly/ScopDetection.h"        // for ScopDetection, etc
-#include "polly/ScopDetectionDiagnostic.h"  // for getDebugLocation, etc
-namespace llvm { class LLVMContext; }  // lines 65-65
-namespace llvm { class Region; }  // lines 66-66
-namespace llvm { class Value; }  // lines 67-67
+#include "polly/LinkAllPasses.h"           // for createScopDetectionPass
+#include "polly/RegisterPasses.h"          // for initializePollyPasses
+#include "polly/ScopDetection.h"           // for ScopDetection, etc
+#include "polly/ScopDetectionDiagnostic.h" // for getDebugLocation, etc
+
+#include "polly/ScopPass.h"
+#include "polly/TempScopInfo.h"
+#include "polly/ScopInfo.h"
+
+#include "polli/AliasCheckCodeGen.h"
+
+#include <numeric>
+
+namespace llvm {
+class LLVMContext;
+} // lines 65-65
+namespace llvm {
+class Region;
+} // lines 66-66
+namespace llvm {
+class Value;
+} // lines 67-67
 
 cl::OptionCategory PolliCategory("Polli Options",
                                  "Configure the runtime options of polli");
@@ -204,13 +219,11 @@ class StaticInitializer {
 public:
   StaticInitializer() {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    initializeNonAffineScopDetectionPass(Registry);
+    initializeJitScopDetectionPass(Registry);
     initializePollyPasses(Registry);
     initializePapiRegionPreparePass(Registry);
     initializePapiCScopProfilingPass(Registry);
     initializePapiCScopProfilingInitPass(Registry);
-
-//    initializeOutputDir();
   }
 };
 }
@@ -307,7 +320,7 @@ public:
     return false;
   };
 
-  virtual void print(raw_ostream &OS, const Module *) const {};
+  virtual void print(raw_ostream &, const Module *) const {};
   //@}
 };
 
@@ -315,7 +328,7 @@ char ScopDetectionResultsViewer::ID = 0;
 
 namespace llvm {
 
-ExecutionEngine *PolyJIT::GetEngine(Module *M, bool NoLazyCompilation) {
+ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
   EngineBuilder builder(M);
   std::string ErrorMsg;
 
@@ -501,7 +514,8 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(polly::createScopDetectionPass());
-  PM.add(new NonAffineScopDetection(EnableJitable));
+  PM.add(new JitScopDetection(EnableJitable));
+  PM.add(new AliasCheckGenerator());
 
   ScopMapper *SM = new ScopMapper();
   if (!DisableRecompile)
