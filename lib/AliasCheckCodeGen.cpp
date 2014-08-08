@@ -43,10 +43,11 @@ void AliasCheckGenerator::getAnalysisUsage(AnalysisUsage &AU) const {
 
 using namespace isl;
 
-void AliasCheckGenerator::checkPairs(const isl::Set &ParamContext,
-                                     const isl::Set &Acc,
-                                     const BoundsMapT &map) const {
+isl::Set AliasCheckGenerator::checkPairs(const isl::Set &Cond,
+                                         const isl::Set &Acc,
+                                         const BoundsMapT &map) const {
   Set AccA = Acc;
+  Set ResCond = Cond;
 
   // Eliminate all but one single dimension and take the min/max.
   unsigned int ndims = AccA.dim(DimType::DTSet);
@@ -62,7 +63,6 @@ void AliasCheckGenerator::checkPairs(const isl::Set &ParamContext,
   minA = minA.add(bpA);
   maxA = maxA.add(bpA);
 
-  Set Cond = Set::universe(ParamContext);
   for (auto &s : map) {
     Set AccB = s;
 
@@ -77,14 +77,10 @@ void AliasCheckGenerator::checkPairs(const isl::Set &ParamContext,
     PwAff minB = AccB.dimMin(0).add(bpB);
     PwAff maxB = AccB.dimMax(0).add(bpB);
 
-    Cond = Cond.intersect(minA.leSet(maxB).intersect(minB.leSet(maxA)));
-    Cond = Cond.coalesce();
+    ResCond = ResCond.intersect(minA.leSet(maxB).intersect(minB.leSet(maxA)));
+    ResCond = ResCond.coalesce();
   }
-
-  AstBuild Builder = AstBuild::fromContext(ParamContext);
-  PwAff Check = Cond.indicatorFunction();
-  AstExpr ExprCheck = Builder.exprFromPwAff(Check);
-  dbgs().indent(4) << "&& (" << ExprCheck.toStr(Format::FC) << ")\n";
+  return ResCond;
 }
 
 void AliasCheckGenerator::printConditions(const isl::Set &ParamContext,
@@ -180,18 +176,24 @@ void AliasCheckGenerator::printIslExpressions(const Scop &S) {
                    << binomial_coefficient(numAccs, 2) << "\n";
 
   BoundsMapT mapcp = BoundsMap;
-  dbgs().indent(2) << "if (true \n";
+  const Set ParamCtx = Set::Wrap(S.getAssumedContext());
+  Set Cond = Set::universe(ParamCtx);
+
+  dbgs().indent(2) << "if (";
   for (auto &s : BoundsMap) {
     BoundsMapT::iterator it = mapcp.find(s);
     if (it != mapcp.end()) {
       mapcp.erase(it);
       if (mapcp.size() > 0) {
-        const Set ParamCtx = Set::Wrap(S.getAssumedContext());
-        const Space ParamSpace = Space::Wrap(S.getParamSpace());
-        checkPairs(ParamCtx, ParamSpace, s, mapcp);
+        Cond = checkPairs(Cond, s, mapcp);
       }
     }
   }
+
+  AstBuild Builder = AstBuild::fromContext(ParamCtx);
+  PwAff Check = Cond.indicatorFunction();
+  AstExpr ExprCheck = Builder.exprFromPwAff(Check);
+  dbgs().indent(4) << "(" << ExprCheck.toStr(Format::FC) << ")\n";
   dbgs().indent(2) << ")\n";
 }
 

@@ -28,7 +28,7 @@ public:
 
   void getAnalysisUsage(AnalysisUsage &AU) const;
   void printIslExpressions(const polly::Scop &S);
-  void checkPairs(const isl::Set &ParamContext, const isl::Set &Acc,
+  isl::Set checkPairs(const isl::Set &Cond, const isl::Set &Acc,
                   const BoundsMapT &map) const;
   void printConditions(const isl::Set &ParamContext, const isl::Set &Acc,
                        const BoundsMapT &map) const;
