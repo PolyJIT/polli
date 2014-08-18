@@ -41,7 +41,6 @@ class RegionInfo;
 class Region;
 }
 
-
 typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
 
 namespace polli {
@@ -52,7 +51,7 @@ public:
   explicit PapiCScopProfilingInit() : ModulePass(ID) {};
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    //AU.setPreservesAll();
+    // AU.setPreservesAll();
   }
 
   virtual bool runOnModule(Module &M);
@@ -67,7 +66,7 @@ public:
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
     AU.addRequired<JitScopDetection>();
-    AU.addRequired<RegionInfo>();
+    AU.addRequired<RegionInfoPass>();
   }
 
   virtual bool runOnFunction(Function &F);
@@ -77,21 +76,21 @@ private:
   ScopDetection *SD;
   JitScopDetection *NSD;
   DominatorTree *DT;
-  RegionInfo *RI;
+  RegionInfoPass *RI;
 
   bool processRegion(const Region *R);
   void instrumentRegion(Module *M, std::vector<BasicBlock *> &EntryBBs,
-                        std::vector<BasicBlock *> &ExitBBs, const Region *R, std::string entryName, std::string exitName);
+                        std::vector<BasicBlock *> &ExitBBs, const Region *R,
+                        std::string entryName, std::string exitName);
 
   void print(raw_ostream &OS, const Module *) const {}
 };
 }
 
-
 namespace llvm {
-  class PassRegistry;
-  void initializePapiCScopProfilingPass(llvm::PassRegistry&);
-  void initializePapiCScopProfilingInitPass(llvm::PassRegistry&);
+class PassRegistry;
+void initializePapiCScopProfilingPass(llvm::PassRegistry &);
+void initializePapiCScopProfilingInitPass(llvm::PassRegistry &);
 }
 #endif // POLLI_INSTRUMENT_REGIONS_H
 

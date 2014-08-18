@@ -219,7 +219,6 @@ class StaticInitializer {
 public:
   StaticInitializer() {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    initializeJitScopDetectionPass(Registry);
     initializePollyPasses(Registry);
     initializePapiRegionPreparePass(Registry);
     initializePapiCScopProfilingPass(Registry);

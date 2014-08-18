@@ -83,7 +83,7 @@ private:
   ScopDetection *SD;
   ScalarEvolution *SE;
   DominatorTree *DT;
-  RegionInfo *RI;
+  RegionInfoPass *RI;
 
   Module *M;
 
@@ -96,9 +96,4 @@ private:
 
   std::set<const Function *> IgnoredFunctions;
 };
-
-namespace llvm {
-  class PassRegistry;
-  void initializeJitScopDetectionPass(llvm::PassRegistry&);
-}
 #endif

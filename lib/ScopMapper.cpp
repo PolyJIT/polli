@@ -31,7 +31,7 @@ using namespace polly;
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JitScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
-  AU.addRequired<RegionInfo>();
+  AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
 
@@ -49,7 +49,7 @@ bool ScopMapper::runOnFunction(Function &F) {
        ++RP) {
     const Region *R = *RP;
 
-    CodeExtractor Extractor(*DT, (*R));
+    CodeExtractor Extractor(*DT, *(R->getNode()));
 
     unsigned LineBegin, LineEnd;
     std::string FileName;

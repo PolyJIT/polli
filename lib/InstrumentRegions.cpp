@@ -215,7 +215,7 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 bool PapiCScopProfiling::runOnFunction(Function &F) {
   SD = &getAnalysis<ScopDetection>();
   NSD = getAnalysisIfAvailable<JitScopDetection>();
-  RI = &getAnalysis<RegionInfo>();
+  RI = &getAnalysis<RegionInfoPass>();
 
   for (ScopDetection::iterator It = SD->begin(), SE = SD->end(); It != SE;
        ++It) {

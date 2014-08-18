@@ -152,7 +152,7 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolution>();
   AU.addRequired<DominatorTreeWrapperPass>();
-  AU.addRequired<RegionInfo>();
+  AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
 
@@ -206,7 +206,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  RI = &getAnalysis<RegionInfo>();
+  RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
   DEBUG(dbgs() << "[polli] Running on: " << F.getName() << "\n");
@@ -320,11 +320,5 @@ void JitScopDetection::releaseMemory() {
 
 char JitScopDetection::ID = 0;
 
-INITIALIZE_PASS_BEGIN(JitScopDetection, "polli-detect",
-                      "Polli JIT ScopDetection", false, false);
-INITIALIZE_PASS_DEPENDENCY(ScopDetection);
-INITIALIZE_PASS_DEPENDENCY(ScalarEvolution);
-INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass);
-INITIALIZE_PASS_DEPENDENCY(RegionInfo);
-INITIALIZE_PASS_END(JitScopDetection, "polli-detect",
-                    "Polli JIT ScopDetection", false, false);
+static RegisterPass<JitScopDetection>
+X("polli-detect", "Polli JIT ScopDetection", false, false);
