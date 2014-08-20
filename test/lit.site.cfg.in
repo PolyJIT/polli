@@ -27,13 +27,5 @@ except KeyError,e:
     key, = e.args
     lit.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
 
-config.substitutions.append(('%polliBinDir', config.polli_obj_root +
-                                          '/bin'))
-config.substitutions.append(('%loadPolly', '-load '
-                             + config.llvm_libs_dir + '/LLVMPolly@LLVM_SHLIBEXT@'))
-config.substitutions.append(('%defaultOpts', ' -basicaa -polly-prepare -polly-region-simplify'))
-#config.substitutions.append(('%polybenchOpts', ' -O3 -loop-simplify -indvars '))
-#config.substitutions.append(('%vector-opt', '-polly-vectorizer=polly'))
-
 # Let the main config do the real work.
 lit_config.load_config(config, "@POLLI_SOURCE_DIR@/test/lit.cfg")

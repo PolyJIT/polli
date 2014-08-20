@@ -3,7 +3,6 @@ set(POLLI_TEST_DIRECTORIES
 )
 
 set(POLLI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
-set(POLLI_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/..")
 set(LLVM_SHLIBEXT "${CMAKE_SHARED_MODULE_SUFFIX}")
 
 if (NOT DEFINED LLVM_MAIN_SRC_DIR)
@@ -13,6 +12,7 @@ if (NOT DEFINED LLVM_MAIN_SRC_DIR)
   set(LLVM_TOOLS_DIR "${LLVM_INSTALL_ROOT}/bin")
   set(LLVM_LIBS_DIR "${LLVM_INSTALL_ROOT}/lib")
   set(POLLI_LIB_DIR "${POLLI_BINARY_DIR}/lib")
+  set(POLLI_BINARY_DIR "${POLLI_SOURCE_DIR}/bin")
 
   # We are building polli out of tree, adjust the settings.
   # FIXME: FileCheck is not available in llvm install directory at the moment.

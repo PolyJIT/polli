@@ -1,4 +1,4 @@
-; RUN: %polliBinDir/polli -debug-only="polyjit" -no-execution -l papi -l pprof -mcjit -polly-detect-keep-going -polly-detect-track-failures -jitable %s 2>&1 | FileCheck %s
+; RUN: polli -debug-only="polyjit" -no-execution -l papi -l pprof -mcjit -polly-detect-keep-going -polly-detect-track-failures -jitable %s 2>&1 | FileCheck %s
 
 ; Function Attrs: nounwind uwtable
 define float @TEST_3_NON_AFF_ACCESS(i64 %n) #0 {
