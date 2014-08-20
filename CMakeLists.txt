@@ -1,61 +1,69 @@
-project(polli)
-cmake_minimum_required(VERSION 2.8)
+if (NOT DEFINED LLVM_MAIN_SRC_DIR)
+  project(polli)
+  cmake_minimum_required(VERSION 2.8)
 
-option(POLLI_BUILD_SHARED_LIB "Build a shared libPolyJIT" ON)
-set(POLLI_USE_SANITIZER "" CACHE STRING "Specify the sanitizer to use during build" )
+  option(POLLI_BUILD_SHARED_LIB "Build a shared libPolyJIT" ON)
+  set(POLLI_USE_SANITIZER "" CACHE STRING "Specify the sanitizer to use during build" )
+
+  ## Find LLVM
+  find_package(LLVM REQUIRED HINTS ${LLVM_INSTALL_ROOT})
+  include_directories( ${LLVM_INCLUDE_DIRS} )
+  link_directories( ${LLVM_LIBRARY_DIRS} )
+  add_definitions( ${LLVM_DEFINITIONS} )
+
+  # Add LLVM's cmake modules
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_DIR}")
+  include(AddLLVM)
+
+  ## Find Polly
+  find_package(Polly REQUIRED)
+  include_directories ( BEFORE ${POLLY_INCLUDE_DIR} )
+  link_directories( ${POLLY_LINK_DIR} )
+  add_definitions( ${POLLY_DEFINITIONS} )
+
+  # Find ISL
+  find_package(Isl REQUIRED)
+  include_directories( BEFORE ${ISL_INCLUDE_DIR})
+  link_directories(${ISL_LIBRARY})
+endif()
 
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-# Provide option for finding LLVM
-set(LLVM_INSTALL_ROOT "" CACHE STRING "Location of LLVM installation")
-
-## Find LLVM
-find_package(LLVM REQUIRED HINTS ${LLVM_INSTALL_ROOT})
-include_directories( ${LLVM_INCLUDE_DIRS} )
-link_directories( ${LLVM_LIBRARY_DIRS} )
-add_definitions( ${LLVM_DEFINITIONS} )
-
-# Add LLVM's cmake modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_DIR}")
-include(AddLLVM)
-
 # Add path for polli custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 include(polli_macros)
 
-## Find Polly
-find_package(Polly REQUIRED)
-include_directories ( ${POLLY_INCLUDE_DIR} )
-link_directories( ${POLLY_LINK_DIR} )
-add_definitions( ${POLLY_DEFINITIONS} )
+add_library(isl SHARED IMPORTED)
+set_target_properties(isl PROPERTIES IMPORTED_LOCATION ${ISL_LIBRARY})
 
 # Find PAPI
-find_package(Papi REQUIRED)
-include_directories(${PAPI_INCLUDE_DIR})
-link_directories(${PAPI_LIBRARY})
+if (NOT DEFINED PAPI_FOUND)
+  find_package(Papi REQUIRED)
+  include_directories(BEFORE ${PAPI_INCLUDE_DIR})
+  link_directories(${PAPI_LIBRARY})
+endif ()
 
-# Find ISL
-find_package(Isl REQUIRED)
-include_directories(${ISL_INCLUDE_DIR})
-link_directories(${ISL_LIBRARY})
+add_library(papi SHARED IMPORTED)
+set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
 
-# Find ISL
-find_package(Isl-cxx REQUIRED)
-include_directories(${ISL_CXX_INCLUDE_DIR})
-link_directories(${ISL_CXX_LIBRARY})
+# Find ISL++
+if (NOT DEFINED ISL_CXX_FOUND)
+  find_package(Isl-cxx REQUIRED)
+  include_directories(BEFORE ${ISL_CXX_INCLUDE_DIR})
+  link_directories(${ISL_CXX_LIBRARY})
+endif ()
+
+add_library(isl-cxx SHARED IMPORTED)
+set_target_properties(isl-cxx PROPERTIES IMPORTED_LOCATION ${ISL_CXX_LIBRARY})
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
 endif ()
 
-if (NOT POLLI_USE_SANITIZER STREQUAL "")
-  set(SANITIZER_OPTS "-fsanitize=${POLLI_USE_SANITIZER}")
-endif ()
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SANITIZER_OPTS} -fno-rtti -std=c++0x")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -std=c++11")
 
 include_directories(
   ${POLLI_SOURCE_DIR}/include
@@ -75,15 +83,6 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/
   PATTERN "CMakeFiles" EXCLUDE
   PATTERN ".svn" EXCLUDE
   )
-
-add_library(papi SHARED IMPORTED)
-set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
-
-add_library(isl SHARED IMPORTED)
-set_target_properties(isl PROPERTIES IMPORTED_LOCATION ${ISL_LIBRARY})
-
-add_library(isl-cxx SHARED IMPORTED)
-set_target_properties(isl-cxx PROPERTIES IMPORTED_LOCATION ${ISL_CXX_LIBRARY})
 
 add_definitions( -D_GNU_SOURCE )
 

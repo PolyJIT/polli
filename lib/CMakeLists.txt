@@ -1,6 +1,5 @@
 set(LLVM_NO_RTTI 1)
 set(LLVM_LINK_COMPONENTS
-  ${LLVM_TARGETS_TO_BUILD}
   AsmParser
   BitReader
   BitWriter
@@ -21,6 +20,7 @@ set(LLVM_LINK_COMPONENTS
   Support
   transformutils
   vectorize
+  ${LLVM_TARGETS_TO_BUILD}
 )
 
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
@@ -40,6 +40,7 @@ target_link_libraries(PolyJIT
   papi
   isl
   isl-cxx
+  Polly
 )
 
 set_target_properties(PolyJIT

@@ -1,9 +1,17 @@
 set(LLVM_LINK_COMPONENTS
   ${LLVM_LINK_COMPONENTS}
-  ${LLVM_TARGETS_TO_BUILD}
-  ${POLLI_DEPS}
+  BitReader
   BitWriter
+  ExecutionEngine
+  IRReader
+  Interpreter
+  JIT
+  linker
+  MCJIT
+  native
+  SelectionDAG
   Support
+  ${LLVM_TARGETS_TO_BUILD}
 )
 
 if( LLVM_USE_OPROFILE )

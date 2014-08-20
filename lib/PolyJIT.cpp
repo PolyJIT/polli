@@ -29,21 +29,24 @@
 #include "llvm/ExecutionEngine/ExecutionEngine.h" // for EngineBuilder, etc
 #include "llvm/ExecutionEngine/GenericValue.h"    // for GenericValue, PTOGV
 #include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/IR/Argument.h"          // for Argument
-#include "llvm/IR/BasicBlock.h"        // for BasicBlock::iterator, etc
-#include "llvm/IR/Constant.h"          // for Constant
-#include "llvm/IR/Constants.h"         // for ConstantInt
-#include "llvm/IR/DataLayout.h"        // for DataLayoutPass
-#include "llvm/IR/DerivedTypes.h"      // for PointerType
-#include "llvm/IR/Function.h"          // for Function, etc
-#include "llvm/IR/GlobalValue.h"       // for GlobalValue, etc
-#include "llvm/IR/IRBuilder.h"         // for IRBuilder
-#include "llvm/IR/Instructions.h"      // for AllocaInst
-#include "llvm/IR/LegacyPassManager.h" // for PassManager, etc
-#include "llvm/IR/Module.h"            // for Module, Module::iterator
-#include "llvm/IR/Type.h"              // for Type
 #include "llvm/ExecutionEngine/JITMemoryManager.h" // for JITMemoryManager
-#include "llvm/Linker/Linker.h"                    // for Linker, etc
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/ExecutionEngine/ObjectCache.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/IR/Argument.h"            // for Argument
+#include "llvm/IR/BasicBlock.h"          // for BasicBlock::iterator, etc
+#include "llvm/IR/Constant.h"            // for Constant
+#include "llvm/IR/Constants.h"           // for ConstantInt
+#include "llvm/IR/DataLayout.h"          // for DataLayoutPass
+#include "llvm/IR/DerivedTypes.h"        // for PointerType
+#include "llvm/IR/Function.h"            // for Function, etc
+#include "llvm/IR/GlobalValue.h"         // for GlobalValue, etc
+#include "llvm/IR/IRBuilder.h"           // for IRBuilder
+#include "llvm/IR/Instructions.h"        // for AllocaInst
+#include "llvm/IR/LegacyPassManager.h"   // for PassManager, etc
+#include "llvm/IR/Module.h"              // for Module, Module::iterator
+#include "llvm/IR/Type.h"                // for Type
+#include "llvm/Linker/Linker.h"          // for Linker, etc
 #include "llvm/Pass.h"                   // for ImmutablePass, FunctionPass, etc
 #include "llvm/PassAnalysisSupport.h"    // for AnalysisUsage, etc
 #include "llvm/PassManager.h"            // for PassManager, etc
@@ -208,13 +211,6 @@ EmitJitDebugInfoToDisk("jit-emit-debug-to-disk", cl::Hidden,
                        cl::desc("Emit debug info objfiles to disk"),
                        cl::init(false));
 
-cl::opt<bool> ForceInterpreter("force-interpreter",
-                               cl::desc("Force interpretation: disable JIT"),
-                               cl::init(false));
-
-static cl::opt<bool> UseMCJIT("mcjit", cl::desc("Use MCJIT instead of old JIT"),
-                              cl::init(false));
-
 class StaticInitializer {
 public:
   StaticInitializer() {
@@ -271,77 +267,10 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
 }
 }
 
-class ScopDetectionResultsViewer : public FunctionPass {
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  ScopDetectionResultsViewer(const ScopDetectionResultsViewer &);
-  // DO NOT IMPLEMENT
-  const ScopDetectionResultsViewer &
-  operator=(const ScopDetectionResultsViewer &);
-
-  ScopDetection *SD;
-
-public:
-  static char ID;
-  explicit ScopDetectionResultsViewer() : FunctionPass(ID) {}
-
-  /// @name FunctionPass interface
-  //@{
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<ScopDetection>();
-    AU.setPreservesAll();
-  };
-
-  virtual void releaseMemory() {};
-
-  virtual bool runOnFunction(Function &F) {
-    SD = &getAnalysis<ScopDetection>();
-
-    for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
-                                              ie = SD->reject_end();
-         i != ie; ++i) {
-      const Region *R = (*i).first;
-      RejectLog Log = (*i).second;
-
-      unsigned LineBegin, LineEnd;
-      std::string FileName;
-      getDebugLocation(R, LineBegin, LineEnd, FileName);
-
-      DEBUG(dbgs() << "[polli] rejected region: \n" << FileName << ":"
-                   << LineBegin << ":" << LineEnd << "\n");
-      int j = 0;
-      for (auto LogEntry : Log) {
-        DEBUG(dbgs().indent(2) << "[" << j++ << "] " << LogEntry->getMessage()
-                               << "\n");
-      }
-    }
-
-    return false;
-  };
-
-  virtual void print(raw_ostream &, const Module *) const {};
-  //@}
-};
-
-char ScopDetectionResultsViewer::ID = 0;
-
 namespace llvm {
 
 ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
-  EngineBuilder builder(M);
   std::string ErrorMsg;
-
-  builder.setMArch(MArch);
-  builder.setMCPU(MCPU);
-  builder.setMAttrs(MAttrs);
-  builder.setRelocationModel(RelocModel);
-  builder.setCodeModel(CMModel);
-  builder.setErrorStr(&ErrorMsg);
-  builder.setEngineKind(ForceInterpreter ? EngineKind::Interpreter
-                                         : EngineKind::JIT);
-  builder.setUseMCJIT(UseMCJIT);
-  builder.setJITMemoryManager(
-      ForceInterpreter ? 0 : JITMemoryManager::CreateDefaultMemManager());
 
   // If we are supposed to override the target triple, do so now.
   if (!TargetTriple.empty())
@@ -367,7 +296,6 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
     OLvl = CodeGenOpt::Aggressive;
     break;
   }
-  builder.setOptLevel(OLvl);
 
   TargetOptions Options;
   Options.UseSoftFloat = GenerateSoftFloatCalls;
@@ -380,7 +308,20 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
   Options.JITEmitDebugInfo = EmitJitDebugInfo;
   Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
 
-  builder.setTargetOptions(Options);
+  EngineBuilder &builder =
+      EngineBuilder(std::unique_ptr<Module>(M))
+          .setMArch(MArch)
+          .setMCPU(MCPU)
+          .setMAttrs(MAttrs)
+          .setRelocationModel(RelocModel)
+          .setCodeModel(CMModel)
+          .setErrorStr(&ErrorMsg)
+          .setEngineKind(EngineKind::JIT)
+          .setUseMCJIT(true)
+          .setMCJITMemoryManager(new SectionMemoryManager())
+          .setOptLevel(OLvl)
+          .setTargetOptions(Options);
+
   return builder.create(builder.selectTarget());
 }
 

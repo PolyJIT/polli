@@ -212,7 +212,7 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
 // PapiCScopProfilingPass
 //
 //-----------------------------------------------------------------------------
-bool PapiCScopProfiling::runOnFunction(Function &F) {
+bool PapiCScopProfiling::runOnFunction(Function &) {
   SD = &getAnalysis<ScopDetection>();
   NSD = getAnalysisIfAvailable<JitScopDetection>();
   RI = &getAnalysis<RegionInfoPass>();

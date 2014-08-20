@@ -51,7 +51,7 @@ public:
   explicit PapiCScopProfilingInit() : ModulePass(ID) {};
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    // AU.setPreservesAll();
+    AU.setPreservesAll();
   }
 
   virtual bool runOnModule(Module &M);
@@ -69,7 +69,7 @@ public:
     AU.addRequired<RegionInfoPass>();
   }
 
-  virtual bool runOnFunction(Function &F);
+  virtual bool runOnFunction(Function &);
 
 private:
   LoopInfo *LI;
@@ -83,7 +83,7 @@ private:
                         std::vector<BasicBlock *> &ExitBBs, const Region *R,
                         std::string entryName, std::string exitName);
 
-  void print(raw_ostream &OS, const Module *) const {}
+  void print(raw_ostream &, const Module *) const {}
 };
 }
 

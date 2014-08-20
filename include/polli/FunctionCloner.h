@@ -119,19 +119,19 @@ struct CopyCreator {
  * Endpoint policies for the function cloner host.
  */
 struct IgnoreSource {
-  static void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  static void Apply(Function *, Function *, ValueToValueMapTy &) {
     /* Do nothing */
   };
 };
 
 struct IgnoreTarget {
-  static void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  static void Apply(Function *, Function *, ValueToValueMapTy &) {
     /* Do nothing */
   };
 };
 
 struct DestroyEndpoint {
-  static void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  static void Apply(Function *TgtF, Function *, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
     VMap.erase(TgtF);
   }
@@ -142,7 +142,7 @@ struct InstrumentEndpoint {
 
   Pass *getPass() { return P; }
 
-  void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  void Apply(Function *TgtF, Function *, ValueToValueMapTy &) {
     if (TgtF->isDeclaration())
       return;
 

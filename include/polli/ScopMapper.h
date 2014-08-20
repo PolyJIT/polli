@@ -40,7 +40,7 @@ public:
   virtual void getAnalysisUsage(AnalysisUsage &AU) const;
   virtual void releaseMemory() {}
   virtual bool runOnFunction(Function &F);
-  virtual void print(raw_ostream &OS, const Module *) const {}
+  virtual void print(raw_ostream &, const Module *) const {}
   //@}
 private:
   //===--------------------------------------------------------------------===//

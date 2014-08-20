@@ -39,10 +39,6 @@ macro(add_polli_library name)
     endforeach(lib)
   endif( LLVM_USED_LIBS )
 
-  target_link_libraries( ${name} ${POLLY_LIBRARY} )
-  target_link_libraries( ${name} ${ISL_LIBRARY} )
-  target_link_libraries( ${name} ${PAPI_LIBRARY} )
-
   if( LLVM_LINK_COMPONENTS )
     llvm_config(${name} ${LLVM_LINK_COMPONENTS})
   endif( LLVM_LINK_COMPONENTS )
