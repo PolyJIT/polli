@@ -308,21 +308,23 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
   Options.JITEmitDebugInfo = EmitJitDebugInfo;
   Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
 
-  EngineBuilder &builder =
-      EngineBuilder(std::unique_ptr<Module>(M))
-          .setMArch(MArch)
-          .setMCPU(MCPU)
-          .setMAttrs(MAttrs)
-          .setRelocationModel(RelocModel)
-          .setCodeModel(CMModel)
-          .setErrorStr(&ErrorMsg)
-          .setEngineKind(EngineKind::JIT)
-          .setUseMCJIT(true)
-          .setMCJITMemoryManager(new SectionMemoryManager())
-          .setOptLevel(OLvl)
-          .setTargetOptions(Options);
+  std::unique_ptr<Module> Owner(M);
 
-  return builder.create(builder.selectTarget());
+  EngineBuilder builder(std::move(Owner));
+
+  builder.setMArch(MArch);
+  builder.setMCPU(MCPU);
+  builder.setMAttrs(MAttrs);
+  builder.setRelocationModel(RelocModel);
+  builder.setCodeModel(CMModel);
+  builder.setErrorStr(&ErrorMsg);
+  builder.setEngineKind(EngineKind::JIT);
+  builder.setUseMCJIT(true);
+  builder.setMCJITMemoryManager(new SectionMemoryManager());
+  builder.setOptLevel(OLvl);
+  builder.setTargetOptions(Options);
+
+  return builder.create();
 }
 
 void
