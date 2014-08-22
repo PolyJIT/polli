@@ -28,7 +28,8 @@ using namespace llvm;
 
 namespace polli {
 bool RuntimeOptimizer::Optimize(Function &F) {
-  DEBUG(dbgs() << "[polli] Preparing " << F.getName() << " for launch!\n");
+  log(Info, 2) << " runtime :: optimizing " << F.getName() << " for launch!\n";
+
   Module *M = F.getParent();
   FunctionPassManager FPM = FunctionPassManager(M);
 
@@ -41,12 +42,6 @@ bool RuntimeOptimizer::Optimize(Function &F) {
   FPM.add(polly::createScopInfoPass());
   FPM.add(polly::createIslScheduleOptimizerPass());
   FPM.add(polly::createCodeGenerationPass());
-  //FPM.add(polly::createIslCodeGenerationPass());
-
-  //  VectorizeConfig C;
-  //    C.FastDep = true;
-  //  FPM.add(createBBVectorizePass(C));
-  //  FPM.add(polly::createIslCodeGenerationPass());
 
   bool result = FPM.run(F);
 

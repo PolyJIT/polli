@@ -135,6 +135,9 @@ static cl::opt<std::string> OutputFilename("o",
                                            cl::desc("Override output filename"),
                                            cl::value_desc("filename"));
 
+static cl::opt<bool> AnalyzeIR("polli-analyze", cl::desc("Only analyze the IR"),
+                               cl::init(false), cl::cat(PolliCategory));
+
 cl::opt<std::string>
 TargetTriple("mtriple", cl::desc("Override target triple for module"));
 
@@ -260,10 +263,10 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   JIT->runSpecializedFunction(NewF, ArgValues);
   PAPI_flops(&rtime, &ptime, &flpops, &mflops);
 
-  DEBUG(dbgs().indent(2) << "Fn: " << NewF->getName() << " stats: \n");
-  DEBUG(dbgs().indent(4) << " RealTime: " << rtime << " ProcTime: " << ptime
-                         << " FlpOps: " << flpops << " MFLOPs: " << mflops
-                         << "\n");
+  DEBUG(log(Debug, 2) << "Fn: " << NewF->getName() << " stats: \n");
+  DEBUG(log(Debug, 4) << " RealTime: " << rtime << " ProcTime: " << ptime
+                      << " FlpOps: " << flpops << " MFLOPs: " << mflops
+                      << "\n");
 }
 }
 
@@ -350,7 +353,7 @@ PolyJIT::runSpecializedFunction(Function *NewF,
 }
 
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
-  DEBUG(dbgs() << "[polli] Phase III: Injecting call to JIT\n");
+  log(LogType::Info) << "inject :: insert call to JIT runtime\n";
   LLVMContext &Ctx = M.getContext();
   IRBuilder<> Builder(Ctx);
 
@@ -435,9 +438,9 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   for (ManagedModules::iterator src = Mods.begin(), se = Mods.end(); src != se;
        ++src) {
     Module *M = (*src).first;
-    DEBUG(dbgs().indent(2) << "Linking: " << M->getModuleIdentifier() << "\n");
+    log(Info, 2) << "link :: " << M->getModuleIdentifier() << "\n";
     if (L.linkInModule(M, Linker::PreserveSource, &ErrorMsg))
-      errs().indent(2) << "ERROR while linking. MESSAGE: " << ErrorMsg << "\n";
+      log(Error, 2) << "ERROR while linking. MESSAGE: " << ErrorMsg << "\n";
   }
 
   StringRef cbName = StringRef("polli.enter.runtime");
@@ -467,8 +470,8 @@ void PolyJIT::extractJitableScops(Module &M) {
     PM.add(polli::createPapiCScopProfilingPass());
 
   PM.run(M);
-  DEBUG(dbgs() << "[polli] Phase II: Create final module\n");
 
+  log(Info, 2) << "link :: create final module\n";
   ValueToValueMapTy VMap;
 
   /* Move the extracted SCoP functions into separate modules. */
@@ -524,8 +527,14 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char *const *envp) {
   Function *Main = M.getFunction(EntryFn);
 
-  if (!Main) {
-    errs() << '\'' << EntryFn << "\' function not found in module.\n";
+  if (AnalyzeIR) {
+    DisableExecution = true;
+    DisableRecompile = true;
+    log(Debug) << "opt :: AnalyzeIR disabled Execution & Recompilation.\n";
+  }
+
+  if (!Main && !AnalyzeIR) {
+    log(Error) << '\'' << EntryFn << "\' function not found in module.\n";
     return -1;
   }
 
@@ -555,13 +564,13 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   EE.finalizeObject();
 
   if (!DisableExecution) {
-    DEBUG(dbgs() << "[polli] Starting execution...\n");
+    log(Info) << "run :: starting execution\n";
 
     // Run static constructors.
     EE.runStaticConstructorsDestructors(false);
     ret = EE.runFunctionAsMain(Main, inputArgs, envp);
 
-    DEBUG(dbgs() << "[polli] Finished (" << ret << ")\n");
+    log(Info) << "run :: execution finished (" << ret << ")\n";
   }
 
   return ret;
@@ -573,7 +582,7 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   registerCanonicalicationPasses(FPM);
   FPM.doInitialization();
 
-  DEBUG(dbgs() << "[polli] Phase I: Applying Preoptimization:\n");
+  log(Info) << "preopt :: applying preoptimization:\n";
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
     if (f->isDeclaration())
       continue;
@@ -601,10 +610,10 @@ int PolyJIT::shutdown(int result) {
     ResultGV.IntVal = APInt(32, result);
     Args.push_back(ResultGV);
     EE.runFunction(ExitF, Args);
-    errs() << "ERROR: exit(" << result << ") returned!\n";
+    log(Error) << "ERROR: exit(" << result << ") returned!\n";
     abort();
   } else {
-    errs() << "ERROR: exit defined with wrong prototype!\n";
+    log(Error) << "ERROR: exit defined with wrong prototype!\n";
     abort();
   }
 

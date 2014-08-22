@@ -2,6 +2,8 @@
 #include "llvm/Support/Debug.h"
 
 #include "polli/AliasCheckCodeGen.h"
+#include "polli/Utils.h"
+
 #include "llvm/Pass.h"
 #include "llvm/PassSupport.h"
 
@@ -172,14 +174,13 @@ void AliasCheckGenerator::printIslExpressions(const Scop &S) {
     }
   }
 
-  dbgs().indent(2) << "Num Accesses: " << numAccs << " -> "
-                   << binomial_coefficient(numAccs, 2) << "\n";
+  log(Debug, 2) << "Num Accesses: " << numAccs << " -> "
+                << binomial_coefficient(numAccs, 2) << "\n";
 
   BoundsMapT mapcp = BoundsMap;
   const Set ParamCtx = Set::Wrap(S.getAssumedContext());
   Set Cond = Set::universe(ParamCtx);
 
-  dbgs().indent(2) << "if (";
   for (auto &s : BoundsMap) {
     BoundsMapT::iterator it = mapcp.find(s);
     if (it != mapcp.end()) {
@@ -193,19 +194,14 @@ void AliasCheckGenerator::printIslExpressions(const Scop &S) {
   AstBuild Builder = AstBuild::fromContext(ParamCtx);
   PwAff Check = Cond.indicatorFunction();
   AstExpr ExprCheck = Builder.exprFromPwAff(Check);
-  dbgs().indent(4) << "(" << ExprCheck.toStr(Format::FC) << ")\n";
-  dbgs().indent(2) << ")\n";
+
+  log(Debug, 4) << "if (" << ExprCheck.toStr(Format::FC) << ")\n\n";
 }
 
 bool AliasCheckGenerator::runOnScop(Scop &S) {
   SD = &getAnalysis<ScopDetection>();
   Region &ScopRegion = S.getRegion();
 
-  dbgs().indent(2) << S.getNameStr() << "\n";
-  S.print(dbgs().indent(2));
-  dbgs().changeColor(raw_ostream::Colors::SAVEDCOLOR);
-  printIslExpressions(S);
-  dbgs().indent(2) << "\n";
   for (ScopDetection::reject_iterator RI = SD->reject_begin(),
                                       RE = SD->reject_end();
        RI != RE; ++RI) {

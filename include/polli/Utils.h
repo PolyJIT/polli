@@ -33,10 +33,18 @@ using namespace llvm::sys::fs;
 namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
 
+enum LogType {
+  Info,
+  Debug,
+  Warning,
+  Error
+};
+
 typedef std::map<Module *, ExecutionEngine *> ManagedModules;
 
 extern SmallVector<char, 255> *DefaultDir;
 
+llvm::raw_ostream &log(const LogType T = Info, const size_t Level = 0);
 void initializeOutputDir();
 void StoreModule(Module &M, const Twine &Name);
 void StoreModules(ManagedModules &Modules);

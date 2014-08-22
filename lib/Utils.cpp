@@ -1,4 +1,4 @@
-//===-- Utils.h -------------------------------------------------*- C++ -*-===//
+//===-- Utils.cpp -----------------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -10,22 +10,24 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include <string>                       // for string
-#include <utility>                      // for pair
-#include "llvm/ADT/OwningPtr.h"         // for OwningPtr
-#include "llvm/ADT/SmallVector.h"       // for SmallVector
-#include "llvm/ADT/Twine.h"             // for Twine
-#include "llvm/Bitcode/BitcodeWriterPass.h" // for BitcodeWriterPass
-#include "llvm/IR/LegacyPassManager.h"  // for PassManager
-#include "llvm/IR/Module.h"             // for Module
-#include "llvm/IR/Verifier.h"           // for createVerifierPass
-#include "llvm/Pass.h"                  // for FunctionPass
-#include "llvm/Support/CommandLine.h"   // for initializer, desc, init, etc
-#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
-#include "llvm/Support/FileSystem.h"    // for OpenFlags::F_RW
-#include "llvm/Support/ToolOutputFile.h"  // for tool_output_file
-#include "llvm/Support/raw_ostream.h"   // for raw_ostream
-#include "polli/Utils.h"                // for ManagedModules
+#include "polli/Utils.h"
+
+#include <string>                      // for string
+#include <utility>                     // for pair
+#include "llvm/ADT/OwningPtr.h"        // for OwningPtr
+#include "llvm/ADT/SmallVector.h"      // for SmallVector
+#include "llvm/ADT/Twine.h"            // for Twine
+#include "llvm/IR/LegacyPassManager.h" // for PassManager
+#include "llvm/IR/Module.h"            // for Module
+#include "llvm/IR/Verifier.h"          // for createVerifierPass
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/Pass.h"                   // for FunctionPass
+#include "llvm/DebugInfo.h"              // for StripDebugInfo(...)
+#include "llvm/Support/CommandLine.h"    // for initializer, desc, init, etc
+#include "llvm/Support/Debug.h"          // for dbgs, DEBUG
+#include "llvm/Support/FileSystem.h"     // for OpenFlags::F_RW
+#include "llvm/Support/ToolOutputFile.h" // for tool_output_file
+#include "llvm/Support/raw_ostream.h"    // for raw_ostream
 
 using namespace llvm;
 
@@ -38,6 +40,26 @@ GenerateOutput("polli-debug-ir",
                cl::desc("Store all IR files inside a unique subdirectory."),
                cl::init(false));
 
+llvm::raw_ostream &log(const LogType T, const size_t Level) {
+  switch (T) {
+  case Info:
+    return errs().indent(Level).resetColor() << " :: ";
+    break;
+  case Debug:
+    dbgs().changeColor(raw_ostream::Colors::GREEN) << " D ";
+    return dbgs().indent(Level).resetColor() << " :: ";
+    break;
+  case Warning:
+    errs().changeColor(raw_ostream::Colors::YELLOW) << " W ";
+    return errs().indent(Level).resetColor() << " :: ";
+    break;
+  case Error:
+    errs().changeColor(raw_ostream::Colors::RED) << " E ";
+    return errs().indent(Level).resetColor() << " :: ";
+    break;
+  }
+}
+
 void initializeOutputDir() {
   DefaultDir = new SmallVector<char, 255>();
   SmallVector<char, 255> cwd;
@@ -46,8 +68,9 @@ void initializeOutputDir() {
   p::append(cwd, "polli");
   fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
 
-  DEBUG(dbgs() << "Storing results in: "
-               << StringRef(DefaultDir->data(), DefaultDir->size()) << "\n");
+  DEBUG(log(Debug) << "Storing results in: "
+                   << StringRef(DefaultDir->data(), DefaultDir->size())
+                   << "\n");
   DirReady = true;
 }
 
@@ -58,24 +81,30 @@ void StoreModule(Module &M, const Twine &Name) {
   if (!DirReady)
     initializeOutputDir();
 
-  SmallVector<char, 255> destPath = *DefaultDir;
-
-  std::string ErrorInfo;
-  OwningPtr<tool_output_file> Out;
-
   M.setModuleIdentifier(Name.str());
+
+  SmallVector<char, 255> destPath = *DefaultDir;
+  std::string ErrorInfo;
 
   p::append(destPath, Name);
 
   std::string path = StringRef(destPath.data(), destPath.size()).str();
-  DEBUG(dbgs().indent(2) << "Storing: " << M.getModuleIdentifier() << "\n");
-  Out.reset(new tool_output_file(path.c_str(), ErrorInfo, F_RW));
+  DEBUG(log(Debug, 2) << "Storing: " << M.getModuleIdentifier() << "\n");
+  std::unique_ptr<tool_output_file> Out(
+      new tool_output_file(path.c_str(), ErrorInfo, sys::fs::F_None));
+
+  // Remove all debug info before storing.
+  // FIXME: This is just working around bugs.
+  // Somewhere we don't fetch all symbols during extraction.
+  llvm::StripDebugInfo(M);
 
   PassManager PM;
   PM.add(new DataLayoutPass(&M));
   PM.add(llvm::createVerifierPass());
-  PM.add(createBitcodeWriterPass(Out->os()));
+  PM.add(createPrintModulePass(Out->os()));
   PM.run(M);
+
+  Out->os().close();
   Out->keep();
 }
 

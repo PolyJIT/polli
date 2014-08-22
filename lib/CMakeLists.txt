@@ -1,5 +1,7 @@
 set(LLVM_NO_RTTI 1)
 set(LLVM_LINK_COMPONENTS
+  ${LLVM_TARGETS_TO_BUILD}
+  Analysis
   AsmParser
   BitReader
   BitWriter
@@ -8,19 +10,22 @@ set(LLVM_LINK_COMPONENTS
   ExecutionEngine
   IRReader
   Interpreter
+  InstCombine
   Instrumentation
-  ipo
+  IPA
+  IPO
   JIT
-  linker
+  Linker
+  MC
   MCJIT
   native
   objcarcopts
-  scalarOpts
+  ScalarOpts
   SelectionDAG
   Support
-  transformutils
-  vectorize
-  ${LLVM_TARGETS_TO_BUILD}
+  Target
+  TransformUtils
+  Vectorize
 )
 
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})

@@ -56,8 +56,7 @@ template <class StorageT, class TypeT>
 raw_ostream &operator<<(raw_ostream &out, const RTParam<StorageT, TypeT> &p) {
   p.print(out);
   return out;
-}
-;
+};
 
 /* Specialize to APInt. We do not have a proper lt operator there. */
 template <class TypeT> struct RTParam<APInt, TypeT> {
@@ -182,8 +181,7 @@ raw_ostream &operator<<(raw_ostream &out, const ParamVector<RTParam> &Params) {
 
   out << "]";
   return out;
-}
-;
+};
 
 /* For now we only deal with APInt storage of IntegerType parameter values. */
 typedef RTParam<APInt, IntegerType> RuntimeParam;
@@ -208,8 +206,7 @@ static inline void printParameters(const Function *F, RTParams &Params) {
     dbgs() << *P << "\n";
   }
   dbgs() << "}\n";
-}
-;
+};
 
 // @brief Extract parameters suitable for specialization.
 //
@@ -399,8 +396,8 @@ struct MainCreator {
 class FunctionDispatcher {
   FunctionDispatcher(const FunctionDispatcher &)
   LLVM_DELETED_FUNCTION;
-  const FunctionDispatcher &operator=(
-      const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
+  const FunctionDispatcher &
+  operator=(const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
 
   /// @brief Maps source Functions to specialized functions,
   //         based on the input parameters.
@@ -441,7 +438,7 @@ public:
   }
 
   template <class ParamT>
-  Function *specialize(Function *F, ParamVector<ParamT> const & Values) {
+  Function *specialize(Function *F, ParamVector<ParamT> const &Values) {
     ValueToValueMapTy VMap;
 
     /* Copy properties of our source module */
@@ -490,15 +487,16 @@ public:
       RuntimeOptimizer RTOpt;
       RTOpt.Optimize(*NewF);
 
-      DEBUG(dbgs() << "( " << Values << " )\n");
+      DEBUG(log(Debug, 2) << "( " << Values << " )\n");
       auto Insert = ValToFun.insert(std::make_pair(Values, NewF));
       assert(Insert.second &&
              "Tried to replace an already specialized function!");
       SpecFuns[F] = ValToFun;
+      log(Info, 2) << " specialize :: " << NewF->getName() << " (" << Values
+                   << ")\n";
     }
 
     Function *SpecF = ValToFun[Values];
-    DEBUG(dbgs() << "[polli] " << SpecF->getName() << " (" << Values << ")\n");
     return SpecF;
   }
 };

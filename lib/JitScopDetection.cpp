@@ -10,36 +10,42 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include <map>                          // for _Rb_tree_const_iterator, etc
-#include <memory>                       // for unique_ptr
-#include <set>                          // for set
-#include <string>                       // for string
-#include <utility>                      // for make_pair, pair
-#include <vector>                       // for vector<>::iterator, vector
-#include "llvm/ADT/Statistic.h"         // for STATISTIC, Statistic
-#include "llvm/Analysis/RegionInfo.h"   // for Region, RegionInfo
-#include "llvm/Analysis/RegionPass.h"   // for RGPassManager
-#include "llvm/Analysis/ScalarEvolution.h"  // for SCEV, ScalarEvolution
+#include <map>                             // for _Rb_tree_const_iterator, etc
+#include <memory>                          // for unique_ptr
+#include <set>                             // for set
+#include <string>                          // for string
+#include <utility>                         // for make_pair, pair
+#include <vector>                          // for vector<>::iterator, vector
+#include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
+#include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
+#include "llvm/Analysis/RegionPass.h"      // for RGPassManager
+#include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/Dominators.h"         // for DominatorTreeWrapperPass
+#include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
 #include "llvm/InitializePasses.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/PassManager.h"           // for FunctionPassManager
-#include "llvm/PassAnalysisSupport.h"   // for AnalysisUsage, etc
-#include "llvm/PassSupport.h"           // for INITIALIZE_PASS_DEPENDENCY, etc
-#include "llvm/Support/CommandLine.h"   // for desc, opt
-#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
-#include "llvm/Support/raw_ostream.h"   // for raw_ostream
-#include "polli/JitScopDetection.h"  // for ParamList, etc
-#include "polly/ScopDetection.h"        // for ScopDetection, etc
-#include "polly/ScopDetectionDiagnostic.h"  // for ReportNonAffBranch, etc
-#include "polly/Support/SCEVValidator.h"  // for getParamsInNonAffineExpr, etc
+#include "llvm/PassManager.h"         // for FunctionPassManager
+#include "llvm/PassAnalysisSupport.h" // for AnalysisUsage, etc
+#include "llvm/PassSupport.h"         // for INITIALIZE_PASS_DEPENDENCY, etc
+#include "llvm/Support/CommandLine.h" // for desc, opt
+#include "llvm/Support/Debug.h"       // for dbgs, DEBUG
+#include "llvm/Support/raw_ostream.h" // for raw_ostream
+#include "polli/JitScopDetection.h"   // for ParamList, etc
+#include "polly/ScopDetection.h"      // for ScopDetection, etc
+#include "polly/ScopDetectionDiagnostic.h" // for ReportNonAffBranch, etc
+#include "polly/Support/SCEVValidator.h"   // for getParamsInNonAffineExpr, etc
 
 #include "polly/LinkAllPasses.h"
 #include "polly/Canonicalization.h"
 
-namespace llvm { class Function; }
-namespace llvm { class Module; }
+#include "polli/Utils.h"
+
+namespace llvm {
+class Function;
+}
+namespace llvm {
+class Module;
+}
 
 static cl::opt<bool>
 AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));
@@ -53,13 +59,12 @@ STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
 STATISTIC(JitNonAffineAccess, "Number of fixable non affine accesses");
 STATISTIC(AliasingIgnored, "Number of ignored aliasings");
 
-template <typename LC, typename RetVal>
-class RejectLogChecker {
+template <typename LC, typename RetVal> class RejectLogChecker {
 public:
   RetVal check(const RejectReason *Reason, const RetVal &Invalid = RetVal()) {
-    LC * lc = (LC *)this;
+    LC *lc = (LC *)this;
 
-    switch(Reason->getKind()) {
+    switch (Reason->getKind()) {
     case rrkNonAffineAccess:
       return lc->checkNonAffineAccess((ReportNonAffineAccess *)Reason);
     case rrkNonAffBranch:
@@ -79,6 +84,7 @@ class AliasingLogChecker : public RejectLogChecker<AliasingLogChecker, bool> {
   Function &F;
 
   ScalarEvolution *SE;
+
 public:
   AliasingLogChecker(Function &F, const Region *R) : R(R), F(F) {}
 
@@ -91,19 +97,20 @@ public:
   }
 };
 
-class NonAffineLogChecker : public RejectLogChecker < NonAffineLogChecker,
-    std::pair<bool, ParamList> > {
+class NonAffineLogChecker
+    : public RejectLogChecker<NonAffineLogChecker,
+                              std::pair<bool, ParamList> > {
 private:
   const Region *R;
   ScalarEvolution *SE;
+
 public:
-  NonAffineLogChecker(const Region *R, ScalarEvolution *SE)
-      : R(R), SE(SE) {}
+  NonAffineLogChecker(const Region *R, ScalarEvolution *SE) : R(R), SE(SE) {}
 
   std::pair<bool, ParamList>
   checkNonAffineAccess(ReportNonAffineAccess *Reason) {
     ParamList Params;
-    if (!polly::isNonAffineExpr(R, Reason->get(), *SE))
+    if (!isNonAffineExpr(R, Reason->get(), *SE))
       return std::make_pair<>(false, Params);
 
     Params = polly::getParamsInNonAffineExpr(R, Reason->get(), *SE);
@@ -111,17 +118,17 @@ public:
     return std::make_pair<>(true, Params);
   }
 
-  std::pair<bool, ParamList>
-  checkNonAffineBranch(ReportNonAffBranch *Reason) {
+  std::pair<bool, ParamList> checkNonAffineBranch(ReportNonAffBranch *Reason) {
     ParamList Params;
 
+    // Check LHS & Add parameters
     if (!isNonAffineExpr(R, Reason->lhs(), *SE))
       return std::make_pair<>(false, Params);
-
     Params = getParamsInNonAffineExpr(R, Reason->lhs(), *SE);
+
+    // Check RHS & Add parameters
     if (!isNonAffineExpr(R, Reason->rhs(), *SE))
       return std::make_pair<>(false, Params);
-
     ParamList RHSParams;
     RHSParams = getParamsInNonAffineExpr(R, Reason->rhs(), *SE);
     Params.insert(Params.end(), RHSParams.begin(), RHSParams.end());
@@ -130,8 +137,7 @@ public:
     return std::make_pair<>(true, Params);
   }
 
-  std::pair<bool, ParamList>
-  checkLoopBound(ReportLoopBound *Reason) {
+  std::pair<bool, ParamList> checkLoopBound(ReportLoopBound *Reason) {
     ParamList Params;
     bool isValid = polly::isNonAffineExpr(R, Reason->loopCount(), *SE);
     if (isValid) {
@@ -141,8 +147,7 @@ public:
     return std::make_pair<>(isValid, Params);
   }
 
-  std::pair<bool, ParamList>
-  checkAlias(ReportAlias *Reason) {
+  std::pair<bool, ParamList> checkAlias(ReportAlias *Reason) {
     ParamList Params;
     return std::make_pair<>(false, Params);
   }
@@ -157,10 +162,10 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 static void printParameters(ParamList &L) {
-  dbgs().indent(4) << "Parameters: ";
+  log(Info, 4) << "params :: ";
   for (const SCEV *S : L)
-    S->print(dbgs().indent(2));
-  dbgs() << "\n";
+    S->print(outs().indent(2));
+  outs() << "\n";
 }
 
 // Remove all direct and indirect children of region R from the region set Regs,
@@ -182,7 +187,7 @@ static unsigned eraseAllChildren(std::set<const Region *> &Regs,
 }
 
 static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
-  dbgs().indent(2) << "SCoPs already valid: -\n";
+  log(Debug, 2) << "valid scops ::\n";
   for (ScopDetection::const_iterator i = SD.begin(), ie = SD.end(); i != ie;
        ++i) {
     const Region *R = (*i);
@@ -191,8 +196,8 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
     unsigned LineBegin, LineEnd;
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
-    DEBUG(dbgs().indent(4) << FileName << ":" << LineBegin << ":" << LineEnd
-                           << " - " << R->getNameStr() << "\n");
+    log(Debug, 4) << FileName << ":" << LineBegin << ":" << LineEnd << " - "
+                  << R->getNameStr() << "\n";
   }
 }
 
@@ -209,7 +214,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  DEBUG(dbgs() << "[polli] Running on: " << F.getName() << "\n");
+  log(Info) << "jit-scops :: " << F.getName() << "\n";
   DEBUG(printValidScops(AccumulatedScops, *SD));
 
   if (!Enabled)
@@ -224,10 +229,12 @@ bool JitScopDetection::runOnFunction(Function &F) {
     unsigned LineBegin, LineEnd;
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
-    DEBUG(dbgs().indent(2) << "[Checking] " << FileName << ":" << LineBegin
-                           << ":" << LineEnd << " - " << R->getNameStr()
-                           << "\n");
-    DEBUG(R->dump());
+    if (FileName.size() > 0) {
+      log(Info, 2) << "check :: " << FileName << ":" << LineBegin << ":"
+                   << LineEnd << " - " << R->getNameStr() << "\n";
+    } else {
+      log(Info, 2) << "check :: " << R->getNameStr() << "\n";
+    }
 
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
@@ -244,14 +251,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
 
-      DEBUG(
-        dbgs().indent(4) << ((IsFixable) ? "[ OK ]: " : "[FAIL]: ");
-        //if (ReportAlias *Alias = dyn_cast<ReportAlias>(Reason.get())) {
-        //  dbgs() << "-FIXME- no message generated --\n";
-        //} else {
-          dbgs() << Reason->getMessage() << "\n";
-        //}
-      );
+      log(Warning, 4) << ((IsFixable) ? "OK :: " : "FAIL :: ")
+                      << Reason->getMessage() << "\n";
       isValid &= IsFixable;
 
       // Record all necessary parameters for later use.
@@ -279,9 +280,9 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        DEBUG(dbgs().indent(2) << "[NSD] " << R->getNameStr()
-                               << "is jitable\n");
-        DEBUG(printParameters(RequiredParams[R]));
+        log(Info, 2) << "check :: is jitable\n";
+        printParameters(RequiredParams[R]);
+
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
         ++JitScopsFound;
@@ -289,8 +290,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
     }
   }
 
-  DEBUG(dbgs().indent(2) << "[NSD]: Number of jitable Scops "
-                        << JitableScops.size() << "\n");
   return false;
 };
 
