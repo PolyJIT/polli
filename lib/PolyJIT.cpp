@@ -251,7 +251,7 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
 
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
-  Function *NewF = Disp->getFunctionForValues(F, Params);
+  VariantFunctionTy VarFun = Disp->getOrCreateVariantFunction(F);
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
@@ -259,17 +259,14 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   ArgValues[0] = ArgC;
   ArgValues[1] = PTOGV(params);
 
-  float rtime, ptime, mflops;
-  long long flpops;
+  Stats &S = VarFun->stats();
+  Function *NewF = VarFun->getOrCreateVariant(Params);
 
-  PAPI_flops(&rtime, &ptime, &flpops, &mflops);
+  PAPI_flops(&(S.RealTime), &(S.ProcTime), &(S.flpops), &(S.MFLOPS));
   JIT->runSpecializedFunction(NewF, ArgValues);
-  PAPI_flops(&rtime, &ptime, &flpops, &mflops);
+  PAPI_flops(&(S.RealTime), &(S.ProcTime), &(S.flpops), &(S.MFLOPS));
 
-  DEBUG(log(Debug, 2) << "Fn: " << NewF->getName() << " stats: \n");
-  DEBUG(log(Debug, 4) << " RealTime: " << rtime << " ProcTime: " << ptime
-                      << " FlpOps: " << flpops << " MFLOPs: " << mflops
-                      << "\n");
+  S.ExecCount++;
 }
 }
 
@@ -595,6 +592,13 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
 
 int PolyJIT::shutdown(int result) {
   LLVMContext &Context = M.getContext();
+
+  DEBUG(
+    for (const auto &Elem : Disp->functions()) {
+      VariantFunctionTy VarFun = Elem.second;
+      VarFun->print(log(LogType::Debug));
+    }
+  );
 
   // Run static destructors.
   EE.runStaticConstructorsDestructors(true);

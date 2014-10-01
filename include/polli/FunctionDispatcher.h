@@ -385,25 +385,22 @@ public:
     assert(Result.second && "Tried to overwrite mapping.");
   }
 
-  /// @brief Get the appropriate function for the given input parameters.
-  //  If it is beneficial, a specialized version for the given set
-  //  of input parameters is generated.
-  //
-  //  Apply all necessary optimization steps here.
-  template <class ParamT>
-  Function *getFunctionForValues(Function *F,
-                                 ParamVector<ParamT> const &Values) {
+  const VariantFunctionMapTy &functions() {
+    return VariantFunctions;
+  }
 
+  /// @brief Get or Create a new variant function for the given Function.
+  VariantFunctionTy getOrCreateVariantFunction(Function *F) {
     // We have already specialized this function at least once.
-    if (VariantFunctionTy VarFun = VariantFunctions[F])
-      return VarFun->getOrCreateVariant(Values);
+    if (VariantFunctions.count(F))
+      return VariantFunctions.at(F);
 
     // Create a variant function & specialize a new variant, based on key.
     VariantFunctionTy VarFun =
         std::make_shared<VariantFunction>(F, FMap[F->getName()]);
 
     VariantFunctions.insert(std::make_pair(F, VarFun));
-    return VarFun->getOrCreateVariant(Values);
+    return VarFun;
   }
 };
 #endif

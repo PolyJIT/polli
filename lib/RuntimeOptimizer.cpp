@@ -30,8 +30,8 @@ using namespace llvm;
 
 namespace polli {
 bool RuntimeOptimizer::Optimize(Function &F) {
-  DEBUG(log(Debug, 2) << " runtime :: optimizing " << F.getName()
-                      << " for launch!\n");
+//  DEBUG(log(Debug, 2) << " runtime :: optimizing " << F.getName()
+//                      << " for launch!\n");
 
   Module *M = F.getParent();
   FunctionPassManager FPM = FunctionPassManager(M);

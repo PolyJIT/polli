@@ -17,7 +17,6 @@ void getRuntimeParameters(Function *F, unsigned paramc, char **params,
                           std::vector<Param> &ParamV) {
   int i = 0;
   for (const Argument &Arg : F->args()) {
-    i++;
     Type *ArgTy = Arg.getType();
 
     /* TODO: Add more types to be suitable for spawning new functions. */
@@ -29,6 +28,7 @@ void getRuntimeParameters(Function *F, unsigned paramc, char **params,
 
       ParamV.push_back(P);
     }
+    i++;
   }
 }
 
@@ -76,7 +76,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
   RuntimeOptimizer RTOpt;
   RTOpt.Optimize(*NewF);
 
-  DEBUG(log(Info, 2) << " specialize :: " << NewF->getName() << " (" << K
-                     << ")\n");
+//  DEBUG(log(Info, 2) << " specialize :: " << NewF->getName() << " (" << K
+//                     << ")\n");
   return NewF;
 }
