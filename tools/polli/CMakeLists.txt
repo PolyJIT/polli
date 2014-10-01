@@ -5,7 +5,6 @@ set(LLVM_LINK_COMPONENTS
   ExecutionEngine
   IRReader
   Interpreter
-  JIT
   linker
   MCJIT
   native

@@ -14,7 +14,6 @@ set(LLVM_LINK_COMPONENTS
   Instrumentation
   IPA
   IPO
-  JIT
   Linker
   MC
   MCJIT
@@ -39,6 +38,7 @@ add_polli_library(PolyJIT
   RuntimeOptimizer.cpp
   ScopMapper.cpp
   Utils.cpp
+  VariantFunction.cpp
   )
 
 target_link_libraries(PolyJIT

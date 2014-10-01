@@ -244,11 +244,14 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   if (!F)
     llvm_unreachable("Function not in this module. It has to be there!");
 
-  ParamVector<RuntimeParam> PArr = getRuntimeParameters(F, paramc, params);
+  std::vector<Param> ParamV;
+  getRuntimeParameters(F, paramc, params, ParamV);
+
+  ParamVector<Param> Params(std::move(ParamV));
 
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
-  Function *NewF = Disp->getFunctionForValues(F, PArr);
+  Function *NewF = Disp->getFunctionForValues(F, Params);
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
@@ -322,7 +325,6 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
   builder.setCodeModel(CMModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
-  builder.setUseMCJIT(true);
   builder.setMCJITMemoryManager(new SectionMemoryManager());
   builder.setOptLevel(OLvl);
   builder.setTargetOptions(Options);
@@ -451,7 +453,7 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
 
 void PolyJIT::extractJitableScops(Module &M) {
   PassManager PM;
-  PM.add(new DataLayoutPass(&M));
+  PM.add(new DataLayoutPass());
 
   if (InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());

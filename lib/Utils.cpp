@@ -14,15 +14,14 @@
 
 #include <string>                      // for string
 #include <utility>                     // for pair
-#include "llvm/ADT/OwningPtr.h"        // for OwningPtr
 #include "llvm/ADT/SmallVector.h"      // for SmallVector
 #include "llvm/ADT/Twine.h"            // for Twine
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/LegacyPassManager.h" // for PassManager
 #include "llvm/IR/Module.h"            // for Module
 #include "llvm/IR/Verifier.h"          // for createVerifierPass
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Pass.h"                   // for FunctionPass
-#include "llvm/DebugInfo.h"              // for StripDebugInfo(...)
 #include "llvm/Support/CommandLine.h"    // for initializer, desc, init, etc
 #include "llvm/Support/Debug.h"          // for dbgs, DEBUG
 #include "llvm/Support/FileSystem.h"     // for OpenFlags::F_RW
@@ -84,7 +83,7 @@ void StoreModule(Module &M, const Twine &Name) {
   M.setModuleIdentifier(Name.str());
 
   SmallVector<char, 255> destPath = *DefaultDir;
-  std::string ErrorInfo;
+  std::error_code ErrorInfo;
 
   p::append(destPath, Name);
 
@@ -99,7 +98,7 @@ void StoreModule(Module &M, const Twine &Name) {
   llvm::StripDebugInfo(M);
 
   PassManager PM;
-  PM.add(new DataLayoutPass(&M));
+  PM.add(new DataLayoutPass());
   PM.add(llvm::createVerifierPass());
   PM.add(createPrintModulePass(Out->os()));
   PM.run(M);

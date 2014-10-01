@@ -14,11 +14,13 @@
 #include "polli/FunctionCloner.h"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
+#include "polli/VariantFunction.h"
 
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/LinkAllPasses.h"
 
 #include "llvm/Support/Debug.h"
+#include <memory>
 
 using namespace polli;
 
@@ -98,91 +100,6 @@ private:
   StringRef Name;
 };
 
-template <class RTParam> struct ParamVector {
-  /* Convert a std::vector of RTParams to a ParamArray. */
-  ParamVector(std::vector<RTParam> const &ParamVector) : Params(ParamVector) {}
-  ParamVector() {}
-
-  typedef typename std::vector<RTParam>::iterator iterator;
-  typedef typename std::vector<RTParam>::const_iterator const_iterator;
-
-  iterator begin() { return Params.begin(); }
-  iterator end() { return Params.end(); }
-
-  const_iterator begin() const { return Params.cbegin(); }
-  const_iterator end() const { return Params.cend(); }
-
-  inline size_t size() const { return Params.size(); }
-
-  RTParam &operator[](unsigned const &index) { return Params[index]; }
-  const RTParam &operator[](unsigned const &index) const {
-    return Params[index];
-  }
-
-  bool operator<(ParamVector<RTParam> const &rhs) {
-    bool isLess = false;
-    bool isGrtr = false;
-    unsigned i = 0;
-    unsigned n = Params.size();
-
-    if (n == 0)
-      return false;
-
-    do {
-      isLess = Params[i] < rhs[i];
-      isGrtr = Params[i] > rhs[i];
-      ++i;
-    } while ((isLess || !isGrtr) && (i < n));
-
-    return isLess;
-  }
-
-  bool operator<(ParamVector<RTParam> const &rhs) const {
-    bool isLess = false;
-    bool isGrtr = false;
-    unsigned i = 0;
-    unsigned n = Params.size();
-
-    if (n == 0)
-      return false;
-
-    do {
-      isLess = Params[i] < rhs[i];
-      isGrtr = Params[i] > rhs[i];
-      ++i;
-    } while ((isLess || !isGrtr) && (i < n));
-
-    return isLess;
-  }
-
-  StringRef getShortName() const {
-    std::string res = "";
-
-    for (unsigned i = 0; i < Params.size(); ++i)
-      if (Constant *c = Params[i].getAsConstant()) {
-        const APInt &val = c->getUniqueInteger();
-        SmallVector<char, 2> str;
-        val.toStringUnsigned(str);
-        res = res + "." + StringRef(str.data(), str.size()).str();
-      }
-    return res;
-  }
-
-private:
-  std::vector<RTParam> Params;
-};
-
-template <class RTParam>
-raw_ostream &operator<<(raw_ostream &out, const ParamVector<RTParam> &Params) {
-  out << "[";
-  for (size_t i = 0; i < Params.size(); ++i) {
-    out << Params[i] << " ";
-  }
-
-  out << "]";
-  return out;
-};
-
 /* For now we only deal with APInt storage of IntegerType parameter values. */
 typedef RTParam<APInt, IntegerType> RuntimeParam;
 typedef std::vector<RuntimeParam> RTParams;
@@ -206,7 +123,7 @@ static inline void printParameters(const Function *F, RTParams &Params) {
     dbgs() << *P << "\n";
   }
   dbgs() << "}\n";
-};
+}
 
 // @brief Extract parameters suitable for specialization.
 //
@@ -219,9 +136,9 @@ static inline void printParameters(const Function *F, RTParams &Params) {
 // @param F The function we extract parameter values for.
 // @param paramc The number of parameters this function has.
 // @param params The array of parameters we got as input.
-//
-// @return A list of runtime parameters.
-RTParams getRuntimeParameters(Function *F, unsigned paramc, char **params);
+// @param paramv A vector where we store the runtime parameters in.
+void getRuntimeParameters(Function *F, unsigned paramc, char **params,
+                          std::vector<Param> &ParamV);
 
 //===----------------------------------------------------------------------===//
 // AliasCheckerEndpoint policy.
@@ -298,19 +215,18 @@ public:
 
     for (unsigned i = 0; i < SpecValues.size(); ++i) {
       ParamT P = SpecValues[i];
-      Function::arg_iterator Arg = getArgument(SrcF, P.getName());
+      Function::arg_iterator Arg = getArgument(SrcF, P.Name);
 
       // Could not find the argument, should not happen.
       if (Arg == TgtF->arg_end())
         continue;
 
       // Get a constant value for P.
-      Constant *replacement = P.getAsConstant();
-      if (replacement) {
+      if (Constant *Replacement = P.Val) {
         Value *NewArg = VMap[Arg];
 
         if (!isa<Constant>(NewArg))
-          NewArg->replaceAllUsesWith(replacement);
+          NewArg->replaceAllUsesWith(Replacement);
       }
     }
 
@@ -374,9 +290,6 @@ struct MainCreator {
   static Function *Create(Function *SrcF, Module *TgtM) {
     LLVMContext &Context = TgtM->getContext();
     Type *RetType = IntegerType::getInt32Ty(Context);
-    //    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Context),
-    // 0);
-
     ArrayType *PtoArr =
         ArrayType::get(Type::getInt8PtrTy(Context), SrcF->arg_size());
 
@@ -394,11 +307,11 @@ struct MainCreator {
 /// @brief Implement a function dispatch to reroute calls to parametrized
 /// functions to their possible specializations.
 class FunctionDispatcher {
-  FunctionDispatcher(const FunctionDispatcher &)
-  LLVM_DELETED_FUNCTION;
+  FunctionDispatcher(const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
   const FunctionDispatcher &
   operator=(const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
 
+  // FIXME: OLD STUFF ->
   /// @brief Maps source Functions to specialized functions,
   //         based on the input parameters.
   SpecializedFuncs SpecFuns;
@@ -412,6 +325,9 @@ class FunctionDispatcher {
   // Map instrumented functions to uninstrumented functions. Used to resolve
   // to the uninstrumented function when coming from the JIT callback function.
   FunctionNameToFunctionMapTy FMap;
+  // FIXME: OLD STUFF <-
+
+  VariantFunctionMapTy VariantFunctions;
 
 public:
   explicit FunctionDispatcher() {}
@@ -419,8 +335,8 @@ public:
   template <class ParamT>
   Function *replaceParamValues(Function *F, ValueToValueMapTy &VMap, Module *M,
                                ParamVector<ParamT> const &Values) {
-    FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<ParamT> >
-    Specializer(VMap, M);
+    FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<ParamT>>
+        Specializer(VMap, M);
 
     // Fetch the uninstrumented function for specialization.
     Function *OrigF = nullptr;
@@ -477,27 +393,17 @@ public:
   template <class ParamT>
   Function *getFunctionForValues(Function *F,
                                  ParamVector<ParamT> const &Values) {
-    ValKeyToFunction ValToFun =
-        (!SpecFuns.count(F)) ? ValKeyToFunction() : SpecFuns[F];
 
-    /* TODO: We need to be a bit smarter than: Specialize everything. */
-    if (!ValToFun.count(Values)) {
-      Function *NewF = specialize(F, Values);
+    // We have already specialized this function at least once.
+    if (VariantFunctionTy VarFun = VariantFunctions[F])
+      return VarFun->getOrCreateVariant(Values);
 
-      RuntimeOptimizer RTOpt;
-      RTOpt.Optimize(*NewF);
+    // Create a variant function & specialize a new variant, based on key.
+    VariantFunctionTy VarFun =
+        std::make_shared<VariantFunction>(F, FMap[F->getName()]);
 
-      DEBUG(log(Debug, 2) << "( " << Values << " )\n");
-      auto Insert = ValToFun.insert(std::make_pair(Values, NewF));
-      assert(Insert.second &&
-             "Tried to replace an already specialized function!");
-      SpecFuns[F] = ValToFun;
-      log(Info, 2) << " specialize :: " << NewF->getName() << " (" << Values
-                   << ")\n";
-    }
-
-    Function *SpecF = ValToFun[Values];
-    return SpecF;
+    VariantFunctions.insert(std::make_pair(F, VarFun));
+    return VarFun->getOrCreateVariant(Values);
   }
 };
 #endif

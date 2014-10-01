@@ -20,7 +20,6 @@
 #include "llvm/Support/Debug.h"
 
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/ADT/OwningPtr.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
@@ -51,6 +50,8 @@
 #define DO_NOTHING_ATEXIT 1
 #endif
 #endif
+
+#include <memory>
 
 using namespace llvm;
 
@@ -123,8 +124,7 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Load the bitcode...
   SMDiagnostic Err;
-  OwningPtr<Module> Mod;
-  Mod.reset(ParseIRFile(InputFile, Err, Context));
+  std::unique_ptr<Module> Mod(parseIRFile(InputFile, Err, Context));
   if (Mod.get() == 0) {
     Err.print(argv[0], errs());
     return 1;
