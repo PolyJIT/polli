@@ -251,8 +251,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
 
-      log(Warning, 4) << ((IsFixable) ? "OK :: " : "FAIL :: ")
-                      << Reason->getMessage() << "\n";
+      //log(Warning, 4) << ((IsFixable) ? "OK :: " : "FAIL :: ")
+      //                << Reason->getMessage() << "\n";
       isValid &= IsFixable;
 
       // Record all necessary parameters for later use.

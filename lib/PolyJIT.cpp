@@ -270,6 +270,13 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
 }
 }
 
+namespace polli {
+/// @brief Memory manager for PolyJIT.
+class PolyJITMemoryManager : public SectionMemoryManager {
+
+};
+}
+
 namespace llvm {
 
 ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
@@ -300,6 +307,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
     break;
   }
 
+
   TargetOptions Options;
   Options.UseSoftFloat = GenerateSoftFloatCalls;
   if (FloatABIForCalls != FloatABI::Default)
@@ -322,7 +330,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
   builder.setCodeModel(CMModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
-  builder.setMCJITMemoryManager(new SectionMemoryManager());
+  builder.setMCJITMemoryManager(new PolyJITMemoryManager());
   builder.setOptLevel(OLvl);
   builder.setTargetOptions(Options);
 

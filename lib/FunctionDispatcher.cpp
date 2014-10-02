@@ -24,7 +24,20 @@ void getRuntimeParameters(Function *F, unsigned paramc, char **params,
       Param P;
       P.Ty = IntTy;
       P.Name = Arg.getName();
-      P.Val = ConstantInt::get(IntTy, *params[i], true);
+      switch(IntTy->getBitWidth()) {
+      case 8:
+        P.Val = ConstantInt::get(IntTy, *(uint8_t *)params[i], true);
+        break;
+      case 16:
+        P.Val = ConstantInt::get(IntTy, *(uint16_t *)params[i], true);
+        break;
+      case 32:
+        P.Val = ConstantInt::get(IntTy, *(uint32_t *)params[i], true);
+        break;
+      case 64:
+        P.Val = ConstantInt::get(IntTy, *(uint64_t *)params[i], true);
+        break;
+      }
 
       ParamV.push_back(P);
     }
@@ -67,16 +80,8 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
   /* Perform a parameter specialization by taking the unchanged base function
    * and substitute all known parameter values.
    */
-  Function *NewF;
-
   Specializer.setParameters(K);
   Specializer.setSource(SourceF);
-  NewF = Specializer.start();
 
-  RuntimeOptimizer RTOpt;
-  RTOpt.Optimize(*NewF);
-
-//  DEBUG(log(Info, 2) << " specialize :: " << NewF->getName() << " (" << K
-//                     << ")\n");
-  return NewF;
+  return OptimizeForRuntime(Specializer.start());
 }

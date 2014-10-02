@@ -20,22 +20,14 @@
 using namespace llvm;
 
 namespace polli {
-/// @brief RuntimeOptimizer provides a small interface to control the
-//  optimization of specialized functions at run time.
-//
-//
-class RuntimeOptimizer {
-public:
-  explicit RuntimeOptimizer() {};
 
-  bool Optimize(Function &F);
-
-private:
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  RuntimeOptimizer(const RuntimeOptimizer &);
-  // DO NOT IMPLEMENT
-  const RuntimeOptimizer &operator=(const RuntimeOptimizer &);
-};
+/// @brief Optimize a function during the runtime of the program.
+//
+// We only perform relatively 'cheap' optimizations here, to avoid increasing
+// the run-time overhead by too much.
+//
+// @param F The function to optimize
+// @return The optimized function.
+Function *OptimizeForRuntime(Function *F);
 }
 #endif // RUNTIMEOPTIMIZER_H

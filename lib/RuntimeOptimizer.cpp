@@ -22,33 +22,43 @@
 #include "polli/Utils.h"               // for StoreModule
 #include "polly/Canonicalization.h"
 #include "polly/LinkAllPasses.h" // for createIslCodeGenerationPass, etc
+
+#include "llvm/Analysis/RegionInfo.h"
+
+#include "llvm/PassManager.h"
+#include "polly/ScopDetectionDiagnostic.h"
+#include "polly/ScopDetection.h"
+
 namespace llvm {
 class Function;
 }
 
 using namespace llvm;
+using namespace polly;
 
 namespace polli {
-bool RuntimeOptimizer::Optimize(Function &F) {
-//  DEBUG(log(Debug, 2) << " runtime :: optimizing " << F.getName()
-//                      << " for launch!\n");
+Function *OptimizeForRuntime(Function *F) {
+  Module *M = F->getParent();
+  FunctionPassManager PM = FunctionPassManager(M);
 
-  Module *M = F.getParent();
-  FunctionPassManager FPM = FunctionPassManager(M);
+  polly::ScopDetection *SD =
+      (polly::ScopDetection *)polly::createScopDetectionPass();
 
-  FPM.add(new DataLayoutPass());
-  FPM.add(llvm::createTypeBasedAliasAnalysisPass());
-  FPM.add(llvm::createBasicAliasAnalysisPass());
+  DEBUG(log(Debug) << "Optimizing (" << F->getName() << ") for run time\n");
+  PM.add(new DataLayoutPass());
+  PM.add(llvm::createTypeBasedAliasAnalysisPass());
+  PM.add(llvm::createBasicAliasAnalysisPass());
+  polly::registerCanonicalicationPasses(PM);
+  PM.add(SD);
+  PM.add(polly::createScopInfoPass());
+  PM.add(polly::createIslScheduleOptimizerPass());
+  PM.add(polly::createCodeGenerationPass());
 
-  polly::registerCanonicalicationPasses(FPM);
-
-  FPM.add(polly::createScopInfoPass());
-  FPM.add(polly::createIslScheduleOptimizerPass());
-  FPM.add(polly::createCodeGenerationPass());
-
-  bool result = FPM.run(F);
+  PM.run(*F);
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
-  return result;
+  DEBUG(log(Debug) << "Optimizing (" << F->getName() << ") finished.\n");
+
+  return F;
 }
 }
