@@ -44,7 +44,6 @@ Function *OptimizeForRuntime(Function *F) {
   polly::ScopDetection *SD =
       (polly::ScopDetection *)polly::createScopDetectionPass();
 
-  DEBUG(log(Debug) << "Optimizing (" << F->getName() << ") for run time\n");
   PM.add(new DataLayoutPass());
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
@@ -57,7 +56,6 @@ Function *OptimizeForRuntime(Function *F) {
   PM.run(*F);
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
-  DEBUG(log(Debug) << "Optimizing (" << F->getName() << ") finished.\n");
 
   return F;
 }

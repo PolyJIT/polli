@@ -14,27 +14,49 @@
 
 #ifndef PolyJIT_H
 #define PolyJIT_H
-
-#include <string>                       // for string
-#include <vector>                       // for vector
 #include "polli/Utils.h"
 
-namespace llvm { class ExecutionEngine; }
-namespace llvm { class Module; }
-namespace llvm { struct GenericValue; }
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+
+#include <string> // for string
+#include <vector> // for vector
 
 namespace llvm {
+class ExecutionEngine;
+class Module;
 class Function;
+struct GenericValue;
+}
+
+namespace polli {
+/// @brief Memory manager for PolyJIT.
+class PolyJITMemoryManager : public SectionMemoryManager {
+private:
+  uint64_t NumAllocatedDataSections;
+  uint64_t NumAllocatedCodeSections;
+  uint64_t AllocatedBytes;
+
+public:
+  explicit PolyJITMemoryManager() : AllocatedBytes(0) {}
+
+  void print(llvm::raw_ostream &OS);
+  uint64_t getSymbolAddress(const std::string &Name) override;
+  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID,
+                               StringRef SectionName) override;
+  uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID, StringRef SectionName,
+                               bool IsReadOnly) override;
+};
 
 class PolyJIT {
 public:
-  static PolyJIT *Get(Module *M = 0, bool NoLazyCompilation = false);
+  static PolyJIT *Get(Module *M = 0);
 
   // Creates a fresh ExecutionEngine for the given Module.
-  static ExecutionEngine *GetEngine(Module *M, bool = false);
+  ExecutionEngine *GetEngine(Module *M);
 
-  void setEntryFunction(std::string name) { EntryFn = name; }
-  ;
+  void setEntryFunction(std::string name) { EntryFn = name; };
 
   // JIT and run the Main function.
   //
@@ -62,7 +84,8 @@ public:
 private:
   static PolyJIT *Instance;
 
-  PolyJIT(ExecutionEngine *ee, Module *m) : EE(*ee), M(*m) {}
+  Module &M;
+  PolyJIT(Module &Main);
 
   PolyJIT(const PolyJIT &);
   ~PolyJIT() {}
@@ -76,12 +99,17 @@ private:
   };
   friend struct Sentinel;
 
-  ExecutionEngine &EE;
-  Module &M;
+  ExecutionEngine *EE;
   std::string EntryFn;
 
   /* The modules we create & manage during execution of the main module M. */
   ManagedModules Mods;
+
+  /* Code generation options for all jit'ed modules. */
+  TargetOptions Options;
+
+  /* Code gen optimization level for all jit'ed modules. */
+  CodeGenOpt::Level OLvl;
 
   /* Link extracted Scops into a module for execution. */
   void linkJitableScops(ManagedModules &, Module &);

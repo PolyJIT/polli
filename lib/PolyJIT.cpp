@@ -271,21 +271,44 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
 }
 
 namespace polli {
-/// @brief Memory manager for PolyJIT.
-class PolyJITMemoryManager : public SectionMemoryManager {
+static uint64_t __polli_dso_handle = 1;
 
-};
+void PolyJITMemoryManager::print(llvm::raw_ostream &OS) {
+  log(Info) << "Memory consumption:\n";
+  log(Info, 2) << "Allocated CodeSections: " << NumAllocatedCodeSections;
+  log(Info, 2) << "Allocated DataSections: " << NumAllocatedDataSections;
+  log(Info, 2) << "Allocated kBytes: " << AllocatedBytes / 1024;
 }
 
-namespace llvm {
+uint64_t
+PolyJITMemoryManager::getSymbolAddress(const std::string &Name) {
+  if (Name.find("__dso_handle") != std::string::npos)
+    return __polli_dso_handle;
+  return SectionMemoryManager::getSymbolAddress(Name);
+}
 
-ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
-  std::string ErrorMsg;
+uint8_t *
+PolyJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment,
+                                          unsigned SectionID,
+                                          StringRef SectionName) {
+  AllocatedBytes += Size;
+  NumAllocatedCodeSections++;
+  return SectionMemoryManager::allocateCodeSection(Size, Alignment, SectionID,
+                                                   SectionName);
+}
 
-  // If we are supposed to override the target triple, do so now.
-  if (!TargetTriple.empty())
-    M->setTargetTriple(Triple::normalize(TargetTriple));
+uint8_t *PolyJITMemoryManager::allocateDataSection(uintptr_t Size,
+                                                   unsigned Alignment,
+                                                   unsigned SectionID,
+                                                   StringRef SectionName,
+                                                   bool IsReadOnly) {
+  AllocatedBytes += Size;
+  NumAllocatedDataSections++;
+  return SectionMemoryManager::allocateDataSection(Size, Alignment, SectionID,
+                                                   SectionName, IsReadOnly);
+}
 
+PolyJIT::PolyJIT(Module &Main) : M(Main) {
   CodeGenOpt::Level OLvl = CodeGenOpt::Default;
   switch (OptLevel) {
   default:
@@ -307,8 +330,6 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
     break;
   }
 
-
-  TargetOptions Options;
   Options.UseSoftFloat = GenerateSoftFloatCalls;
   if (FloatABIForCalls != FloatABI::Default)
     Options.FloatABIType = FloatABIForCalls;
@@ -318,6 +339,23 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M, bool) {
   // Remote target execution doesn't handle EH or debug registration.
   Options.JITEmitDebugInfo = EmitJitDebugInfo;
   Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
+
+  EE = GetEngine(&M);
+
+  // The following functions have no effect if their respective profiling
+  // support wasn't enabled in the build configuration.
+  EE->RegisterJITEventListener(
+      JITEventListener::createOProfileJITEventListener());
+  EE->RegisterJITEventListener(
+      JITEventListener::createIntelJITEventListener());
+}
+
+ExecutionEngine *PolyJIT::GetEngine(Module *M) {
+  std::string ErrorMsg;
+
+  // If we are supposed to override the target triple, do so now.
+  if (!TargetTriple.empty())
+    M->setTargetTriple(Triple::normalize(TargetTriple));
 
   std::unique_ptr<Module> Owner(M);
 
@@ -375,7 +413,7 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
         cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt32Ty(Ctx), PtoArr, NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
-    EE.addGlobalMapping(PJITCB, (void *)&pjit_callback);
+    EE->addGlobalMapping(PJITCB, (void *)&pjit_callback);
 
     std::vector<Value *> Args(3);
 
@@ -497,7 +535,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     NewM->setModuleIdentifier(
         (M->getModuleIdentifier() + "." + F->getName()).str());
 
-    Mods[NewM] = &EE;
+    Mods[NewM] = EE;
 
     MovingFunctionCloner MoveCloner(VMap, NewM);
     InstrumentingFunctionCloner InstCloner(VMap, NewM);
@@ -568,14 +606,14 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 
   int ret = 0;
   // Make the object executable.
-  EE.finalizeObject();
+  EE->finalizeObject();
 
   if (!DisableExecution) {
     log(Info) << "run :: starting execution\n";
 
     // Run static constructors.
-    EE.runStaticConstructorsDestructors(false);
-    ret = EE.runFunctionAsMain(Main, inputArgs, envp);
+    EE->runStaticConstructorsDestructors(false);
+    ret = EE->runFunctionAsMain(Main, inputArgs, envp);
 
     log(Info) << "run :: execution finished (" << ret << ")\n";
   }
@@ -609,7 +647,7 @@ int PolyJIT::shutdown(int result) {
   );
 
   // Run static destructors.
-  EE.runStaticConstructorsDestructors(true);
+  EE->runStaticConstructorsDestructors(true);
 
   // If the program doesn't explicitly call exit, we will need the Exit
   // function later on to make an explicit call, so get the function now.
@@ -623,7 +661,7 @@ int PolyJIT::shutdown(int result) {
     GenericValue ResultGV;
     ResultGV.IntVal = APInt(32, result);
     Args.push_back(ResultGV);
-    EE.runFunction(ExitF, Args);
+    EE->runFunction(ExitF, Args);
     log(Error) << "ERROR: exit(" << result << ") returned!\n";
     abort();
   } else {
@@ -639,22 +677,9 @@ int PolyJIT::shutdown(int result) {
 };
 
 PolyJIT *PolyJIT::Instance = NULL;
-PolyJIT *PolyJIT::Get(Module *M, bool NoLazyCompilation) {
+PolyJIT *PolyJIT::Get(Module *M) {
   if (!Instance) {
-    ExecutionEngine *EE = PolyJIT::GetEngine(M);
-
-    if (!EE)
-      return NULL;
-
-    // The following functions have no effect if their respective profiling
-    // support wasn't enabled in the build configuration.
-    EE->RegisterJITEventListener(
-        JITEventListener::createOProfileJITEventListener());
-    EE->RegisterJITEventListener(
-        JITEventListener::createIntelJITEventListener());
-    EE->DisableLazyCompilation(NoLazyCompilation);
-
-    Instance = new PolyJIT(EE, M);
+    Instance = new PolyJIT(*M);
   }
   return Instance;
 };

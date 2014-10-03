@@ -186,18 +186,25 @@ static unsigned eraseAllChildren(std::set<const Region *> &Regs,
   return Count;
 }
 
+#include <sstream>
 static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
-  log(Debug, 2) << "valid scops ::\n";
+  std::stringstream Messages;
+  int ValidScopCount = 0;
   for (ScopDetection::const_iterator i = SD.begin(), ie = SD.end(); i != ie;
-       ++i) {
+       ++i, ++ValidScopCount) {
     const Region *R = (*i);
     AllScops.insert(R);
 
     unsigned LineBegin, LineEnd;
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
-    log(Debug, 4) << FileName << ":" << LineBegin << ":" << LineEnd << " - "
-                  << R->getNameStr() << "\n";
+    Messages << "    " << FileName << ":" << LineBegin << ":" << LineEnd
+             << " - " << R->getNameStr() << "\n";
+  }
+
+  if (ValidScopCount > 0) {
+    log(Debug, 2) << "valid scops ::\n";
+    log(Debug) << Messages.str();
   }
 }
 
@@ -214,7 +221,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  log(Info) << "jit-scops :: " << F.getName() << "\n";
+  DEBUG(log(Info) << "jit-scops :: " << F.getName() << "\n");
   DEBUG(printValidScops(AccumulatedScops, *SD));
 
   if (!Enabled)
@@ -228,6 +235,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
     unsigned LineBegin, LineEnd;
     std::string FileName;
+    DEBUG(
     getDebugLocation(R, LineBegin, LineEnd, FileName);
     if (FileName.size() > 0) {
       log(Info, 2) << "check :: " << FileName << ":" << LineBegin << ":"
@@ -235,6 +243,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
     } else {
       log(Info, 2) << "check :: " << R->getNameStr() << "\n";
     }
+    );
 
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
@@ -280,7 +289,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        log(Info, 2) << "check :: is jitable\n";
+        DEBUG(log(Info, 2) << "check :: is jitable\n");
         printParameters(RequiredParams[R]);
 
         AccumulatedScops.insert(R);

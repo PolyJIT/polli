@@ -155,7 +155,7 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
-  PolyJIT *pjit = PolyJIT::Get(Mod.get());
+  polli::PolyJIT *pjit = polli::PolyJIT::Get(Mod.get());
 
   if (!pjit) {
     errs() << argv[0] << ": error creating PolyJIT\n";
