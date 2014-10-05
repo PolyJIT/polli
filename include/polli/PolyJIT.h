@@ -47,6 +47,8 @@ public:
   uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
                                unsigned SectionID, StringRef SectionName,
                                bool IsReadOnly) override;
+
+  virtual ~PolyJITMemoryManager() override;
 };
 
 class PolyJIT {
@@ -104,6 +106,7 @@ private:
 
   /* The modules we create & manage during execution of the main module M. */
   ManagedModules Mods;
+  PolyJITMemoryManager MemMan;
 
   /* Code generation options for all jit'ed modules. */
   TargetOptions Options;

@@ -275,9 +275,14 @@ static uint64_t __polli_dso_handle = 1;
 
 void PolyJITMemoryManager::print(llvm::raw_ostream &OS) {
   log(Info) << "Memory consumption:\n";
-  log(Info, 2) << "Allocated CodeSections: " << NumAllocatedCodeSections;
-  log(Info, 2) << "Allocated DataSections: " << NumAllocatedDataSections;
-  log(Info, 2) << "Allocated kBytes: " << AllocatedBytes / 1024;
+  log(Info, 2) << "Allocated CodeSections: " << NumAllocatedCodeSections
+               << "\n";
+  log(Info, 2) << "Allocated DataSections: " << NumAllocatedDataSections
+               << "\n";
+  log(Info, 2) << "Allocated kBytes: " << AllocatedBytes / 1024 << "\n";
+}
+
+PolyJITMemoryManager::~PolyJITMemoryManager() {
 }
 
 uint64_t
@@ -368,7 +373,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   builder.setCodeModel(CMModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
-  builder.setMCJITMemoryManager(new PolyJITMemoryManager());
+  builder.setMCJITMemoryManager(&MemMan);
   builder.setOptLevel(OLvl);
   builder.setTargetOptions(Options);
 
@@ -644,6 +649,9 @@ int PolyJIT::shutdown(int result) {
       VariantFunctionTy VarFun = Elem.second;
       VarFun->print(log(LogType::Debug));
     }
+
+    log(Debug) << "\n";
+    MemMan.print(log(Debug));
   );
 
   // Run static destructors.
