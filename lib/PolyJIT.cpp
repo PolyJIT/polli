@@ -60,6 +60,7 @@
 #include "llvm/Support/raw_ostream.h"    // for raw_ostream, errs
 #include "llvm/Target/TargetOptions.h"   // for ABIType, TargetOptions, etc
 #include "llvm/Transforms/IPO.h"         // for createStripSymbolsPass
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/ValueMapper.h" // for ValueToValueMapTy
 #include "papi.h"                              // for PAPI_flops
@@ -106,14 +107,16 @@ Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
-static cl::opt<bool> EnableCaddy("caddy", cl::desc("Enable Caddy"),
-                                 cl::init(false), cl::cat(PolliCategory));
+static cl::opt<bool>
+    EnableCaddy("caddy",
+                cl::desc("Enable Caddy. Requires the 'caddy' branch of polly."),
+                cl::init(false), cl::cat(PolliCategory));
 
 static cl::opt<bool>
 InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
                   cl::init(false), cl::cat(PolliCategory));
 
-cl::opt<bool> EnableJitable("jitable", cl::desc("Enable Non AffineSCoPs"),
+cl::opt<bool> EnableJitable("jitable", cl::desc("Enable JIT extensions."),
                             cl::init(false), cl::cat(PolliCategory));
 
 static cl::opt<bool>
@@ -123,6 +126,11 @@ DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
 static cl::opt<bool> DisableExecution(
     "no-execution",
     cl::desc("Disable execution just produce all intermediate files"),
+    cl::init(false), cl::cat(PolliCategory));
+
+static cl::opt<bool> AnalyzeIR(
+    "polli-analyze",
+    cl::desc("Only analyze the IR. This disables recompilation & execution."),
     cl::init(false), cl::cat(PolliCategory));
 
 // Determine optimization level.
@@ -135,8 +143,6 @@ static cl::opt<std::string> OutputFilename("o",
                                            cl::desc("Override output filename"),
                                            cl::value_desc("filename"));
 
-static cl::opt<bool> AnalyzeIR("polli-analyze", cl::desc("Only analyze the IR"),
-                               cl::init(false), cl::cat(PolliCategory));
 
 cl::opt<std::string>
 TargetTriple("mtriple", cl::desc("Override target triple for module"));
@@ -355,6 +361,10 @@ PolyJIT::PolyJIT(Module &Main) : M(Main) {
       JITEventListener::createIntelJITEventListener());
 }
 
+// @brief Get a new Execution engine for the given module.
+//
+// @param M The module that needs a new execution engine.
+// @result A new execution engine for M.
 ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   std::string ErrorMsg;
 
@@ -380,6 +390,17 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   return builder.create();
 }
 
+// @brief Run a specialized version of a function.
+//
+// The specialized version needs to be in 'main' form, i.e., its signature
+// has to be:
+//  void fn_name(int argc, char **argv);
+//
+// The FunctionCloner's MainCreator policy takes care of that. All the real
+// parameters are passed via argv.
+//
+// @param NewF the specialized function in main form.
+// @param ArgValues the parameter _values_ for the formal parameters.
 void
 PolyJIT::runSpecializedFunction(Function *NewF,
                                 const std::vector<GenericValue> &ArgValues) {
@@ -402,8 +423,13 @@ PolyJIT::runSpecializedFunction(Function *NewF,
   NewEE->runFunction(NewF, ArgValues);
 }
 
+// @brief Place the call to the polli runtime inside all extracted SCoPs.
+//
+// @param M
+// @param Mods the set of managed modules.
+//
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
-  log(LogType::Info) << "inject :: insert call to JIT runtime\n";
+  DEBUG(log(LogType::Info) << "inject :: insert call to JIT runtime\n");
   LLVMContext &Ctx = M.getContext();
   IRBuilder<> Builder(Ctx);
 
@@ -488,7 +514,7 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   for (ManagedModules::iterator src = Mods.begin(), se = Mods.end(); src != se;
        ++src) {
     Module *M = (*src).first;
-    log(Info, 2) << "link :: " << M->getModuleIdentifier() << "\n";
+    DEBUG(log(Info, 2) << "link :: " << M->getModuleIdentifier() << "\n");
     if (L.linkInModule(M, Linker::PreserveSource, &ErrorMsg))
       log(Error, 2) << "ERROR while linking. MESSAGE: " << ErrorMsg << "\n";
   }
@@ -521,7 +547,7 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   PM.run(M);
 
-  log(Info, 2) << "link :: create final module\n";
+  DEBUG(log(Info, 2) << "link :: create final module\n");
   ValueToValueMapTy VMap;
 
   /* Move the extracted SCoP functions into separate modules. */
@@ -614,13 +640,13 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   EE->finalizeObject();
 
   if (!DisableExecution) {
-    log(Info) << "run :: starting execution\n";
+    DEBUG(log(Info) << "run :: starting execution\n");
 
     // Run static constructors.
     EE->runStaticConstructorsDestructors(false);
     ret = EE->runFunctionAsMain(Main, inputArgs, envp);
 
-    log(Info) << "run :: execution finished (" << ret << ")\n";
+    DEBUG(log(Info) << "run :: execution finished (" << ret << ")\n");
   }
 
   return ret;
@@ -632,7 +658,7 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   registerCanonicalicationPasses(FPM);
   FPM.doInitialization();
 
-  log(Info) << "preopt :: applying preoptimization:\n";
+  DEBUG(log(Info) << "preopt :: applying preoptimization:\n");
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
     if (f->isDeclaration())
       continue;

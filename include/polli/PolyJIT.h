@@ -117,6 +117,11 @@ private:
   /* Link extracted Scops into a module for execution. */
   void linkJitableScops(ManagedModules &, Module &);
 
+  // Optimize the module before executing it for the first time.
+  //
+  // @params M The 'main' module we prepare for execution.
+  void prepareOptimizedIR(Module &M);
+
   /* Instrument extracted Scops with a callback to the JIT */
   void instrumentScops(Module &, ManagedModules &);
 

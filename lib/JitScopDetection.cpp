@@ -80,13 +80,8 @@ public:
 };
 
 class AliasingLogChecker : public RejectLogChecker<AliasingLogChecker, bool> {
-  const Region *R;
-  Function &F;
-
-  ScalarEvolution *SE;
-
 public:
-  AliasingLogChecker(Function &F, const Region *R) : R(R), F(F) {}
+  AliasingLogChecker(Function &, const Region *) {}
 
   bool checkNonAffineAccess(ReportNonAffineAccess *Reason) { return false; }
   bool checkNonAffineBranch(ReportNonAffBranch *Reason) { return false; }
@@ -162,10 +157,10 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 static void printParameters(ParamList &L) {
-  log(Info, 4) << "params :: ";
+  DEBUG(log(Info, 4) << "params :: ");
   for (const SCEV *S : L)
     S->print(outs().indent(2));
-  outs() << "\n";
+  DEBUG(log(Info) << "\n");
 }
 
 // Remove all direct and indirect children of region R from the region set Regs,
