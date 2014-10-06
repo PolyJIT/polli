@@ -616,7 +616,7 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   // Add O3.
   PassManagerBuilder Builder;
   Builder.Inliner = createFunctionInliningPass(OptLevel);
-  Builder.OptLevel = 3;
+  Builder.OptLevel = OptLevel;
   Builder.populateModulePassManager(PM);
 
   FunctionPassManager FPM(&M);
