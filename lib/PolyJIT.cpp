@@ -599,6 +599,40 @@ void PolyJIT::extractJitableScops(Module &M) {
     StoreModule(M, M.getModuleIdentifier() + ".extr");
 }
 
+void PolyJIT::prepareOptimizedIR(Module &M) {
+  PassManager PM;
+
+  polly::ScopDetection *SD =
+      (polly::ScopDetection *)polly::createScopDetectionPass();
+
+  PM.add(new DataLayoutPass());
+  PM.add(llvm::createTypeBasedAliasAnalysisPass());
+  PM.add(llvm::createBasicAliasAnalysisPass());
+  PM.add(SD);
+  PM.add(polly::createScopInfoPass());
+  PM.add(polly::createIslScheduleOptimizerPass());
+  PM.add(polly::createCodeGenerationPass());
+
+  // Add O3.
+  PassManagerBuilder Builder;
+  Builder.Inliner = createFunctionInliningPass(OptLevel);
+  Builder.OptLevel = 3;
+  Builder.populateModulePassManager(PM);
+
+  FunctionPassManager FPM(&M);
+  Builder.populateFunctionPassManager(FPM);
+
+  // Optimize the functions.
+  for (Function &F : M) {
+    FPM.doInitialization();
+    FPM.run(F);
+    FPM.doFinalization();
+  }
+
+  // Optimize the whole module.
+  PM.run(M);
+}
+
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char *const *envp) {
   Function *Main = M.getFunction(EntryFn);
@@ -630,6 +664,9 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 
   /* Get the Scops back */
   linkJitableScops(Mods, M);
+
+  /* Optimize with O3&Polly */
+  prepareOptimizedIR(M);
 
   /* Store module before execution */
   if (OutputFilename.size() > 0)
