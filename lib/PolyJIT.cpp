@@ -107,58 +107,56 @@ Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
-static cl::opt<bool>
+cl::opt<bool>
     EnableCaddy("caddy",
                 cl::desc("Enable Caddy. Requires the 'caddy' branch of polly."),
                 cl::init(false), cl::cat(PolliCategory));
 
-static cl::opt<bool>
-InstrumentRegions("instrument", cl::desc("Enable instrumenting of SCoPs"),
-                  cl::init(false), cl::cat(PolliCategory));
+cl::opt<bool> InstrumentRegions("instrument",
+                                cl::desc("Enable instrumenting of SCoPs"),
+                                cl::init(false), cl::cat(PolliCategory));
 
 cl::opt<bool> EnableJitable("jitable", cl::desc("Enable JIT extensions."),
                             cl::init(false), cl::cat(PolliCategory));
 
-static cl::opt<bool>
-DisableRecompile("no-recompilation", cl::desc("Disable recompilation of SCoPs"),
-                 cl::init(false), cl::cat(PolliCategory));
+cl::opt<bool> DisableRecompile("no-recompilation",
+                               cl::desc("Disable recompilation of SCoPs"),
+                               cl::init(false), cl::cat(PolliCategory));
 
-static cl::opt<bool> DisableExecution(
+cl::opt<bool> DisableExecution(
     "no-execution",
     cl::desc("Disable execution just produce all intermediate files"),
     cl::init(false), cl::cat(PolliCategory));
 
-static cl::opt<bool> AnalyzeIR(
+cl::opt<bool> AnalyzeIR(
     "polli-analyze",
     cl::desc("Only analyze the IR. This disables recompilation & execution."),
     cl::init(false), cl::cat(PolliCategory));
 
-// Determine optimization level.
 cl::opt<char> OptLevel("O",
                        cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
                                 "(default = '-O2')"),
                        cl::Prefix, cl::ZeroOrMore, cl::init(' '));
 
-static cl::opt<std::string> OutputFilename("o",
-                                           cl::desc("Override output filename"),
-                                           cl::value_desc("filename"));
-
+cl::opt<std::string> OutputFilename("o", cl::desc("Override output filename"),
+                                    cl::value_desc("filename"));
 
 cl::opt<std::string>
-TargetTriple("mtriple", cl::desc("Override target triple for module"));
+    TargetTriple("mtriple", cl::desc("Override target triple for module"));
 
 cl::opt<std::string>
-MArch("march",
-      cl::desc("Architecture to generate assembly for (see --version)"));
+    MArch("march",
+          cl::desc("Architecture to generate assembly for (see --version)"));
 
 cl::opt<std::string>
-MCPU("mcpu", cl::desc("Target a specific cpu type (-mcpu=help for details)"),
-     cl::value_desc("cpu-name"), cl::init(""));
+    MCPU("mcpu",
+         cl::desc("Target a specific cpu type (-mcpu=help for details)"),
+         cl::value_desc("cpu-name"), cl::init(""));
 
 cl::list<std::string>
-MAttrs("mattr", cl::CommaSeparated,
-       cl::desc("Target specific attributes (-mattr=help for details)"),
-       cl::value_desc("a1,+a2,-a3,..."));
+    MAttrs("mattr", cl::CommaSeparated,
+           cl::desc("Target specific attributes (-mattr=help for details)"),
+           cl::value_desc("a1,+a2,-a3,..."));
 
 cl::opt<Reloc::Model> RelocModel(
     "relocation-model", cl::desc("Choose relocation model"),
@@ -173,21 +171,21 @@ cl::opt<Reloc::Model> RelocModel(
                    "Relocatable external references, non-relocatable code"),
         clEnumValEnd));
 
-cl::opt<llvm::CodeModel::Model>
-CMModel("code-model", cl::desc("Choose code model"),
-        cl::init(CodeModel::JITDefault),
-        cl::values(clEnumValN(CodeModel::JITDefault, "default",
-                              "Target default JIT code model"),
-                   clEnumValN(CodeModel::Small, "small", "Small code model"),
-                   clEnumValN(CodeModel::Kernel, "kernel", "Kernel code model"),
-                   clEnumValN(CodeModel::Medium, "medium", "Medium code model"),
-                   clEnumValN(CodeModel::Large, "large", "Large code model"),
-                   clEnumValEnd));
+cl::opt<llvm::CodeModel::Model> CMModel(
+    "code-model", cl::desc("Choose code model"),
+    cl::init(CodeModel::JITDefault),
+    cl::values(clEnumValN(CodeModel::JITDefault, "default",
+                          "Target default JIT code model"),
+               clEnumValN(CodeModel::Small, "small", "Small code model"),
+               clEnumValN(CodeModel::Kernel, "kernel", "Kernel code model"),
+               clEnumValN(CodeModel::Medium, "medium", "Medium code model"),
+               clEnumValN(CodeModel::Large, "large", "Large code model"),
+               clEnumValEnd));
 
 cl::opt<bool>
-EnableJITExceptionHandling("jit-enable-eh",
-                           cl::desc("Emit exception handling information"),
-                           cl::init(false));
+    EnableJITExceptionHandling("jit-enable-eh",
+                               cl::desc("Emit exception handling information"),
+                               cl::init(false));
 
 cl::opt<bool> GenerateSoftFloatCalls(
     "soft-float", cl::desc("Generate software floating point library calls"),
@@ -210,15 +208,15 @@ cl::opt<bool>
 #else
 #define EMIT_DEBUG true
 #endif
-EmitJitDebugInfo("jit-emit-debug",
-                 cl::desc("Emit debug information to debugger"),
-                 cl::init(EMIT_DEBUG));
+    EmitJitDebugInfo("jit-emit-debug",
+                     cl::desc("Emit debug information to debugger"),
+                     cl::init(EMIT_DEBUG));
 #undef EMIT_DEBUG
 
-static cl::opt<bool>
-EmitJitDebugInfoToDisk("jit-emit-debug-to-disk", cl::Hidden,
-                       cl::desc("Emit debug info objfiles to disk"),
-                       cl::init(false));
+cl::opt<bool>
+    EmitJitDebugInfoToDisk("jit-emit-debug-to-disk", cl::Hidden,
+                           cl::desc("Emit debug info objfiles to disk"),
+                           cl::init(false));
 
 class StaticInitializer {
 public:

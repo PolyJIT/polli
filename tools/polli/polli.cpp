@@ -55,7 +55,7 @@
 
 using namespace llvm;
 
-namespace {
+namespace llvm {
   // Runtime Options
   cl::list<std::string> LibPaths("L", cl::Prefix,
     cl::desc("Specify a library search path"),
