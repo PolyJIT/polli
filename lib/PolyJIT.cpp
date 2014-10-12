@@ -705,15 +705,11 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
 int PolyJIT::shutdown(int result) {
   LLVMContext &Context = M.getContext();
 
-  DEBUG(
-    for (const auto &Elem : Disp->functions()) {
-      VariantFunctionTy VarFun = Elem.second;
-      VarFun->print(log(LogType::Debug));
-    }
-
-    log(Debug) << "\n";
-    MemMan.print(log(Debug));
-  );
+  for (const auto &Elem : Disp->functions()) {
+    VariantFunctionTy VarFun = Elem.second;
+    VarFun->print(log(LogType::Info));
+  }
+  MemMan.print(log(Info));
 
   // Run static destructors.
   EE->runStaticConstructorsDestructors(true);

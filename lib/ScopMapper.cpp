@@ -60,12 +60,12 @@ bool ScopMapper::runOnFunction(Function &F) {
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
 
-    log(Info) << " mapper :: extract :: " << FileName << ":" << LineBegin << ":"
-              << LineEnd << " - " << R->getNameStr() << "\n";
+    DEBUG(log(Debug) << " mapper :: extract :: " << FileName << ":" << LineBegin
+                     << ":" << LineEnd << " - " << R->getNameStr() << "\n");
 
     if (Extractor.isEligible()) {
       Function *ExtractedF = Extractor.extractCodeRegion();
-      log(Debug, 2) << " into: " << ExtractedF->getName() << "\n";
+      DEBUG(log(Debug, 2) << " into: " << ExtractedF->getName() << "\n");
 
       if (ExtractedF) {
         ExtractedF->setLinkage(GlobalValue::ExternalLinkage);

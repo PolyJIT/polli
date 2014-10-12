@@ -41,9 +41,6 @@ GenerateOutput("polli-debug-ir",
 
 llvm::raw_ostream &log(const LogType T, const size_t Level) {
   switch (T) {
-  case Info:
-    return errs().indent(Level).resetColor() << " :: ";
-    break;
   case Debug:
     dbgs().changeColor(raw_ostream::Colors::GREEN) << " D ";
     return dbgs().indent(Level).resetColor() << " :: ";
@@ -55,6 +52,9 @@ llvm::raw_ostream &log(const LogType T, const size_t Level) {
   case Error:
     errs().changeColor(raw_ostream::Colors::RED) << " E ";
     return errs().indent(Level).resetColor() << " :: ";
+    break;
+  case Info:
+    return errs().indent(Level).resetColor();
     break;
   }
 }

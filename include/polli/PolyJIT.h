@@ -51,47 +51,91 @@ public:
   virtual ~PolyJITMemoryManager() override;
 };
 
+/**
+ * @brief The PolyJIT. Execute arbitrary code powered by MCJIT.
+ *
+ * TODO: longer explanation needs to go here.
+ */
 class PolyJIT {
 public:
+  /**
+   * @brief Get the singleton instance.
+   *
+   * @param M
+   *
+   * @return The current PolyJIT instance.
+   */
   static PolyJIT *Get(Module *M = 0);
 
-  // Creates a fresh ExecutionEngine for the given Module.
+  /**
+   * @brief Creates a fresh ExecutionEngine for the given Module.
+   *
+   * @param M The module we need a fresh execution engine for.
+   *
+   * @return A new execution engine for the module.
+   */
   ExecutionEngine *GetEngine(Module *M);
 
+  /**
+   * @brief Setter for the JIT's EntryFn.
+   *
+   * @param name The entry function's name.
+   */
   void setEntryFunction(std::string name) { EntryFn = name; };
 
-  // JIT and run the Main function.
-  //
-  // Before execution the Module preoptimizes every
-  // module for use with Polly.
-  // Afterwards n phases are executed:
-  //
+  /**
+   * @brief Run the EntryFn. Starts this PolyJIT session.
+   *
+   * @param inputArgs
+   * @param envp
+   *
+   * @return
+   */
   int runMain(const std::vector<std::string> &inputArgs,
               const char *const *envp);
 
+  /**
+   * @brief Shutdown the JIT and clean up the mess we made.
+   *
+   * Before we actually do the cleanup, we print some nice stats about the
+   * current session.
+   *
+   * @param result Our exit-code
+   *
+   * @return
+   */
   int shutdown(int result);
 
+  /**
+   * @brief Getter for the 'main' module.
+   *
+   * @return Reference to the main module.
+   */
   Module &getExecutedModule() { return M; }
 
-  /* Execute a function with the given arguments.
-     The function needs to follow the "main" format:
-
-     i32 main(i32 argc, i8** params);
-
-     The function dispatcher is capable of providing this
-     structure. */
+  /**
+   * @brief Execute a specialized function.
+   *
+   * Executes a specialized function by applying it to the given list of
+   * argument values.
+   *  The function needs to follow the "main" format:
+   *
+   *  i32 main(i32 argc, i8** params);
+   *
+   * @param NewF The function to execute
+   * @param ArgValues A list of parameter values to the apply the function to.
+   */
   void runSpecializedFunction(Function *NewF,
                               const std::vector<GenericValue> &ArgValues);
 
 private:
+  /**
+   * @name Hidden, because singleton.
+   * @{ */
   static PolyJIT *Instance;
-
-  Module &M;
   PolyJIT(Module &Main);
-
   PolyJIT(const PolyJIT &);
   ~PolyJIT() {}
-
   struct Sentinel {
   public:
     ~Sentinel() {
@@ -100,32 +144,79 @@ private:
     }
   };
   friend struct Sentinel;
+  /**  @} */
 
+  /**
+   * @brief Our 'main' module we work on.
+   */
+  Module &M;
+
+  /**
+   * @brief Our default 'main' execution engine.
+   * TODO: Why do I store it in here, check that again.
+   */
   ExecutionEngine *EE;
+
+  /**
+   * @brief Our EntryFn, usually it is main()
+   */
   std::string EntryFn;
 
-  /* The modules we create & manage during execution of the main module M. */
+  /**
+   * @brief The set of modules this PolyJIT hast to deal with.
+   */
   ManagedModules Mods;
+
+  /**
+   * @brief Our memory manager, keeps track of all emitted objects.
+   */
   PolyJITMemoryManager MemMan;
 
-  /* Code generation options for all jit'ed modules. */
+  /**
+   * @brief TargetOptions to be used for all execution engines.
+   */
   TargetOptions Options;
 
-  /* Code gen optimization level for all jit'ed modules. */
+  /**
+   * @brief CodeGen optimization level for all modules emitted by the JIT.
+   */
   CodeGenOpt::Level OLvl;
 
-  /* Link extracted Scops into a module for execution. */
+  /**
+   * @brief Link extracted Scops into a module for execution.
+   *
+   * @param The set of managed modules to link into a single one.
+   * @param The module to link into.
+   */
   void linkJitableScops(ManagedModules &, Module &);
 
-  // Optimize the module before executing it for the first time.
-  //
-  // @params M The 'main' module we prepare for execution.
+  /**
+   * @brief Optimize the module before executing it for the first time.
+   *
+   * @param M The 'main' module we prepare for execution.
+   */
   void prepareOptimizedIR(Module &M);
 
-  /* Instrument extracted Scops with a callback to the JIT */
+  /**
+   * @brief Instrument extracted Scops with a callback to the JIT
+   *
+   * @param
+   * @param
+   */
   void instrumentScops(Module &, ManagedModules &);
 
+  /**
+   * @brief Extract all jitable Scops into a separate module
+   *
+   * @param The module to extract all jitable Scops from
+   */
   void extractJitableScops(Module &);
+
+  /**
+   * @brief Run Polly's default set of preoptimization on a module.
+   *
+   * @param The module to run the preoptimization on.
+   */
   void runPollyPreoptimizationPasses(Module &);
 };
 
