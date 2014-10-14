@@ -49,14 +49,18 @@ namespace polli {
  */
 class PapiCScopProfilingInit : public ModulePass {
 public:
-  static char ID;
   explicit PapiCScopProfilingInit() : ModulePass(ID) {};
 
+  /**
+   * @name ModulePass interface
+   * @{ */
+  static char ID;
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.setPreservesAll();
   }
 
   virtual bool runOnModule(Module &M);
+  /**  @} */
 };
 
 /**
@@ -64,9 +68,12 @@ public:
  */
 class PapiCScopProfiling : public FunctionPass {
 public:
-  static char ID;
-
   explicit PapiCScopProfiling() : FunctionPass(ID) {}
+
+  /**
+   * @name FunctionPass interface
+   * @{ */
+  static char ID;
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetection>();
@@ -75,6 +82,7 @@ public:
   }
 
   virtual bool runOnFunction(Function &);
+  /**  @} */
 
 private:
   LoopInfo *LI;
