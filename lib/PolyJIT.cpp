@@ -234,6 +234,15 @@ static StaticInitializer InitializeEverything;
 static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
+/**
+ * @brief Runtime callback for PolyJIT.
+ *
+ * All calls to the PolyJIT runtime will land here.
+ *
+ * @param fName The function name we want to call.
+ * @param paramc number of arguments of the function we want to call
+ * @param params arugments of the function we want to call.
+ */
 static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   /* Let's hope that we have called it before ;-)
    * Otherwise it will blow up. FIXME: Don't blow up. */
@@ -277,6 +286,11 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
 namespace polli {
 static uint64_t __polli_dso_handle = 1;
 
+/**
+ * @brief Print statistics about the memory consumption for this manager.
+ *
+ * @param OS the outstream we print to.
+ */
 void PolyJITMemoryManager::print(llvm::raw_ostream &OS) {
   log(Info) << "Memory consumption:\n";
   log(Info, 2) << "Allocated CodeSections: " << NumAllocatedCodeSections
@@ -296,6 +310,18 @@ PolyJITMemoryManager::getSymbolAddress(const std::string &Name) {
   return SectionMemoryManager::getSymbolAddress(Name);
 }
 
+/**
+ * @brief Allocate a new code section.
+ *
+ * We just override it to track the amount of memory allocated.
+ *
+ * @param Size
+ * @param Alignment
+ * @param SectionID
+ * @param SectionName
+ *
+ * @return pointer to the allocated code section.
+ */
 uint8_t *
 PolyJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment,
                                           unsigned SectionID,
@@ -306,6 +332,19 @@ PolyJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment,
                                                    SectionName);
 }
 
+/**
+ * @brief Allocate a new data section.
+ *
+ * We just override it to track the amount of memory allocated.
+ *
+ * @param Size
+ * @param Alignment
+ * @param SectionID
+ * @param SectionName
+ * @param IsReadOnly
+ *
+ * @return pointer to the allocated data section
+ */
 uint8_t *PolyJITMemoryManager::allocateDataSection(uintptr_t Size,
                                                    unsigned Alignment,
                                                    unsigned SectionID,
@@ -359,10 +398,13 @@ PolyJIT::PolyJIT(Module &Main) : M(Main) {
       JITEventListener::createIntelJITEventListener());
 }
 
-// @brief Get a new Execution engine for the given module.
-//
-// @param M The module that needs a new execution engine.
-// @result A new execution engine for M.
+/**
+ * @brief Get a new Execution engine for the given module.
+ *
+ * @param M The module that needs a new execution engine.
+ *
+ * @return A new execution engine for M.
+ */
 ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   std::string ErrorMsg;
 
@@ -388,17 +430,19 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   return builder.create();
 }
 
-// @brief Run a specialized version of a function.
-//
-// The specialized version needs to be in 'main' form, i.e., its signature
-// has to be:
-//  void fn_name(int argc, char **argv);
-//
-// The FunctionCloner's MainCreator policy takes care of that. All the real
-// parameters are passed via argv.
-//
-// @param NewF the specialized function in main form.
-// @param ArgValues the parameter _values_ for the formal parameters.
+/**
+ * @brief Run a specialized version of a function.
+ *
+ * The specialized version needs to be in 'main' form, i.e., its signature
+ * has to be:
+ *  void fn_name(int argc, char **argv);
+ *
+ * The FunctionCloner's MainCreator policy takes care of that. All the real
+ * parameters are passed via argv.
+ *
+ * @param NewF the specialized function in main form.
+ * @param ArgValues the parameter _values_ for the formal parameters.
+ */
 void
 PolyJIT::runSpecializedFunction(Function *NewF,
                                 const std::vector<GenericValue> &ArgValues) {
@@ -421,11 +465,12 @@ PolyJIT::runSpecializedFunction(Function *NewF,
   NewEE->runFunction(NewF, ArgValues);
 }
 
-// @brief Place the call to the polli runtime inside all extracted SCoPs.
-//
-// @param M
-// @param Mods the set of managed modules.
-//
+/**
+ * @brief Place the call to the polli runtime inside all extracted SCoPs.
+ *
+ * @param M
+ * @param Mods the set of managed modules.
+ */
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   DEBUG(log(LogType::Info) << "inject :: insert call to JIT runtime\n");
   LLVMContext &Ctx = M.getContext();
@@ -504,6 +549,12 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   }
 }
 
+/**
+ * @brief Link extracted Scops into a module for execution.
+ *
+ * @param The set of managed modules to link into a single one.
+ * @param The module to link into.
+ */
 void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   Linker L(&M);
 
@@ -523,6 +574,11 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   sys::DynamicLibrary::AddSymbol(cbName, (void *)&pjit_callback);
 }
 
+/**
+ * @brief Extract all jitable Scops into a separate module
+ *
+ * @param The module to extract all jitable Scops from
+ */
 void PolyJIT::extractJitableScops(Module &M) {
   PassManager PM;
   PM.add(new DataLayoutPass());
@@ -597,6 +653,11 @@ void PolyJIT::extractJitableScops(Module &M) {
     StoreModule(M, M.getModuleIdentifier() + ".extr");
 }
 
+/**
+ * @brief Optimize the module before executing it for the first time.
+ *
+ * @param M The 'main' module we prepare for execution.
+ */
 void PolyJIT::prepareOptimizedIR(Module &M) {
   PassManager PM;
 
@@ -631,6 +692,14 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   PM.run(M);
 }
 
+/**
+ * @brief Run the EntryFn. Starts this PolyJIT session.
+ *
+ * @param inputArgs
+ * @param envp
+ *
+ * @return
+ */
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char *const *envp) {
   Function *Main = M.getFunction(EntryFn);
@@ -687,6 +756,11 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   return ret;
 }
 
+/**
+ * @brief Run Polly's default set of preoptimization on a module.
+ *
+ * @param The module to run the preoptimization on.
+ */
 void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   FunctionPassManager FPM(&M);
 
@@ -702,6 +776,16 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   FPM.doFinalization();
 }
 
+/**
+ * @brief Shutdown the JIT and clean up the mess we made.
+ *
+ * Before we actually do the cleanup, we print some nice stats about the
+ * current session.
+ *
+ * @param result Our exit-code
+ *
+ * @return
+ */
 int PolyJIT::shutdown(int result) {
   LLVMContext &Context = M.getContext();
 

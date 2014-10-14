@@ -29,26 +29,70 @@ struct GenericValue;
 }
 
 namespace polli {
-/// @brief Memory manager for PolyJIT.
+/**
+ * @brief Memory manager for PolyJIT
+ *
+ * We just introduce some memory usage tracking for now.
+ */
 class PolyJITMemoryManager : public SectionMemoryManager {
+public:
+  explicit PolyJITMemoryManager() : AllocatedBytes(0) {}
+  virtual ~PolyJITMemoryManager() override;
+
+  /**
+   * @brief Print statistics about the memory consumption for this manager.
+   *
+   * @param OS the outstream we print to.
+   */
+  void print(llvm::raw_ostream &OS);
+
+  /**
+   * @brief Override to intercept requests for the __dso_handle
+   *
+   * @param Name symbol name requested.
+   *
+   * @return
+   */
+  uint64_t getSymbolAddress(const std::string &Name) override;
+
+  /**
+   * @brief Allocate a new code section.
+   *
+   * We just override it to track the amount of memory allocated.
+   *
+   * @param Size
+   * @param Alignment
+   * @param SectionID
+   * @param SectionName
+   *
+   * @return pointer to the allocated code section.
+   */
+  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID,
+                               StringRef SectionName) override;
+
+  /**
+   * @brief Allocate a new data section.
+   *
+   * We just override it to track the amount of memory allocated.
+   *
+   * @param Size
+   * @param Alignment
+   * @param SectionID
+   * @param SectionName
+   * @param IsReadOnly
+   *
+   * @return pointer to the allocated data section
+   */
+  uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID, StringRef SectionName,
+                               bool IsReadOnly) override;
+
 private:
   uint64_t NumAllocatedDataSections;
   uint64_t NumAllocatedCodeSections;
   uint64_t AllocatedBytes;
 
-public:
-  explicit PolyJITMemoryManager() : AllocatedBytes(0) {}
-
-  void print(llvm::raw_ostream &OS);
-  uint64_t getSymbolAddress(const std::string &Name) override;
-  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
-                               unsigned SectionID,
-                               StringRef SectionName) override;
-  uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
-                               unsigned SectionID, StringRef SectionName,
-                               bool IsReadOnly) override;
-
-  virtual ~PolyJITMemoryManager() override;
 };
 
 /**

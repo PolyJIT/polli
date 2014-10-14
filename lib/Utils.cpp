@@ -48,6 +48,7 @@ ReportFilename("polli-report-file",
 static llvm::SmallString<1024> Report;
 static llvm::raw_svector_ostream ReportStream(Report);
 
+
 /**
  * @brief Get a report output stream and indent it to the correct depth
  *
