@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/Utils.h"
+#include "polli/Options.h"
 
 #include <string>                      // for string
 #include <utility>                     // for pair

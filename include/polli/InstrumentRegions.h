@@ -44,7 +44,9 @@ class Region;
 typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
 
 namespace polli {
-
+/**
+ * @brief Initialize PAPI CSCoP profiling
+ */
 class PapiCScopProfilingInit : public ModulePass {
 public:
   static char ID;
@@ -57,6 +59,9 @@ public:
   virtual bool runOnModule(Module &M);
 };
 
+/**
+ * @brief Instrument SCoPs for PAPI profiling
+ */
 class PapiCScopProfiling : public FunctionPass {
 public:
   static char ID;
@@ -79,10 +84,27 @@ private:
   RegionInfoPass *RI;
 
   bool processRegion(const Region *R);
+
+  /**
+   * @brief Instrument a region for papi profiling
+   *
+   * @param M Module the instrumented region is in.
+   * @param EntryBBs the entry BBs to this region
+   * @param ExitBBs the exit BBs of this region
+   * @param R the region we want to instrument
+   * @param entryName name of our region entry
+   * @param exitName name of our region exit
+   */
   void instrumentRegion(Module *M, std::vector<BasicBlock *> &EntryBBs,
                         std::vector<BasicBlock *> &ExitBBs, const Region *R,
                         std::string entryName, std::string exitName);
 
+  /**
+   * @brief Print analysis information. Empty.
+   *
+   * @param
+   * @param
+   */
   void print(raw_ostream &, const Module *) const {}
 };
 }

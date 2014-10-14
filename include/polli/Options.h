@@ -52,7 +52,7 @@ extern cl::opt<llvm::FloatABI::ABIType> FloatABIForCalls;
 extern cl::opt<bool> EmitJitDebugInfo;
 extern cl::opt<bool> EmitJitDebugInfoToDisk;
 
-/* JIT ScopDetection */
+/* JIT ScopDetection options */
 extern cl::opt<bool> AnalyzeOnly;
 }
 #endif
