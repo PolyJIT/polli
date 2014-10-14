@@ -54,5 +54,8 @@ extern cl::opt<bool> EmitJitDebugInfoToDisk;
 
 /* JIT ScopDetection options */
 extern cl::opt<bool> AnalyzeOnly;
+
+/* Utility options */
+extern cl::opt<std::string> ReportFilename;
 }
 #endif

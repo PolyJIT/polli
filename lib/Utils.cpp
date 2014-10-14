@@ -35,10 +35,15 @@ SmallVector<char, 255> *DefaultDir;
 
 static bool DirReady = false;
 
-static cl::opt<bool>
+cl::opt<bool>
 GenerateOutput("polli-debug-ir",
                cl::desc("Store all IR files inside a unique subdirectory."),
                cl::init(false));
+
+cl::opt<std::string>
+ReportFilename("polli-report-file",
+               cl::desc("Name of the report file to generate."),
+               cl::init("polli.report"));
 
 static llvm::SmallString<1024> Report;
 static llvm::raw_svector_ostream ReportStream(Report);
