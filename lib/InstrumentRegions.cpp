@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-// 
+//
 // This takes a region and instruments the Entry and Exit blocks with calls
 // to the PAPI library.
 //
@@ -43,9 +43,9 @@
 #include "llvm/PassAnalysisSupport.h"   // for Pass::getAnalysis, etc
 #include "llvm/PassSupport.h"           // for INITIALIZE_PASS_BEGIN, etc
 #include "llvm/Transforms/Utils/BasicBlockUtils.h" // for SplitEdge
+#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
 #include "llvm/Support/Casting.h"       // for isa
 #include "llvm/Support/Debug.h"         // for dbgs, DEBUG
-#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
 #include "papi.h"                       // for PAPI_VER_CURRENT
 #include "polli/InstrumentRegions.h"    // for PapiCScopProfiling, etc
 #include "polli/JitScopDetection.h"  // for JitScopDetection, etc
@@ -62,6 +62,14 @@ STATISTIC(InstrumentedJITScops, "Number of instrumented JIT SCoPs");
 STATISTIC(MoreEntries, "Number of regions with more than one entry edge");
 STATISTIC(MoreExits, "Number of regions with more than one exit edge");
 
+/**
+ * @brief Mark the entry of a SCoP.
+ *
+ * @param InsertBefore Instruction we insert our call before.
+ * @param M module we get or create our instrumentation call into.
+ * @param id ID we pass to the library to identify the event again.
+ * @param dbgStr a free debug string that gets passed into libpprof.
+ */
 static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M, uint64_t id,
                                 std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
@@ -78,6 +86,14 @@ static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M, uint64_t i
   Builder.CreateCall(PapiScopEnterFn, Args);
 }
 
+/**
+ * @brief Mark the exit of a region.
+ *
+ * @param InsertBefore Instruction we insert our call before.
+ * @param M module we get or create our instrumentation call into.
+ * @param id ID we pass to the library to identify the event again.
+ * @param dbgStr a free debug string that gets passed into libpprof.
+ */
 static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M, uint64_t id,
                                std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
@@ -94,6 +110,13 @@ static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M, uint64_t id
   Builder.CreateCall(PapiScopExitFn, Args);
 }
 
+/**
+ * @brief Deprecated.
+ *
+ * @param InsertBefore
+ * @param M
+ * @param id
+ */
 void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
@@ -107,6 +130,13 @@ void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
       ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
+/**
+ * @brief Deprecated.
+ *
+ * @param InsertBefore
+ * @param M
+ * @param id
+ */
 void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
@@ -119,6 +149,11 @@ void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
       ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
+/**
+ * @brief
+ *
+ * @param F
+ */
 static void PapiCreateInit(Function *F) {
   LLVMContext &Context = F->getContext();
   Module *M = F->getParent();
@@ -132,6 +167,11 @@ static void PapiCreateInit(Function *F) {
                      "papi.lib.init");
 }
 
+/**
+ * @brief
+ *
+ * @param MainFn
+ */
 static void InsertProfilingInitCall(Function *MainFn) {
   LLVMContext &Context = MainFn->getContext();
   Module &M = *MainFn->getParent();
@@ -186,11 +226,13 @@ static void InsertProfilingInitCall(Function *MainFn) {
   }
 }
 
-//-----------------------------------------------------------------------------
-//
-// PapiCScopProfilingInitPasss
-//
-//-----------------------------------------------------------------------------
+/**
+ * @brief Prepare the module for PAPICScop profiling
+ *
+ * @param M the module to prepare
+ *
+ * @return  true, if we changed something in the module.
+ */
 bool PapiCScopProfilingInit::runOnModule(Module &M) {
   DEBUG(dbgs() << "PapiCScop $ Initializing module\n");
   Function *Main = M.getFunction("main");
@@ -207,11 +249,16 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
   return true;
 }
 
-//-----------------------------------------------------------------------------
-//
-// PapiCScopProfilingPass
-//
-//-----------------------------------------------------------------------------
+/**
+ * @brief Instrument Scops & JITScops in a function.
+ *
+ * We inject calls to our libpprof at all entries & exits of Scop/JitScop
+ * in this function.
+ *
+ * @param The function we want to instrument, unused.
+ *
+ * @return true, if we actually instrumented something.
+ */
 bool PapiCScopProfiling::runOnFunction(Function &) {
   SD = &getAnalysis<ScopDetection>();
   NSD = getAnalysisIfAvailable<JitScopDetection>();
@@ -237,6 +284,13 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
   return true;
 }
 
+/**
+ * @brief Find or create insertion points for a region.
+ *
+ * @param R the region we find/create the insertion point for.
+ *
+ * @return FIXME: always true
+ */
 bool PapiCScopProfiling::processRegion(const Region *R) {
   BasicBlock *Entry, *Exit;
   Function *F = R->getEntry()->getParent();
@@ -292,11 +346,27 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
   return true;
 }
 
+/**
+ * @brief A static counter to identify the event later.
+ */
 static uint64_t EvID = 1;
+
+/**
+ * @brief Instrument a single region.
+ *
+ * @param M the module this region lies in.
+ * @param EntryBBs all entry BBs to place a call to libpprof.
+ * @param ExitBBs all exit BBs to place a call to libpprof.
+ * @param R the region we instrument
+ * @param entryName name of our entry
+ * @param exitName name of our exit
+ */
 void PapiCScopProfiling::instrumentRegion(Module *M,
                                           std::vector<BasicBlock *> &EntryBBs,
                                           std::vector<BasicBlock *> &ExitBBs,
-                                          const Region *R, std::string entryName, std::string exitName) {
+                                          const Region *R,
+                                          std::string entryName,
+                                          std::string exitName) {
   BasicBlock::iterator InsertPos;
   for (auto &BB : EntryBBs) {
     InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
@@ -336,8 +406,8 @@ INITIALIZE_PASS_BEGIN(PapiCScopProfilingInit, "pprof-init",
 INITIALIZE_PASS_END(PapiCScopProfilingInit, "pprof-init",
                       "PAPI CScop Profiling (Initialization)", false, false);
 
-INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy",
-                      "PAPI CScop Profiling", false, false);
+INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy", "PAPI CScop Profiling",
+                      false, false);
 INITIALIZE_PASS_DEPENDENCY(ScopDetection);
 INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy",
                       "PAPI CScop Profiling", false, false);
