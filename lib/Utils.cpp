@@ -29,6 +29,8 @@
 #include "llvm/Support/ToolOutputFile.h" // for tool_output_file
 #include "llvm/Support/raw_ostream.h"    // for raw_ostream
 
+#include <cxxabi.h>
+
 using namespace llvm;
 
 SmallVector<char, 255> *DefaultDir;
@@ -133,4 +135,25 @@ void StoreModules(ManagedModules &Modules) {
     Module *M = (Modules_MI).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
+}
+
+std::string demangle(const std::string &Name) {
+  char *demangled;
+  size_t size = 0;
+  int status;
+
+  demangled = abi::__cxa_demangle(Name.c_str(), nullptr, &size, &status);
+
+  if (demangled) {
+    log(Info) << " S: " << size;
+    log(Info) << "St: " << status << "\n";
+    log(Info) << " Content: " << demangled;
+  }
+
+  if (status != 0) {
+    free((void *)demangled);
+    return Name;
+  }
+
+  return std::string(demangled);
 }

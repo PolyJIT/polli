@@ -789,6 +789,7 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
 int PolyJIT::shutdown(int result) {
   LLVMContext &Context = M.getContext();
 
+  VariantFunction::printHeader(log(Info));
   for (const auto &Elem : Disp->functions()) {
     VariantFunctionTy VarFun = Elem.second;
     VarFun->print(log(LogType::Info));

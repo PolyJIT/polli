@@ -82,4 +82,14 @@ void StoreModules(ManagedModules &Modules);
  * @return the indented output stream.
  */
 llvm::raw_ostream &report(const size_t Indent = 0);
+
+/**
+ * @brief Demangle a C++ name.
+ *
+ * @param Name
+ *
+ * @return the demangled name, if possible. Otherwise, the input.
+ */
+std::string demangle(const std::string &Name);
+
 #endif // POLLI_UTILS_H

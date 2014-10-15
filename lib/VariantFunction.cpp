@@ -1,6 +1,9 @@
 #include "polli/VariantFunction.h"
 #include "polli/Utils.h"
 
+#include <cxxabi.h>
+#include <stdlib.h>
+
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
@@ -21,19 +24,25 @@ void VariantFunction::printVariants(raw_ostream &OS) {
     }
     OS << "\n";
 }
+
+void VariantFunction::printHeader(llvm::raw_ostream &OS) {
+  OS << "Source Function::Base Function:: Variants; Calls; MFLOPS [MFLOPs/s]; "
+     << "FLOPs [#]; Real Time [us]; Virtual Time [us]\n\n";
+}
+
 void VariantFunction::print(llvm::raw_ostream &OS) {
-  OS << "SourceF: " << SourceF->getName() << "\n";
-  OS.indent(2) << " BaseF: " << BaseF->getName() << "\n";
-  OS.indent(2) << " Variants: " << getVariants().size() << "\n";
-  OS << "\n";
+  std::string Message;
+  std::string Format = "%s :: %s :: %d; %d; %f; %ld; %f; %f\n";
+
+  OS << demangle(SourceF->getName()) << " :: "
+     << demangle(BaseF->getName()) << " :: "
+     << S.ExecCount << "; "
+     << S.MFLOPS << "; "
+     << S.flpops << "; "
+     << S.RealTime << "; "
+     << S.ProcTime << "\n";
 
   DEBUG(printVariants(OS));
-
-  OS.indent(4) << "Calls [#]: " << S.ExecCount << "\n";
-  OS.indent(4) << "MFLOPS [MFLOPs/s]: " << S.MFLOPS << "\n";
-  OS.indent(4) << "FLOPs [#]: " << S.flpops << "\n";
-  OS.indent(4) << "Real Time []: " << S.RealTime << "\n";
-  OS.indent(4) << "Virtual Time []: " << S.ProcTime << "\n";
 }
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out,

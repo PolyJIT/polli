@@ -180,9 +180,53 @@ protected:
   }
 
 public:
+  /**
+   * @brief Create a new variant function.
+   *
+   * Variant functions have a base function and a source function.
+   * The source function signals from which function it derives (the function
+   * that is called and rerouted to this variant).
+   * The base function represents the function code without instrumentation.
+   *
+   * @param BaseF
+   * @param SourceF
+   */
   explicit VariantFunction(llvm::Function *BaseF, llvm::Function *SourceF)
       : BaseF(BaseF), SourceF(SourceF) {}
 
+  /**
+   * @brief Print header for variant functions.
+   *
+   * @param OS
+   */
+  static void printHeader(llvm::raw_ostream &OS);
+
+  /**
+   * @brief Print statistics about this variant function.
+   *
+   * @param OS
+   */
+  void print(llvm::raw_ostream &OS);
+
+  /**
+   * @brief Return a reference to our statistics.
+   *
+   * @return
+   */
+  Stats &stats() { return S; }
+
+  /**
+   * @brief Return or create a new variant for this function with a given key
+   *
+   * @param K
+   *
+   * @return
+   */
+  llvm::Function *getOrCreateVariant(const FunctionKey &K);
+
+  /**
+   * @name Copy Constructor/Assignment/Conversion/Destruction
+   * @{ */
   VariantFunction() : BaseF(nullptr), SourceF(nullptr) {}
 
   VariantFunction(const VariantFunction &Other)
@@ -200,18 +244,8 @@ public:
     return *this;
   }
 
-  /// @brief Print statistics about this variant functions.
-  void print(llvm::raw_ostream &OS);
-
   ~VariantFunction() { Variants.clear(); }
-
-  // @brief Return a reference to our statistics.
-  Stats &stats() { return S; }
-
-  // @brief Return or create a new variant for this function with a given
-  // key
-  llvm::Function *getOrCreateVariant(const FunctionKey &K);
-
+  /**  @} */
 private:
   void printVariants(llvm::raw_ostream &OS);
 
