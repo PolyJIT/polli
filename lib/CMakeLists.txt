@@ -46,6 +46,7 @@ target_link_libraries(PolyJIT
   isl
   isl-cxx
   Polly
+  pprof
 )
 
 set_target_properties(PolyJIT

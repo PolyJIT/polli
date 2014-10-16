@@ -47,21 +47,6 @@ ReportFilename("polli-report-file",
                cl::desc("Name of the report file to generate."),
                cl::init("polli.report"));
 
-static llvm::SmallString<1024> Report;
-static llvm::raw_svector_ostream ReportStream(Report);
-
-
-/**
- * @brief Get a report output stream and indent it to the correct depth
- *
- * @param Indent Indentation level, we indent with spaces.
- *
- * @return the indented output stream.
- */
-llvm::raw_ostream &report(const size_t Indent) {
-  return ReportStream.indent(Indent);
-}
-
 llvm::raw_ostream &log(const LogType T, const size_t Level) {
   switch (T) {
   case Debug:
