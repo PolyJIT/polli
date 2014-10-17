@@ -4,33 +4,11 @@
 #include <papi.h>
 
 #include <fstream>
+#include <sstream>
 #include <iostream>
+#include <memory>
 
-/**
- * @brief Setup papi for trace monitoring.
- */
-void pprof_setup_papi();
-
-/**
- * @brief PAPI Event to add to the tracking.
- *
- * @param PapiEventNum
- */
-void pprof_trace_add_event(int PapiEventNum);
-
-/**
- * @brief Mark the entry for a specified trace.
- *
- * @param TraceName
- */
-void pprof_trace_entry(const std::string &TraceName);
-
-/**
- * @brief Mark the exit for a specified trace.
- *
- * @param TraceName
- */
-void pprof_trace_exit(const std::string &TraceName);
+#include <assert.h>
 
 extern "C" {
 /**
@@ -77,7 +55,14 @@ void papi_atexit_handler(void);
 void papi_region_setup(int _argc, char **_argv);
 }
 
-enum PPEventType { ScopEnter, ScopExit, RegionEnter, RegionExit };
+enum PPEventType {
+  ScopEnter,
+  ScopExit,
+  RegionEnter,
+  RegionExit,
+  TraceEnter,
+  TraceExit
+};
 
 struct PPStringRegion {
   PPStringRegion(std::pair<uint32_t, std::pair<const char *, const char *>>) {}
@@ -112,39 +97,9 @@ struct PPEvent {
 
 using namespace std;
 
-std::ostream &operator<<(std::ostream &os, const PPEvent &event) {
-  return os << event.ID << " " << event.Timestamp << " " << event.EventTy
-            << "\n";
-}
-
-std::ostream &operator<<(std::ostream &os, const PPEvent *event) {
-  return os << event->ID << " " << event->Timestamp << " " << event->EventTy
-            << "\n";
-}
-
-std::ostream &operator<<(std::ostream &os, const PPStringRegion &R) {
-  std::string entStr = R.Entry;
-  if (entStr.size() == 0)
-    entStr = "ERROR:Entry";
-  std::string exStr = R.Exit;
-  if (exStr.size() == 0)
-    exStr = "ERROR:Exit";
-
-  return os << R.ID << " " << entStr << " " << exStr;
-}
-
-std::istream &operator>>(std::istream &is, PPEvent &event) {
-  int EventTy;
-  is >> event.ID;
-  is >> event.Timestamp;
-  is >> EventTy;
-
-  event.EventTy = (PPEventType)EventTy;
-  return is;
-}
-
-std::istream &operator>>(std::istream &is, PPStringRegion &R) {
-  is >> R.ID >> R.Entry >> R.Exit;
-  return is.ignore(1, '\n');
-}
+std::ostream &operator<<(std::ostream &os, const PPEvent &event);
+std::ostream &operator<<(std::ostream &os, const PPEvent *event);
+std::ostream &operator<<(std::ostream &os, const PPStringRegion &R);
+std::istream &operator>>(std::istream &is, PPEvent &event);
+std::istream &operator>>(std::istream &is, PPStringRegion &R);
 #endif

@@ -83,6 +83,9 @@
 
 #include "polli/AliasCheckCodeGen.h"
 
+#include "pprof/pprof.h"
+#include "pprof/tracing.h"
+
 #include <numeric>
 
 namespace llvm {
@@ -250,13 +253,14 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
 
   /* Be very careful here, we want to exit this callback asap to cut down on
    * overhead. Think about triggering any modifications to the underlying IR
-   * in a concurrent thread instead of blocking everything here. */
+   * in a concurrent thread instead of b tlocking everything here. */
   Module &M = JIT->getExecutedModule();
   Function *F = M.getFunction(fName);
 
   if (!F)
     llvm_unreachable("Function not in this module. It has to be there!");
 
+  pprof_trace_entry("Variants");
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
 
@@ -265,6 +269,7 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp->getOrCreateVariantFunction(F);
+  pprof_trace_exit("Variants");
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
@@ -275,9 +280,9 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   Stats &S = VarFun->stats();
   Function *NewF = VarFun->getOrCreateVariant(Params);
 
-  PAPI_flops(&(S.RealTime), &(S.ProcTime), &(S.flpops), &(S.MFLOPS));
+  pprof_trace_entry(NewF->getName());
   JIT->runSpecializedFunction(NewF, ArgValues);
-  PAPI_flops(&(S.RealTime), &(S.ProcTime), &(S.flpops), &(S.MFLOPS));
+  pprof_trace_exit(NewF->getName());
 
   S.ExecCount++;
 }
@@ -456,7 +461,9 @@ PolyJIT::runSpecializedFunction(Function *NewF,
   // Fetch or Create a new ExecutionEngine for this Module.
   if (!Mods.count(NewM)) {
     Mods[NewM] = PolyJIT::GetEngine(NewM);
+    pprof_trace_entry("JIT-codegen");
     Mods[NewM]->finalizeObject();
+    pprof_trace_exit("JIT-codegen");
   }
   NewEE = Mods[NewM];
 
@@ -702,6 +709,17 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
  */
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char *const *envp) {
+  /*
+   * Initialize papi and prepare the event set.
+   */
+  pprof_setup_papi();
+  pprof_trace_add_event(std::string("PAPI_TOT_CYC"));
+  pprof_trace_add_event(std::string("PAPI_TOT_INS"));
+  pprof_trace_add_event(std::string("PAPI_BR_MSP"));
+  pprof_trace_add_event(std::string("PAPI_L1_DCM"));
+  pprof_trace_add_event(std::string("PAPI_L2_DCM"));
+  pprof_trace_start();
+
   Function *Main = M.getFunction(EntryFn);
 
   if (AnalyzeIR) {
@@ -804,6 +822,9 @@ int PolyJIT::shutdown(int result) {
   // function later on to make an explicit call, so get the function now.
   Constant *Exit = M.getOrInsertFunction("exit", Type::getVoidTy(Context),
                                          Type::getInt32Ty(Context), NULL);
+
+  // Stop monitoring.
+  pprof_trace_stop();
 
   // If the program didn't call exit explicitly, we should call it now.
   // This ensures that any atexit handlers get called correctly.

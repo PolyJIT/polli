@@ -14,7 +14,12 @@
 #include <iostream>
 
 static std::map<uint32_t, PPStringRegion> PPStrings;
+
+/**
+ * @brief Storage container for all PAPI region events.
+ */
 static std::vector<const PPEvent *> PapiEvents;
+
 static int argc;
 static char **argv;
 static std::string fileName = "papi.profile.out";
@@ -40,6 +45,8 @@ void StoreRun(std::vector<const PPEvent *> &Events) {
     case RegionExit:
       PPStrings[event->ID].Exit = str;
       break;
+    default:
+      break;
     }
 
     PPStrings[event->ID].ID = event->ID;
@@ -55,116 +62,6 @@ void StoreRun(std::vector<const PPEvent *> &Events) {
 
   out.flush();
   out.close();
-}
-
-/**
- * @brief Store experimental results in traces
- *
- * A trace is a named event list.
- */
-class TraceStorage {
-public:
-  typedef std::unique_ptr<PPEvent> PPEventPtr;
-  typedef std::vector<PPEventPtr> PPEventPtrs;
-  typedef std::map<const std::string, PPEventPtrs> TraceRegions;
-private:
-  TraceRegions Log;
-public:
-  /**
-   * @brief Store the all traces.
-   *
-   * @param Trace
-   * @param Ptr
-   */
-  void save(const std::string &Trace, PPEventPtr &Ptr) {}
-
-  /**
-   * @brief Load an trace storage from file
-   *
-   * @param FileName
-   */
-  void load(std::string FileName) {
-  }
-};
-
-/**
- * @brief The currently executed PAPI event set.
- */
-int EventSet = PAPI_NULL;
-int EventSetSize = 0;
-
-/**
- * @brief Setup papi for trace monitoring.
- */
-void pprof_setup_papi() {
-  int status = PAPI_is_initialized();
-
-  if (status != PAPI_LOW_LEVEL_INITED) {
-    status = PAPI_library_init(PAPI_VER_CURRENT);
-    if (status != PAPI_VER_CURRENT & status > 0) {
-      fprintf(stderr, "PPROF: PAPI_library_init: Version mismatch\n");
-      std::exit(status);
-    }
-  }
-
-  if (PAPI_create_eventset(&EventSet) != PAPI_OK) {
-    fprintf(stderr, "PPROF: Could not create an empty event set\n");
-    std::exit(1);
-  }
-}
-
-void pprof_trace_add_event(char *Name) {
-  if (PAPI_is_initialized() != PAPI_LOW_LEVEL_INITED)
-    pprof_setup_papi();
-
-  int NativeEv = 0x0;
-  if (PAPI_event_name_to_code(Name, &NativeEv) != PAPI_OK) {
-    fprintf(stderr, "PPROF: Could not get the event code for this name\n");
-    std::exit(1);
-  }
-
-  pprof_trace_add_event(NativeEv);
-}
-
-void pprof_trace_add_event(int PapiEventNum) {
-  if (PAPI_is_initialized() != PAPI_LOW_LEVEL_INITED)
-    pprof_setup_papi();
-
-  if (PAPI_add_event(EventSet, PapiEventNum) != PAPI_OK) {
-    fprintf(stderr,
-            "PPROF: Could not add the requested event code to the set\n");
-    std::exit(1);
-  }
-
-  ++EventSetSize;
-}
-
-/**
- * @brief Mark the entry for a specified trace.
- *
- * @param TraceName
- */
-void pprof_trace_entry(const std::string &TraceName) {
-
-}
-
-/**
- * @brief Mark the exit for a specified trace.
- *
- * @param TraceName
- */
-void pprof_trace_exit(const std::string &TraceName) {
-
-}
-
-static void papi_append_calls(void) {
-  FILE *fp;
-
-  fp = fopen(fileNameCallStack.c_str(), "a+");
-  if (fp) {
-    fprintf(fp, "%zu\n", PapiEvents.size());
-    fclose(fp);
-  }
 }
 
 extern "C" {
@@ -194,6 +91,17 @@ void papi_region_exit(uint64_t id) {
   ev->snapshot();
   PapiEvents.push_back(ev);
 }
+
+static void papi_append_calls(void) {
+  FILE *fp;
+
+  fp = fopen(fileNameCallStack.c_str(), "a+");
+  if (fp) {
+    fprintf(fp, "%zu\n", PapiEvents.size());
+    fclose(fp);
+  }
+}
+
 
 void papi_atexit_handler(void) {
   PPEvent *ev = new PPEvent(0, RegionExit, "STOP");

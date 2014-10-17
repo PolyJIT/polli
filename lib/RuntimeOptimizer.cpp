@@ -29,6 +29,9 @@
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/ScopDetection.h"
 
+#include "pprof/pprof.h"
+#include "pprof/tracing.h"
+
 namespace llvm {
 class Function;
 }
@@ -53,7 +56,9 @@ Function *OptimizeForRuntime(Function *F) {
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
 
+  pprof_trace_entry("JIT-Opt");
   PM.run(*F);
+  pprof_trace_exit("JIT-Opt");
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
 
