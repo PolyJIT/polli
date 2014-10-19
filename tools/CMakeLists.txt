@@ -1,3 +1,4 @@
 add_subdirectory(polli)
-set(LLVM_COMMON_DEPENDS ${LLVM_COMMON_DEPENDS} PARENT_SCOPE)
+add_subdirectory(pprof)
 
+set(LLVM_COMMON_DEPENDS ${LLVM_COMMON_DEPENDS} PARENT_SCOPE)
