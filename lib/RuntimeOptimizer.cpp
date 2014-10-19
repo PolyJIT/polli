@@ -54,7 +54,8 @@ Function *OptimizeForRuntime(Function *F) {
   PM.add(SD);
   PM.add(polly::createScopInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
-  PM.add(polly::createCodeGenerationPass());
+  PM.add(polly::createIslCodeGenerationPass());
+//  PM.add(polly::createCodeGenerationPass());
 
   pprof_trace_entry("JIT-Opt");
   PM.run(*F);
