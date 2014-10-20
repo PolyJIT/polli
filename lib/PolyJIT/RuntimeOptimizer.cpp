@@ -57,9 +57,9 @@ Function *OptimizeForRuntime(Function *F) {
   PM.add(polly::createIslCodeGenerationPass());
 //  PM.add(polly::createCodeGenerationPass());
 
-  pprof_trace_entry("JIT-Opt");
+  TRACE(pprof_trace_entry("JIT-Opt"));
   PM.run(*F);
-  pprof_trace_exit("JIT-Opt");
+  TRACE(pprof_trace_exit("JIT-Opt"));
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
 

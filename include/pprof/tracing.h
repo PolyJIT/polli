@@ -1,6 +1,7 @@
 #ifndef PPROF_TRACING_H
 #define PPROF_TRACING_H
 #include "pprof/pprof.h"
+#include "pprof/Config.h"
 
 #include <inttypes.h>
 #include <papi.h>
@@ -10,6 +11,15 @@
 #include <memory>
 
 #include <assert.h>
+
+// Enable tracing conditionally
+#ifdef ENABLE_TRACING
+#define TRACE(X) \
+  do { X; } while (0)
+#else
+#define TRACE(X) \
+  do { } while (0)
+#endif
 
 /**
  * @brief Setup papi for trace monitoring.

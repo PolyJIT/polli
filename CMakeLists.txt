@@ -65,8 +65,14 @@ endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -std=c++11")
 
+
+option(ENABLE_TRACING "Trace critical parts of polli with PAPI counters" ON)
+configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
+  ${POLLI_BINARY_DIR}/include/pprof/Config.h )
+
 include_directories(
-  ${POLLI_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
 install(DIRECTORY include/

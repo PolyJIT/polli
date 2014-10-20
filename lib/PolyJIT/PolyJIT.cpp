@@ -260,7 +260,7 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   if (!F)
     llvm_unreachable("Function not in this module. It has to be there!");
 
-  pprof_trace_entry("Variants");
+  TRACE(pprof_trace_entry("Variants"));
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
 
@@ -269,7 +269,7 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp->getOrCreateVariantFunction(F);
-  pprof_trace_exit("Variants");
+  TRACE(pprof_trace_exit("Variants"));
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
@@ -280,9 +280,9 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   Stats &S = VarFun->stats();
   Function *NewF = VarFun->getOrCreateVariant(Params);
 
-  pprof_trace_entry(NewF->getName());
+  TRACE(pprof_trace_entry(NewF->getName()));
   JIT->runSpecializedFunction(NewF, ArgValues);
-  pprof_trace_exit(NewF->getName());
+  TRACE(pprof_trace_exit(NewF->getName()));
 
   S.ExecCount++;
 }
@@ -461,9 +461,9 @@ PolyJIT::runSpecializedFunction(Function *NewF,
   // Fetch or Create a new ExecutionEngine for this Module.
   if (!Mods.count(NewM)) {
     Mods[NewM] = PolyJIT::GetEngine(NewM);
-    pprof_trace_entry("JIT-codegen");
+    TRACE(pprof_trace_entry("JIT-codegen"));
     Mods[NewM]->finalizeObject();
-    pprof_trace_exit("JIT-codegen");
+    TRACE(pprof_trace_exit("JIT-codegen"));
   }
   NewEE = Mods[NewM];
 
@@ -712,13 +712,13 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   /*
    * Initialize papi and prepare the event set.
    */
-  pprof_setup_papi();
-  pprof_trace_add_event(std::string("PAPI_TOT_CYC"));
-  pprof_trace_add_event(std::string("PAPI_TOT_INS"));
-  pprof_trace_add_event(std::string("PAPI_BR_MSP"));
-  pprof_trace_add_event(std::string("PAPI_L1_DCM"));
-  pprof_trace_add_event(std::string("PAPI_L2_DCM"));
-  pprof_trace_start();
+  TRACE(pprof_setup_papi());
+  TRACE(pprof_trace_add_event(std::string("PAPI_TOT_CYC")));
+  TRACE(pprof_trace_add_event(std::string("PAPI_TOT_INS")));
+  TRACE(pprof_trace_add_event(std::string("PAPI_BR_MSP")));
+  TRACE(pprof_trace_add_event(std::string("PAPI_L1_DCM")));
+  TRACE(pprof_trace_add_event(std::string("PAPI_L2_DCM")));
+  TRACE(pprof_trace_start());
 
   Function *Main = M.getFunction(EntryFn);
 
@@ -824,7 +824,7 @@ int PolyJIT::shutdown(int result) {
                                          Type::getInt32Ty(Context), NULL);
 
   // Stop monitoring.
-  pprof_trace_stop();
+  TRACE(pprof_trace_stop());
 
   // If the program didn't call exit explicitly, we should call it now.
   // This ensures that any atexit handlers get called correctly.
