@@ -45,9 +45,8 @@ void AliasCheckGenerator::getAnalysisUsage(AnalysisUsage &AU) const {
 
 using namespace isl;
 
-isl::Set AliasCheckGenerator::checkPairs(const isl::Set &Cond,
-                                         const isl::Set &Acc,
-                                         const BoundsMapT &map) const {
+Set AliasCheckGenerator::checkPairs(const Set &Cond, const Set &Acc,
+                                    const BoundsMapT &map) const {
   Set AccA = Acc;
   Set ResCond = Cond;
 

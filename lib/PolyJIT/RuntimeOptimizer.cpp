@@ -30,7 +30,7 @@
 #include "polly/ScopDetection.h"
 
 #include "pprof/pprof.h"
-#include "pprof/tracing.h"
+#include "pprof/Tracing.h"
 
 namespace llvm {
 class Function;
@@ -50,8 +50,8 @@ Function *OptimizeForRuntime(Function *F) {
   PM.add(new DataLayoutPass());
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
-  polly::registerCanonicalicationPasses(PM);
-  PM.add(SD);
+//  polly::registerCanonicalicationPasses(PM);
+//  PM.add(SD);
   PM.add(polly::createScopInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createIslCodeGenerationPass());

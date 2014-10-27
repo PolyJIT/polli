@@ -84,7 +84,7 @@
 #include "polli/AliasCheckCodeGen.h"
 
 #include "pprof/pprof.h"
-#include "pprof/tracing.h"
+#include "pprof/Tracing.h"
 
 #include <numeric>
 

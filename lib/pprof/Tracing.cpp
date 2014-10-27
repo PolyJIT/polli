@@ -1,6 +1,7 @@
-#include "pprof/tracing.h"
+#include "pprof/Tracing.h"
 
 #include <string>
+#include <set>
 #include <memory>
 #include <vector>
 #include <map>
@@ -95,6 +96,19 @@ public:
     using namespace std;
 
     ofstream out(FileName, ios_base::out | ios_base::app);
+
+    set<string> TraceEventNames;
+
+    /**
+     * @name Fetch Event names.
+     *
+     * FIXME: This looks horribly inefficient for something that simple.
+     * Just fetch the set of keys.
+     * @{ */
+    for (auto &TracePair : Log) {
+      TraceEventNames.insert(TracePair.first);
+    }
+    /**  @} */
 
     /**
      * @name Iterate over all traces and print the log.

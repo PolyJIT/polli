@@ -1,6 +1,6 @@
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
 add_polli_library(pprof
-  tracing.cpp
+  Tracing.cpp
   libpprof.cpp
   pprof.cpp
 )
