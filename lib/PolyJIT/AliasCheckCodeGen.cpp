@@ -45,7 +45,6 @@ void AliasCheckGenerator::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 using namespace isl;
-
 Set AliasCheckGenerator::checkPairs(const Set &Cond, const Set &Acc,
                                     const BoundsMapT &map) const {
   Set AccA = Acc;
@@ -164,8 +163,8 @@ void AliasCheckGenerator::printIslExpressions(const Scop &S) {
   unsigned int numAccs = 0;
   for (ScopStmt *Stmt : S) {
     for (MemoryAccess *Acc : *Stmt) {
-      Map Access = isl::Map::Wrap(Acc->getAccessRelation());
-      Set Domain = isl::Set::Wrap(Stmt->getDomain());
+      Map Access = isl::Map(Acc->getAccessRelation());
+      Set Domain = isl::Set(Stmt->getDomain());
       const Set MemAccs = Domain.apply(Access);
       if (!BoundsMap.count(MemAccs)) {
         BoundsMap.insert(MemAccs);
@@ -178,7 +177,7 @@ void AliasCheckGenerator::printIslExpressions(const Scop &S) {
                 << binomial_coefficient(numAccs, 2) << "\n";
 
   BoundsMapT mapcp = BoundsMap;
-  const Set ParamCtx = Set::Wrap(S.getAssumedContext());
+  const Set ParamCtx = Set(S.getAssumedContext());
   Set Cond = Set::universe(ParamCtx.getSpace());
 
   for (const Set &s : BoundsMap) {
