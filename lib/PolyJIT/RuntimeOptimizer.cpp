@@ -47,16 +47,12 @@ Function *OptimizeForRuntime(Function *F) {
   PM.add(new DataLayoutPass());
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
-//  polly::registerCanonicalicationPasses(PM);
-//  PM.add(SD);
+  PM.add(SD);
   PM.add(polly::createScopInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createIslCodeGenerationPass());
-//  PM.add(polly::createCodeGenerationPass());
 
-  LIKWID_MARKER_START("JIT-Opt");
   PM.run(*F);
-  LIKWID_MARKER_STOP("JIT-Opt");
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
 

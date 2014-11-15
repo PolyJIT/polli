@@ -3,6 +3,11 @@
 #include "pprof/pprof.h"
 #include "pprof/Config.h"
 
+// Enable/Disable tracing
+#ifdef ENABLE_TRACING
+#define LIKWID_PERFMON
+#endif
+
 #include <inttypes.h>
 #include <papi.h>
 
@@ -11,19 +16,7 @@
 #include <memory>
 
 #include <assert.h>
-
-// Enable/Disable tracing
-#ifdef ENABLE_TRACING
-#define LIKWID_PERFMON
-
-#define TRACE(X) \
-  do { X; } while (0)
-#else
-#undef LIKWID_PERFMON
-
-#define TRACE(X) \
-  do { } while (0)
-#endif
+#include <likwid.h>
 
 /**
  * @brief Setup papi for trace monitoring.

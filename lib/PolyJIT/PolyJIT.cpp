@@ -259,16 +259,15 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
    * Otherwise it will blow up. FIXME: Don't blow up. */
   PolyJIT *JIT = PolyJIT::Get();
 
+  LIKWID_MARKER_START("ParamSel");
   /* Be very careful here, we want to exit this callback asap to cut down on
    * overhead. Think about triggering any modifications to the underlying IR
    * in a concurrent thread instead of b tlocking everything here. */
   Module &M = JIT->getExecutedModule();
   Function *F = M.getFunction(fName);
-
   if (!F)
     llvm_unreachable("Function not in this module. It has to be there!");
 
-  LIKWID_MARKER_START("Variants");
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
 
@@ -277,16 +276,18 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp->getOrCreateVariantFunction(F);
-  LIKWID_MARKER_STOP("Variants");
 
   std::vector<GenericValue> ArgValues(2);
   GenericValue ArgC;
   ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
   ArgValues[0] = ArgC;
   ArgValues[1] = PTOGV(params);
+  LIKWID_MARKER_STOP("ParamSel");
 
   Stats &S = VarFun->stats();
+  LIKWID_MARKER_START("GenVarFun");
   Function *NewF = VarFun->getOrCreateVariant(Params);
+  LIKWID_MARKER_STOP("GenVarFun");
 
   LIKWID_MARKER_START(NewF->getName().str().c_str());
   JIT->runSpecializedFunction(NewF, ArgValues);
@@ -467,16 +468,16 @@ PolyJIT::runSpecializedFunction(llvm::Function *NewF,
   assert(NewM && "Passed function parameter has no parent module!");
 
   // Fetch or Create a new ExecutionEngine for this Module.
-  if (!Mods.count(NewM)) {
-    Mods[NewM] = PolyJIT::GetEngine(NewM);
-    LIKWID_MARKER_START("JIT-codegen");
-    Mods[NewM]->finalizeObject();
-    LIKWID_MARKER_STOP("JIT-codegen");
+  if (!SpecializedModules.count(NewM)) {
+    SpecializedModules[NewM] = PolyJIT::GetEngine(NewM);
+    LIKWID_MARKER_START("CodeGenJIT");
+    SpecializedModules[NewM]->finalizeObject();
+    LIKWID_MARKER_STOP("CodeGenJIT");
   }
-  NewEE = Mods[NewM];
+
+  NewEE = SpecializedModules[NewM];
 
   assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
-
   NewEE->runFunction(NewF, ArgValues);
 }
 
@@ -603,6 +604,7 @@ static ModulePtrT copyModule(Module &M) {
  * @param The module to extract all jitable Scops from
  */
 void PolyJIT::extractJitableScops(Module &M) {
+  LIKWID_MARKER_START("ExtractScops");
   PassManager PM;
   PM.add(new DataLayoutPass());
 
@@ -675,6 +677,7 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   if (OutputFilename.size() == 0)
     StoreModule(M, M.getModuleIdentifier() + ".extr");
+  LIKWID_MARKER_STOP("ExtractScops");
 }
 
 /**
@@ -729,8 +732,6 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   /*
    * Initialize papi and prepare the event set.
    */
-  LIKWID_MARKER_INIT;
-
   Function *Main = M.getFunction(EntryFn);
 
   if (AnalyzeIR) {
@@ -778,6 +779,7 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 
     // Run static constructors.
     EE->runStaticConstructorsDestructors(false);
+
     ret = EE->runFunctionAsMain(Main, inputArgs, envp);
 
     DEBUG(log(Info) << "run :: execution finished (" << ret << ")\n");
@@ -834,9 +836,6 @@ int PolyJIT::shutdown(int result) {
   // function later on to make an explicit call, so get the function now.
   Constant *Exit = M.getOrInsertFunction("exit", Type::getVoidTy(Context),
                                          Type::getInt32Ty(Context), NULL);
-
-  // Stop monitoring.
-  LIKWID_MARKER_CLOSE;
 
   // If the program didn't call exit explicitly, we should call it now.
   // This ensures that any atexit handlers get called correctly.

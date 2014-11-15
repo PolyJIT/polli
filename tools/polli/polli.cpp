@@ -45,7 +45,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "polli/Options.h"
-#include "polli/PolyJIT.h"
+#include "pprof/Tracing.h"
 
 #ifdef __CYGWIN__
 #include <cygwin/version.h>
@@ -158,6 +158,8 @@ int main(int argc, char **argv, char * const *envp) {
   // Reset errno to zero on entry to main.
   errno = 0;
 
+  LIKWID_MARKER_INIT;
+
   polli::PolyJIT *pjit = polli::PolyJIT::Get(Mod.get());
 
   if (!pjit) {
@@ -181,6 +183,10 @@ int main(int argc, char **argv, char * const *envp) {
   }
 
   int Result = pjit->runMain(InputArgv, envp);
+
+  // Stop monitoring.
+  LIKWID_MARKER_CLOSE;
+
   pjit->shutdown(Result);
 
   return Result;
