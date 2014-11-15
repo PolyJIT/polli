@@ -6,24 +6,25 @@
 
 #include "llvm/Pass.h"
 #include "llvm/PassSupport.h"
+#include "llvm/IR/Instructions.h"
 
 #include "polly/ScopDetection.h"
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
-#include "isl++/PwAff.h"
-#include "isl++/Set.h"
-#include "isl++/Map.h"
-#include "isl++/Printer.h"
-#include "isl++/Format.h"
-#include "isl++/DimType.h"
-#include "isl++/AstExpr.h"
-#include "isl++/AstBuild.h"
-#include "isl++/Id.h"
-#include "isl++/Space.h"
+#include "isl/Format.h"
+#include "isl/DimType.h"
 
-#include "llvm/IR/Instructions.h"
+#include "isl/Set.hpp"
+#include "isl/Map.hpp"
+#include "isl/PwAff.hpp"
+
+#include "isl/Printer.hpp"
+#include "isl/AstExpr.hpp"
+#include "isl/AstBuild.hpp"
+#include "isl/Id.hpp"
+#include "isl/Space.hpp"
 
 using namespace llvm;
 using namespace polli;
@@ -64,7 +65,7 @@ Set AliasCheckGenerator::checkPairs(const Set &Cond, const Set &Acc,
   minA = minA.add(bpA);
   maxA = maxA.add(bpA);
 
-  for (auto &s : map) {
+  for (const isl::Set &s : map) {
     Set AccB = s;
 
     ndims = AccB.dim(DimType::DTSet);
@@ -108,7 +109,7 @@ void AliasCheckGenerator::printConditions(const isl::Set &ParamContext,
   ExpMinA = ExpIdA.add(ExpMinA);
   ExpMaxA = ExpIdA.add(ExpMaxA);
 
-  for (auto &s : map) {
+  for (const isl::Set &s : map) {
     Set AccB = s;
     Space B = AccB.getSpace();
 
@@ -178,9 +179,9 @@ void AliasCheckGenerator::printIslExpressions(const Scop &S) {
 
   BoundsMapT mapcp = BoundsMap;
   const Set ParamCtx = Set::Wrap(S.getAssumedContext());
-  Set Cond = Set::universe(ParamCtx);
+  Set Cond = Set::universe(ParamCtx.getSpace());
 
-  for (auto &s : BoundsMap) {
+  for (const Set &s : BoundsMap) {
     BoundsMapT::iterator it = mapcp.find(s);
     if (it != mapcp.end()) {
       mapcp.erase(it);

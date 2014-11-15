@@ -48,16 +48,6 @@ endif ()
 add_library(papi SHARED IMPORTED)
 set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
 
-# Find ISL++
-if (NOT DEFINED ISL_CXX_FOUND)
-  find_package(Isl-cxx REQUIRED)
-  include_directories(BEFORE ${ISL_CXX_INCLUDE_DIR})
-  link_directories(${ISL_CXX_LIBRARY})
-endif ()
-
-add_library(isl-cxx SHARED IMPORTED)
-set_target_properties(isl-cxx PROPERTIES IMPORTED_LOCATION ${ISL_CXX_LIBRARY})
-
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")

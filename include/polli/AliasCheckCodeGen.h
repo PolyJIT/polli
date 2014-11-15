@@ -6,9 +6,7 @@
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
-#include "isl++/Set.h"
-#include "isl++/Map.h"
-#include "isl++/PwAff.h"
+#include "isl/Set.hpp"
 
 namespace polli {
 class AliasCheckGenerator : public polly::ScopPass,

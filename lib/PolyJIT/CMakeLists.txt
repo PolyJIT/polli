@@ -42,10 +42,9 @@ add_polli_library(PolyJIT
   )
 
 target_link_libraries(PolyJIT
-  papi
   isl
-  isl-cxx
   Polly
+  papi
   pprof
 )
 
