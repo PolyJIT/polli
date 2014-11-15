@@ -13,84 +13,88 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/PolyJIT.h"
-#include <assert.h> // for assert
-#include <ext/alloc_traits.h>
-#include <stddef.h>             // for size_t
-#include <stdlib.h>             // for NULL, abort
-#include <map>                  // for _Rb_tree_iterator, etc
-#include <memory>               // for __shared_ptr, shared_ptr
-#include <utility>              // for pair
-#include "llvm/ADT/APInt.h"     // for APInt, operator<<
-#include "llvm/ADT/StringRef.h" // for StringRef, operator==
-#include "llvm/ADT/Triple.h"    // for Triple
-#include "llvm/ADT/Twine.h"     // for Twine, operator+
-#include "llvm/ADT/ilist.h"     // for ilist_iterator
+
+#include "llvm/ADT/APInt.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/Triple.h"
+#include "llvm/ADT/Twine.h"
+
 #include "llvm/Analysis/Passes.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h" // for EngineBuilder, etc
-#include "llvm/ExecutionEngine/GenericValue.h"    // for GenericValue, PTOGV
+
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
 #include "llvm/ExecutionEngine/JITEventListener.h"
-#include "llvm/ExecutionEngine/JITMemoryManager.h" // for JITMemoryManager
+#include "llvm/ExecutionEngine/JITMemoryManager.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/ExecutionEngine/ObjectCache.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
-#include "llvm/IR/Argument.h"            // for Argument
-#include "llvm/IR/BasicBlock.h"          // for BasicBlock::iterator, etc
-#include "llvm/IR/Constant.h"            // for Constant
-#include "llvm/IR/Constants.h"           // for ConstantInt
-#include "llvm/IR/DataLayout.h"          // for DataLayoutPass
-#include "llvm/IR/DerivedTypes.h"        // for PointerType
-#include "llvm/IR/Function.h"            // for Function, etc
-#include "llvm/IR/GlobalValue.h"         // for GlobalValue, etc
-#include "llvm/IR/IRBuilder.h"           // for IRBuilder
-#include "llvm/IR/Instructions.h"        // for AllocaInst
-#include "llvm/IR/LegacyPassManager.h"   // for PassManager, etc
-#include "llvm/IR/Module.h"              // for Module, Module::iterator
-#include "llvm/IR/Type.h"                // for Type
-#include "llvm/Linker/Linker.h"          // for Linker, etc
-#include "llvm/Pass.h"                   // for ImmutablePass, FunctionPass, etc
-#include "llvm/PassAnalysisSupport.h"    // for AnalysisUsage, etc
-#include "llvm/PassManager.h"            // for PassManager, etc
-#include "llvm/PassRegistry.h"           // for PassRegistry
-#include "llvm/Support/Casting.h"        // for cast, dyn_cast
-#include "llvm/Support/CodeGen.h"        // for Model, Level::Default, etc
-#include "llvm/Support/CommandLine.h"    // for desc, initializer, opt, cat, etc
-#include "llvm/Support/Debug.h"          // for dbgs, DEBUG
+
+#include "llvm/IR/Argument.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/Support/DynamicLibrary.h" // for DynamicLibrary
-#include "llvm/Support/ErrorHandling.h"  // for llvm_unreachable
-#include "llvm/Support/raw_ostream.h"    // for raw_ostream, errs
-#include "llvm/Target/TargetOptions.h"   // for ABIType, TargetOptions, etc
-#include "llvm/Transforms/IPO.h"         // for createStripSymbolsPass
+#include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+
+#include "llvm/Linker/Linker.h"
+
+#include "llvm/Pass.h"
+#include "llvm/PassAnalysisSupport.h"
+#include "llvm/PassManager.h"
+#include "llvm/PassRegistry.h"
+
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include "llvm/Target/TargetOptions.h"
+
+#include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Utils/ValueMapper.h" // for ValueToValueMapTy
-#include "papi.h"                              // for PAPI_flops
-#include "polli/FunctionCloner.h"     // for InstrumentingFunctionCloner, etc
-#include "polli/FunctionDispatcher.h" // for RuntimeParam, etc
-#include "polli/InstrumentRegions.h"  // for PapiCScopProfiling, etc
-#include "polli/JitScopDetection.h"   // for JitScopDetection, etc
-#include "polli/PapiProfiling.h"
-#include "polli/ScopMapper.h" // for ScopMapper, etc
-#include "polli/Utils.h"      // for ManagedModules, StoreModule, etc
-#include "polly/Canonicalization.h"
-#include "polly/LinkAllPasses.h"           // for createScopDetectionPass
-#include "polly/RegisterPasses.h"          // for initializePollyPasses
-#include "polly/ScopDetection.h"           // for ScopDetection, etc
-#include "polly/ScopDetectionDiagnostic.h" // for getDebugLocation, etc
+#include "llvm/Transforms/Utils/ValueMapper.h"
 
+#include "polly/Canonicalization.h"
+#include "polly/LinkAllPasses.h"
+#include "polly/RegisterPasses.h"
+#include "polly/ScopDetection.h"
+#include "polly/ScopDetectionDiagnostic.h"
+#include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 #include "polly/TempScopInfo.h"
-#include "polly/ScopInfo.h"
 
+#include "polli/FunctionCloner.h"
+#include "polli/FunctionDispatcher.h"
+#include "polli/InstrumentRegions.h"
+#include "polli/JitScopDetection.h"
+#include "polli/PapiProfiling.h"
+#include "polli/ScopMapper.h"
+#include "polli/Utils.h"
 #include "polli/AliasCheckCodeGen.h"
 
-#include "likwid.h"
-
-#include "pprof/pprof.h"
 #include "pprof/Tracing.h"
 
 #include <numeric>
+#include <assert.h>
+#include <ext/alloc_traits.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <map>
+#include <memory>
+#include <utility>
 
 namespace llvm {
 class LLVMContext;
@@ -453,7 +457,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
  * @param ArgValues the parameter _values_ for the formal parameters.
  */
 void
-PolyJIT::runSpecializedFunction(Function *NewF,
+PolyJIT::runSpecializedFunction(llvm::Function *NewF,
                                 const std::vector<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
 
@@ -584,6 +588,15 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   sys::DynamicLibrary::AddSymbol(cbName, (void *)&pjit_callback);
 }
 
+static ModulePtrT copyModule(Module &M) {
+  ModulePtrT NewM = new Module(M.getModuleIdentifier(), M.getContext());
+  NewM->setTargetTriple(M.getTargetTriple());
+  NewM->setDataLayout(M.getDataLayout());
+  NewM->setMaterializer(M.getMaterializer());
+
+  return NewM;
+}
+
 /**
  * @brief Extract all jitable Scops into a separate module
  *
@@ -613,27 +626,28 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   DEBUG(log(Info, 2) << "link :: create final module\n");
   ValueToValueMapTy VMap;
+  ModulePtrT MoveTargetMod;
+  ModulePtrT InstrumentTargetMod;
+  StringRef ModuleName = M.getModuleIdentifier();
 
   /* Move the extracted SCoP functions into separate modules. */
   for (ScopMapper::iterator f = SM->begin(), fe = SM->end(); f != fe; ++f) {
     Function *F = (*f);
+    StringRef FunctionName = F->getName();
 
     /* Prepare a fresh module for this function. */
-    Module *M, *NewM;
-    M = F->getParent();
+    MoveTargetMod = copyModule(M);
+    InstrumentTargetMod = copyModule(M);
+    MoveTargetMod->setModuleIdentifier((ModuleName + "." + FunctionName).str() +
+                                       ".prototype");
+    InstrumentTargetMod->setModuleIdentifier(
+        (ModuleName + "." + FunctionName + ".instrumented").str());
 
-    /* Copy properties of our source module */
-    NewM = new Module(M->getModuleIdentifier(), M->getContext());
-    NewM->setTargetTriple(M->getTargetTriple());
-    NewM->setDataLayout(M->getDataLayout());
-    NewM->setMaterializer(M->getMaterializer());
-    NewM->setModuleIdentifier(
-        (M->getModuleIdentifier() + "." + F->getName()).str());
+    RawModules[MoveTargetMod] = EE;
+    InstrumentedModules[InstrumentTargetMod] = EE;
 
-    Mods[NewM] = EE;
-
-    MovingFunctionCloner MoveCloner(VMap, NewM);
-    InstrumentingFunctionCloner InstCloner(VMap, NewM);
+    MovingFunctionCloner MoveCloner(VMap, MoveTargetMod);
+    InstrumentingFunctionCloner InstCloner(VMap, InstrumentTargetMod);
 
     MoveCloner.setSource(F);
     Function *OrigF = MoveCloner.start();
@@ -647,7 +661,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     F->setName(InstF->getName());
 
     // Remove the mess we made during instrumentation.
-    FunctionPassManager NewFPM(NewM);
+    FunctionPassManager NewFPM(InstrumentTargetMod);
     NewFPM.add(llvm::createPromoteMemoryToRegisterPass());
     NewFPM.add(llvm::createTypeBasedAliasAnalysisPass());
     NewFPM.add(llvm::createBasicAliasAnalysisPass());
@@ -742,10 +756,11 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   PM.run(M);
 
   /* Store temporary files */
-  StoreModules(Mods);
+  StoreModules(RawModules);
+  StoreModules(InstrumentedModules);
 
   /* Get the Scops back */
-  linkJitableScops(Mods, M);
+  linkJitableScops(InstrumentedModules, M);
 
   /* Optimize with O3&Polly */
   prepareOptimizedIR(M);
@@ -838,10 +853,16 @@ int PolyJIT::shutdown(int result) {
     abort();
   }
 
-  for (ManagedModules::iterator I = Mods.begin(), ME = Mods.end(); I != ME;
-       ++I) {
-    ExecutionEngine *EE = (*I).second;
-    delete EE;
+  for (auto &JitModule : RawModules) {
+    ExecutionEngine *EE = JitModule.second;
+    if (EE)
+      delete EE;
+  }
+
+  for (auto &JitModule : InstrumentedModules) {
+    ExecutionEngine *EE = JitModule.second;
+    if (EE)
+      delete EE;
   }
 };
 

@@ -17,16 +17,19 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Support/Debug.h"
+#include "polli/PolyJIT.h"
 
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Bitcode/ReaderWriter.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
+
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IRReader/IRReader.h"
+
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/ManagedStatic.h"

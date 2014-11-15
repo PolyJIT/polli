@@ -9,6 +9,8 @@
 
 #include "llvm/Support/raw_ostream.h"
 
+using namespace llvm;
+
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
   return OS << P.Val->getUniqueInteger();

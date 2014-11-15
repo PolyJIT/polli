@@ -117,7 +117,7 @@ void StoreModule(Module &M, const Twine &Name) {
 
 void StoreModules(ManagedModules &Modules) {
   for (auto &Modules_MI : Modules) {
-    Module *M = (Modules_MI).first;
+    ModulePtrT M = (Modules_MI).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
 }

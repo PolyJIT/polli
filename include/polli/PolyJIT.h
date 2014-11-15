@@ -34,7 +34,7 @@ namespace polli {
  *
  * We just introduce some memory usage tracking for now.
  */
-class PolyJITMemoryManager : public SectionMemoryManager {
+class PolyJITMemoryManager : public llvm::SectionMemoryManager {
 public:
   explicit PolyJITMemoryManager() : AllocatedBytes(0) {}
   virtual ~PolyJITMemoryManager() override;
@@ -69,7 +69,7 @@ public:
    */
   uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
                                unsigned SectionID,
-                               StringRef SectionName) override;
+                               llvm::StringRef SectionName) override;
 
   /**
    * @brief Allocate a new data section.
@@ -85,7 +85,7 @@ public:
    * @return pointer to the allocated data section
    */
   uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
-                               unsigned SectionID, StringRef SectionName,
+                               unsigned SectionID, llvm::StringRef SectionName,
                                bool IsReadOnly) override;
 
 private:
@@ -109,7 +109,7 @@ public:
    *
    * @return The current PolyJIT instance.
    */
-  static PolyJIT *Get(Module *M = 0);
+  static PolyJIT *Get(llvm::Module *M = 0);
 
   /**
    * @brief Creates a fresh ExecutionEngine for the given Module.
@@ -118,7 +118,7 @@ public:
    *
    * @return A new execution engine for the module.
    */
-  ExecutionEngine *GetEngine(Module *M);
+  llvm::ExecutionEngine *GetEngine(llvm::Module *M);
 
   /**
    * @brief Setter for the JIT's EntryFn.
@@ -155,7 +155,7 @@ public:
    *
    * @return Reference to the main module.
    */
-  Module &getExecutedModule() { return M; }
+  llvm::Module &getExecutedModule() { return M; }
 
   /**
    * @brief Execute a specialized function.
@@ -169,17 +169,18 @@ public:
    * @param NewF The function to execute
    * @param ArgValues A list of parameter values to the apply the function to.
    */
-  void runSpecializedFunction(Function *NewF,
-                              const std::vector<GenericValue> &ArgValues);
+  void runSpecializedFunction(llvm::Function *NewF,
+                              const std::vector<llvm::GenericValue> &ArgValues);
 
 private:
   /**
    * @name Hidden, because singleton.
    * @{ */
   static PolyJIT *Instance;
-  PolyJIT(Module &Main);
+  PolyJIT(llvm::Module &Main);
   PolyJIT(const PolyJIT &);
-  ~PolyJIT() {}
+  ~PolyJIT() {
+  }
   struct Sentinel {
   public:
     ~Sentinel() {
@@ -193,13 +194,13 @@ private:
   /**
    * @brief Our 'main' module we work on.
    */
-  Module &M;
+  llvm::Module &M;
 
   /**
    * @brief Our default 'main' execution engine.
    * TODO: Why do I store it in here, check that again.
    */
-  ExecutionEngine *EE;
+  llvm::ExecutionEngine *EE;
 
   /**
    * @brief Our EntryFn, usually it is main()
@@ -207,9 +208,27 @@ private:
   std::string EntryFn;
 
   /**
-   * @brief The set of modules this PolyJIT hast to deal with.
+   * @brief The set of raw modules used for creating new function variants.
+   *
+   * We store one prototype function per module. These serve as a source for
+   * new variants.
    */
-  ManagedModules Mods;
+  ManagedModules RawModules;
+
+  /**
+   * @brief The set of modules with instrumented functions.
+   *
+   * We store one instrumented function per module. These have to be
+   * re-linked before the main module starts execution again. This is the
+   * time when they are destoryed again by the linker (does not preserve
+   * source anymore).
+   */
+  ManagedModules InstrumentedModules;
+
+  /**
+   * @brief The set of modules with specialized functions.
+   */
+  ManagedModules SpecializedModules;
 
   /**
    * @brief Our memory manager, keeps track of all emitted objects.
@@ -219,12 +238,12 @@ private:
   /**
    * @brief TargetOptions to be used for all execution engines.
    */
-  TargetOptions Options;
+  llvm::TargetOptions Options;
 
   /**
    * @brief CodeGen optimization level for all modules emitted by the JIT.
    */
-  CodeGenOpt::Level OLvl;
+  llvm::CodeGenOpt::Level OLvl;
 
   /**
    * @brief Link extracted Scops into a module for execution.
@@ -232,14 +251,14 @@ private:
    * @param The set of managed modules to link into a single one.
    * @param The module to link into.
    */
-  void linkJitableScops(ManagedModules &, Module &);
+  void linkJitableScops(ManagedModules &, llvm::Module &);
 
   /**
    * @brief Optimize the module before executing it for the first time.
    *
    * @param M The 'main' module we prepare for execution.
    */
-  void prepareOptimizedIR(Module &M);
+  void prepareOptimizedIR(llvm::Module &M);
 
   /**
    * @brief Instrument extracted Scops with a callback to the JIT
@@ -247,21 +266,21 @@ private:
    * @param
    * @param
    */
-  void instrumentScops(Module &, ManagedModules &);
+  void instrumentScops(llvm::Module &, ManagedModules &);
 
   /**
    * @brief Extract all jitable Scops into a separate module
    *
    * @param The module to extract all jitable Scops from
    */
-  void extractJitableScops(Module &);
+  void extractJitableScops(llvm::Module &);
 
   /**
    * @brief Run Polly's default set of preoptimization on a module.
    *
    * @param The module to run the preoptimization on.
    */
-  void runPollyPreoptimizationPasses(Module &);
+  void runPollyPreoptimizationPasses(llvm::Module &);
 };
 
 } // End llvm namespace
