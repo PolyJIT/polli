@@ -12,11 +12,15 @@
 
 #include <assert.h>
 
-// Enable tracing conditionally
+// Enable/Disable tracing
 #ifdef ENABLE_TRACING
+#define LIKWID_PERFMON
+
 #define TRACE(X) \
   do { X; } while (0)
 #else
+#undef LIKWID_PERFMON
+
 #define TRACE(X) \
   do { } while (0)
 #endif

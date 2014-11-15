@@ -30,7 +30,7 @@
 #include "polly/ScopDetection.h"
 
 #include "pprof/pprof.h"
-#include "pprof/Tracing.h"
+#include "likwid.h"
 
 namespace llvm {
 class Function;
@@ -57,9 +57,9 @@ Function *OptimizeForRuntime(Function *F) {
   PM.add(polly::createIslCodeGenerationPass());
 //  PM.add(polly::createCodeGenerationPass());
 
-  TRACE(pprof_trace_entry("JIT-Opt"));
+  LIKWID_MARKER_START("JIT-Opt");
   PM.run(*F);
-  TRACE(pprof_trace_exit("JIT-Opt"));
+  LIKWID_MARKER_STOP("JIT-Opt");
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
 

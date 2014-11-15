@@ -43,9 +43,10 @@ add_polli_library(PolyJIT
 
 target_link_libraries(PolyJIT
   isl
+  likwid
   Polly
-  papi
   pprof
+  pthread
 )
 
 set_target_properties(PolyJIT

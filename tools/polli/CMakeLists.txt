@@ -2,6 +2,8 @@ set(LLVM_LINK_COMPONENTS
   ${LLVM_LINK_COMPONENTS}
   BitReader
   BitWriter
+  CodeGen
+  Core
   ExecutionEngine
   IRReader
   Interpreter

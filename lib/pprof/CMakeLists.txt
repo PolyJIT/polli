@@ -6,7 +6,9 @@ add_polli_library(pprof
 )
 
 target_link_libraries(pprof
+  likwid
   papi
+  pthread
 )
 
 set_target_properties(pprof

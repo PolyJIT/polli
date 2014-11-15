@@ -38,7 +38,6 @@ include(polli_macros)
 add_library(isl SHARED IMPORTED)
 set_target_properties(isl PROPERTIES IMPORTED_LOCATION ${ISL_LIBRARY})
 
-# Find PAPI
 if (NOT DEFINED PAPI_FOUND)
   find_package(Papi REQUIRED)
   include_directories(BEFORE ${PAPI_INCLUDE_DIR})
@@ -48,6 +47,26 @@ endif ()
 add_library(papi SHARED IMPORTED)
 set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
 
+if (NOT DEFINED PTHREAD_FOUND)
+  find_package(Pthread REQUIRED)
+  include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
+  link_directories(${PTHREAD_LIBRARY})
+endif ()
+
+add_library(pthread SHARED IMPORTED)
+set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
+
+if (NOT DEFINED LIKWID_FOUND)
+  find_package(Likwid REQUIRED)
+  include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
+  link_directories(${LIKWID_LIBRARY})
+endif ()
+
+add_library(likwid SHARED IMPORTED)
+set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
+
+option(ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
+
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
@@ -55,8 +74,6 @@ endif ()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -std=c++11")
 
-
-option(ENABLE_TRACING "Trace critical parts of polli with PAPI counters" ON)
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
 
