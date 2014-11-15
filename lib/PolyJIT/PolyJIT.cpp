@@ -55,6 +55,8 @@
 #include "llvm/Support/CodeGen.h"        // for Model, Level::Default, etc
 #include "llvm/Support/CommandLine.h"    // for desc, initializer, opt, cat, etc
 #include "llvm/Support/Debug.h"          // for dbgs, DEBUG
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/Support/DynamicLibrary.h" // for DynamicLibrary
 #include "llvm/Support/ErrorHandling.h"  // for llvm_unreachable
 #include "llvm/Support/raw_ostream.h"    // for raw_ostream, errs
@@ -563,16 +565,15 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
  * @param The module to link into.
  */
 void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
-  Linker L(&M);
-
   /* We need to link the functions back in for execution */
-  std::string ErrorMsg;
   for (ManagedModules::iterator src = Mods.begin(), se = Mods.end(); src != se;
        ++src) {
-    Module *M = (*src).first;
-    DEBUG(log(Info, 2) << "link :: " << M->getModuleIdentifier() << "\n");
-    if (L.linkInModule(M, Linker::PreserveSource, &ErrorMsg))
-      log(Error, 2) << "ERROR while linking. MESSAGE: " << ErrorMsg << "\n";
+    Module *SrcM = (*src).first;
+    DEBUG(log(Info, 2) << "link :: " << SrcM->getModuleIdentifier() << "\n");
+    Linker::LinkModules(&M, SrcM, [](const DiagnosticInfo &Info) {
+      DiagnosticPrinterRawOStream OS(errs());
+      Info.print(OS);
+    });
   }
 
   StringRef cbName = StringRef("polli.enter.runtime");
