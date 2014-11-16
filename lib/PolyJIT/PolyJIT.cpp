@@ -259,7 +259,7 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
    * Otherwise it will blow up. FIXME: Don't blow up. */
   PolyJIT *JIT = PolyJIT::Get();
 
-  LIKWID_MARKER_START("ParamSel");
+  LIKWID_MARKER_START("JitSelectParams");
   /* Be very careful here, we want to exit this callback asap to cut down on
    * overhead. Think about triggering any modifications to the underlying IR
    * in a concurrent thread instead of b tlocking everything here. */
@@ -282,17 +282,14 @@ static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
   ArgValues[0] = ArgC;
   ArgValues[1] = PTOGV(params);
-  LIKWID_MARKER_STOP("ParamSel");
+  LIKWID_MARKER_STOP("JitSelectParams");
 
   Stats &S = VarFun->stats();
-  LIKWID_MARKER_START("GenVarFun");
+  LIKWID_MARKER_START("JitOptVariant");
   Function *NewF = VarFun->getOrCreateVariant(Params);
-  LIKWID_MARKER_STOP("GenVarFun");
+  LIKWID_MARKER_STOP("JitOptVariant");
 
-  LIKWID_MARKER_START(NewF->getName().str().c_str());
   JIT->runSpecializedFunction(NewF, ArgValues);
-  LIKWID_MARKER_STOP(NewF->getName().str().c_str());
-
   S.ExecCount++;
 }
 }
@@ -461,6 +458,7 @@ void
 PolyJIT::runSpecializedFunction(llvm::Function *NewF,
                                 const std::vector<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
+  LIKWID_MARKER_START("CodeGenJIT");
 
   Module *NewM = NewF->getParent();
   ExecutionEngine *NewEE;
@@ -470,15 +468,18 @@ PolyJIT::runSpecializedFunction(llvm::Function *NewF,
   // Fetch or Create a new ExecutionEngine for this Module.
   if (!SpecializedModules.count(NewM)) {
     SpecializedModules[NewM] = PolyJIT::GetEngine(NewM);
-    LIKWID_MARKER_START("CodeGenJIT");
     SpecializedModules[NewM]->finalizeObject();
-    LIKWID_MARKER_STOP("CodeGenJIT");
   }
 
   NewEE = SpecializedModules[NewM];
-
   assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
+
+  LIKWID_MARKER_STOP("CodeGenJIT");
+
+  LIKWID_MARKER_START(NewF->getName().str().c_str());
+  LIKWID_MARKER_THREADINIT;
   NewEE->runFunction(NewF, ArgValues);
+  LIKWID_MARKER_STOP(NewF->getName().str().c_str());
 }
 
 /**
@@ -688,6 +689,7 @@ void PolyJIT::extractJitableScops(Module &M) {
 void PolyJIT::prepareOptimizedIR(Module &M) {
   PassManager PM;
 
+  LIKWID_MARKER_START("OptMain");
   polly::ScopDetection *SD =
       (polly::ScopDetection *)polly::createScopDetectionPass();
 
@@ -717,6 +719,7 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
 
   // Optimize the whole module.
   PM.run(M);
+  LIKWID_MARKER_STOP("OptMain");
 }
 
 /**
@@ -745,6 +748,7 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     return -1;
   }
 
+  LIKWID_MARKER_START("PreoptMain");
   /* Preoptimize our module for polly */
   runPollyPreoptimizationPasses(M);
 
@@ -769,10 +773,14 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   /* Store module before execution */
   if (OutputFilename.size() > 0)
     StoreModule(M, OutputFilename);
+  LIKWID_MARKER_STOP("PreoptMain");
 
+  LIKWID_MARKER_START("CodeGenMain");
   int ret = 0;
   // Make the object executable.
   EE->finalizeObject();
+
+  LIKWID_MARKER_STOP("CodeGenMain");
 
   if (!DisableExecution) {
     DEBUG(log(Info) << "run :: starting execution\n");
@@ -780,7 +788,9 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     // Run static constructors.
     EE->runStaticConstructorsDestructors(false);
 
+    LIKWID_MARKER_START("RunMain");
     ret = EE->runFunctionAsMain(Main, inputArgs, envp);
+    LIKWID_MARKER_STOP("RunMain");
 
     DEBUG(log(Info) << "run :: execution finished (" << ret << ")\n");
   }
