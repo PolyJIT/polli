@@ -458,25 +458,20 @@ void
 PolyJIT::runSpecializedFunction(llvm::Function *NewF,
                                 const std::vector<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
-  LIKWID_MARKER_START("CodeGenJIT");
 
   Module *NewM = NewF->getParent();
-  ExecutionEngine *NewEE;
-
-  assert(NewM && "Passed function parameter has no parent module!");
 
   // Fetch or Create a new ExecutionEngine for this Module.
   if (!SpecializedModules.count(NewM)) {
+    LIKWID_MARKER_START("CodeGenJIT");
     SpecializedModules[NewM] = PolyJIT::GetEngine(NewM);
     SpecializedModules[NewM]->finalizeObject();
+    LIKWID_MARKER_STOP("CodeGenJIT");
   }
 
-  NewEE = SpecializedModules[NewM];
-  assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
-
-  LIKWID_MARKER_STOP("CodeGenJIT");
-
   LIKWID_MARKER_START(NewF->getName().str().c_str());
+  ExecutionEngine *NewEE = SpecializedModules[NewM];
+  assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
   LIKWID_MARKER_THREADINIT;
   NewEE->runFunction(NewF, ArgValues);
   LIKWID_MARKER_STOP(NewF->getName().str().c_str());
@@ -699,7 +694,7 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   PM.add(SD);
   PM.add(polly::createScopInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
-  PM.add(polly::createCodeGenerationPass());
+  PM.add(polly::createIslCodeGenerationPass());
 
   // Add O3.
   PassManagerBuilder Builder;

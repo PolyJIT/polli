@@ -1,5 +1,7 @@
 #include "pprof/pprof.h"
 
+#include "llvm/Support/CommandLine.h"
+
 #include <string>
 #include <vector>
 #include <map>
@@ -13,7 +15,7 @@
 #include <memory>
 #include <assert.h>
 
-using namespace std;
+using namespace llvm;
 
 static std::map<uint32_t, PPStringRegion> PPStrings;
 static std::map<uint32_t, uint64_t> PPDurations;
@@ -27,10 +29,8 @@ static int64_t timeInSCoPs_ns = 0;
 static int64_t totalTime_ns = 0;
 
 uint64_t getTimeInSCoPs(PPVector &Events, ostream &os) {
-  std::shared_ptr<std::vector<int64_t>> s(
-      new std::vector<int64_t>(Events.size() + 1));
-  std::shared_ptr<std::vector<int64_t>> ts(
-      new std::vector<int64_t>(Events.size() + 1));
+  std::vector<int64_t> s(Events.size() + 1);
+  std::vector<int64_t> ts(Events.size() + 1);
   std::vector<int64_t> evs;
 
   uint64_t sum = std::accumulate(Events.begin(), Events.end(), (int64_t)0,
@@ -39,8 +39,8 @@ uint64_t getTimeInSCoPs(PPVector &Events, ostream &os) {
     if (y.EventTy == ScopEnter) {
       // Start with 0 in newx, track the start time in ts and reserve a slot
       // in s for our subregions.
-      ts->push_back(-y.Timestamp);
-      s->push_back(0);
+      ts.push_back(-y.Timestamp);
+      s.push_back(0);
       evs.push_back(y.ID);
     }
 
@@ -52,13 +52,13 @@ uint64_t getTimeInSCoPs(PPVector &Events, ostream &os) {
       if (evs.size() > 0 && evs.back() == y.ID) {
         evs.pop_back();
 
-        int64_t fullDur = ts->back() + y.Timestamp;
-        int64_t exclusiveDur = fullDur - s->back();
+        int64_t fullDur = ts.back() + y.Timestamp;
+        int64_t exclusiveDur = fullDur - s.back();
 
-        s->pop_back();
-        ts->pop_back();
+        s.pop_back();
+        ts.pop_back();
 
-        s->back() += fullDur;
+        s.back() += fullDur;
 
         // We accumulate only the exclusive Duration.
         newx += exclusiveDur;
@@ -161,6 +161,8 @@ void PrintStats(std::ostream &os) {
 }
 
 int main(int argc, const char **argv) {
+  cl::ParseCommandLineOptions(argc, argv);
+
   ostream &dbgs = std::cout;
 
   if (argv[1])
