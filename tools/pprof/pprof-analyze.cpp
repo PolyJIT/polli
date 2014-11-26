@@ -161,8 +161,6 @@ void PrintStats(std::ostream &os) {
 }
 
 int main(int argc, const char **argv) {
-  cl::ParseCommandLineOptions(argc, argv);
-
   ostream &dbgs = std::cout;
 
   if (argv[1])
