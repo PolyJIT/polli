@@ -61,6 +61,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llvm/Target/TargetOptions.h"
+#include "llvm/Target/TargetLibraryInfo.h"
 
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -622,7 +623,6 @@ void PolyJIT::extractJitableScops(Module &M) {
 
   PM.run(M);
 
-  DEBUG(log(Info, 2) << "link :: create final module\n");
   ValueToValueMapTy VMap;
   ModulePtrT MoveTargetMod;
   ModulePtrT InstrumentTargetMod;
@@ -658,15 +658,6 @@ void PolyJIT::extractJitableScops(Module &M) {
     // version in the extracted version.
     F->setName(InstF->getName());
 
-    // Remove the mess we made during instrumentation.
-    FunctionPassManager NewFPM(InstrumentTargetMod);
-    NewFPM.add(llvm::createPromoteMemoryToRegisterPass());
-    NewFPM.add(llvm::createTypeBasedAliasAnalysisPass());
-    NewFPM.add(llvm::createBasicAliasAnalysisPass());
-    polly::registerCanonicalicationPasses(NewFPM);
-
-    NewFPM.run(*InstF);
-
     // Set up the mapping for this prototype.
     Disp->setPrototypeMapping(InstF, OrigF);
   }
@@ -683,37 +674,44 @@ void PolyJIT::extractJitableScops(Module &M) {
  */
 void PolyJIT::prepareOptimizedIR(Module &M) {
   PassManager PM;
+  PassManager PostProcess;
+
+  StoreModule(M, M.getModuleIdentifier() + ".before.ll");
 
   LIKWID_MARKER_START("OptMain");
-  polly::ScopDetection *SD =
-      (polly::ScopDetection *)polly::createScopDetectionPass();
-
+  TargetLibraryInfo *TLI = new TargetLibraryInfo(Triple(M.getTargetTriple()));
+  PM.add(TLI);
   PM.add(new DataLayoutPass());
+
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
-  PM.add(SD);
-  PM.add(polly::createScopInfoPass());
+  PM.add(polly::createPollyCanonicalizePass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createIslCodeGenerationPass());
 
+  // Make sure we run polly as early as possible too.
+  PM.run(M);
+
   // Add O3.
   PassManagerBuilder Builder;
+  Builder.VerifyInput = true;
+  Builder.VerifyOutput = true;
   Builder.Inliner = createFunctionInliningPass(OptLevel);
   Builder.OptLevel = OptLevel;
-  Builder.populateModulePassManager(PM);
+  Builder.populateModulePassManager(PostProcess);
 
   FunctionPassManager FPM(&M);
   Builder.populateFunctionPassManager(FPM);
 
   // Optimize the functions.
-  for (Function &F : M) {
-    FPM.doInitialization();
+  FPM.doInitialization();
+  for (Function &F : M)
     FPM.run(F);
-    FPM.doFinalization();
-  }
+  FPM.doFinalization();
+
+  PostProcess.run(M);
 
   // Optimize the whole module.
-  PM.run(M);
   LIKWID_MARKER_STOP("OptMain");
 }
 

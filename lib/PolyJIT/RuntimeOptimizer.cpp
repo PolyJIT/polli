@@ -18,11 +18,15 @@
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Pass.h"
-#include "llvm/PassManager.h"
 #include "llvm/Support/Debug.h"
+
+#include "llvm/Pass.h"
+#include "llvm/PassAnalysisSupport.h"
+#include "llvm/PassManager.h"
+#include "llvm/PassRegistry.h"
+
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "polly/Canonicalization.h"
 #include "polly/LinkAllPasses.h"
@@ -40,17 +44,21 @@ namespace polli {
 Function *OptimizeForRuntime(Function *F) {
   Module *M = F->getParent();
   FunctionPassManager PM = FunctionPassManager(M);
+  PassManagerBuilder Builder;
 
-  polly::ScopDetection *SD =
-      (polly::ScopDetection *)polly::createScopDetectionPass();
 
   PM.add(new DataLayoutPass());
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
-  PM.add(SD);
+  polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createIslCodeGenerationPass());
+
+  Builder.VerifyInput = true;
+  Builder.VerifyOutput = true;
+  Builder.OptLevel = 3;
+  Builder.populateFunctionPassManager(PM);
 
   PM.run(*F);
 
