@@ -99,6 +99,7 @@ static void do_shutdown() {
 #ifndef DO_NOTHING_ATEXIT
   delete EE;
   llvm_shutdown();
+  LIKWID_MARKER_CLOSE;
 #endif
 }
 
@@ -183,9 +184,6 @@ int main(int argc, char **argv, char * const *envp) {
   }
 
   int Result = pjit->runMain(InputArgv, envp);
-
-  // Stop monitoring.
-  LIKWID_MARKER_CLOSE;
 
   pjit->shutdown(Result);
 
