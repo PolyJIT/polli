@@ -103,6 +103,17 @@ static void do_shutdown() {
 #endif
 }
 
+static bool loadSymbolsFromLibrary(const std::string &Lib) {
+  std::string ErrorMsg;
+  DEBUG(dbgs().indent(2) << "Linking: " << Lib << "\n");
+  if (sys::DynamicLibrary::LoadLibraryPermanently(Lib.c_str(), &ErrorMsg)) {
+    errs() << "ERROR: " << ErrorMsg << "\n";
+    return false;
+  }
+
+  return true;
+}
+
 //===----------------------------------------------------------------------===//
 // main Driver function
 //
@@ -172,15 +183,16 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Link libraries.
   for (unsigned i = 0; i < Libraries.size(); ++i) {
-    std::string ErrorMsg;
-    std::string Lib = "lib";
+    std::string Lib = "lib" + Libraries[i] + ".so";
 
-    Lib.append(Libraries[i]);
-    Lib.append(".so");
+    // Load the symbols and try the staic lib, if we can't load the shared one.
+    if (!loadSymbolsFromLibrary(Lib)) {
+      Lib = "lib" + Libraries[i] + ".a";
+      if (loadSymbolsFromLibrary(Lib)) {
+        errs() << "Loaded " << Lib << " instead.\n";
+      }
+    }
 
-    DEBUG(dbgs().indent(2) << "Linking: " << Lib << "\n");
-    if (sys::DynamicLibrary::LoadLibraryPermanently(Lib.c_str(), &ErrorMsg))
-      errs() << "ERROR: " << ErrorMsg << "\n";
   }
 
   int Result = pjit->runMain(InputArgv, envp);
