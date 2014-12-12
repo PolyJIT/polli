@@ -157,10 +157,11 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 static void printParameters(ParamList &L) {
-  log(Info, 4) << "param values required at run time\n";
+  log(Info, 4) << "required @ run time: ";
   for (const SCEV *S : L) {
+    log(Info) << "[";
     S->print(log(Info, 6));
-    log(Info) << "\n";
+    log(Info) << "]";
   }
   log(Info) << "\n";
 }
@@ -230,14 +231,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
     const Region *R = (*i).first;
     RejectLog Log = (*i).second;
 
-    unsigned LineBegin, LineEnd;
-    std::string FileName;
-    DEBUG(getDebugLocation(R, LineBegin, LineEnd, FileName);
-          if (FileName.size() > 0) log(Info, 2)
-              << "check :: " << FileName << ":" << LineBegin << ":" << LineEnd
-              << " - " << R->getNameStr() << "\n";
-          else log(Info, 2) << "check :: " << R->getNameStr() << "\n";);
-
     bool isValid = Log.size() > 0;
     for (auto Reason : Log) {
       NonAffineLogChecker NonAffine(R, SE);
@@ -282,8 +275,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        log(Info, 2) << "check :: " << F.getName() << "::" << R->getNameStr()
-                     << " is jitable\n";
+        log(Info, 2) << "jit-scops :: " << F.getName()
+                     << "::" << R->getNameStr();
         printParameters(RequiredParams[R]);
 
         AccumulatedScops.insert(R);
