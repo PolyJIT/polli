@@ -176,6 +176,9 @@ int main(int argc, char **argv, char * const *envp) {
   // Link libraries.
   for (unsigned i = 0; i < Libraries.size(); ++i) {
     std::string Lib = "lib" + Libraries[i] + ".so";
+    if (Libraries[i] == "gfortran")
+      Lib = Lib + ".3";
+
 
     // Load the symbols and try the staic lib, if we can't load the shared one.
     if (!loadSymbolsFromLibrary(Lib)) {
