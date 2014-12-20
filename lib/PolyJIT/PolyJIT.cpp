@@ -131,6 +131,10 @@ cl::opt<bool> InstrumentRegions("instrument",
 cl::opt<bool> EnableJitable("jitable", cl::desc("Enable JIT extensions."),
                             cl::init(false), cl::cat(PolliCategory));
 
+cl::opt<bool> DisablePreopt("disable-preopt",
+                            cl::desc("Disable polly's canonicalization"),
+                            cl::init(false), cl::cat(PolliCategory));
+
 cl::opt<bool> DisableRecompile("no-recompilation",
                                cl::desc("Disable recompilation of SCoPs"),
                                cl::init(false), cl::cat(PolliCategory));
@@ -743,7 +747,8 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 
   LIKWID_MARKER_START("PreoptMain");
   /* Preoptimize our module for polly */
-  runPollyPreoptimizationPasses(M);
+  if (!DisablePreopt)
+    runPollyPreoptimizationPasses(M);
 
   /* Extract suitable Scops */
   extractJitableScops(M);
