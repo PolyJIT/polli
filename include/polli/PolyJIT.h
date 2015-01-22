@@ -37,8 +37,8 @@ namespace polli {
 class PolyJITMemoryManager : public llvm::SectionMemoryManager {
 public:
   explicit PolyJITMemoryManager()
-      : NumAllocatedCodeSections(0),
-        NumAllocatedDataSections(0), AllocatedBytes(0) {}
+      : NumAllocatedDataSections(0), NumAllocatedCodeSections(0),
+        AllocatedBytes(0) {}
   virtual ~PolyJITMemoryManager() override;
 
   /**
