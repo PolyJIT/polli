@@ -1,4 +1,4 @@
-; RUN: polli -polli-analyze -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: polli -polli-analyze -polly-use-runtime-alias-checks=false -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
 
 ; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem"
 ; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem"

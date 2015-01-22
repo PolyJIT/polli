@@ -1,4 +1,4 @@
-; RUN: polli -polli-analyze -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: polli -polli-analyze -polly-use-runtime-alias-checks=false -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
 
 ; CHECK: OK :: Possible aliasing: "a", "b"
 ; CHECK: OK :: Possible aliasing: "a", "b"
