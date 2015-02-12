@@ -47,19 +47,26 @@ ReportFilename("polli-report-file",
                cl::desc("Name of the report file to generate."),
                cl::init("polli.report"));
 
+cl::opt<LogType>
+    LogLevel("polli-log-level", cl::desc("Log level for output messages"),
+             cl::values(clEnumVal(Info, "Info messages (very spammy!)"),
+                        clEnumVal(Debug, "Up to debug messages"),
+                        clEnumVal(Warning, "Up to warning messages"),
+                        clEnumVal(Error, "Error messages only"), clEnumValEnd));
+
 llvm::raw_ostream &log(const LogType T, const size_t Level) {
   switch (T) {
-  case Debug:
-    dbgs().changeColor(raw_ostream::Colors::GREEN) << " D ";
-    return dbgs().indent(Level).resetColor() << " :: ";
+  case Error:
+    errs().changeColor(raw_ostream::Colors::RED) << " E ";
+    return errs().indent(Level).resetColor() << " :: ";
     break;
   case Warning:
     errs().changeColor(raw_ostream::Colors::YELLOW) << " W ";
     return errs().indent(Level).resetColor() << " :: ";
     break;
-  case Error:
-    errs().changeColor(raw_ostream::Colors::RED) << " E ";
-    return errs().indent(Level).resetColor() << " :: ";
+  case Debug:
+    dbgs().changeColor(raw_ostream::Colors::GREEN) << " D ";
+    return dbgs().indent(Level).resetColor() << " :: ";
     break;
   case Info:
     return errs().indent(Level).resetColor();

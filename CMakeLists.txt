@@ -69,10 +69,10 @@ option(ENABLE_TRACING "Trace critical parts of polli with performance counters" 
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fno-rtti -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -pthread -fno-rtti -std=c++11")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
@@ -80,9 +80,18 @@ configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/spdlog/include
+  ${CMAKE_CURRENT_BINARY_DIR}/external/spdlog/include
 )
 
 install(DIRECTORY include/
+  DESTINATION include
+  FILES_MATCHING
+  PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+  )
+
+install(DIRECTORY external/spdlog/include/
   DESTINATION include
   FILES_MATCHING
   PATTERN "*.h"
@@ -94,6 +103,13 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/
   FILES_MATCHING
   PATTERN "*.h"
   PATTERN "CMakeFiles" EXCLUDE
+  PATTERN ".svn" EXCLUDE
+  )
+
+install(DIRECTORY ${POLLI_BINARY_DIR}/external/spdlog/include/
+  DESTINATION include
+  FILES_MATCHING
+  PATTERN "*.h"
   PATTERN ".svn" EXCLUDE
   )
 

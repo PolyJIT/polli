@@ -97,6 +97,8 @@
 #include <memory>
 #include <utility>
 
+#include "spdlog/spdlog.h"
+
 namespace llvm {
 class LLVMContext;
 } // lines 65-65
@@ -373,7 +375,14 @@ uint8_t *PolyJITMemoryManager::allocateDataSection(uintptr_t Size,
 }
 
 PolyJIT::PolyJIT(Module &Main) : M(Main) {
-  CodeGenOpt::Level OLvl = CodeGenOpt::Default;
+  spdlog::set_async_mode(1048576);
+  spdlog::set_pattern("%v");
+
+  //auto console = spdlog::stderr_logger_mt("console");
+  auto console =
+      spdlog::daily_logger_st("console", "polli.log");
+
+  CodeGenOpt::Level OLvl;
   switch (OptLevel) {
   default:
     OLvl = CodeGenOpt::Default;
@@ -871,7 +880,7 @@ int PolyJIT::shutdown(int result) {
     if (EE)
       delete EE;
   }
-};
+}
 
 PolyJIT *PolyJIT::Instance = NULL;
 PolyJIT *PolyJIT::Get(Module *M) {
@@ -879,5 +888,5 @@ PolyJIT *PolyJIT::Get(Module *M) {
     Instance = new PolyJIT(*M);
   }
   return Instance;
-};
+}
 } // end of llvm namespace

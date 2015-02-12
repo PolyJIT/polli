@@ -40,6 +40,8 @@
 
 #include "polli/Utils.h"
 
+#include "spdlog/spdlog.h"
+
 namespace llvm {
 class Function;
 }
@@ -157,13 +159,15 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 static void printParameters(ParamList &L) {
-  log(Info, 4) << "required @ run time: ";
+  auto Console = spdlog::get("console");
+  std::string ParamStr = "";
+  llvm::raw_string_ostream OS(ParamStr);
   for (const SCEV *S : L) {
-    log(Info) << "[";
-    S->print(log(Info, 6));
-    log(Info) << "]";
+    OS << "[";
+    S->print(OS);
+    OS << "]";
   }
-  log(Info) << "\n";
+  Console->info("required @ run time: {:>30}", ParamStr);
 }
 
 // Remove all direct and indirect children of region R from the region set Regs,
@@ -184,6 +188,7 @@ static unsigned eraseAllChildren(std::set<const Region *> &Regs,
   return Count;
 }
 
+#ifndef NDEBUG
 #include <sstream>
 static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
   std::stringstream Messages;
@@ -201,10 +206,12 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
   }
 
   if (ValidScopCount > 0) {
-    log(Debug, 2) << "valid scops ::\n";
-    log(Debug) << Messages.str();
+    auto console = spdlog::get("console");
+    console->debug() << "  valid scops ::";
+    console->debug() << Messages.str();
   }
 }
+#endif
 
 bool JitScopDetection::runOnFunction(Function &F) {
   if (F.isDeclaration())
@@ -219,7 +226,9 @@ bool JitScopDetection::runOnFunction(Function &F) {
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  DEBUG(log(Info) << "jit-scops :: " << F.getName() << "\n");
+  auto console = spdlog::get("console");
+
+  console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));
 
   if (!Enabled)
@@ -246,8 +255,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
 
-      log(Warning, 4) << ((IsFixable) ? "OK :: " : "FAIL :: ")
-                      << Reason->getMessage() << "\n";
+      console->warn() << ((IsFixable) ? "OK :: " : "FAIL :: ")
+                      << Reason->getMessage();
       isValid &= IsFixable;
 
       // Record all necessary parameters for later use.
@@ -275,8 +284,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        log(Info, 2) << "jit-scops :: " << F.getName()
-                     << "::" << R->getNameStr();
+        console->info() << "jit-scops :: " << F.getName().str()
+                        << "::" << R->getNameStr();
         printParameters(RequiredParams[R]);
 
         AccumulatedScops.insert(R);
@@ -287,7 +296,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   }
 
   return false;
-};
+}
 
 void JitScopDetection::print(raw_ostream &OS, const Module *) const {
   for (ParamMap::const_iterator r = RequiredParams.begin(),
@@ -303,7 +312,7 @@ void JitScopDetection::print(raw_ostream &OS, const Module *) const {
     }
     OS << " )\n";
   }
-};
+}
 
 void JitScopDetection::releaseMemory() {
   JitableScops.clear();

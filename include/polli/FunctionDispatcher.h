@@ -96,7 +96,7 @@ template <class StorageT, class TypeT>
 raw_ostream &operator<<(raw_ostream &out, const RTParam<StorageT, TypeT> &p) {
   p.print(out);
   return out;
-};
+}
 
 /**
  * @brief Specialize to APInt. We need a special lt/gt operator there.

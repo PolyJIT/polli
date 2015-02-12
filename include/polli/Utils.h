@@ -33,10 +33,10 @@ namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
 
 enum LogType {
-  Info,
-  Debug,
+  Error,
   Warning,
-  Error
+  Debug,
+  Info
 };
 
 typedef llvm::Module* ModulePtrT;
