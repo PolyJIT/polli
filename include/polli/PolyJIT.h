@@ -233,11 +233,6 @@ private:
   ManagedModules SpecializedModules;
 
   /**
-   * @brief Our memory manager, keeps track of all emitted objects.
-   */
-  PolyJITMemoryManager MemMan;
-
-  /**
    * @brief TargetOptions to be used for all execution engines.
    */
   llvm::TargetOptions Options;

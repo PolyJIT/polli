@@ -845,8 +845,6 @@ int PolyJIT::shutdown(int result) {
     VariantFunctionTy VarFun = Elem.second;
     VarFun->print(log(LogType::Info));
   }
-  log(Info) << "\n";
-  MemMan.print(log(Info));
 
   // Run static destructors.
   EE->runStaticConstructorsDestructors(true);
