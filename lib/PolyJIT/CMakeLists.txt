@@ -19,6 +19,7 @@ set(LLVM_LINK_COMPONENTS
   MCJIT
   native
   objcarcopts
+  RuntimeDyld
   ScalarOpts
   SelectionDAG
   Support
@@ -29,7 +30,7 @@ set(LLVM_LINK_COMPONENTS
 
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
 add_polli_library(PolyJIT
-  AliasCheckCodeGen.cpp
+  #  AliasCheckCodeGen.cpp
   FunctionDispatcher.cpp
   InstrumentRegions.cpp
   JitScopDetection.cpp

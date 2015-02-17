@@ -20,6 +20,7 @@
 #include "llvm/ADT/Twine.h"
 
 #include "llvm/Analysis/Passes.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
@@ -61,7 +62,6 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "llvm/Target/TargetOptions.h"
-#include "llvm/Target/TargetLibraryInfo.h"
 
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -84,7 +84,9 @@
 #include "polli/PapiProfiling.h"
 #include "polli/ScopMapper.h"
 #include "polli/Utils.h"
+#if 0
 #include "polli/AliasCheckCodeGen.h"
+#endif
 
 #include "pprof/Tracing.h"
 
@@ -440,6 +442,8 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   std::unique_ptr<Module> Owner(M);
 
   EngineBuilder builder(std::move(Owner));
+  auto MemMan =
+      std::unique_ptr<PolyJITMemoryManager>(new PolyJITMemoryManager());
 
   builder.setMArch(MArch);
   builder.setMCPU(MCPU);
@@ -448,7 +452,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   builder.setCodeModel(CMModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
-  builder.setMCJITMemoryManager(&MemMan);
+  builder.setMCJITMemoryManager(std::move(MemMan));
   builder.setOptLevel(OLvl);
   builder.setTargetOptions(Options);
 
@@ -625,7 +629,7 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(polly::createScopDetectionPass());
   PM.add(new JitScopDetection(EnableJitable));
-  PM.add(new AliasCheckGenerator());
+//  PM.add(new AliasCheckGenerator());
 
   ScopMapper *SM = new ScopMapper();
   if (!DisableRecompile)
@@ -692,8 +696,6 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   StoreModule(M, M.getModuleIdentifier() + ".before.ll");
 
   LIKWID_MARKER_START("OptMain");
-  TargetLibraryInfo *TLI = new TargetLibraryInfo(Triple(M.getTargetTriple()));
-  PM.add(TLI);
   PM.add(new DataLayoutPass());
 
   PM.add(llvm::createTypeBasedAliasAnalysisPass());

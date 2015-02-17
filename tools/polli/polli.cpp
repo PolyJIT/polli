@@ -145,19 +145,14 @@ int main(int argc, char **argv, char * const *envp) {
     return 1;
   }
 
-  // If the user specifically requested an argv[0] to pass into the program,
-  // do it now.
-  if (!FakeArgv0.empty()) {
-    InputFile = FakeArgv0;
-  } else {
-    // Otherwise, if there is a .bc suffix on the executable strip it off, it
-    // might confuse the program.
-    if (StringRef(InputFile).endswith(".bc"))
-      InputFile.erase(InputFile.length() - 3);
-  }
+  // Otherwise, if there is a .bc suffix on the executable strip it off, it
+  // might confuse the program.
+  if (StringRef(InputFile).endswith(".bc"))
+    InputFile.erase(InputFile.length() - 3);
 
   // Add the module's name to the start of the vector of arguments to main().
-  InputArgv.insert(InputArgv.begin(), InputFile);
+  InputArgv.insert(InputArgv.begin(),
+                   (!FakeArgv0.empty()) ? FakeArgv0 : InputFile);
 
   // Reset errno to zero on entry to main.
   errno = 0;

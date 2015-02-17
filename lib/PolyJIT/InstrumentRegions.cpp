@@ -311,7 +311,8 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
        ++BB) {
     BasicBlock *PredBB = *BB;
     if (!R->contains(PredBB))
-      if ((SplitBB = SplitEdge(PredBB, Entry, this)))
+      // Need: DominatorTree & LoopInfo
+      if ((SplitBB = SplitEdge(PredBB, Entry)))
         EntrySplits.push_back(SplitBB);
   }
 
@@ -319,7 +320,7 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
        ++BB) {
     BasicBlock *PredBB = *BB;
     if (R->contains(PredBB))
-      if ((SplitBB = SplitEdge(PredBB, Exit, this)))
+      if ((SplitBB = SplitEdge(PredBB, Exit)))
         ExitSplits.push_back(SplitBB);
   }
 

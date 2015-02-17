@@ -85,10 +85,8 @@ public:
   /**  @} */
 
 private:
-  LoopInfo *LI;
   ScopDetection *SD;
   JitScopDetection *NSD;
-  DominatorTree *DT;
   RegionInfoPass *RI;
 
   bool processRegion(const Region *R);

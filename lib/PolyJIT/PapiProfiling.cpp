@@ -47,19 +47,6 @@ namespace llvm { class Value; }  // lines 41-41
 using namespace llvm;
 using namespace polly;
 
-static void PapiCreateInit(Function *F) {
-  LLVMContext &Context = F->getContext();
-  Module *M = F->getParent();
-  IRBuilder<> Builder(Context);
-  Constant *PapiLibInitFn = M->getOrInsertFunction(
-      "PAPI_library_init", Builder.getInt32Ty(), Builder.getInt32Ty(), NULL);
-
-  Instruction *Insert = F->getEntryBlock().getFirstInsertionPt();
-  Builder.SetInsertPoint(Insert);
-  Builder.CreateCall(PapiLibInitFn, Builder.getInt32(PAPI_VER_CURRENT),
-                     "papi.lib.init");
-}
-
 static void PapiCreateAdd(Instruction *InsertBefore, Constant *ElemPtr,
                           Module *M, std::string prefix = "papi.counters.") {
   LLVMContext &Context = M->getContext();
@@ -318,10 +305,10 @@ void PapiRegionPrepare::createPapiEntry(Region *R) {
   SmallVector<BasicBlock *, 2> SplitBBs;
   if (Entry->isLandingPad())
     SplitLandingPadPredecessors(Entry, Preds, ".papi.exit", ".papi.others",
-                                this, SplitBBs);
+                                SplitBBs);
   else
     SplitBBs.push_back(
-        SplitBlockPredecessors(Entry, Preds, ".papi.entry", this));
+        SplitBlockPredecessors(Entry, Preds, ".papi.entry"));
   RI->splitBlock(SplitBBs[0], Entry);
 
   /* Update the region exits for siblings of our current region.
@@ -376,16 +363,16 @@ void PapiRegionPrepare::createPapiExit(Region *R) {
     SmallVector<BasicBlock *, 2> SplitBBs;
     if (Exit->isLandingPad())
       SplitLandingPadPredecessors(Exit, Preds, ".papi.exit", ".papi.others",
-                                  this, SplitBBs);
+                                  SplitBBs);
     else
       SplitBBs.push_back(
-          SplitBlockPredecessors(Exit, Preds, ".papi.exit", this));
+          SplitBlockPredecessors(Exit, Preds, ".papi.exit"));
     RI->setRegionFor(SplitBBs[0], R);
   }
 }
 
 bool PapiRegionPrepare::runOnRegion(Region *R, RGPassManager &RGM) {
-  LI = &getAnalysis<LoopInfo>();
+  LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
   createPapiExit(R);

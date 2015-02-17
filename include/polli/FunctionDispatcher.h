@@ -459,9 +459,9 @@ struct MainCreator {
  * functions to their possible - semintically equivalent - specializations.
  */
 class FunctionDispatcher {
-  FunctionDispatcher(const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
+  FunctionDispatcher(const FunctionDispatcher &);
   const FunctionDispatcher &
-  operator=(const FunctionDispatcher &) LLVM_DELETED_FUNCTION;
+  operator=(const FunctionDispatcher &);
 
   // FIXME: OLD STUFF ->
   /// @brief Maps source Functions to specialized functions,
@@ -558,8 +558,8 @@ public:
    * @param MapTo Target function
    */
   void setPrototypeMapping(Function *F, Function *MapTo) {
-    auto Result = FMap.insert(std::make_pair(F->getName().str(), MapTo));
-    assert(Result.second && "Tried to overwrite mapping.");
+    FMap.insert(std::make_pair(F->getName().str(), MapTo));
+    //assert(Result.second && "Tried to overwrite mapping.");
   }
 
   /**
