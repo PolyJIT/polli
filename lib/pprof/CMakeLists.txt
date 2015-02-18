@@ -1,8 +1,12 @@
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
-add_polli_library(pprof
+set(POLLI_SOURCES
   Tracing.cpp
   libpprof.cpp
   pprof.cpp
+)
+
+add_polli_library(pprof
+  ${POLLI_SOURCES}
 )
 
 target_link_libraries(pprof
@@ -15,4 +19,16 @@ set_target_properties(pprof
   PROPERTIES
   LINKER_LANGUAGE CXX
   PREFIX "lib"
+)
+
+add_definitions("-DENABLE_CALIBRATION")
+add_polli_executable(pprof-calibrate
+  ${POLLI_SOURCES}
+)
+
+target_link_libraries(pprof-calibrate
+  pprof
+)
+add_dependencies(pprof-calibrate
+  pprof
 )
