@@ -20,11 +20,6 @@ if (NOT DEFINED LLVM_MAIN_SRC_DIR)
   include_directories ( BEFORE ${POLLY_INCLUDE_DIR} )
   link_directories( ${POLLY_LINK_DIR} )
   add_definitions( ${POLLY_DEFINITIONS} )
-
-  # Find ISL
-  find_package(Isl REQUIRED)
-  include_directories( BEFORE ${ISL_INCLUDE_DIR})
-  link_directories(${ISL_LIBRARY})
 endif()
 
 # Set our project paths
@@ -35,9 +30,6 @@ set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 include(polli_macros)
 
-add_library(isl SHARED IMPORTED)
-set_target_properties(isl PROPERTIES IMPORTED_LOCATION ${ISL_LIBRARY})
-
 if (NOT DEFINED PAPI_FOUND)
   find_package(Papi REQUIRED)
   include_directories(BEFORE ${PAPI_INCLUDE_DIR})
@@ -45,7 +37,8 @@ if (NOT DEFINED PAPI_FOUND)
 endif ()
 
 add_library(papi SHARED IMPORTED)
-set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+set_target_properties(papi
+  PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
 
 if (NOT DEFINED PTHREAD_FOUND)
   find_package(Pthread REQUIRED)
@@ -54,7 +47,8 @@ if (NOT DEFINED PTHREAD_FOUND)
 endif ()
 
 add_library(pthread SHARED IMPORTED)
-set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
+set_target_properties(pthread
+  PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
 
 if (NOT DEFINED LIKWID_FOUND)
   find_package(Likwid REQUIRED)
