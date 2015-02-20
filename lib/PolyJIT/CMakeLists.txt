@@ -28,7 +28,6 @@ set(LLVM_LINK_COMPONENTS
   Vectorize
 )
 
-set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
 add_polli_library(PolyJIT
   #  AliasCheckCodeGen.cpp
   FunctionDispatcher.cpp
@@ -42,13 +41,14 @@ add_polli_library(PolyJIT
   VariantFunction.cpp
   )
 
-target_link_libraries(PolyJIT
-  isl
-  likwid
-  Polly
-  pprof
-  pthread
-)
+if (BUILD_SHARED_LIBS)
+  target_link_libraries(PolyJIT ${cmake_2_8_12_PRIVATE}
+    likwid
+    Polly
+    pprof
+    pthread
+  )
+endif()
 
 set_target_properties(PolyJIT
   PROPERTIES

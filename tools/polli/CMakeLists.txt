@@ -33,5 +33,7 @@ add_polli_executable(polli
   polli.cpp
 )
 
-target_link_libraries(polli PolyJIT)
+target_link_libraries(polli
+  PolyJIT
+  likwid)
 add_dependencies(polli PolyJIT)
