@@ -22,6 +22,7 @@
 #include "llvm/IR/Module.h"            // for Module
 #include "llvm/IR/Verifier.h"          // for createVerifierPass
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"                   // for FunctionPass
 #include "llvm/Support/CommandLine.h"    // for initializer, desc, init, etc
 #include "llvm/Support/Debug.h"          // for dbgs, DEBUG
@@ -32,6 +33,7 @@
 #include <cxxabi.h>
 
 using namespace llvm;
+using namespace llvm::legacy;
 
 SmallVector<char, 255> *DefaultDir;
 
