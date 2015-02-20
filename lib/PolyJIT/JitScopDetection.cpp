@@ -24,7 +24,7 @@
 #include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
 #include "llvm/InitializePasses.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/PassManager.h"         // for FunctionPassManager
+#include "llvm/IR/LegacyPassManager.h"         // for FunctionPassManager
 #include "llvm/PassAnalysisSupport.h" // for AnalysisUsage, etc
 #include "llvm/PassSupport.h"         // for INITIALIZE_PASS_DEPENDENCY, etc
 #include "llvm/Support/CommandLine.h" // for desc, opt
@@ -53,6 +53,7 @@ static cl::opt<bool>
 AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));
 
 using namespace llvm;
+using namespace llvm::legacy;
 using namespace polly;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");

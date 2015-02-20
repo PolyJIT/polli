@@ -18,7 +18,6 @@
 #include "llvm/ADT/SmallVector.h"      // for SmallVector
 #include "llvm/ADT/Twine.h"            // for Twine
 #include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/LegacyPassManager.h" // for PassManager
 #include "llvm/IR/Module.h"            // for Module
 #include "llvm/IR/Verifier.h"          // for createVerifierPass
 #include "llvm/IR/IRPrintingPasses.h"

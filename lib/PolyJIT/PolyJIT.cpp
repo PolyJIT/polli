@@ -50,7 +50,6 @@
 
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
-#include "llvm/PassManager.h"
 #include "llvm/PassRegistry.h"
 
 #include "llvm/Support/Casting.h"
@@ -117,6 +116,7 @@ cl::OptionCategory PolliCategory("Polli Options",
 using namespace polli;
 using namespace polly;
 using namespace llvm;
+using namespace llvm::legacy;
 
 namespace polli {
 Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }

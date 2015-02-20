@@ -19,11 +19,11 @@
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/Debug.h"
 
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
-#include "llvm/PassManager.h"
 #include "llvm/PassRegistry.h"
 
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -38,6 +38,7 @@ class Function;
 }
 
 using namespace llvm;
+using namespace llvm::legacy;
 using namespace polly;
 
 namespace polli {
