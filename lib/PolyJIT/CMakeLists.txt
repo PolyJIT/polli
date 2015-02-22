@@ -42,7 +42,7 @@ add_polli_library(PolyJIT
   )
 
 if (BUILD_SHARED_LIBS)
-  target_link_libraries(PolyJIT ${cmake_2_8_12_PRIVATE}
+  target_link_libraries(PolyJIT PRIVATE
     likwid
     Polly
     pprof
