@@ -136,14 +136,6 @@ void papi_region_setup(int _argc, char **_argv) {
   argc = _argc;
   argv = _argv;
 
-  if (argv) {
-    fileName = argv[0];
-    fileNameCallStack = argv[0];
-
-    fileName += ".profile.out";
-    fileNameCallStack += ".calls";
-  }
-
   int err = atexit(papi_atexit_handler);
   if (err)
     fprintf(stderr, "ERROR(PAPI-Prof): Failed to setup atexit handler (%d).\n",
@@ -179,7 +171,43 @@ void papi_calibrate(void) {
   fprintf(stdout, "Real time (s): %f\n", time2 / 1e9);
 }
 
+#include <getopt.h>
+static void parse_command_line(int argc, char **argv) {
+  // Set a default, if the user did not specify any command line options.
+  if (argv) {
+    fileName = argv[0];
+    fileNameCallStack = argv[0];
+
+    fileName += ".profile.out";
+    fileNameCallStack += ".calls";
+  }
+
+  static struct option options[] = {
+    {"file", required_argument, 0, 'f'},
+    {"calls", required_argument, 0, 'c'},
+    {0, 0, 0, 0}
+  };
+
+  int opt_index = 0;
+  int c;
+  while ((c = getopt_long(argc, argv, "fc", options, &opt_index)) != -1) {
+    switch (c) {
+    case 'f':
+      fileName = std::string(optarg);
+      break;
+    case 'c':
+      fileNameCallStack = std::string(optarg);
+      break;
+    default:
+      abort();
+    }
+  }
+  printf("profile goes into: %s\n", fileName.c_str());
+  printf("papi calls go into: %s\n", fileNameCallStack.c_str());
+}
+
 int main(int argc, char **argv) {
+  parse_command_line(argc, argv);
   fprintf(stdout, "EventSize: %zu\n", sizeof(PPEvent));
   fprintf(stdout, "EventTySize: %zu\n", sizeof(PPEventType));
 
