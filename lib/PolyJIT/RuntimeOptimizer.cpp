@@ -47,8 +47,6 @@ Function *OptimizeForRuntime(Function *F) {
   FunctionPassManager PM = FunctionPassManager(M);
   PassManagerBuilder Builder;
 
-
-  PM.add(new DataLayoutPass());
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
   polly::registerCanonicalicationPasses(PM);

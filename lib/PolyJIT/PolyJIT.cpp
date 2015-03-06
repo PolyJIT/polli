@@ -620,7 +620,6 @@ static ModulePtrT copyModule(Module &M) {
 void PolyJIT::extractJitableScops(Module &M) {
   LIKWID_MARKER_START("ExtractScops");
   PassManager PM;
-  PM.add(new DataLayoutPass());
 
   if (InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
@@ -696,7 +695,6 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   StoreModule(M, M.getModuleIdentifier() + ".before.ll");
 
   LIKWID_MARKER_START("OptMain");
-  PM.add(new DataLayoutPass());
 
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());

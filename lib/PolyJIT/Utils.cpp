@@ -114,7 +114,6 @@ void StoreModule(Module &M, const Twine &Name) {
   llvm::StripDebugInfo(M);
 
   PassManager PM;
-  PM.add(new DataLayoutPass());
   PM.add(llvm::createVerifierPass());
   PM.add(createPrintModulePass(Out->os()));
   PM.run(M);
