@@ -12,6 +12,7 @@
 #include <memory>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 static std::map<uint32_t, PPStringRegion> PPStrings;
 
@@ -24,6 +25,25 @@ static int argc;
 static char **argv;
 static std::string fileName = "papi.profile.out";
 static std::string fileNameCallStack = "papi.calls.out";
+static std::string csvFileName = "papi.profile.events.csv";
+
+static std::string event2csv(const PPEvent *Ev) {
+  std::stringstream res;
+  res << Ev->DebugStr << "," << Ev->Timestamp << "," << Ev->EventTy;
+  return res.str();
+}
+
+void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
+  using namespace std;
+  ofstream out(csvFileName, ios_base::out | ios_base::app);
+
+  out << "Region, Timestamp, EventType\n";
+  for (auto &event : Events)
+    out << event2csv(event) << "\n";
+
+  out.flush();
+  out.close();
+}
 
 void StoreRun(std::vector<const PPEvent *> &Events) {
   using namespace std;
@@ -109,6 +129,7 @@ void papi_atexit_handler(void) {
   PapiEvents.push_back(ev);
 
   StoreRun(PapiEvents);
+  StoreRunAsCSV(PapiEvents);
 
   for (auto evt : PapiEvents)
     delete evt;
