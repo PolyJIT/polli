@@ -27,23 +27,133 @@ static std::string fileName = "papi.profile.out";
 static std::string fileNameCallStack = "papi.calls.out";
 static std::string csvFileName = "papi.profile.events.csv";
 
-static std::string event2csv(const PPEvent *Ev) {
+static std::string event2csv(const PPEvent *Ev, uint64_t TimeOffset,
+                             const PPEvent *ExitEv,
+                             uint32_t idx, uint32_t n) {
   std::stringstream res;
-  res << Ev->DebugStr << "," << Ev->Timestamp << "," << Ev->EventTy;
+  res << (Ev->Timestamp - TimeOffset) << "," << Ev->DebugStr << ","
+      << (ExitEv->Timestamp - Ev->Timestamp);
   return res.str();
+}
+
+//static std::string event2csv(const PPEvent *Ev, uint64_t TimeOffset,
+//                             const PPEvent *ExitEv,
+//                             uint32_t idx, uint32_t n) {
+//  std::stringstream res;
+//  res << (Ev->Timestamp - TimeOffset);
+//  for (uint32_t i = 0; i < n; i++) {
+//    res << ",";
+//    if (i == idx)
+//      res << (ExitEv->Timestamp - Ev->Timestamp);
+//    else
+//      res << 0;
+//  }
+//  return res.str();
+//}
+
+typedef std::vector<const PPEvent *>::iterator EventItTy;
+static const PPEvent *getMatchingExit(EventItTy &It, const EventItTy &End) {
+  const PPEvent *Ev = (*It);
+  const PPEvent *NextEvent = *(++It);
+  if (Ev->EventTy != PPEventType::ScopEnter &&
+      Ev->EventTy != PPEventType::RegionEnter) {
+    std::cerr << "ERROR: " << Ev;
+    return nullptr;
+  }
+
+  int i = 0;
+  while (((NextEvent->ID != Ev->ID) ||
+          ((NextEvent->EventTy != PPEventType::ScopExit) &&
+           (NextEvent->EventTy != PPEventType::RegionExit))) &&
+         (It != End)) {
+    NextEvent = *(++It);
+    if (!NextEvent)
+      std::cerr << "NextEvent is a nullptr\n";
+
+    i++;
+  }
+
+  if (It == End) {
+    std::cerr << "ERROR: Iterator reached end\n";
+    return nullptr;
+  }
+
+  for (int j = 0; j <= i; j++) { It--; }
+  return NextEvent;
 }
 
 void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
   using namespace std;
   ofstream out(csvFileName, ios_base::out | ios_base::app);
 
-  out << "Region, Timestamp, EventType\n";
-  for (auto &event : Events)
-    out << event2csv(event) << "\n";
+  std::map<uint32_t, std::pair<uint32_t, const char *>> IdMap;
+  uint32_t idx =0;
+  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
+    const PPEvent *Event = *I;
+    if (!IdMap.count(Event->ID)) {
+      IdMap[Event->ID] = std::make_pair(idx++, Event->DebugStr);
+    }
+  }
+
+  EventItTy Start = Events.begin();
+
+  out << "StartTime,Region,Duration\n";
+  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
+    const PPEvent *Event = *I;
+    switch(Event->EventTy) {
+    default:
+      break;
+    case ScopEnter:
+    case RegionEnter:
+      std::pair<uint32_t, const char *> Idx = IdMap[Event->ID];
+      out << event2csv(Event, (*Start)->Timestamp,
+                       getMatchingExit(I, IE), Idx.first, IdMap.size()) << "\n";
+      break;
+    }
+  }
 
   out.flush();
   out.close();
 }
+
+//void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
+//  using namespace std;
+//  ofstream out(csvFileName, ios_base::out | ios_base::app);
+//
+//  std::map<uint32_t, std::pair<uint32_t, const char *>> IdMap;
+//  uint32_t idx =0;
+//  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
+//    const PPEvent *Event = *I;
+//    if (!IdMap.count(Event->ID)) {
+//      IdMap[Event->ID] = std::make_pair(idx++, Event->DebugStr);
+//    }
+//  }
+//
+//  EventItTy Start = Events.begin();
+//
+//  out << "StartTime";
+//  for (auto &p : IdMap) {
+//    out << "," << p.second.second;
+//  }
+//  out << "\n";
+//
+//  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
+//    const PPEvent *Event = *I;
+//    switch(Event->EventTy) {
+//    default:
+//      break;
+//    case ScopEnter:
+//    case RegionEnter:
+//      std::pair<uint32_t, const char *> Idx = IdMap[Event->ID];
+//      out << event2csv(Event, (*Start)->Timestamp,
+//                       getMatchingExit(I, IE), Idx.first, IdMap.size()) << "\n";
+//      break;
+//    }
+//  }
+//
+//  out.flush();
+//  out.close();
+//}
 
 void StoreRun(std::vector<const PPEvent *> &Events) {
   using namespace std;
@@ -157,6 +267,16 @@ void papi_region_setup(int _argc, char **_argv) {
   argc = _argc;
   argv = _argv;
 
+  if (argv) {
+    fileName = argv[0];
+    fileNameCallStack = argv[0];
+    csvFileName = argv[0];
+
+    fileName += ".profile.out";
+    fileNameCallStack += ".calls";
+    csvFileName += ".profile.events.csv";
+  }
+
   int err = atexit(papi_atexit_handler);
   if (err)
     fprintf(stderr, "ERROR(PAPI-Prof): Failed to setup atexit handler (%d).\n",
@@ -165,11 +285,21 @@ void papi_region_setup(int _argc, char **_argv) {
 };
 
 #ifdef ENABLE_CALIBRATION
-static long long papi_calib_cnt = 10000000;
+static long long papi_calib_cnt = 1000;
+//static long long papi_calib_cnt = 1;
 
 void papi_calibrate(void) {
   long long time = PAPI_get_virt_nsec();
   long long time2 = PAPI_get_real_nsec();
+
+
+  for (int i = 0; i < papi_calib_cnt; ++i) {
+    papi_region_enter_scop(1, "a");
+    papi_region_enter_scop(2, "b");
+    papi_region_exit_scop(2, "b");
+    papi_region_exit_scop(1, "a");
+  }
+
   for (int i = 0; i < papi_calib_cnt; ++i) {
     papi_region_enter_scop(1, "a");
     papi_region_enter_scop(2, "b");
@@ -178,6 +308,12 @@ void papi_calibrate(void) {
     papi_region_exit_scop(2, "b");
     papi_region_exit_scop(1, "a");
   }
+
+  for (int i = 0; i < papi_calib_cnt; ++i) {
+    papi_region_enter_scop(3, "c");
+    papi_region_exit_scop(3, "c");
+  }
+
   time = (PAPI_get_virt_nsec() - time);
   time2 = (PAPI_get_real_nsec() - time2);
 
@@ -198,9 +334,12 @@ static void parse_command_line(int argc, char **argv) {
   if (argv) {
     fileName = argv[0];
     fileNameCallStack = argv[0];
+    csvFileName = argv[0];
 
     fileName += ".profile.out";
     fileNameCallStack += ".calls";
+    csvFileName += ".profile.events.csv";
+
   }
 
   static struct option options[] = {
