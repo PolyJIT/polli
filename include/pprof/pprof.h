@@ -52,7 +52,7 @@ void papi_atexit_handler(void);
  * @param _argc
  * @param _argv
  */
-void papi_region_setup(int _argc, char **_argv);
+void papi_region_setup();
 }
 
 enum PPEventType {

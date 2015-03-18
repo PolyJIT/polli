@@ -34,7 +34,7 @@ template<typename IdTy>
 size_t PPEventInfo<IdTy>::size() const { return Size; }
 
 template<typename IdTy>
-uint64_t PPEventInfo<IdTy>::timestamp() const { return Timestamp; };
+uint64_t PPEventInfo<IdTy>::timestamp() const { return Timestamp; }
 
 template<typename IdTy>
 void PPEventInfo<IdTy>::snapshot() {
@@ -149,7 +149,7 @@ void pprof_setup_papi() {
 
   if (status != PAPI_LOW_LEVEL_INITED) {
     status = PAPI_library_init(PAPI_VER_CURRENT);
-    if (status != PAPI_VER_CURRENT & status > 0) {
+    if (status != PAPI_VER_CURRENT) {
       fprintf(stderr, "PPROF: PAPI_library_init: Version mismatch\n");
       std::exit(status);
     }

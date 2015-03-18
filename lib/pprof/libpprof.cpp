@@ -20,9 +20,6 @@ static std::map<uint32_t, PPStringRegion> PPStrings;
  * @brief Storage container for all PAPI region events.
  */
 static std::vector<const PPEvent *> PapiEvents;
-
-static int argc;
-static char **argv;
 static std::string fileName = "papi.profile.out";
 static std::string fileNameCallStack = "papi.calls.out";
 static std::string csvFileName = "papi.profile.events.csv";
@@ -115,45 +112,6 @@ void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
   out.flush();
   out.close();
 }
-
-//void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
-//  using namespace std;
-//  ofstream out(csvFileName, ios_base::out | ios_base::app);
-//
-//  std::map<uint32_t, std::pair<uint32_t, const char *>> IdMap;
-//  uint32_t idx =0;
-//  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
-//    const PPEvent *Event = *I;
-//    if (!IdMap.count(Event->ID)) {
-//      IdMap[Event->ID] = std::make_pair(idx++, Event->DebugStr);
-//    }
-//  }
-//
-//  EventItTy Start = Events.begin();
-//
-//  out << "StartTime";
-//  for (auto &p : IdMap) {
-//    out << "," << p.second.second;
-//  }
-//  out << "\n";
-//
-//  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
-//    const PPEvent *Event = *I;
-//    switch(Event->EventTy) {
-//    default:
-//      break;
-//    case ScopEnter:
-//    case RegionEnter:
-//      std::pair<uint32_t, const char *> Idx = IdMap[Event->ID];
-//      out << event2csv(Event, (*Start)->Timestamp,
-//                       getMatchingExit(I, IE), Idx.first, IdMap.size()) << "\n";
-//      break;
-//    }
-//  }
-//
-//  out.flush();
-//  out.close();
-//}
 
 void StoreRun(std::vector<const PPEvent *> &Events) {
   using namespace std;
@@ -248,7 +206,7 @@ void papi_atexit_handler(void) {
   PAPI_shutdown();
 }
 
-void papi_region_setup(int _argc, char **_argv) {
+void papi_region_setup() {
   PPEvent *ev = new PPEvent(0, RegionEnter, "START");
   PapiEvents.push_back(ev);
   ev->snapshot();
@@ -264,25 +222,12 @@ void papi_region_setup(int _argc, char **_argv) {
   if (PAPI_thread_init(pthread_self) != PAPI_OK)
     fprintf(stderr, "ERROR(PPROF): PAPI_thread_init failed!\n");
 
-  argc = _argc;
-  argv = _argv;
-
-  if (argv) {
-    fileName = argv[0];
-    fileNameCallStack = argv[0];
-    csvFileName = argv[0];
-
-    fileName += ".profile.out";
-    fileNameCallStack += ".calls";
-    csvFileName += ".profile.events.csv";
-  }
-
   int err = atexit(papi_atexit_handler);
   if (err)
     fprintf(stderr, "ERROR(PAPI-Prof): Failed to setup atexit handler (%d).\n",
             err);
 }
-};
+}
 
 #ifdef ENABLE_CALIBRATION
 static long long papi_calib_cnt = 1000;
@@ -339,7 +284,6 @@ static void parse_command_line(int argc, char **argv) {
     fileName += ".profile.out";
     fileNameCallStack += ".calls";
     csvFileName += ".profile.events.csv";
-
   }
 
   static struct option options[] = {
@@ -375,7 +319,7 @@ int main(int argc, char **argv) {
   if (!PAPI_is_initialized()) {
     fprintf(stderr, "ERROR: libPAPI is not initialized\n");
   }
-  papi_region_setup(argc, argv);
+  papi_region_setup();
   papi_calibrate();
 }
 #endif
