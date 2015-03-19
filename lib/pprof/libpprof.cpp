@@ -14,6 +14,8 @@
 #include <iostream>
 #include <sstream>
 
+#include <sys/stat.h>
+
 static std::map<uint32_t, PPStringRegion> PPStrings;
 
 /**
@@ -81,8 +83,6 @@ static const PPEvent *getMatchingExit(EventItTy &It, const EventItTy &End) {
 
 void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
   using namespace std;
-  ofstream out(csvFileName, ios_base::out | ios_base::app);
-
   std::map<uint32_t, std::pair<uint32_t, const char *>> IdMap;
   uint32_t idx =0;
   for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
@@ -94,7 +94,13 @@ void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
 
   EventItTy Start = Events.begin();
 
-  out << "StartTime,Region,Duration\n";
+  struct stat buffer;
+  bool writeHeader = stat(csvFileName.c_str(), &buffer) != 0;
+
+  ofstream out(csvFileName, ios_base::out | ios_base::app);
+  if (writeHeader)
+    out << "StartTime,Region,Duration\n";
+
   for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
     const PPEvent *Event = *I;
     switch(Event->EventTy) {
