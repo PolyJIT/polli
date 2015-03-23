@@ -22,7 +22,6 @@ llvm::cl::OptionCategory
 
 namespace polli {
 namespace opt {
-
 std::vector<std::string> LibPaths;
 std::vector<std::string> Libraries;
 std::string InputFile;
@@ -207,3 +206,39 @@ static cl::opt<std::string, true> ReportFilenameX(
     "polli-report-file", cl::desc("Name of the report file to generate."),
     cl::init("polli.report"), cl::location(polli::opt::ReportFilename));
 
+static cl::list<std::string, std::vector<std::string>>
+    LibPathsX("L", cl::Prefix, cl::desc("Specify a library search path"),
+              cl::value_desc("directory"), cl::ZeroOrMore,
+              cl::location(polli::opt::LibPaths), cl::cat(PolliCategory));
+
+static cl::list<std::string, std::vector<std::string>>
+    LibrariesX("l", cl::Prefix, cl::desc("Specify libraries to link to"),
+               cl::value_desc("library prefix"), cl::ZeroOrMore,
+               cl::location(polli::opt::Libraries), cl::cat(PolliCategory));
+
+static cl::opt<std::string, true>
+    InputFileX(cl::desc("<input bitcode>"), cl::Positional, cl::init("-"),
+               cl::location(polli::opt::InputFile));
+
+static cl::list<std::string, std::vector<std::string>>
+    InputArgvX(cl::ConsumeAfter, cl::desc("<program arguments>..."),
+               cl::location(polli::opt::InputArgv));
+
+static cl::opt<std::string, true>
+    EntryFuncX("entry-function",
+               cl::desc("Specify the entry function (default = 'main') "
+                        "of the executable"),
+               cl::value_desc("function"), cl::location(polli::opt::EntryFunc),
+               cl::init("main"));
+
+static cl::opt<std::string, true>
+    FakeArgv0X("fake-argv0",
+               cl::desc("Override the 'argv[0]' value passed into the executing"
+                        " program"),
+               cl::value_desc("executable"),
+               cl::location(polli::opt::FakeArgv0));
+
+static cl::opt<bool, true>
+    DisableCoreFilesX("disable-core-files", cl::Hidden,
+                      cl::desc("Disable emission of core files if possible"),
+                      cl::location(polli::opt::DisableCoreFiles));
