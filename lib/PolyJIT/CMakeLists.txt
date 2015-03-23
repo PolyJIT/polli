@@ -35,6 +35,7 @@ add_polli_library(PolyJIT
   JitScopDetection.cpp
   PapiProfiling.cpp
   PolyJIT.cpp
+  Options.cpp
   RuntimeOptimizer.cpp
   ScopMapper.cpp
   Utils.cpp

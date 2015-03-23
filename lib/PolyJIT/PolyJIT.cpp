@@ -98,6 +98,7 @@
 #include <memory>
 #include <utility>
 
+#include "polli/Options.h"
 #include "spdlog/spdlog.h"
 
 namespace llvm {
@@ -110,9 +111,6 @@ namespace llvm {
 class Value;
 } // lines 67-67
 
-cl::OptionCategory PolliCategory("Polli Options",
-                                 "Configure the runtime options of polli");
-
 using namespace polli;
 using namespace polly;
 using namespace llvm;
@@ -123,121 +121,6 @@ Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
 namespace {
-cl::opt<bool>
-    EnableCaddy("caddy",
-                cl::desc("Enable Caddy. Requires the 'caddy' branch of polly."),
-                cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<bool> InstrumentRegions("instrument",
-                                cl::desc("Enable instrumenting of SCoPs"),
-                                cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<bool> EnableJitable("jitable", cl::desc("Enable JIT extensions."),
-                            cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<bool> DisablePreopt("disable-preopt",
-                            cl::desc("Disable polly's canonicalization"),
-                            cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<bool> DisableRecompile("no-recompilation",
-                               cl::desc("Disable recompilation of SCoPs"),
-                               cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<bool> DisableExecution(
-    "no-execution",
-    cl::desc("Disable execution just produce all intermediate files"),
-    cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<bool> AnalyzeIR(
-    "polli-analyze",
-    cl::desc("Only analyze the IR. This disables recompilation & execution."),
-    cl::init(false), cl::cat(PolliCategory));
-
-cl::opt<char> OptLevel("O",
-                       cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
-                                "(default = '-O2')"),
-                       cl::Prefix, cl::ZeroOrMore, cl::init(' '));
-
-cl::opt<std::string> OutputFilename("o", cl::desc("Override output filename"),
-                                    cl::value_desc("filename"));
-
-cl::opt<std::string>
-    TargetTriple("mtriple", cl::desc("Override target triple for module"));
-
-cl::opt<std::string>
-    MArch("march",
-          cl::desc("Architecture to generate assembly for (see --version)"));
-
-cl::opt<std::string>
-    MCPU("mcpu",
-         cl::desc("Target a specific cpu type (-mcpu=help for details)"),
-         cl::value_desc("cpu-name"), cl::init(""));
-
-cl::list<std::string>
-    MAttrs("mattr", cl::CommaSeparated,
-           cl::desc("Target specific attributes (-mattr=help for details)"),
-           cl::value_desc("a1,+a2,-a3,..."));
-
-cl::opt<Reloc::Model> RelocModel(
-    "relocation-model", cl::desc("Choose relocation model"),
-    cl::init(Reloc::Default),
-    cl::values(
-        clEnumValN(Reloc::Default, "default",
-                   "Target default relocation model"),
-        clEnumValN(Reloc::Static, "static", "Non-relocatable code"),
-        clEnumValN(Reloc::PIC_, "pic",
-                   "Fully relocatable, position independent code"),
-        clEnumValN(Reloc::DynamicNoPIC, "dynamic-no-pic",
-                   "Relocatable external references, non-relocatable code"),
-        clEnumValEnd));
-
-cl::opt<llvm::CodeModel::Model> CMModel(
-    "code-model", cl::desc("Choose code model"),
-    cl::init(CodeModel::JITDefault),
-    cl::values(clEnumValN(CodeModel::JITDefault, "default",
-                          "Target default JIT code model"),
-               clEnumValN(CodeModel::Small, "small", "Small code model"),
-               clEnumValN(CodeModel::Kernel, "kernel", "Kernel code model"),
-               clEnumValN(CodeModel::Medium, "medium", "Medium code model"),
-               clEnumValN(CodeModel::Large, "large", "Large code model"),
-               clEnumValEnd));
-
-cl::opt<bool>
-    EnableJITExceptionHandling("jit-enable-eh",
-                               cl::desc("Emit exception handling information"),
-                               cl::init(false));
-
-cl::opt<bool> GenerateSoftFloatCalls(
-    "soft-float", cl::desc("Generate software floating point library calls"),
-    cl::init(false));
-
-cl::opt<llvm::FloatABI::ABIType> FloatABIForCalls(
-    "float-abi", cl::desc("Choose float ABI type"), cl::init(FloatABI::Default),
-    cl::values(clEnumValN(FloatABI::Default, "default",
-                          "Target default float ABI type"),
-               clEnumValN(FloatABI::Soft, "soft",
-                          "Soft float ABI (implied by -soft-float)"),
-               clEnumValN(FloatABI::Hard, "hard",
-                          "Hard float ABI (uses FP registers)"),
-               clEnumValEnd));
-
-cl::opt<bool>
-// In debug builds, make this default to true.
-#ifdef NDEBUG
-#define EMIT_DEBUG false
-#else
-#define EMIT_DEBUG true
-#endif
-    EmitJitDebugInfo("jit-emit-debug",
-                     cl::desc("Emit debug information to debugger"),
-                     cl::init(EMIT_DEBUG));
-#undef EMIT_DEBUG
-
-cl::opt<bool>
-    EmitJitDebugInfoToDisk("jit-emit-debug-to-disk", cl::Hidden,
-                           cl::desc("Emit debug info objfiles to disk"),
-                           cl::init(false));
-
 class StaticInitializer {
 public:
   StaticInitializer() {
@@ -385,7 +268,7 @@ PolyJIT::PolyJIT(Module &Main) : M(Main) {
       spdlog::daily_logger_st("console", "polli.log");
 
   CodeGenOpt::Level OLvl;
-  switch (OptLevel) {
+  switch (opt::OptLevel) {
   default:
     OLvl = CodeGenOpt::Default;
     break;
@@ -405,15 +288,15 @@ PolyJIT::PolyJIT(Module &Main) : M(Main) {
     break;
   }
 
-  Options.UseSoftFloat = GenerateSoftFloatCalls;
-  if (FloatABIForCalls != FloatABI::Default)
-    Options.FloatABIType = FloatABIForCalls;
-  if (GenerateSoftFloatCalls)
-    FloatABIForCalls = FloatABI::Soft;
+  Options.UseSoftFloat = opt::GenerateSoftFloatCalls;
+  if (opt::FloatABIForCalls != FloatABI::Default)
+    Options.FloatABIType = opt::FloatABIForCalls;
+  if (opt::GenerateSoftFloatCalls)
+    opt::FloatABIForCalls = FloatABI::Soft;
 
   // Remote target execution doesn't handle EH or debug registration.
-  Options.JITEmitDebugInfo = EmitJitDebugInfo;
-  Options.JITEmitDebugInfoToDisk = EmitJitDebugInfoToDisk;
+  Options.JITEmitDebugInfo = opt::EmitJitDebugInfo;
+  Options.JITEmitDebugInfoToDisk = opt::EmitJitDebugInfoToDisk;
 
   EE = GetEngine(&M);
 
@@ -436,8 +319,8 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   std::string ErrorMsg;
 
   // If we are supposed to override the target triple, do so now.
-  if (!TargetTriple.empty())
-    M->setTargetTriple(Triple::normalize(TargetTriple));
+  if (!opt::TargetTriple.empty())
+    M->setTargetTriple(Triple::normalize(opt::TargetTriple));
 
   std::unique_ptr<Module> Owner(M);
 
@@ -445,11 +328,11 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   auto MemMan =
       std::unique_ptr<PolyJITMemoryManager>(new PolyJITMemoryManager());
 
-  builder.setMArch(MArch);
-  builder.setMCPU(MCPU);
-  builder.setMAttrs(MAttrs);
-  builder.setRelocationModel(RelocModel);
-  builder.setCodeModel(CMModel);
+  builder.setMArch(opt::MArch);
+  builder.setMCPU(opt::MCPU);
+  builder.setMAttrs(opt::MAttrs);
+  builder.setRelocationModel(opt::RelocModel);
+  builder.setCodeModel(opt::CModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
   builder.setMCJITMemoryManager(std::move(MemMan));
@@ -621,20 +504,20 @@ void PolyJIT::extractJitableScops(Module &M) {
   LIKWID_MARKER_START("ExtractScops");
   PassManager PM;
 
-  if (InstrumentRegions)
+  if (opt::InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
 
   PM.add(llvm::createTypeBasedAliasAnalysisPass());
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(polly::createScopDetectionPass());
-  PM.add(new JitScopDetection(EnableJitable));
+  PM.add(new JitScopDetection(opt::EnableJitable));
 //  PM.add(new AliasCheckGenerator());
 
   ScopMapper *SM = new ScopMapper();
-  if (!DisableRecompile)
+  if (!opt::DisableRecompile)
     PM.add(SM);
 
-  if (InstrumentRegions)
+  if (opt::InstrumentRegions)
     PM.add(polli::createPapiCScopProfilingPass());
 
   PM.run(M);
@@ -678,7 +561,7 @@ void PolyJIT::extractJitableScops(Module &M) {
     Disp->setPrototypeMapping(InstF, OrigF);
   }
 
-  if (OutputFilename.size() == 0)
+  if (opt::OutputFilename.size() == 0)
     StoreModule(M, M.getModuleIdentifier() + ".extr");
   LIKWID_MARKER_STOP("ExtractScops");
 }
@@ -709,8 +592,8 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   PassManagerBuilder Builder;
   Builder.VerifyInput = true;
   Builder.VerifyOutput = true;
-  Builder.Inliner = createFunctionInliningPass(OptLevel);
-  Builder.OptLevel = OptLevel;
+  Builder.Inliner = createFunctionInliningPass(opt::OptLevel);
+  Builder.OptLevel = opt::OptLevel;
   Builder.populateModulePassManager(PostProcess);
 
   FunctionPassManager FPM(&M);
@@ -743,20 +626,20 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
    */
   Function *Main = M.getFunction(EntryFn);
 
-  if (AnalyzeIR) {
-    DisableExecution = true;
-    DisableRecompile = true;
+  if (opt::AnalyzeIR) {
+    opt::DisableExecution = true;
+    opt::DisableRecompile = true;
     log(Debug) << "opt :: AnalyzeIR disabled Execution & Recompilation.\n";
   }
 
-  if (!Main && !AnalyzeIR) {
+  if (!Main && !opt::AnalyzeIR) {
     log(Error) << '\'' << EntryFn << "\' function not found in module.\n";
     return -1;
   }
 
   LIKWID_MARKER_START("PreoptMain");
   /* Preoptimize our module for polly */
-  if (!DisablePreopt)
+  if (!opt::DisablePreopt)
     runPollyPreoptimizationPasses(M);
 
   /* Extract suitable Scops */
@@ -778,8 +661,8 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   prepareOptimizedIR(M);
 
   /* Store module before execution */
-  if (OutputFilename.size() > 0)
-    StoreModule(M, OutputFilename);
+  if (opt::OutputFilename.size() > 0)
+    StoreModule(M, opt::OutputFilename);
   LIKWID_MARKER_STOP("PreoptMain");
 
   LIKWID_MARKER_START("CodeGenMain");
@@ -789,7 +672,7 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 
   LIKWID_MARKER_STOP("CodeGenMain");
 
-  if (!DisableExecution) {
+  if (!opt::DisableExecution) {
     DEBUG(log(Info) << "run :: starting execution\n");
 
     // Run static constructors.

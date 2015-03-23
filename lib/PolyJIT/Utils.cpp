@@ -33,27 +33,11 @@
 
 using namespace llvm;
 using namespace llvm::legacy;
+using namespace polli;
 
 SmallVector<char, 255> *DefaultDir;
 
 static bool DirReady = false;
-
-cl::opt<bool>
-GenerateOutput("polli-debug-ir",
-               cl::desc("Store all IR files inside a unique subdirectory."),
-               cl::init(false));
-
-cl::opt<std::string>
-ReportFilename("polli-report-file",
-               cl::desc("Name of the report file to generate."),
-               cl::init("polli.report"));
-
-cl::opt<LogType>
-    LogLevel("polli-log-level", cl::desc("Log level for output messages"),
-             cl::values(clEnumVal(Info, "Info messages (very spammy!)"),
-                        clEnumVal(Debug, "Up to debug messages"),
-                        clEnumVal(Warning, "Up to warning messages"),
-                        clEnumVal(Error, "Error messages only"), clEnumValEnd));
 
 llvm::raw_ostream &log(const LogType T, const size_t Level) {
   switch (T) {
@@ -90,7 +74,7 @@ void initializeOutputDir() {
 }
 
 void StoreModule(Module &M, const Twine &Name) {
-  if (!GenerateOutput)
+  if (!opt::GenerateOutput)
     return;
 
   if (!DirReady)

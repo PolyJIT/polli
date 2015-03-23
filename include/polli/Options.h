@@ -16,46 +16,63 @@
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/CodeGen.h"
+#include "llvm/Target/TargetOptions.h"
 
 #include <string>
 
 extern llvm::cl::OptionCategory PolliCategory;
 
-namespace llvm {
-/* Polli options */
-extern cl::list<std::string> LibPaths;
-extern cl::list<std::string> Libraries;
-extern cl::opt<std::string> InputFile;
-extern cl::list<std::string> InputArgv;
-extern cl::opt<std::string> EntryFunc;
-extern cl::opt<std::string> FakeArgv0;
-extern cl::opt<bool> DisableCoreFiles;
+namespace polli {
+  enum LogType {
+    Error,
+    Warning,
+    Debug,
+    Info
+  };
 
-/* PolyJIT options */
-extern cl::opt<bool> EnableCaddy;
-extern cl::opt<bool> InstrumentRegions;
-extern cl::opt<bool> EnableJitable;
-extern cl::opt<bool> DisableRecompile;
-extern cl::opt<bool> DisableExecution;
-extern cl::opt<bool> AnalyzeIR;
-extern cl::opt<bool> OptLevel;
-extern cl::opt<std::string> OutputFilename;
-extern cl::opt<std::string> TargetTriple;
-extern cl::opt<std::string> MArch;
-extern cl::opt<std::string> MCPU;
-extern cl::opt<std::string> MAttrs;
-extern cl::opt<llvm::Reloc::Model> RelocModel;
-extern cl::opt<llvm::CodeModel::Model> CMModel;
-extern cl::opt<bool> EnableJITExceptionHandling;
-extern cl::opt<bool> GenerateSoftFloatCalls;
-extern cl::opt<llvm::FloatABI::ABIType> FloatABIForCalls;
-extern cl::opt<bool> EmitJitDebugInfo;
-extern cl::opt<bool> EmitJitDebugInfoToDisk;
+  namespace opt {
+    extern std::vector<std::string> LibPaths;
+    extern std::vector<std::string> Libraries;
 
-/* JIT ScopDetection options */
-extern cl::opt<bool> AnalyzeOnly;
+    extern std::string InputFile;
+    extern std::vector<std::string> InputArgv;
 
-/* Utility options */
-extern cl::opt<std::string> ReportFilename;
+    extern std::string EntryFunc;
+    extern std::string FakeArgv0;
+
+    extern bool DisableCoreFiles;
+
+    extern bool InstrumentRegions;
+    extern bool EnableCaddy;
+    extern bool EnableJitable;
+    extern bool DisableRecompile;
+    extern bool DisableExecution;
+    extern bool AnalyzeIR;
+    extern char OptLevel;
+
+    extern std::string OutputFilename;
+    extern std::string TargetTriple;
+    extern std::string MArch;
+    extern std::string MCPU;
+    extern std::vector<std::string> MAttrs;
+
+    extern llvm::Reloc::Model RelocModel;
+    extern llvm::CodeModel::Model CModel;
+
+    extern bool EnableJITExceptionHandling;
+    extern bool GenerateSoftFloatCalls;
+
+    extern llvm::FloatABI::ABIType FloatABIForCalls;
+
+    extern bool EmitJitDebugInfo;
+    extern bool EmitJitDebugInfoToDisk;
+
+    extern bool AnalyseOnly;
+    extern std::string ReportFilename;
+
+    extern bool DisablePreopt;
+    extern bool GenerateOutput;
+    extern polli::LogType LogLevel;
+  }
 }
 #endif

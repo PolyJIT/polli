@@ -12,6 +12,8 @@
 #ifndef POLLI_UTILS_H
 #define POLLI_UTILS_H
 
+#include "polli/Options.h"
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
@@ -31,13 +33,6 @@ using namespace llvm::sys::fs;
 namespace fs = llvm::sys::fs;
 namespace p = llvm::sys::path;
 
-enum LogType {
-  Error,
-  Warning,
-  Debug,
-  Info
-};
-
 typedef llvm::Module* ModulePtrT;
 typedef llvm::DenseMap<ModulePtrT, llvm::ExecutionEngine *> ManagedModules;
 
@@ -51,7 +46,8 @@ extern llvm::SmallVector<char, 255> *DefaultDir;
  *
  * @return stream to put our log output to.
  */
-llvm::raw_ostream &log(const LogType T = Info, const size_t Level = 0);
+llvm::raw_ostream &log(const polli::LogType T = polli::Info,
+                       const size_t Level = 0);
 
 /**
  * @brief Initialize the output directory to put all intermediate files into.
