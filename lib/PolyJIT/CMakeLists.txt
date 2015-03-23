@@ -40,6 +40,7 @@ add_polli_library(PolyJIT
   ScopMapper.cpp
   Utils.cpp
   VariantFunction.cpp
+  RegisterCompilationPasses.cpp
   )
 
 if (BUILD_SHARED_LIBS)
