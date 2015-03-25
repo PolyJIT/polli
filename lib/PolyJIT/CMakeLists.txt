@@ -41,6 +41,7 @@ add_polli_library(PolyJIT
   Utils.cpp
   VariantFunction.cpp
   RegisterCompilationPasses.cpp
+  ModuleExtraction.cpp
   )
 
 if (BUILD_SHARED_LIBS)

@@ -49,9 +49,6 @@ namespace llvm {
 class Module;
 }
 
-static cl::opt<bool>
-AnalyzeOnly("analyze", cl::desc("Only perform analysis, no optimization"));
-
 using namespace llvm;
 using namespace llvm::legacy;
 using namespace polly;
@@ -61,6 +58,8 @@ STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
 STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
 STATISTIC(JitNonAffineAccess, "Number of fixable non affine accesses");
 STATISTIC(AliasingIgnored, "Number of ignored aliasings");
+
+static auto Console = spdlog::stderr_logger_st("polli");
 
 template <typename LC, typename RetVal> class RejectLogChecker {
 public:
@@ -160,7 +159,6 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 static void printParameters(ParamList &L) {
-  auto Console = spdlog::get("console");
   std::string ParamStr = "";
   llvm::raw_string_ostream OS(ParamStr);
   for (const SCEV *S : L) {
@@ -207,9 +205,8 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
   }
 
   if (ValidScopCount > 0) {
-    auto console = spdlog::get("console");
-    console->debug() << "  valid scops ::";
-    console->debug() << Messages.str();
+    Console->debug() << "  valid scops ::";
+    Console->debug() << Messages.str();
   }
 }
 #endif
@@ -227,9 +224,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  auto console = spdlog::get("console");
 
-  console->info("jit-scops :: {:>30}", F.getName().str());
+  Console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));
 
   if (!Enabled)
@@ -256,7 +252,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
       IsFixable |= NonAffineResult.first;
       IsFixable |= AliasResult;
 
-      console->warn() << ((IsFixable) ? "OK :: " : "FAIL :: ")
+      Console->info() << ((IsFixable) ? "OK :: " : "FAIL :: ")
                       << Reason->getMessage();
       isValid &= IsFixable;
 
@@ -285,7 +281,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        console->info() << "jit-scops :: " << F.getName().str()
+        Console->info() << "jit-scops :: " << F.getName().str()
                         << "::" << R->getNameStr();
         printParameters(RequiredParams[R]);
 
@@ -326,4 +322,5 @@ void JitScopDetection::releaseMemory() {
 char JitScopDetection::ID = 0;
 
 static RegisterPass<JitScopDetection>
-X("polli-detect", "Polli JIT ScopDetection", false, false);
+    X("polli-detect", "PolyJIT - Detect SCoPs that require runtime support.",
+      false, false);

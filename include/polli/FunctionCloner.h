@@ -75,7 +75,7 @@ public:
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
-    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
+    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     // Store function mapping for the linker.
     VMap[SrcF] = TgtF;
