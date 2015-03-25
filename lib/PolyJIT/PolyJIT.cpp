@@ -120,20 +120,6 @@ namespace polli {
 Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
-namespace {
-class StaticInitializer {
-public:
-  StaticInitializer() {
-    PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    initializePollyPasses(Registry);
-    initializePapiRegionPreparePass(Registry);
-    initializePapiCScopProfilingPass(Registry);
-    initializePapiCScopProfilingInitPass(Registry);
-  }
-};
-}
-
-static StaticInitializer InitializeEverything;
 static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
