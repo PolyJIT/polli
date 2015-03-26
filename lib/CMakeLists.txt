@@ -1,3 +1,4 @@
+add_subdirectory(pjit)
 add_subdirectory(pprof)
 add_subdirectory(PolyJIT)
 

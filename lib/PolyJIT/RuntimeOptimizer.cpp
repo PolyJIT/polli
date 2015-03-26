@@ -47,12 +47,12 @@ Function *OptimizeForRuntime(Function *F) {
   FunctionPassManager PM = FunctionPassManager(M);
   PassManagerBuilder Builder;
 
-  PM.add(llvm::createTypeBasedAliasAnalysisPass());
-  PM.add(llvm::createBasicAliasAnalysisPass());
-  polly::registerCanonicalicationPasses(PM);
-  PM.add(polly::createScopInfoPass());
-  PM.add(polly::createIslScheduleOptimizerPass());
-  PM.add(polly::createIslCodeGenerationPass());
+  //PM.add(llvm::createTypeBasedAliasAnalysisPass());
+  //PM.add(llvm::createBasicAliasAnalysisPass());
+  //polly::registerCanonicalicationPasses(PM);
+  //PM.add(polly::createScopInfoPass());
+  //PM.add(polly::createIslScheduleOptimizerPass());
+  //PM.add(polly::createIslCodeGenerationPass());
 
   Builder.VerifyInput = true;
   Builder.VerifyOutput = true;

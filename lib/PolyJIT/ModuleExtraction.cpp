@@ -53,20 +53,9 @@ static std::string moduleToString(Module &M) {
 
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
-    MovingFunctionCloner MoveCloner(VMap, &M);
-    MoveCloner.setSource(&F);
-    return MoveCloner.start();
-}
-
-static Function *extractInstrumentedM(ValueToValueMapTy &VMap, Function &F,
-                                      Module &M, Pass &SinkHost) {
-    InstrumentingFunctionCloner InstCloner(VMap, &M);
-    InstCloner.setSource(&F);
-    InstCloner.setSinkHostPass(&SinkHost);
-
-    Function *InstF = InstCloner.start();
-    InstF->addFnAttr(Attribute::OptimizeNone);
-    return InstF;
+  MovingFunctionCloner MoveCloner(VMap, &M);
+  MoveCloner.setSource(&F);
+  return MoveCloner.start();
 }
 
 bool ModuleExtractor::runOnFunction(Function &F) {
@@ -85,13 +74,21 @@ bool ModuleExtractor::runOnFunction(Function &F) {
                                     ".prototype");
 
     Function *ProtoF = extractPrototypeM(VMap, *F, *PrototypeM);
-    Function *InstrF = extractInstrumentedM(VMap, *ProtoF, M, SM);
-
-    F->replaceAllUsesWith(InstrF);
 
     std::string PrototypeModStr = moduleToString(*PrototypeM);
-    Builder.CreateGlobalString(PrototypeModStr,
-                               InstrF->getName() + ".prototype");
+    Value *Prototype = Builder.CreateGlobalStringPtr(
+        PrototypeModStr, F->getName() + ".prototype");
+
+    InstrumentingFunctionCloner InstCloner(VMap, &M);
+    InstCloner.setSource(ProtoF);
+    InstCloner.setSinkHostPass(&SM);
+    InstCloner.setPrototype(Prototype);
+
+    Function *InstF = InstCloner.start();
+    InstF->addFnAttr(Attribute::OptimizeNone);
+
+    F->replaceAllUsesWith(InstF);
+    ProtoF->setName("prototype");
   });
   
   return true;

@@ -63,7 +63,7 @@ void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
 static void setupLogging() {
   spdlog::set_async_mode(1048576);
   spdlog::set_pattern("%v");
-  spdlog::set_level(spdlog::level::debug);
+  spdlog::set_level(spdlog::level::critical);
 }
 
 static void registerPolli(const llvm::PassManagerBuilder &,
