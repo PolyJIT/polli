@@ -38,6 +38,7 @@ static Module &getModule(const char *prototype) {
     SMDiagnostic Err;
     
     std::unique_ptr<Module> Mod = parseIR(Buf, Err, Ctx);
+    Console->warn("Prototype module {} registered.", Mod->getModuleIdentifier());
     ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
   } 
   
@@ -48,6 +49,7 @@ static Function *getFunction(Module &M) {
   Disp.setPrototypeMapping(M.begin(), M.begin());
   return M.begin();
 }
+
 class StaticInitializer {
 public:
   StaticInitializer() {

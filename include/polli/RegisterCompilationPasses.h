@@ -14,14 +14,18 @@
 #define POLLI_REGISTER_COMPILATION_PASSES_H
 
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/PassRegistry.h"
 
 namespace llvm {
 namespace legacy {
 class PassManagerBase;
 }
+
+class PassRegistry;
 }
 
-namespace polly {
+namespace polli {
 void registerPolli(llvm::legacy::PassManagerBase &PM);
+void initializePolliPasses(llvm::PassRegistry &Registry);
 }
 #endif

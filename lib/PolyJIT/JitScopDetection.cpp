@@ -52,6 +52,7 @@ class Module;
 using namespace llvm;
 using namespace llvm::legacy;
 using namespace polly;
+using namespace polli;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
@@ -153,8 +154,6 @@ public:
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolution>();
-  AU.addRequired<DominatorTreeWrapperPass>();
-  AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
 
@@ -220,10 +219,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
-  DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
-
 
   Console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));

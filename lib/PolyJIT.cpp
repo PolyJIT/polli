@@ -10,8 +10,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "polli/RegisterCompilationPasses.h"
-#include "polli/PapiProfiling.h"
-#include "polli/InstrumentRegions.h"
 #include "polly/RegisterPasses.h"
 
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
@@ -20,11 +18,9 @@ namespace {
 class StaticInitializer {
 public:
   StaticInitializer() {
-    PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    initializePollyPasses(Registry);
-    initializePapiRegionPreparePass(Registry);
-    initializePapiCScopProfilingPass(Registry);
-    initializePapiCScopProfilingInitPass(Registry);
+    llvm::PassRegistry &Registry = *llvm::PassRegistry::getPassRegistry();
+    polly::initializePollyPasses(Registry);
+    polli::initializePolliPasses(Registry);
   }
 };
 static StaticInitializer InitializeEverything;

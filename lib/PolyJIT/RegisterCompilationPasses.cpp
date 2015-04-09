@@ -22,12 +22,14 @@
 
 #include "polli/Options.h"
 #include "polli/JitScopDetection.h"
+#include "polli/PapiProfiling.h"
 #include "polli/ScopMapper.h"
 #include "polli/ModuleExtractor.h"
 
 #include "spdlog/spdlog.h"
 
 using namespace llvm;
+using namespace polli;
 
 #include <iostream>
 #include <stdio.h>
@@ -38,9 +40,20 @@ auto Console = spdlog::stderr_logger_st("polli");
 }
 
 namespace polli {
+
+void initializePolliPasses(PassRegistry &Registry) {
+  initializePapiRegionPreparePass(Registry);
+  initializePapiCScopProfilingPass(Registry);
+  initializePapiCScopProfilingInitPass(Registry);
+  Console->warn("PolyJIT - Initialization complete.");
+}
+
 static void printConfig() {
-  Console->warn("PolyJIT - Print config:");
+  Console->warn("PolyJIT - Config:");
   Console->warn(" polyjit.jitable: {}", opt::EnableJitable);
+  Console->warn(" polyjit.recompile: {}", !opt::DisableRecompile);
+  Console->warn(" polyjit.execute: {}", !opt::DisableExecution);
+  Console->warn(" polyjit.instrument: {}", opt::InstrumentRegions);
 }
 
 void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
@@ -63,7 +76,7 @@ void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
 static void setupLogging() {
   spdlog::set_async_mode(1048576);
   spdlog::set_pattern("%v");
-  spdlog::set_level(spdlog::level::critical);
+  spdlog::set_level(spdlog::level::warn);
 }
 
 static void registerPolli(const llvm::PassManagerBuilder &,
