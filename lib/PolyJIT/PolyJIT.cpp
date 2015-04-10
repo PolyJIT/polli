@@ -99,7 +99,6 @@
 #include <utility>
 
 #include "polli/Options.h"
-#include "spdlog/spdlog.h"
 
 namespace llvm {
 class LLVMContext;
@@ -120,20 +119,6 @@ namespace polli {
 Pass *createPapiCScopProfilingPass() { return new PapiCScopProfiling(); }
 }
 
-namespace {
-class StaticInitializer {
-public:
-  StaticInitializer() {
-    PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    initializePollyPasses(Registry);
-    initializePapiRegionPreparePass(Registry);
-    initializePapiCScopProfilingPass(Registry);
-    initializePapiCScopProfilingInitPass(Registry);
-  }
-};
-}
-
-static StaticInitializer InitializeEverything;
 static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
@@ -260,13 +245,6 @@ uint8_t *PolyJITMemoryManager::allocateDataSection(uintptr_t Size,
 }
 
 PolyJIT::PolyJIT(Module &Main) : M(Main) {
-  spdlog::set_async_mode(1048576);
-  spdlog::set_pattern("%v");
-
-  //auto console = spdlog::stderr_logger_mt("console");
-  auto console =
-      spdlog::daily_logger_st("console", "polli.log");
-
   CodeGenOpt::Level OLvl;
   switch (opt::OptLevel) {
   default:
@@ -328,6 +306,25 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   auto MemMan =
       std::unique_ptr<PolyJITMemoryManager>(new PolyJITMemoryManager());
 
+  CodeGenOpt::Level OLvl;
+  switch (opt::OptLevel) {
+  default:
+    OLvl = CodeGenOpt::Default;
+    break;
+  case '0':
+    OLvl = CodeGenOpt::None;
+    break;
+  case '1':
+    OLvl = CodeGenOpt::Less;
+    break;
+  case '2':
+    OLvl = CodeGenOpt::Default;
+    break;
+  case '3':
+    OLvl = CodeGenOpt::Aggressive;
+    break;
+  }
+
   builder.setMArch(opt::MArch);
   builder.setMCPU(opt::MCPU);
   builder.setMAttrs(opt::MAttrs);
@@ -337,9 +334,23 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   builder.setEngineKind(EngineKind::JIT);
   builder.setMCJITMemoryManager(std::move(MemMan));
   builder.setOptLevel(OLvl);
-  builder.setTargetOptions(Options);
 
-  return builder.create();
+  llvm::TargetOptions Options;
+  Options.UseSoftFloat = opt::GenerateSoftFloatCalls;
+  if (opt::FloatABIForCalls != FloatABI::Default)
+    Options.FloatABIType = opt::FloatABIForCalls;
+  if (opt::GenerateSoftFloatCalls)
+    opt::FloatABIForCalls = FloatABI::Soft;
+
+  // Remote target execution doesn't handle EH or debug registration.
+  Options.JITEmitDebugInfo = opt::EmitJitDebugInfo;
+  Options.JITEmitDebugInfoToDisk = opt::EmitJitDebugInfoToDisk;
+
+  builder.setTargetOptions(Options);
+  ExecutionEngine *EE = builder.create();
+  if (!EE)
+    std::cerr << "ERROR: " << ErrorMsg << "\n";
+  return EE;
 }
 
 /**
@@ -359,13 +370,15 @@ void
 PolyJIT::runSpecializedFunction(llvm::Function *NewF,
                                 const std::vector<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
+  static ManagedModules SpecializedModules;
 
   Module *NewM = NewF->getParent();
 
   // Fetch or Create a new ExecutionEngine for this Module.
   if (!SpecializedModules.count(NewM)) {
     LIKWID_MARKER_START("CodeGenJIT");
-    SpecializedModules[NewM] = PolyJIT::GetEngine(NewM);
+    ExecutionEngine *EE = PolyJIT::GetEngine(NewM);
+    SpecializedModules[NewM] = EE;
     SpecializedModules[NewM]->finalizeObject();
     LIKWID_MARKER_STOP("CodeGenJIT");
   }

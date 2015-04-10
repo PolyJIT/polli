@@ -43,7 +43,6 @@ namespace polli {
     extern bool DisableCoreFiles;
 
     extern bool InstrumentRegions;
-    extern bool EnableCaddy;
     extern bool EnableJitable;
     extern bool DisableRecompile;
     extern bool DisableExecution;
@@ -73,6 +72,7 @@ namespace polli {
     extern bool DisablePreopt;
     extern bool GenerateOutput;
     extern polli::LogType LogLevel;
+    extern bool Enabled;
   }
 }
 #endif

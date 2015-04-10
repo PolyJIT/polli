@@ -17,11 +17,17 @@
 #include <string>
 #include <vector>
 
+using namespace llvm;
+
 llvm::cl::OptionCategory
     PolliCategory("Polli Options", "Configure the runtime options of polli");
 
 namespace polli {
 namespace opt {
+bool InstrumentRegions;
+bool EnableJitable;
+bool DisableRecompile;
+bool DisableExecution;
 
 std::vector<std::string> LibPaths;
 std::vector<std::string> Libraries;
@@ -30,11 +36,6 @@ std::vector<std::string> InputArgv;
 std::string EntryFunc;
 std::string FakeArgv0;
 bool DisableCoreFiles;
-bool InstrumentRegions;
-bool EnableCaddy;
-bool EnableJitable;
-bool DisableRecompile;
-bool DisableExecution;
 bool AnalyzeIR;
 char OptLevel;
 std::string OutputFilename;
@@ -54,81 +55,78 @@ std::string ReportFilename;
 bool DisablePreopt;
 bool GenerateOutput;
 LogType LogLevel;
+bool Enabled;
 }
 }
 
-using namespace llvm;
-static cl::opt<bool, true> EnableCaddyX(
-    "caddy", cl::desc("Enable Caddy. Requires the 'caddy' branch of polly."),
-    cl::init(false), cl::cat(PolliCategory),
-    cl::location(polli::opt::EnableCaddy));
-
+using namespace polli;
+using namespace polli::opt;
 static cl::opt<bool, true>
     InstrumentRegionsX("instrument", cl::desc("Enable instrumenting of SCoPs"),
-                       cl::init(false), cl::cat(PolliCategory),
-                       cl::location(polli::opt::InstrumentRegions));
+                       cl::location(InstrumentRegions),
+                       cl::init(false), cl::cat(PolliCategory));
 
-static cl::opt<bool, true> EnableJitableX("jitable",
-                                    cl::desc("Enable JIT extensions."),
-                                    cl::init(false), cl::cat(PolliCategory),
-                                    cl::location(polli::opt::EnableJitable));
+static cl::opt<bool, true>
+    EnableJitableX("jitable", cl::desc("Enable JIT extensions."),
+                   cl::location(EnableJitable), cl::init(false),
+                   cl::cat(PolliCategory));
 
 static cl::opt<bool, true>
     DisablePreoptX("disable-preopt",
                    cl::desc("Disable polly's canonicalization"),
-                   cl::init(false), cl::cat(PolliCategory),
-                   cl::location(polli::opt::DisablePreopt));
+                   cl::location(DisablePreopt), cl::init(false),
+                   cl::cat(PolliCategory));
 
 static cl::opt<bool, true>
     DisableRecompileX("no-recompilation",
                       cl::desc("Disable recompilation of SCoPs"),
-                      cl::init(false), cl::cat(PolliCategory),
-                      cl::location(polli::opt::DisableRecompile));
+                      cl::location(DisableRecompile),
+                      cl::init(false), cl::cat(PolliCategory));
 
 static cl::opt<bool, true> DisableExecutionX(
     "no-execution",
     cl::desc("Disable execution just produce all intermediate files"),
-    cl::init(false), cl::cat(PolliCategory),
-    cl::location(polli::opt::DisableExecution));
+    cl::location(DisableExecution), cl::init(false),
+    cl::cat(PolliCategory));
 
 static cl::opt<bool, true> AnalyzeIRX(
     "polli-analyze",
     cl::desc("Only analyze the IR. This disables recompilation & execution."),
-    cl::init(false), cl::cat(PolliCategory),
-    cl::location(polli::opt::AnalyzeIR));
+    cl::location(AnalyzeIR), cl::init(false),
+    cl::cat(PolliCategory));
 
 static cl::opt<char, true>
     OptLevelX("O", cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
                             "(default = '-O2')"),
-              cl::Prefix, cl::ZeroOrMore, cl::init(' '),
-              cl::location(polli::opt::OptLevel));
+              cl::Prefix, cl::ZeroOrMore, cl::location(OptLevel),
+              cl::init(' '));
 
 static cl::opt<std::string, true>
     OutputFilenameX("o", cl::desc("Override output filename"),
                     cl::value_desc("filename"),
-                    cl::location(polli::opt::OutputFilename));
+                    cl::location(OutputFilename));
 
 static cl::opt<std::string, true>
     TargetTripleX("mtriple", cl::desc("Override target triple for module"),
-                  cl::location(polli::opt::TargetTriple));
+                  cl::location(TargetTriple));
 
 static cl::opt<std::string, true>
     MArchX("march",
            cl::desc("Architecture to generate assembly for (see --version)"),
-           cl::location(polli::opt::MArch));
+           cl::location(MArch));
 
 static cl::opt<std::string, true> MCPUX(
     "mcpu", cl::desc("Target a specific cpu type (-mcpu=help for details)"),
-    cl::value_desc("cpu-name"), cl::init(""), cl::location(polli::opt::MCPU));
+    cl::location(MCPU), cl::value_desc("cpu-name"), cl::init(""));
 
 static cl::list<std::string, std::vector<std::string>>
     MAttrsX("mattr", cl::CommaSeparated,
             cl::desc("Target specific attributes (-mattr=help for details)"),
-            cl::value_desc("a1,+a2,-a3,..."), cl::location(polli::opt::MAttrs));
+            cl::value_desc("a1,+a2,-a3,..."), cl::location(MAttrs));
 
 static cl::opt<Reloc::Model, true> RelocModelX(
     "relocation-model", cl::desc("Choose relocation model"),
-    cl::init(Reloc::Default),
+    cl::location(RelocModel), cl::init(Reloc::Default),
     cl::values(
         clEnumValN(Reloc::Default, "default",
                    "Target default relocation model"),
@@ -137,39 +135,37 @@ static cl::opt<Reloc::Model, true> RelocModelX(
                    "Fully relocatable, position independent code"),
         clEnumValN(Reloc::DynamicNoPIC, "dynamic-no-pic",
                    "Relocatable external references, non-relocatable code"),
-        clEnumValEnd),
-    cl::location(polli::opt::RelocModel));
+        clEnumValEnd));
 
 static cl::opt<llvm::CodeModel::Model, true> CModelX(
     "code-model", cl::desc("Choose code model"),
-    cl::init(CodeModel::JITDefault),
+    cl::location(CModel), cl::init(CodeModel::JITDefault),
     cl::values(clEnumValN(CodeModel::JITDefault, "default",
                           "Target default JIT code model"),
                clEnumValN(CodeModel::Small, "small", "Small code model"),
                clEnumValN(CodeModel::Kernel, "kernel", "Kernel code model"),
                clEnumValN(CodeModel::Medium, "medium", "Medium code model"),
                clEnumValN(CodeModel::Large, "large", "Large code model"),
-               clEnumValEnd),
-    cl::location(polli::opt::CModel));
+               clEnumValEnd));
 
 static cl::opt<bool, true> EnableJITExceptionHandlingX(
     "jit-enable-eh", cl::desc("Emit exception handling information"),
-    cl::init(false), cl::location(polli::opt::EnableJITExceptionHandling));
+    cl::location(EnableJITExceptionHandling), cl::init(false));
 
 static cl::opt<bool, true> GenerateSoftFloatCallsX(
     "soft-float", cl::desc("Generate software floating point library calls"),
-    cl::init(false), cl::location(polli::opt::GenerateSoftFloatCalls));
+    cl::location(GenerateSoftFloatCalls), cl::init(false));
 
 static cl::opt<llvm::FloatABI::ABIType, true> FloatABIForCallsX(
-    "float-abi", cl::desc("Choose float ABI type"), cl::init(FloatABI::Default),
+    "float-abi", cl::desc("Choose float ABI type"),
+    cl::location(FloatABIForCalls), cl::init(FloatABI::Default),
     cl::values(clEnumValN(FloatABI::Default, "default",
                           "Target default float ABI type"),
                clEnumValN(FloatABI::Soft, "soft",
                           "Soft float ABI (implied by -soft-float)"),
                clEnumValN(FloatABI::Hard, "hard",
                           "Hard float ABI (uses FP registers)"),
-               clEnumValEnd),
-    cl::location(polli::opt::FloatABIForCalls));
+               clEnumValEnd));
 
 static cl::opt<bool, true>
 // In debug builds, make this default to true.
@@ -180,30 +176,76 @@ static cl::opt<bool, true>
 #endif
     EmitJitDebugInfoX("jit-emit-debug",
                       cl::desc("Emit debug information to debugger"),
-                      cl::init(EMIT_DEBUG),
-                      cl::location(polli::opt::EmitJitDebugInfo));
+                      cl::location(EmitJitDebugInfo),
+                      cl::init(EMIT_DEBUG));
 #undef EMIT_DEBUG
 
 static cl::opt<bool, true>
     EmitJitDebugInfoToDiskX("jit-emit-debug-to-disk", cl::Hidden,
                             cl::desc("Emit debug info objfiles to disk"),
-                            cl::init(false),
-                            cl::location(polli::opt::EmitJitDebugInfoToDisk));
+                            cl::location(EmitJitDebugInfoToDisk),
+                            cl::init(false));
 
 static cl::opt<bool, true> GenerateOutputX(
     "polli-debug-ir",
     cl::desc("Store all IR files inside a unique subdirectory."),
-    cl::init(false), cl::location(polli::opt::GenerateOutput));
+    cl::location(GenerateOutput), cl::init(false),
+    cl::cat(PolliCategory));
 
 static cl::opt<polli::LogType, true> LogLevelX(
     "polli-log-level", cl::desc("Log level for output messages"),
-    cl::values(clEnumVal(polli::Info, "Info messages (very spammy!)"),
-               clEnumVal(polli::Debug, "Up to debug messages"),
-               clEnumVal(polli::Warning, "Up to warning messages"),
-               clEnumVal(polli::Error, "Error messages only"), clEnumValEnd),
-    cl::location(polli::opt::LogLevel));
+    cl::values(clEnumVal(Info, "Info messages (very spammy!)"),
+               clEnumVal(Debug, "Up to debug messages"),
+               clEnumVal(Warning, "Up to warning messages"),
+               clEnumVal(Error, "Error messages only"), clEnumValEnd),
+    cl::location(LogLevel), cl::cat(PolliCategory));
 
-static cl::opt<std::string, true> ReportFilenameX(
-    "polli-report-file", cl::desc("Name of the report file to generate."),
-    cl::init("polli.report"), cl::location(polli::opt::ReportFilename));
+static cl::opt<std::string, true>
+    ReportFilenameX("polli-report-file",
+                    cl::desc("Name of the report file to generate."),
+                    cl::location(ReportFilename),
+                    cl::init("polli.report"), cl::cat(PolliCategory));
+
+static cl::list<std::string, std::vector<std::string>>
+    LibPathsX("L", cl::Prefix, cl::desc("Specify a library search path"),
+              cl::value_desc("directory"), cl::ZeroOrMore,
+              cl::location(LibPaths), cl::cat(PolliCategory));
+
+static cl::list<std::string, std::vector<std::string>>
+    LibrariesX("l", cl::Prefix, cl::desc("Specify libraries to link to"),
+               cl::value_desc("library prefix"), cl::ZeroOrMore,
+               cl::location(Libraries), cl::cat(PolliCategory));
+
+static cl::opt<std::string, true>
+    InputFileX(cl::desc("<input bitcode>"), cl::Positional,
+               cl::location(InputFile), cl::init("-"),
+               cl::cat(PolliCategory));
+
+static cl::list<std::string, std::vector<std::string>>
+    InputArgvX(cl::ConsumeAfter, cl::desc("<program arguments>..."),
+               cl::location(InputArgv), cl::cat(PolliCategory));
+
+static cl::opt<std::string, true>
+    EntryFuncX("entry-function",
+               cl::desc("Specify the entry function (default = 'main') "
+                        "of the executable"),
+               cl::value_desc("function"), cl::location(EntryFunc),
+               cl::init("main"), cl::cat(PolliCategory));
+
+static cl::opt<std::string, true>
+    FakeArgv0X("fake-argv0",
+               cl::desc("Override the 'argv[0]' value passed into the executing"
+                        " program"),
+               cl::value_desc("executable"),
+               cl::location(FakeArgv0), cl::cat(PolliCategory));
+
+static cl::opt<bool, true>
+    DisableCoreFilesX("disable-core-files", cl::Hidden,
+                      cl::desc("Disable emission of core files if possible"),
+                      cl::location(DisableCoreFiles));
+
+static cl::opt<bool, true>
+    PolliEnabledX("polli", cl::desc("Enable the polli JIT compiler"),
+                  cl::ZeroOrMore, cl::location(polli::opt::Enabled),
+                  cl::init(false), cl::cat(PolliCategory));
 

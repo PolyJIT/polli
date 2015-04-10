@@ -33,6 +33,7 @@ typedef std::set<const Region *> ScopSet;
 typedef std::vector<const SCEV *> ParamList;
 typedef std::map<const Region *, ParamList> ParamMap;
 
+namespace polli {
 class JitScopDetection : public FunctionPass {
 public:
   static char ID;
@@ -96,4 +97,5 @@ private:
 
   std::set<const Function *> IgnoredFunctions;
 };
+} // end of polli namespace
 #endif

@@ -24,9 +24,14 @@
 #include "polly/ScopDetectionDiagnostic.h"       // for getDebugLocation
 
 #include "polli/Utils.h"
+#include "spdlog/spdlog.h"
 
 namespace llvm {
 class Function;
+}
+
+namespace {
+auto Console = spdlog::stderr_logger_st("polli");
 }
 
 using namespace llvm;
@@ -44,6 +49,9 @@ bool ScopMapper::runOnFunction(Function &F) {
   JitScopDetection *NSD = &getAnalysis<JitScopDetection>();
   DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
+  if(F.hasFnAttribute(Attribute::OptimizeNone))
+    return false;
+
   // Ignore functions created by us.
   if (CreatedFunctions.count(&F))
     return false;
@@ -60,8 +68,8 @@ bool ScopMapper::runOnFunction(Function &F) {
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
 
-    DEBUG(log(Debug) << " mapper :: extract :: " << FileName << ":" << LineBegin
-                     << ":" << LineEnd << " - " << R->getNameStr() << "\n");
+    DEBUG(Console->debug("mapper :: extract :: {0}:{1}:{2} - {3}", FileName,
+                         LineBegin, LineEnd, R->getNameStr()););
 
     if (Extractor.isEligible()) {
       Function *ExtractedF = Extractor.extractCodeRegion();
@@ -84,3 +92,5 @@ bool ScopMapper::runOnFunction(Function &F) {
 }
 
 char ScopMapper::ID = 0;
+static RegisterPass<ScopMapper>
+    X("polli-map-scops", "PolyJIT - Extract SCoPs into their own function");

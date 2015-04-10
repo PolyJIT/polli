@@ -108,7 +108,8 @@ static void InsertProfilingInitCall(Function *MainFn, const char *FnName,
       2, Constant::getNullValue(Type::getInt64Ty(Context)));
   unsigned NumElements = 0;
   if (Array) {
-    Args[2] = ConstantExpr::getGetElementPtr(Array, GEPIndices);
+    Args[2] = ConstantExpr::getInBoundsGetElementPtr(Array->getType(), Array,
+                                                     GEPIndices);
     NumElements =
         cast<ArrayType>(Array->getType()->getElementType())->getNumElements();
   } else {
@@ -197,7 +198,8 @@ void PapiProfiling::instrumentFunction(int idx, Function *F,
 
   Indices[0] = Constant::getNullValue(Type::getInt64Ty(Context));
   Indices[1] = ConstantInt::get(Type::getInt64Ty(Context), idx);
-  ElemPtr = ConstantExpr::getGetElementPtr(Array, Indices);
+  ElemPtr =
+      ConstantExpr::getInBoundsGetElementPtr(Array->getType(), Array, Indices);
 
   // Store initial time in the array
   InsertPos = EntryBB->getFirstNonPHIOrDbgOrLifetime();

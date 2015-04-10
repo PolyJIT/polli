@@ -120,7 +120,7 @@ public:
    *
    * @return A new execution engine for the module.
    */
-  llvm::ExecutionEngine *GetEngine(llvm::Module *M);
+  static llvm::ExecutionEngine *GetEngine(llvm::Module *M);
 
   /**
    * @brief Setter for the JIT's EntryFn.
@@ -171,8 +171,9 @@ public:
    * @param NewF The function to execute
    * @param ArgValues A list of parameter values to the apply the function to.
    */
-  void runSpecializedFunction(llvm::Function *NewF,
-                              const std::vector<llvm::GenericValue> &ArgValues);
+  static void
+  runSpecializedFunction(llvm::Function *NewF,
+                         const std::vector<llvm::GenericValue> &ArgValues);
 
 private:
   /**

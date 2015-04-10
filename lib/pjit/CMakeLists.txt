@@ -24,37 +24,22 @@ set(LLVM_LINK_COMPONENTS
   SelectionDAG
   Support
   Target
+  X86Codegen
   TransformUtils
   Vectorize
 )
 
-add_polli_library(PolyJIT
-  #  AliasCheckCodeGen.cpp
-  FunctionDispatcher.cpp
-  InstrumentRegions.cpp
-  JitScopDetection.cpp
-  PapiProfiling.cpp
-  PolyJIT.cpp
-  Options.cpp
-  RuntimeOptimizer.cpp
-  ScopMapper.cpp
-  Utils.cpp
-  VariantFunction.cpp
-  RegisterCompilationPasses.cpp
-  ModuleExtraction.cpp
+add_polli_library(pjit
+  libpjit.cpp
   )
 
+
 if (BUILD_SHARED_LIBS)
-  target_link_libraries(PolyJIT PRIVATE
+  target_link_libraries(pjit PRIVATE
+    PolyJIT
     likwid
     Polly
     pprof
     pthread
   )
 endif()
-
-set_target_properties(PolyJIT
-  PROPERTIES
-  LINKER_LANGUAGE CXX
-  PREFIX "lib"
-)

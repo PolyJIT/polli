@@ -58,40 +58,6 @@
 
 using namespace llvm;
 
-namespace llvm {
-  // Runtime Options
-  cl::list<std::string> LibPaths("L", cl::Prefix,
-    cl::desc("Specify a library search path"),
-    cl::value_desc("directory"), cl::ZeroOrMore, cl::cat(PolliCategory));
-
-  cl::list<std::string> Libraries("l", cl::Prefix,
-    cl::desc("Specify libraries to link to"),
-    cl::value_desc("library prefix"), cl::ZeroOrMore,
-    cl::cat(PolliCategory));
-
-  cl::opt<std::string>
-  InputFile(cl::desc("<input bitcode>"), cl::Positional, cl::init("-"));
-
-  cl::list<std::string>
-  InputArgv(cl::ConsumeAfter, cl::desc("<program arguments>..."));
-
-  cl::opt<std::string>
-  EntryFunc("entry-function",
-            cl::desc("Specify the entry function (default = 'main') "
-                     "of the executable"),
-            cl::value_desc("function"),
-            cl::init("main"));
-
-  cl::opt<std::string>
-  FakeArgv0("fake-argv0",
-            cl::desc("Override the 'argv[0]' value passed into the executing"
-                     " program"), cl::value_desc("executable"));
-
-  cl::opt<bool>
-  DisableCoreFiles("disable-core-files", cl::Hidden,
-                   cl::desc("Disable emission of core files if possible"));
-}
-
 static ExecutionEngine *EE = 0;
 
 static void do_shutdown() {
@@ -118,6 +84,8 @@ static bool loadSymbolsFromLibrary(const std::string &Lib) {
 // main Driver function
 //
 int main(int argc, char **argv, char * const *envp) {
+  using namespace polli;
+
   sys::PrintStackTraceOnErrorSignal();
   PrettyStackTraceProgram X(argc, argv);
 
@@ -134,12 +102,12 @@ int main(int argc, char **argv, char * const *envp) {
                               "llvm interpreter & dynamic compiler\n");
 
   // If the user doesn't want core files, disable them.
-  if (DisableCoreFiles)
+  if (opt::DisableCoreFiles)
     sys::Process::PreventCoreFiles();
 
   // Load the bitcode...
   SMDiagnostic Err;
-  std::unique_ptr<Module> Mod(parseIRFile(InputFile, Err, Context));
+  std::unique_ptr<Module> Mod(parseIRFile(opt::InputFile, Err, Context));
   if (Mod.get() == 0) {
     Err.print(argv[0], errs());
     return 1;
@@ -147,12 +115,13 @@ int main(int argc, char **argv, char * const *envp) {
 
   // Otherwise, if there is a .bc suffix on the executable strip it off, it
   // might confuse the program.
-  if (StringRef(InputFile).endswith(".bc"))
-    InputFile.erase(InputFile.length() - 3);
+  if (StringRef(opt::InputFile).endswith(".bc"))
+    opt::InputFile.erase(opt::InputFile.length() - 3);
 
   // Add the module's name to the start of the vector of arguments to main().
-  InputArgv.insert(InputArgv.begin(),
-                   (!FakeArgv0.empty()) ? FakeArgv0 : InputFile);
+  opt::InputArgv.insert(opt::InputArgv.begin(), (!opt::FakeArgv0.empty())
+                                                    ? opt::FakeArgv0
+                                                    : opt::InputFile);
 
   // Reset errno to zero on entry to main.
   errno = 0;
@@ -166,26 +135,24 @@ int main(int argc, char **argv, char * const *envp) {
     exit(1);
   }
 
-  pjit->setEntryFunction(EntryFunc);
+  pjit->setEntryFunction(opt::EntryFunc);
 
   // Link libraries.
-  for (unsigned i = 0; i < Libraries.size(); ++i) {
-    std::string Lib = "lib" + Libraries[i] + ".so";
-    if (Libraries[i] == "gfortran")
+  for (unsigned i = 0; i < opt::Libraries.size(); ++i) {
+    std::string Lib = "lib" + opt::Libraries[i] + ".so";
+    if (opt::Libraries[i] == "gfortran")
       Lib = Lib + ".3";
-
 
     // Load the symbols and try the staic lib, if we can't load the shared one.
     if (!loadSymbolsFromLibrary(Lib)) {
-      Lib = "lib" + Libraries[i] + ".a";
+      Lib = "lib" + opt::Libraries[i] + ".a";
       if (loadSymbolsFromLibrary(Lib)) {
         errs() << "Loaded " << Lib << " instead.\n";
       }
     }
-
   }
 
-  int Result = pjit->runMain(InputArgv, envp);
+  int Result = pjit->runMain(opt::InputArgv, envp);
 
   pjit->shutdown(Result);
 
