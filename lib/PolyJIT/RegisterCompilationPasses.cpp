@@ -57,7 +57,10 @@ static void printConfig() {
 }
 
 void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
-  polly::PollyDelinearize = false;
+  if (polly::PollyDelinearize && opt::EnableJitable) {
+    Console->warn(" polly.delinearize: disabled (blocked by jitable)");
+    polly::PollyDelinearize = false;
+  }
 
   if (opt::InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
