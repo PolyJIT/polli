@@ -75,7 +75,7 @@ public:
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
-    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
+    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     // Store function mapping for the linker.
     VMap[SrcF] = TgtF;
@@ -139,6 +139,9 @@ struct DestroyEndpoint {
 
 struct InstrumentEndpoint {
   void setPass(Pass *HostPass) { P = HostPass; }
+  void setPrototype(Value *Prototype) {
+    PrototypeF = Prototype;
+  }
 
   Pass *getPass() { return P; }
 
@@ -150,7 +153,7 @@ struct InstrumentEndpoint {
     LLVMContext &Ctx = M->getContext();
     IRBuilder<> Builder(Ctx);
 
-    StringRef cbName = StringRef("polli.enter.runtime");
+    StringRef cbName = StringRef("pjit_main");
     PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
         cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
@@ -200,7 +203,8 @@ struct InstrumentEndpoint {
       i++;
     }
 
-    Args[0] = Builder.CreateGlobalStringPtr(TgtF->getName());
+    Args[0] = (PrototypeF) ? PrototypeF
+                           : Builder.CreateGlobalStringPtr(TgtF->getName());
     Args[1] = ParamC;
     Args[2] = Params;
 
@@ -229,6 +233,7 @@ struct InstrumentEndpoint {
 
 private:
   Pass *P;
+  Value *PrototypeF;
 };
 
 typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>

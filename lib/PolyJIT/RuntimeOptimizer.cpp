@@ -25,9 +25,11 @@
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassRegistry.h"
+#include "llvm/PassSupport.h"
 
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "polly/RegisterPasses.h"
 #include "polly/Canonicalization.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/ScopDetectionDiagnostic.h"
@@ -44,21 +46,15 @@ using namespace polly;
 namespace polli {
 Function *OptimizeForRuntime(Function *F) {
   Module *M = F->getParent();
-  FunctionPassManager PM = FunctionPassManager(M);
   PassManagerBuilder Builder;
 
-  PM.add(llvm::createTypeBasedAliasAnalysisPass());
-  PM.add(llvm::createBasicAliasAnalysisPass());
-  polly::registerCanonicalicationPasses(PM);
-  PM.add(polly::createScopInfoPass());
-  PM.add(polly::createIslScheduleOptimizerPass());
-  PM.add(polly::createIslCodeGenerationPass());
+  FunctionPassManager PM = FunctionPassManager(M);
 
   Builder.VerifyInput = true;
   Builder.VerifyOutput = true;
   Builder.OptLevel = 3;
-  Builder.populateFunctionPassManager(PM);
 
+  Builder.populateFunctionPassManager(PM);
   PM.run(*F);
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
