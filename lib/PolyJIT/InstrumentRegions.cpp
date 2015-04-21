@@ -57,6 +57,9 @@ using namespace llvm;
 using namespace polli;
 using namespace polly;
 
+#include "spdlog/spdlog.h"
+auto Console = spdlog::stderr_logger_st("polli");
+
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 STATISTIC(InstrumentedJITScops, "Number of instrumented JIT SCoPs");
 STATISTIC(MoreEntries, "Number of regions with more than one entry edge");
@@ -234,11 +237,9 @@ static void InsertProfilingInitCall(Function *MainFn) {
  * @return  true, if we changed something in the module.
  */
 bool PapiCScopProfilingInit::runOnModule(Module &M) {
-  DEBUG(dbgs() << "PapiCScop $ Initializing module\n");
   Function *Main = M.getFunction("main");
   if (Main == 0) {
-    errs() << "WARNING: cannot insert papi profiling into a module"
-           << " with no main function!\n";
+    Console->warn("no main function found in module.");
     return false; // No main, no instrumentation!
   }
 

@@ -19,6 +19,7 @@
 #include "spdlog/spdlog.h"
 
 #include <vector>
+#include <cstdlib>
 
 using namespace llvm;
 using namespace polli;
@@ -31,17 +32,17 @@ using UniqueMod = std::unique_ptr<Module>;
 
 static Module &getModule(const char *prototype) {
   static DenseMap<const char *, UniqueMod> ModuleIndex;
-  
+
   if(!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
     SMDiagnostic Err;
-    
+
     std::unique_ptr<Module> Mod = parseIR(Buf, Err, Ctx);
     Console->warn("Prototype module {} registered.", Mod->getModuleIdentifier());
     ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
-  } 
-  
+  }
+
   return *ModuleIndex[prototype];
 }
 
@@ -50,9 +51,23 @@ static Function *getFunction(Module &M) {
   return M.begin();
 }
 
+static void do_shutdown() {
+  LIKWID_MARKER_STOP("main-thread");
+  LIKWID_MARKER_CLOSE;
+}
+
+static void set_options_from_environment() {
+  opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
+}
+
 class StaticInitializer {
 public:
   StaticInitializer() {
+    LIKWID_MARKER_INIT;
+    LIKWID_MARKER_START("main-thread");
+    atexit(do_shutdown);
+    set_options_from_environment();
+
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
     initializeCore(Registry);
@@ -98,8 +113,6 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
     return;
   }
 
-  /* Let's hope that we have called it before ;-)
-   * Otherwise it will blow up. FIXME: Don't blow up. */
   LIKWID_MARKER_START("JitSelectParams");
 
   std::vector<Param> ParamV;

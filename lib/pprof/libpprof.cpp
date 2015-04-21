@@ -16,7 +16,9 @@
 
 #include <sys/stat.h>
 
-static std::map<uint32_t, PPStringRegion> PPStrings;
+#include "pprof/pgsql.h"
+#include "pprof/file.h"
+using namespace pprof;
 
 /**
  * @brief Storage container for all PAPI region events.
@@ -34,21 +36,6 @@ static std::string event2csv(const PPEvent *Ev, uint64_t TimeOffset,
       << (ExitEv->Timestamp - Ev->Timestamp);
   return res.str();
 }
-
-//static std::string event2csv(const PPEvent *Ev, uint64_t TimeOffset,
-//                             const PPEvent *ExitEv,
-//                             uint32_t idx, uint32_t n) {
-//  std::stringstream res;
-//  res << (Ev->Timestamp - TimeOffset);
-//  for (uint32_t i = 0; i < n; i++) {
-//    res << ",";
-//    if (i == idx)
-//      res << (ExitEv->Timestamp - Ev->Timestamp);
-//    else
-//      res << 0;
-//  }
-//  return res.str();
-//}
 
 typedef std::vector<const PPEvent *>::iterator EventItTy;
 static const PPEvent *getMatchingExit(EventItTy &It, const EventItTy &End) {
@@ -119,45 +106,6 @@ void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
   out.close();
 }
 
-void StoreRun(std::vector<const PPEvent *> &Events) {
-  using namespace std;
-
-  ofstream out(fileName, ios_base::out | ios_base::app);
-
-  // Build global string table
-  const char *str;
-  for (auto &event : Events) {
-    str = event->DebugStr;
-    if (!str)
-      str = "UNDEF";
-    switch (event->EventTy) {
-    case ScopEnter:
-    case RegionEnter:
-      PPStrings[event->ID].Entry = str;
-      break;
-    case ScopExit:
-    case RegionExit:
-      PPStrings[event->ID].Exit = str;
-      break;
-    default:
-      break;
-    }
-
-    PPStrings[event->ID].ID = event->ID;
-  }
-
-  // Append String table
-  for (auto &dbg : PPStrings)
-    out << dbg.second << "\n";
-
-  // Append Events
-  for (auto &event : Events)
-    out << event;
-
-  out.flush();
-  out.close();
-}
-
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {
   PPEvent *ev = new PPEvent(id, ScopEnter, dbg);
@@ -202,7 +150,8 @@ void papi_atexit_handler(void) {
   ev->snapshot();
   PapiEvents.push_back(ev);
 
-  StoreRun(PapiEvents);
+  pgsql::StoreRun(PapiEvents);
+  file::StoreRun(PapiEvents);
   StoreRunAsCSV(PapiEvents);
 
   for (auto evt : PapiEvents)
@@ -237,7 +186,6 @@ void papi_region_setup() {
 
 #ifdef ENABLE_CALIBRATION
 static long long papi_calib_cnt = 1000;
-//static long long papi_calib_cnt = 1;
 
 void papi_calibrate(void) {
   long long time = PAPI_get_virt_nsec();

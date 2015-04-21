@@ -44,6 +44,7 @@ using namespace llvm::legacy;
 using namespace polly;
 
 namespace polli {
+
 Function *OptimizeForRuntime(Function *F) {
   Module *M = F->getParent();
   PassManagerBuilder Builder;
