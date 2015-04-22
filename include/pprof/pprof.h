@@ -95,6 +95,17 @@ struct PPEvent {
   void snapshot() { Timestamp = PAPI_get_virt_nsec(); }
 };
 
+namespace pprof {
+struct Options {
+  std::string experiment;
+  std::string project;
+  std::string command;
+  bool        use_db;
+  bool        use_csv;
+  bool        use_file;
+};
+}
+
 using namespace std;
 
 std::ostream &operator<<(std::ostream &os, const PPEvent &event);

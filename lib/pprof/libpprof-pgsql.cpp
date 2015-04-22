@@ -19,13 +19,6 @@ namespace pprof {
     std::string name;
   };
 
-  struct PprofOptions {
-    std::string experiment;
-    std::string project;
-    std::string command;
-    bool        use_db;
-  };
-
   DbOptions getDBOptionsFromEnv() {
     DbOptions Opts;
 
@@ -44,22 +37,6 @@ namespace pprof {
     return Opts;
   }
 
-  PprofOptions getPprofOptionsFromEnv() {
-    PprofOptions Opts;
-
-    const char *exp = std::getenv("PPROF_EXPERIMENT");
-    const char *prj = std::getenv("PPROF_PROJECT");
-    const char *cmd = std::getenv("PPROF_CMD");
-    const char *db  = std::getenv("PPROF_USE_DATABASE");
-
-    Opts.experiment = exp ? exp : "unknown";
-    Opts.project = prj ? prj : "unknown";
-    Opts.command = cmd ? cmd : "unknwon";
-    Opts.use_db = db ? (bool)stoi(db) : false;
-
-    return Opts;
-  }
-
   std::string now() {
     char buf[sizeof "YYYY-MM-DDTHH:MM:SS"];
     time_t now;
@@ -69,12 +46,10 @@ namespace pprof {
     return std::string(buf);
   }
 
-  void StoreRun(const std::vector<const PPEvent *> &Events) {
+  namespace pgsql {
+  void StoreRun(const std::vector<const PPEvent *> &Events,
+                const pprof::Options &opts) {
     using namespace fmt;
-    PprofOptions PPOpts = getPprofOptionsFromEnv();
-
-    if (!PPOpts.use_db)
-      return;
 
     DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
@@ -87,8 +62,8 @@ namespace pprof {
 
     pqxx::connection c(connection_str);
     pqxx::work w(c);
-    pqxx::result r = w.exec(format(new_run_sql, now(), PPOpts.command,
-                                   PPOpts.project, PPOpts.experiment));
+    pqxx::result r = w.exec(format(new_run_sql, now(), opts.command,
+                                   opts.project, opts.experiment));
 
     long run_id;
     r[0]["id"].to(run_id);
@@ -98,21 +73,22 @@ namespace pprof {
 
     int n = 500;
     size_t i;
-    for (i=0; i < Events.size(); i+=n) {
-       std::stringstream vals;
-       for (size_t j=i; j < std::min(Events.size(), (size_t)(n+i)); j++) {
-         const PPEvent *Ev = Events[j];
-         if (j != i)
-           vals << ",";
-         vals << format(" ({}, {}, {}, {})", Ev->EventTy, Ev->ID, Ev->Timestamp,
-                        run_id);
-       }
-       vals << ";";
-       w.exec(new_run_result_sql + vals.str());
-       vals.clear();
-       vals.flush();
+    for (i = 0; i < Events.size(); i += n) {
+      std::stringstream vals;
+      for (size_t j = i; j < std::min(Events.size(), (size_t)(n + i)); j++) {
+        const PPEvent *Ev = Events[j];
+        if (j != i)
+          vals << ",";
+        vals << format(" ({}, {}, {}, {})", Ev->EventTy, Ev->ID, Ev->Timestamp,
+                       run_id);
+      }
+      vals << ";";
+      w.exec(new_run_result_sql + vals.str());
+      vals.clear();
+      vals.flush();
     }
 
     w.commit();
   }
-}
+  }
+  }

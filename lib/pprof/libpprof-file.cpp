@@ -13,32 +13,32 @@
 namespace pprof {
 static std::map<uint32_t, PPStringRegion> PPStrings;
 
-struct PprofOptions {
-  std::string experiment;
-  std::string project;
-  std::string command;
-  bool use_db;
+struct FileOptions {
+  std::string profile;
+  std::string calls;
 };
 
-PprofOptions getPprofOptionsFromEnv() {
-  PprofOptions Opts;
+FileOptions getFileOptions() {
+  FileOptions Opts;
 
-  const char *exp = std::getenv("PPROF_EXPERIMENT");
-  const char *prj = std::getenv("PPROF_PROJECT");
-  const char *cmd = std::getenv("PPROF_CMD");
-  const char *db = std::getenv("PPROF_USE_DATABASE");
+  const char *profile = std::getenv("PPROF_FILE_PROFILE");
+  const char *calls = std::getenv("PPROF_FILE_CALLS");
 
-  Opts.experiment = exp ? exp : "unknown";
-  Opts.project = prj ? prj : "unknown";
-  Opts.command = cmd ? cmd : "unknwon";
-  Opts.use_db = db ? (bool)stoi(db) : false;
+  Opts.profile = profile ? profile : "papi.profile.out";
+  Opts.calls = calls ? calls : "papi.calls.out";
 
   return Opts;
 }
-void StoreRun(const std::vector<const PPEvent *> &Events) {
+
+namespace file {
+void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts) {
   using namespace std;
 
-  ofstream out(fileName, ios_base::out | ios_base::app);
+  if (!opts.use_file)
+    return;
+
+  FileOptions Opts = getFileOptions();
+  ofstream out(Opts.profile, ios_base::out | ios_base::app);
 
   // Build global string table
   const char *str;
@@ -72,5 +72,13 @@ void StoreRun(const std::vector<const PPEvent *> &Events) {
 
   out.flush();
   out.close();
+
+  // Append calls to papi
+  FILE *fp = fopen(Opts.calls.c_str(), "a+");
+  if (fp) {
+    fprintf(fp, "%zu\n", Events.size());
+    fclose(fp);
+  }
+}
 }
 }

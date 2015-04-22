@@ -6,7 +6,7 @@
 
 namespace pprof {
 namespace file {
-void StoreRun(const std::vector<const PPEvent *> &Events);
+void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts);
 }
 }
 

@@ -18,105 +18,24 @@
 
 #include "pprof/pgsql.h"
 #include "pprof/file.h"
+#include "pprof/csv.h"
+
 using namespace pprof;
 
 /**
  * @brief Storage container for all PAPI region events.
  */
 static std::vector<const PPEvent *> PapiEvents;
-static std::string fileName = "papi.profile.out";
-static std::string fileNameCallStack = "papi.calls.out";
-static std::string csvFileName = "papi.profile.events.csv";
-
-static std::string event2csv(const PPEvent *Ev, uint64_t TimeOffset,
-                             const PPEvent *ExitEv,
-                             uint32_t idx, uint32_t n) {
-  std::stringstream res;
-  res << (Ev->Timestamp - TimeOffset) << "," << Ev->DebugStr << ","
-      << (ExitEv->Timestamp - Ev->Timestamp);
-  return res.str();
-}
-
-typedef std::vector<const PPEvent *>::iterator EventItTy;
-static const PPEvent *getMatchingExit(EventItTy &It, const EventItTy &End) {
-  const PPEvent *Ev = (*It);
-  const PPEvent *NextEvent = *(++It);
-  if (Ev->EventTy != PPEventType::ScopEnter &&
-      Ev->EventTy != PPEventType::RegionEnter) {
-    std::cerr << "ERROR: " << Ev;
-    return nullptr;
-  }
-
-  int i = 0;
-  while (((NextEvent->ID != Ev->ID) ||
-          ((NextEvent->EventTy != PPEventType::ScopExit) &&
-           (NextEvent->EventTy != PPEventType::RegionExit))) &&
-         (It != End)) {
-    NextEvent = *(++It);
-    if (!NextEvent)
-      std::cerr << "NextEvent is a nullptr\n";
-
-    i++;
-  }
-
-  if (It == End) {
-    std::cerr << "ERROR: Iterator reached end\n";
-    return nullptr;
-  }
-
-  for (int j = 0; j <= i; j++) { It--; }
-  return NextEvent;
-}
-
-void StoreRunAsCSV(std::vector<const PPEvent *> &Events) {
-  using namespace std;
-  std::map<uint32_t, std::pair<uint32_t, const char *>> IdMap;
-  uint32_t idx =0;
-  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
-    const PPEvent *Event = *I;
-    if (!IdMap.count(Event->ID)) {
-      IdMap[Event->ID] = std::make_pair(idx++, Event->DebugStr);
-    }
-  }
-
-  EventItTy Start = Events.begin();
-
-  struct stat buffer;
-  bool writeHeader = stat(csvFileName.c_str(), &buffer) != 0;
-
-  ofstream out(csvFileName, ios_base::out | ios_base::app);
-  if (writeHeader)
-    out << "StartTime,Region,Duration\n";
-
-  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
-    const PPEvent *Event = *I;
-    switch(Event->EventTy) {
-    default:
-      break;
-    case ScopEnter:
-    case RegionEnter:
-      std::pair<uint32_t, const char *> Idx = IdMap[Event->ID];
-      out << event2csv(Event, (*Start)->Timestamp,
-                       getMatchingExit(I, IE), Idx.first, IdMap.size()) << "\n";
-      break;
-    }
-  }
-
-  out.flush();
-  out.close();
-}
 
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {
   PPEvent *ev = new PPEvent(id, ScopEnter, dbg);
   PapiEvents.push_back(ev);
-
   ev->snapshot();
 }
 
 void papi_region_exit_scop(uint64_t id, const char *dbg) {
   PPEvent *ev = new PPEvent(id, ScopExit, dbg);
-
   ev->snapshot();
   PapiEvents.push_back(ev);
 }
@@ -129,35 +48,48 @@ void papi_region_enter(uint64_t id) {
 
 void papi_region_exit(uint64_t id) {
   PPEvent *ev = new PPEvent(id, RegionExit);
-
   ev->snapshot();
   PapiEvents.push_back(ev);
 }
 
-static void papi_append_calls(void) {
-  FILE *fp;
+static Options getPprofOptionsFromEnv() {
+  Options Opts;
 
-  fp = fopen(fileNameCallStack.c_str(), "a+");
-  if (fp) {
-    fprintf(fp, "%zu\n", PapiEvents.size());
-    fclose(fp);
-  }
+  const char *exp = std::getenv("PPROF_EXPERIMENT");
+  const char *prj = std::getenv("PPROF_PROJECT");
+  const char *cmd = std::getenv("PPROF_CMD");
+  const char *db = std::getenv("PPROF_USE_DATABASE");
+  const char *csv = std::getenv("PPROF_USE_CSV");
+  const char *file = std::getenv("PPROF_USE_FILE");
+
+  Opts.experiment = exp ? exp : "unknown";
+  Opts.project = prj ? prj : "unknown";
+  Opts.command = cmd ? cmd : "unknown";
+  Opts.use_db = db ? (bool)stoi(db) : false;
+  Opts.use_csv = csv ? (bool)stoi(csv) : true;
+  Opts.use_file = file ? (bool)stoi(file) : true;
+
+  return Opts;
 }
-
 
 void papi_atexit_handler(void) {
   PPEvent *ev = new PPEvent(0, RegionExit, "STOP");
+  Options opts = getPprofOptionsFromEnv();
+
   ev->snapshot();
   PapiEvents.push_back(ev);
 
-  pgsql::StoreRun(PapiEvents);
-  file::StoreRun(PapiEvents);
-  StoreRunAsCSV(PapiEvents);
+  if (opts.use_db)
+    pgsql::StoreRun(PapiEvents, opts);
+  if (opts.use_file)
+    file::StoreRun(PapiEvents, opts);
+  if (opts.use_csv)
+    csv::StoreRun(PapiEvents, opts);
 
   for (auto evt : PapiEvents)
     delete evt;
 
-  papi_append_calls();
+  PapiEvents.clear();
   PAPI_shutdown();
 }
 
@@ -227,45 +159,7 @@ void papi_calibrate(void) {
   fprintf(stdout, "Real time (s): %f\n", time2 / 1e9);
 }
 
-#include <getopt.h>
-static void parse_command_line(int argc, char **argv) {
-  // Set a default, if the user did not specify any command line options.
-  if (argv) {
-    fileName = argv[0];
-    fileNameCallStack = argv[0];
-    csvFileName = argv[0];
-
-    fileName += ".profile.out";
-    fileNameCallStack += ".calls";
-    csvFileName += ".profile.events.csv";
-  }
-
-  static struct option options[] = {
-    {"file", required_argument, 0, 'f'},
-    {"calls", required_argument, 0, 'c'},
-    {0, 0, 0, 0}
-  };
-
-  int opt_index = 0;
-  int c;
-  while ((c = getopt_long(argc, argv, "fc", options, &opt_index)) != -1) {
-    switch (c) {
-    case 'f':
-      fileName = std::string(optarg);
-      break;
-    case 'c':
-      fileNameCallStack = std::string(optarg);
-      break;
-    default:
-      abort();
-    }
-  }
-  printf("profile goes into: %s\n", fileName.c_str());
-  printf("papi calls go into: %s\n", fileNameCallStack.c_str());
-}
-
 int main(int argc, char **argv) {
-  parse_command_line(argc, argv);
   fprintf(stdout, "EventSize: %zu\n", sizeof(PPEvent));
   fprintf(stdout, "EventTySize: %zu\n", sizeof(PPEventType));
 

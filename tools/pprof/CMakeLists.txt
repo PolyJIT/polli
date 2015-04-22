@@ -8,5 +8,6 @@ add_polli_executable(pprof-analyze
 
 target_link_libraries(pprof-analyze
   pprof
+  pqxx
 )
 add_dependencies(pprof-analyze pprof)
