@@ -30,37 +30,37 @@ libpprof supports different output backends for a tracked run:
 
 ### General options ###
 
-  | Name               | Type   | Description                               |
-  |--------------------|--------|-------------------------------------------|
-  | PPROF_EXPERIMENT   | text   | Which experiment does this run belong to. |
-  | PPROF_PROJECT      | text   | Which project does this run belong to.    |
-  | PPROF_CMD          | text   | Command line that has been executed.      |
-  | PPROF_USE_DATABASE | bool   | Use the Postgres backend.                 |
-  | PPROF_USE_CSV      | bool   | Use the CSV file backend.                 |
-  | PPROF_USE_FILE     | bool   | Use the RAW file backend.                 |
+  | Name                 | Type     | Description                                 |
+  | -------------------- | -------- | ------------------------------------------- |
+  | PPROF_EXPERIMENT     | text     | Which experiment does this run belong to.   |
+  | PPROF_PROJECT        | text     | Which project does this run belong to.      |
+  | PPROF_CMD            | text     | Command line that has been executed.        |
+  | PPROF_USE_DATABASE   | bool     | Use the Postgres backend.                   |
+  | PPROF_USE_CSV        | bool     | Use the CSV file backend.                   |
+  | PPROF_USE_FILE       | bool     | Use the RAW file backend.                   |
 
 ### PostgreSQL options ###
 
   libpq automatically derives missing connection parameters from the
   $HOME/.pgpass file.
 
-  | Name            | Type     | Description                         |
-  |-----------------|----------|-------------------------------------|
-  | PPROF_DB_HOST   | text     | Database Host                       |
-  | PPROF_DB_PORT   | text     | Database Port                       |
-  | PPROF_DB_USER   | text     | Username to connect with (optional) |
-  | PPROF_DB_PASS   | text     | Password to connect with (optional) |
-  | PPROF_DB_NAME   | text     | Which DB should we select           |
+  | Name              | Type       | Description                           |
+  | ----------------- | ---------- | ------------------------------------- |
+  | PPROF_DB_HOST     | text       | Database Host                         |
+  | PPROF_DB_PORT     | text       | Database Port                         |
+  | PPROF_DB_USER     | text       | Username to connect with (optional)   |
+  | PPROF_DB_PASS     | text       | Password to connect with (optional)   |
+  | PPROF_DB_NAME     | text       | Which DB should we select             |
 
 ### CSV file options ###
 
-  | Name            | Type     | Description                         |
-  |-----------------|----------|-------------------------------------|
-  | PPROF_CSV_FILE  | text     | Path to store the csv file in.      |
+  | Name              | Type       | Description                           |
+  | ----------------- | ---------- | ------------------------------------- |
+  | PPROF_CSV_FILE    | text       | Path to store the csv file in.        |
 
 ### RAW file options ###
 
-  | Name               | Type  | Description                               |
-  |--------------------|-------|-------------------------------------------|
-  | PPROF_FILE_PROFILE | text  | Path to store the profile in.             |
-  | PPROF_FILE_CALLS   | text  | Path to store the library calls count in. |
+  | Name                 | Type    | Description                                 |
+  | -------------------- | ------- | ------------------------------------------- |
+  | PPROF_FILE_PROFILE   | text    | Path to store the profile in.               |
+  | PPROF_FILE_CALLS     | text    | Path to store the library calls count in.   |
