@@ -51,6 +51,7 @@ libpprof supports different output backends for a tracked run:
   PPROF_DB_USER     | text  | Username to connect with (optional)
   PPROF_DB_PASS     | text  | Password to connect with (optional)
   PPROF_DB_NAME     | text  | Which DB should we select
+  PPROF_DB_RUN_GROUP | uuid | UUID that identifies a set of runs (required)
 
 ### CSV file options ###
 

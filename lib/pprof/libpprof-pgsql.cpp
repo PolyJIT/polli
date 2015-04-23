@@ -17,6 +17,7 @@ namespace pprof {
     std::string user;
     std::string pass;
     std::string name;
+    std::string uuid;
   };
 
   DbOptions getDBOptionsFromEnv() {
@@ -27,12 +28,14 @@ namespace pprof {
     const char *pass = std::getenv("PPROF_DB_PASS");
     const char *name = std::getenv("PPROF_DB_NAME");
     const char *port = std::getenv("PPROF_DB_PORT");
+    const char *uuid = std::getenv("PPROF_DB_RUN_GROUP");
 
     Opts.host = host ? host : "localhost";
     Opts.port = port ? stoi(port) : 49153;
     Opts.name = name ? name : "pprof";
     Opts.user = user ? user : "pprof";
     Opts.pass = pass ? pass : "pprof";
+    Opts.uuid = uuid ? uuid : "00000000-0000-0000-0000-000000000000";
 
     return Opts;
   }
@@ -55,15 +58,15 @@ namespace pprof {
     std::string connection_str =
         format("user={} port={} host={} dbname={}", Opts.user, Opts.port,
                Opts.host, Opts.name);
-    std::string new_run_sql =
-        "INSERT INTO run (finished, command, "
-        "project_name, experiment_name) VALUES (TIMESTAMP '{}', '{}', "
-        "'{}', '{}\') RETURNING id;";
+    std::string new_run_sql = "INSERT INTO run (finished, command, "
+                              "project_name, experiment_name, run_group) "
+                              "VALUES (TIMESTAMP '{}', '{}', "
+                              "'{}', '{}', '{}') RETURNING id;";
 
     pqxx::connection c(connection_str);
     pqxx::work w(c);
     pqxx::result r = w.exec(format(new_run_sql, now(), opts.command,
-                                   opts.project, opts.experiment));
+                                   opts.project, opts.experiment, Opts.uuid));
 
     long run_id;
     r[0]["id"].to(run_id);
