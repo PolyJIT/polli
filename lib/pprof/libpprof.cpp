@@ -52,26 +52,6 @@ void papi_region_exit(uint64_t id) {
   PapiEvents.push_back(ev);
 }
 
-static Options getPprofOptionsFromEnv() {
-  Options Opts;
-
-  const char *exp = std::getenv("PPROF_EXPERIMENT");
-  const char *prj = std::getenv("PPROF_PROJECT");
-  const char *cmd = std::getenv("PPROF_CMD");
-  const char *db = std::getenv("PPROF_USE_DATABASE");
-  const char *csv = std::getenv("PPROF_USE_CSV");
-  const char *file = std::getenv("PPROF_USE_FILE");
-
-  Opts.experiment = exp ? exp : "unknown";
-  Opts.project = prj ? prj : "unknown";
-  Opts.command = cmd ? cmd : "unknown";
-  Opts.use_db = db ? (bool)stoi(db) : false;
-  Opts.use_csv = csv ? (bool)stoi(csv) : true;
-  Opts.use_file = file ? (bool)stoi(file) : true;
-
-  return Opts;
-}
-
 void papi_atexit_handler(void) {
   PPEvent *ev = new PPEvent(0, RegionExit, "STOP");
   Options opts = getPprofOptionsFromEnv();
@@ -122,7 +102,6 @@ static long long papi_calib_cnt = 1000;
 void papi_calibrate(void) {
   long long time = PAPI_get_virt_nsec();
   long long time2 = PAPI_get_real_nsec();
-
 
   for (int i = 0; i < papi_calib_cnt; ++i) {
     papi_region_enter_scop(1, "a");

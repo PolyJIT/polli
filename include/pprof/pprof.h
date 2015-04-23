@@ -77,7 +77,7 @@ struct PPEvent {
   PPEvent(uint64_t id, PPEventType evTy, const char *dbgStr = "")
       : ID(id), EventTy(evTy), DebugStr(dbgStr) {
     Timestamp = -1;
-  };
+  }
 
   PPEvent(PPStringRegion &R) {
     ID = R.ID;
@@ -85,7 +85,7 @@ struct PPEvent {
     EventTy = (PPEventType)std::stoi(R.Exit);
   }
 
-  PPEvent(){};
+  PPEvent(){}
 
   uint32_t ID;
   PPEventType EventTy;
@@ -100,10 +100,35 @@ struct Options {
   std::string experiment;
   std::string project;
   std::string command;
-  bool        use_db;
-  bool        use_csv;
-  bool        use_file;
+  bool use_db;
+  bool use_csv;
+  bool use_file;
 };
+
+Options getPprofOptionsFromEnv();
+
+template <typename T> struct Metric {
+  std::string Name;
+  T Val;
+
+  Metric(std::string Name, T Val) : Name(Name), Val(Val) {}
+  Metric() : Name("pprof.unknown"), Val(T()) {}
+};
+
+struct Metrics {
+  Metric<uint64_t> TimeInSCoPs_ns;
+  Metric<uint64_t> TotalTime_ns;
+  Metric<uint64_t> Runs;
+};
+
+/** 
+ * @name Addition for metric with uint64_t
+ * @{ */
+template <typename T> Metric<T> &operator+=(Metric<T> &LHS, T && RHS) {
+  LHS.Val += RHS;
+  return LHS;
+}
+/**  @} */
 }
 
 using namespace std;

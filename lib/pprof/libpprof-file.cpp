@@ -64,7 +64,7 @@ void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts) {
 
   // Append String table
   for (auto &dbg : PPStrings)
-    out << dbg.second << "\n";
+    out << dbg.second;
 
   // Append Events
   for (auto &event : Events)
@@ -80,5 +80,63 @@ void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts) {
     fclose(fp);
   }
 }
+
+static bool ReadRun(std::unique_ptr<std::ifstream> &in,
+                    std::vector<const PPEvent *> &Events,
+                    std::map<uint32_t, PPStringRegion> &Regions) {
+  PPStringRegion StartR;
+
+  *in >> StartR;
+  assert((StartR.ID == 0) && "ERROR: StartRegion has ID != 0\n");
+
+  PPStringRegion R;
+  while ((*in >> R) && R.ID != 0)
+    PPStrings[R.ID] = R;
+
+  // Last region we read is an event.
+  if (in->eof()) {
+    std::cerr << "Reached EOF before finding a run.\n";
+    return false;
+  }
+
+  Events.push_back(new PPEvent(R));
+
+  // Continue until we reach another run.
+  PPEvent Ev;
+  while (!in->eof() && (*in >> Ev) && Ev.ID != 0)
+    Events.push_back(new PPEvent(Ev));
+
+  // Last event of a run is defined to have ID 0.
+  Events.push_back(new PPEvent(Ev));
+  std::cout << "Completed reading a single run!\n";
+  return true;
 }
+
+std::unique_ptr<ifstream> ifs;
+
+bool ReadRun(std::vector<const PPEvent *> &Events,
+             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
+  FileOptions FileOpts = getFileOptions();
+  bool gotValidRun = false;
+
+  if (!ifs) {
+    ifs = std::unique_ptr<std::ifstream>(
+        new std::ifstream(FileOpts.profile, ios_base::in));
+    std::cout << "Reading runs from: " << FileOpts.profile << "\n";
+  }
+
+  if (ifs) {
+    Events.clear();
+    gotValidRun = file::ReadRun(ifs, Events, Regions);
+
+    if (!gotValidRun) {
+      ifs->close();
+      ifs.reset(nullptr);
+    }
+  }
+
+  return gotValidRun;
 }
+
+} // end of file namespace
+} // end of pprof namespace
