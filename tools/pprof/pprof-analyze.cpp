@@ -1,5 +1,6 @@
 #include "pprof/pprof.h"
 #include "pprof/file.h"
+#include "pprof/pgsql.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -115,6 +116,9 @@ SanitizeRun(std::vector<const PPEvent *> &Events) {
 
       if (past < future)
         ValidEvents.push_back(Ev);
+      else
+        std::cout << "invalid: " << past << " > " << future << "\n"
+                  << "PastEv: " << *Past << " CurEv:: " << *Ev << "\n";
     } else {
       ValidEvents.push_back(Ev);
     }
@@ -128,7 +132,7 @@ SanitizeRun(std::vector<const PPEvent *> &Events) {
 
 namespace pprof {
 static void GenerateStats(std::vector<const PPEvent *> &Events, Metrics &M) {
-  
+
   M.TimeInSCoPs_ns += getTimeInSCoPs(Events, std::cout);
   M.TotalTime_ns += getTotalTimeInProgram(Events, std::cout);
   M.Runs.Val += 1;
@@ -159,6 +163,12 @@ int main(int argc, const char **argv) {
 
   if (Opts.use_db) {
     std::cout << "Using Postgres DB backend\n";
+    SingleRun.clear();
+    while (pgsql::ReadRun(SingleRun, Regions, Opts)) {
+      SingleRun = SanitizeRun(SingleRun);
+      GenerateStats(SingleRun, M);
+      SingleRun.clear();
+    }
   }
 
   PrintStats(std::cout, M, Regions);
