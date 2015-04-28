@@ -6,7 +6,7 @@
 
 namespace pprof {
 namespace csv {
-void StoreRun(std::vector<const PPEvent *> &Events, const Options &opts);
+void StoreRun(Run<PPEvent> &Events, const Options &opts);
 }
 }
 

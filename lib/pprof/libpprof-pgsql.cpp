@@ -58,8 +58,7 @@ static std::string NEW_RUN_SQL = "INSERT INTO run (finished, command, "
 static std::string NEW_RUN_RESULT_SQL = "INSERT INTO papi_results (type, id, "
                                         "timestamp, run_id) VALUES";
 
-void StoreRun(const std::vector<const PPEvent *> &Events,
-              const pprof::Options &opts) {
+void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
@@ -80,10 +79,10 @@ void StoreRun(const std::vector<const PPEvent *> &Events,
   for (i = 0; i < Events.size(); i += n) {
     std::stringstream vals;
     for (size_t j = i; j < std::min(Events.size(), (size_t)(n + i)); j++) {
-      const PPEvent *Ev = Events[j];
+      const PPEvent &Ev = Events[j];
       if (j != i)
         vals << ",";
-      vals << format(" ({}, {}, {}, {})", Ev->EventTy, Ev->ID, Ev->Timestamp,
+      vals << format(" ({}, {}, {}, {})", Ev.event(), Ev.id(), Ev.timestamp(),
                      run_id);
     }
     vals << ";";
@@ -101,46 +100,72 @@ static std::string SELECT_RUN =
     "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
     "timestamp;";
 static std::string SELECT_RUN_IDs = "SELECT id FROM run WHERE run_group = $1;";
-static std::vector<uint32_t> RunIDs;
 
-static bool ReadRun(std::unique_ptr<pqxx::connection> &c, std::vector<const PPEvent *> &Events,
-                    std::map<uint32_t, PPStringRegion> &Regions) {
-  using namespace fmt;
-  if (RunIDs.size() == 0)
-    return false;
+using IdVector = std::vector<uint32_t>;
+static IdVector RunIDs;
 
-  uint32_t id = RunIDs.back();
-  DbOptions Opts = getDBOptionsFromEnv();
+static void printRunIDs(const IdVector &IDs) {
+  std::cout << "RunIds: [";
+  for (size_t i = 0; i < IDs.size(); i++) {
+    if (i != 0)
+      std::cout << ", ";
 
-  pqxx::read_transaction txn(*c);
-  pqxx::result r = txn.prepared("select_run")(id).exec();
-
-  for (size_t i = 0; i < r.size(); i++) {
-    PPEvent Ev;
-    Ev.ID = r[i][0].as<uint32_t>();
-    Ev.EventTy = (PPEventType)r[i][1].as<uint32_t>();
-    Ev.Timestamp = r[i][3].as<uint64_t>();
-    Events.push_back(new PPEvent(Ev));
+    std::cout << IDs[i];
   }
-
-  std::cout << "Completed reading a single run!\n";
-  RunIDs.pop_back();
-  return true;
+  std::cout << "]\n";
 }
 
-static void ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c,
-                                std::vector<uint32_t> &RunIDs) {
+static IdVector
+ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c) {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::read_transaction txn(*c);
   pqxx::result r = txn.prepared("select_run_ids")(Opts.uuid).exec();
 
-  RunIDs.clear();
+  IdVector RunIDs(r.size());
   for (size_t i = 0; i < r.size(); i++) {
-    RunIDs.push_back(r[0][0].as<uint32_t>());
+    RunIDs[i] = r[i][0].as<uint32_t>();
   }
+
+  std::cout << "Runs available in database:\n";
+  printRunIDs(RunIDs);
   txn.commit();
+  return RunIDs;
+}
+
+static Run<PPEvent> ReadRun(std::unique_ptr<pqxx::connection> &c,
+                            IdVector &RunIDs,
+                            std::map<uint32_t, PPStringRegion> &Regions) {
+  using namespace fmt;
+
+  DbOptions Opts = getDBOptionsFromEnv();
+  uint32_t id = RunIDs.back();
+  Run<PPEvent> Events(id);
+  Events.clear();
+
+  if (RunIDs.size() == 0)
+    return Events;
+
+  pqxx::read_transaction txn(*c);
+  pqxx::result r = txn.prepared("select_run")(id).exec();
+
+  Events.ID = id;
+  for (size_t i = 0; i < r.size(); i++) {
+    uint16_t ev_id = r[i][0].as<uint16_t>();
+    uint32_t ev_ty = r[i][1].as<uint32_t>();
+    uint64_t ev_ts = r[i][2].as<uint64_t>();
+
+    Events.push_back(PPEvent(ev_id, (PPEventType)ev_ty, ev_ts));
+  }
+
+  std::cout << "Completed reading a run #" << id << "\n";
+  RunIDs.pop_back();
+
+  std::cout << "Remaining runs in database:\n";
+  printRunIDs(RunIDs);
+
+  return Events;
 }
 
 static void PrepareReadStatements(std::unique_ptr<pqxx::connection> &c,
@@ -149,23 +174,28 @@ static void PrepareReadStatements(std::unique_ptr<pqxx::connection> &c,
   c->prepare("select_run_ids", SELECT_RUN_IDs);
 }
 
-bool ReadRun(std::vector<const PPEvent *> &Events,
-             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
+static void OpenNewConnection(const DbOptions &Opts) {
   using namespace fmt;
+  std::string connection_str =
+      format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name);
+  c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
+}
+
+bool ReadRun(Run<PPEvent> &Events,
+             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
   DbOptions Opts = getDBOptionsFromEnv();
   bool gotValidRun = false;
 
   if (!c) {
-    std::string connection_str =
-        format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name);
-    c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
+    OpenNewConnection(Opts);
     PrepareReadStatements(c, Opts);
-    ReadAvailableRunIDs(c, RunIDs);
+    RunIDs = ReadAvailableRunIDs(c);
   }
 
   if (c) {
     Events.clear();
-    gotValidRun = pgsql::ReadRun(c, Events, Regions);
+    Events = pgsql::ReadRun(c, RunIDs, Regions);
+    gotValidRun = Events.size() > 0;
 
     if (!gotValidRun) {
       c->disconnect();
@@ -174,6 +204,25 @@ bool ReadRun(std::vector<const PPEvent *> &Events,
   }
   return gotValidRun;
 }
+
+void StoreRunMetrics(long run_id, const Metrics &M) {
+  using namespace std;
+  using namespace fmt;
+
+  const DbOptions Opts = getDBOptionsFromEnv();
+  if (!c)
+    OpenNewConnection(Opts);
+
+  static std::string NewMetric =
+      "INSERT INTO metrics (name, value, run_id) VALUES ('{}', {}, {});";
+
+  pqxx::work w(*c);
+
+  for (auto e : M)
+    w.exec(format(NewMetric, e.first, e.second, run_id));
+
+  w.commit();
+};
 
 } // end of sql namespace
 } // end of pprof namespace

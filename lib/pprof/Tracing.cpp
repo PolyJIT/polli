@@ -7,6 +7,7 @@
 #include <map>
 
 #include <assert.h>
+#include <fstream>
 
 /**
  * @brief Output filename.

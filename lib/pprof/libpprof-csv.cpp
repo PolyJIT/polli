@@ -9,6 +9,8 @@
 
 #include <sys/stat.h>
 #include <map>
+#include <fstream>
+#include <iostream>
 
 namespace pprof {
 struct CsvOptions {
@@ -22,48 +24,31 @@ CsvOptions getCSVoptions() {
   return Opts;
 }
 
-static std::string event2csv(const PPEvent *Ev, uint64_t TimeOffset,
-                             const PPEvent *ExitEv,
+static std::string event2csv(const PPEvent &Ev, uint64_t TimeOffset,
+                             const PPEvent &ExitEv,
                              uint32_t idx, uint32_t n) {
-  std::stringstream res;
-  res << (Ev->Timestamp - TimeOffset) << "," << Ev->DebugStr << ","
-      << (ExitEv->Timestamp - Ev->Timestamp);
-  return res.str();
+  using namespace fmt;
+  return format("{:s}, {:s}, {:s}", (Ev.timestamp() - TimeOffset),
+                Ev.userString(), (ExitEv.timestamp() - Ev.timestamp()));
 }
 
-typedef std::vector<const PPEvent *>::iterator EventItTy;
-static const PPEvent *getMatchingExit(EventItTy &It, const EventItTy &End) {
-  const PPEvent *Ev = (*It);
-  const PPEvent *NextEvent = *(++It);
-  if (Ev->EventTy != PPEventType::ScopEnter &&
-      Ev->EventTy != PPEventType::RegionEnter) {
-    std::cerr << "ERROR: " << Ev;
-    return nullptr;
+static const Run<PPEvent>::iterator
+getMatchingExit(Run<PPEvent>::iterator It,
+                const Run<PPEvent>::iterator &End) {
+  const PPEvent &Ev = *It;
+
+  while (
+      ((It->id() != Ev.id()) || ((It->event() != PPEventType::ScopExit) &&
+                                 (It->event() != PPEventType::RegionExit))) &&
+      (It != End)) {
+    ++It;
   }
 
-  int i = 0;
-  while (((NextEvent->ID != Ev->ID) ||
-          ((NextEvent->EventTy != PPEventType::ScopExit) &&
-           (NextEvent->EventTy != PPEventType::RegionExit))) &&
-         (It != End)) {
-    NextEvent = *(++It);
-    if (!NextEvent)
-      std::cerr << "NextEvent is a nullptr\n";
-
-    i++;
-  }
-
-  if (It == End) {
-    std::cerr << "ERROR: Iterator reached end\n";
-    return nullptr;
-  }
-
-  for (int j = 0; j <= i; j++) { It--; }
-  return NextEvent;
+  return It;
 }
 
 namespace csv {
-void StoreRun(std::vector<const PPEvent *> &Events, const Options &opts) {
+void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   using namespace std;
 
   if (!opts.use_csv)
@@ -71,16 +56,15 @@ void StoreRun(std::vector<const PPEvent *> &Events, const Options &opts) {
 
   CsvOptions csvOpts = getCSVoptions();
 
-  std::map<uint32_t, std::pair<uint32_t, const char *>> IdMap;
+  std::map<uint32_t, std::pair<uint32_t, std::string>> IdMap;
   uint32_t idx = 0;
-  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
-    const PPEvent *Event = *I;
-    if (!IdMap.count(Event->ID)) {
-      IdMap[Event->ID] = std::make_pair(idx++, Event->DebugStr);
+  for (const PPEvent &Event : Events) {
+    if (!IdMap.count(Event.id())) {
+      IdMap[Event.id()] = std::make_pair(idx++, Event.userString());
     }
   }
 
-  EventItTy Start = Events.begin();
+  Run<PPEvent>::iterator Start = Events.begin();
 
   struct stat buffer;
   bool writeHeader = stat(csvOpts.output.c_str(), &buffer) != 0;
@@ -89,15 +73,15 @@ void StoreRun(std::vector<const PPEvent *> &Events, const Options &opts) {
   if (writeHeader)
     out << "StartTime,Region,Duration\n";
 
-  for (EventItTy I = Events.begin(), IE = Events.end(); I != IE; ++I) {
-    const PPEvent *Event = *I;
-    switch (Event->EventTy) {
+  for (Run<PPEvent>::iterator I = Events.begin(), IE = Events.end();
+       I != IE; ++I) {
+    switch (I->event()) {
     default:
       break;
     case ScopEnter:
     case RegionEnter:
-      std::pair<uint32_t, const char *> Idx = IdMap[Event->ID];
-      out << event2csv(Event, (*Start)->Timestamp, getMatchingExit(I, IE),
+      std::pair<uint32_t, std::string> Idx = IdMap[I->id()];
+      out << event2csv(*I, Start->timestamp(), *getMatchingExit(I, IE),
                        Idx.first, IdMap.size()) << "\n";
       break;
     }

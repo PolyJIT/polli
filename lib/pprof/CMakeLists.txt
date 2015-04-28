@@ -24,15 +24,3 @@ set_target_properties(pprof
   LINKER_LANGUAGE CXX
   PREFIX "lib"
 )
-
-add_definitions("-DENABLE_CALIBRATION")
-add_polli_executable(pprof-calibrate
-  ${POLLI_SOURCES}
-)
-
-target_link_libraries(pprof-calibrate
-  pprof
-)
-add_dependencies(pprof-calibrate
-  pprof
-)

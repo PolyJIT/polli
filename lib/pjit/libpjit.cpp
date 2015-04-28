@@ -15,6 +15,7 @@
 #include "llvm/LinkAllPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 #include "spdlog/spdlog.h"
 
@@ -25,6 +26,9 @@ using namespace llvm;
 using namespace polli;
 
 namespace {
+using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
+StackTracePtr StackTrace;
+
 static FunctionDispatcher Disp;
 auto Console = spdlog::stderr_logger_st("polli");
 
@@ -38,8 +42,15 @@ static Module &getModule(const char *prototype) {
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
     SMDiagnostic Err;
 
-    std::unique_ptr<Module> Mod = parseIR(Buf, Err, Ctx);
-    Console->warn("Prototype module {} registered.", Mod->getModuleIdentifier());
+    UniqueMod Mod = parseIR(Buf, Err, Ctx);
+    if (Mod)
+      Console->warn("Prototype registered.");
+    else {
+      Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
+                     Err.getLineNo(), Err.getColumnNo(),
+                     Err.getMessage().str());
+      Console->error("{:s}", prototype);
+    }
     ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
   }
 
@@ -54,6 +65,7 @@ static Function *getFunction(Module &M) {
 static void do_shutdown() {
   LIKWID_MARKER_STOP("main-thread");
   LIKWID_MARKER_CLOSE;
+  Console->warn("PolyJIT shut down.");
 }
 
 static void set_options_from_environment() {
@@ -63,8 +75,12 @@ static void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
+    Console->warn("PolyJIT activated.");
+    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
+
     LIKWID_MARKER_INIT;
     LIKWID_MARKER_START("main-thread");
+
     atexit(do_shutdown);
     set_options_from_environment();
 
@@ -90,6 +106,10 @@ public:
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
+  }
+
+  ~StaticInitializer() {
+    do_shutdown();
   }
 };
 static StaticInitializer InitializeEverything;

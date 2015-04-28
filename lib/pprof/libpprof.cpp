@@ -25,39 +25,28 @@ using namespace pprof;
 /**
  * @brief Storage container for all PAPI region events.
  */
-static std::vector<const PPEvent *> PapiEvents;
+static Run<PPEvent> PapiEvents;
 
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {
-  PPEvent *ev = new PPEvent(id, ScopEnter, dbg);
-  PapiEvents.push_back(ev);
-  ev->snapshot();
+  PapiEvents.push_back(PPEvent(id, ScopEnter, dbg));
 }
 
 void papi_region_exit_scop(uint64_t id, const char *dbg) {
-  PPEvent *ev = new PPEvent(id, ScopExit, dbg);
-  ev->snapshot();
-  PapiEvents.push_back(ev);
+  PapiEvents.push_back(PPEvent(id, ScopExit, dbg));
 }
 
 void papi_region_enter(uint64_t id) {
-  PPEvent *ev = new PPEvent(id, RegionEnter);
-  ev->snapshot();
-  PapiEvents.push_back(ev);
+  PapiEvents.push_back(PPEvent(id, RegionEnter));
 }
 
 void papi_region_exit(uint64_t id) {
-  PPEvent *ev = new PPEvent(id, RegionExit);
-  ev->snapshot();
-  PapiEvents.push_back(ev);
+  PapiEvents.push_back(PPEvent(id, RegionExit));
 }
 
 void papi_atexit_handler(void) {
-  PPEvent *ev = new PPEvent(0, RegionExit, "STOP");
   Options opts = getPprofOptionsFromEnv();
-
-  ev->snapshot();
-  PapiEvents.push_back(ev);
+  PapiEvents.push_back(PPEvent(0, RegionExit, "STOP"));
 
   if (opts.use_db)
     pgsql::StoreRun(PapiEvents, opts);
@@ -66,17 +55,12 @@ void papi_atexit_handler(void) {
   if (opts.use_csv)
     csv::StoreRun(PapiEvents, opts);
 
-  for (auto evt : PapiEvents)
-    delete evt;
-
   PapiEvents.clear();
   PAPI_shutdown();
 }
 
 void papi_region_setup() {
-  PPEvent *ev = new PPEvent(0, RegionEnter, "START");
-  PapiEvents.push_back(ev);
-  ev->snapshot();
+  PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
 
   int init = PAPI_library_init(PAPI_VER_CURRENT);
   if (init != PAPI_VER_CURRENT && init > 0)
@@ -95,58 +79,3 @@ void papi_region_setup() {
             err);
 }
 }
-
-#ifdef ENABLE_CALIBRATION
-static long long papi_calib_cnt = 1000;
-
-void papi_calibrate(void) {
-  long long time = PAPI_get_virt_nsec();
-  long long time2 = PAPI_get_real_nsec();
-
-  for (int i = 0; i < papi_calib_cnt; ++i) {
-    papi_region_enter_scop(1, "a");
-    papi_region_enter_scop(2, "b");
-    papi_region_exit_scop(2, "b");
-    papi_region_exit_scop(1, "a");
-  }
-
-  for (int i = 0; i < papi_calib_cnt; ++i) {
-    papi_region_enter_scop(1, "a");
-    papi_region_enter_scop(2, "b");
-    papi_region_enter_scop(3, "c");
-    papi_region_exit_scop(3, "c");
-    papi_region_exit_scop(2, "b");
-    papi_region_exit_scop(1, "a");
-  }
-
-  for (int i = 0; i < papi_calib_cnt; ++i) {
-    papi_region_enter_scop(3, "c");
-    papi_region_exit_scop(3, "c");
-  }
-
-  time = (PAPI_get_virt_nsec() - time);
-  time2 = (PAPI_get_real_nsec() - time2);
-
-  // Measurement is done per "pair" of PAPI calls.
-  double avg = time / (double)(PapiEvents.size() / 2);
-  double avg2 = time2 / (double)(PapiEvents.size() / 2);
-
-  fprintf(stdout, "User time per call (ns): %f\n", avg);
-  fprintf(stdout, "Real time per call (ns): %f\n", avg2);
-  fprintf(stdout, "PAPI-stack calls: %lu\n", PapiEvents.size() / 2);
-  fprintf(stdout, "User time (s): %f\n", time / 1e9);
-  fprintf(stdout, "Real time (s): %f\n", time2 / 1e9);
-}
-
-int main(int argc, char **argv) {
-  fprintf(stdout, "EventSize: %zu\n", sizeof(PPEvent));
-  fprintf(stdout, "EventTySize: %zu\n", sizeof(PPEventType));
-
-  PAPI_library_init(PAPI_VER_CURRENT);
-  if (!PAPI_is_initialized()) {
-    fprintf(stderr, "ERROR: libPAPI is not initialized\n");
-  }
-  papi_region_setup();
-  papi_calibrate();
-}
-#endif

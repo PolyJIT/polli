@@ -9,6 +9,8 @@
 #include <cppformat/format.h>
 
 #include <map>
+#include <fstream>
+#include <iostream>
 
 namespace pprof {
 static std::map<uint32_t, PPStringRegion> PPStrings;
@@ -31,7 +33,7 @@ FileOptions getFileOptions() {
 }
 
 namespace file {
-void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts) {
+void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   using namespace std;
 
   if (!opts.use_file)
@@ -41,26 +43,26 @@ void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts) {
   ofstream out(Opts.profile, ios_base::out | ios_base::app);
 
   // Build global string table
-  const char *str;
-  for (auto &event : Events) {
-    str = event->DebugStr;
-    if (!str)
-      str = "UNDEF";
-    switch (event->EventTy) {
-    case ScopEnter:
-    case RegionEnter:
-      PPStrings[event->ID].Entry = str;
-      break;
-    case ScopExit:
-    case RegionExit:
-      PPStrings[event->ID].Exit = str;
-      break;
-    default:
-      break;
-    }
+  //const char *str;
+  //for (auto &event : Events) {
+  //  str = event.userString();
+  //  if (!str)
+  //    str = "UNDEF";
+  //  switch (event.event()) {
+  //  case ScopEnter:
+  //  case RegionEnter:
+  //    PPStrings[event->ID].Entry = str;
+  //    break;
+  //  case ScopExit:
+  //  case RegionExit:
+  //    PPStrings[event->ID].Exit = str;
+  //    break;
+  //  default:
+  //    break;
+  //  }
 
-    PPStrings[event->ID].ID = event->ID;
-  }
+  //  PPStrings[event->ID].ID = event->ID;
+  //}
 
   // Append String table
   for (auto &dbg : PPStrings)
@@ -82,7 +84,7 @@ void StoreRun(const std::vector<const PPEvent *> &Events, const Options &opts) {
 }
 
 static bool ReadRun(std::unique_ptr<std::ifstream> &in,
-                    std::vector<const PPEvent *> &Events,
+                    Run<PPEvent> &Events,
                     std::map<uint32_t, PPStringRegion> &Regions) {
   PPStringRegion StartR;
 
@@ -99,22 +101,22 @@ static bool ReadRun(std::unique_ptr<std::ifstream> &in,
     return false;
   }
 
-  Events.push_back(new PPEvent(R));
+  Events.push_back(R);
 
   // Continue until we reach another run.
   PPEvent Ev;
-  while (!in->eof() && (*in >> Ev) && Ev.ID != 0)
-    Events.push_back(new PPEvent(Ev));
+  while (!in->eof() && (*in >> Ev) && Ev.id() != 0)
+    Events.push_back(Ev);
 
   // Last event of a run is defined to have ID 0.
-  Events.push_back(new PPEvent(Ev));
+  Events.push_back(Ev);
   std::cout << "Completed reading a single run!\n";
   return true;
 }
 
 std::unique_ptr<ifstream> ifs;
 
-bool ReadRun(std::vector<const PPEvent *> &Events,
+bool ReadRun(Run<PPEvent> &Events,
              std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
   FileOptions FileOpts = getFileOptions();
   bool gotValidRun = false;

@@ -32,12 +32,7 @@ Options getPprofOptionsFromEnv() {
 }
 
 std::ostream &operator<<(std::ostream &os, const PPEvent &event) {
-  return os << event.ID << " " << event.Timestamp << " " << event.EventTy
-            << "\n";
-}
-
-std::ostream &operator<<(std::ostream &os, const PPEvent *event) {
-  return os << event->ID << " " << event->Timestamp << " " << event->EventTy
+  return os << event.id() << " " << event.timestamp() << " " << event.event()
             << "\n";
 }
 
@@ -53,16 +48,22 @@ std::ostream &operator<<(std::ostream &os, const PPStringRegion &R) {
 }
 
 std::istream &operator>>(std::istream &is, PPEvent &event) {
-  int EventTy;
-  is >> event.ID;
-  is >> event.Timestamp;
-  is >> EventTy;
+  uint16_t id;
+  uint64_t timestamp;
+  uint32_t type;
 
-  event.EventTy = (PPEventType)EventTy;
+  ((is >> id) >> timestamp) >> type;
+  event = PPEvent(id, (PPEventType)type, timestamp);
+
   return is;
 }
 
 std::istream &operator>>(std::istream &is, PPStringRegion &R) {
-  is >> R.ID >> R.Entry >> R.Exit;
+  uint32_t id;
+  std::string entry;
+  std::string exit;
+  ((is >> id) >> entry) >> exit;
+
+  R = PPStringRegion(id, entry, exit);
   return is;
 }
