@@ -3,12 +3,10 @@
 #include <inttypes.h>
 #include <papi.h>
 
-#include <fstream>
-#include <sstream>
-#include <iostream>
-#include <memory>
-
 #include <assert.h>
+#include <memory>
+#include <vector>
+#include <string>
 
 extern "C" {
 /**
@@ -61,11 +59,13 @@ enum PPEventType {
   RegionEnter,
   RegionExit,
   TraceEnter,
-  TraceExit
+  TraceExit,
+  Unknown,
 };
 
 struct PPStringRegion {
-  PPStringRegion(std::pair<uint32_t, std::pair<const char *, const char *>>) {}
+  PPStringRegion(uint32_t ID, std::string Entry, std::string Exit)
+      : Entry(Entry), Exit(Exit) {}
   PPStringRegion() {}
 
   uint32_t ID;
@@ -73,32 +73,78 @@ struct PPStringRegion {
   std::string Exit;
 };
 
-struct PPEvent {
-  PPEvent(uint64_t id, PPEventType evTy, const char *dbgStr = "")
-      : ID(id), EventTy(evTy), DebugStr(dbgStr) {
-    Timestamp = -1;
-  };
+class PPEvent {
+public:
+  PPEvent(uint64_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
+      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_virt_nsec()), DebugStr(dbgStr) {
+  }
+  explicit PPEvent(uint64_t ID, PPEventType Ty, uint64_t Timestamp,
+                   const char *dbgStr = "")
+      : ID(ID), EventTy(Ty), Timestamp(Timestamp), DebugStr(dbgStr) {}
 
-  PPEvent(PPStringRegion &R) {
+  // Conversion from String Region.
+  PPEvent(const PPStringRegion &R) {
     ID = R.ID;
     Timestamp = std::stoll(R.Entry);
     EventTy = (PPEventType)std::stoi(R.Exit);
   }
 
-  PPEvent(){};
+  ~PPEvent() = default;
+  PPEvent(const PPEvent &Other) = default;
+  PPEvent &operator=(const PPEvent &Other) = default;
+  PPEvent(PPEvent &&Other) = default;
+  PPEvent &operator=(PPEvent &&Other) = default;
 
+  uint32_t id() const { return ID; }
+  PPEventType event() const { return EventTy; }
+  uint64_t timestamp() const { return Timestamp; }
+  std::string userString() const { return DebugStr; }
+
+  /**
+   * @brief Set the timestamp of this event to 'right now'
+   */
+  void snapshot() { Timestamp = PAPI_get_virt_nsec(); }
+private:
   uint32_t ID;
   PPEventType EventTy;
   uint64_t Timestamp;
-  const char *DebugStr;
-
-  void snapshot() { Timestamp = PAPI_get_virt_nsec(); }
+  std::string DebugStr;
 };
 
-using namespace std;
+namespace pprof {
+template<typename T>
+class Run : public std::vector<T> {
+  typedef std::vector<T> vector;
+public:
+  Run(long ID = -1, size_t Size = 1024) : std::vector<T>(Size), ID(ID) {}
 
+  using vector::begin;
+  using vector::end;
+  using vector::pop_back;
+  using vector::push_back;
+  using vector::size;
+  using vector::back;
+  using vector::clear;
+  using vector::operator[];
+
+  long ID;
+};
+
+struct Options {
+  std::string experiment;
+  std::string project;
+  std::string command;
+  bool use_db;
+  bool use_csv;
+  bool use_file;
+};
+
+Options getPprofOptionsFromEnv();
+} // end of namespace pprof
+
+#include <iostream>
+using namespace std;
 std::ostream &operator<<(std::ostream &os, const PPEvent &event);
-std::ostream &operator<<(std::ostream &os, const PPEvent *event);
 std::ostream &operator<<(std::ostream &os, const PPStringRegion &R);
 std::istream &operator>>(std::istream &is, PPEvent &event);
 std::istream &operator>>(std::istream &is, PPStringRegion &R);

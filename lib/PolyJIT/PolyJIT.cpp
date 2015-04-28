@@ -123,14 +123,14 @@ static FunctionDispatcher *Disp = new FunctionDispatcher();
 
 extern "C" {
 /**
- * @brief Runtime callback for PolyJIT.
- *
- * All calls to the PolyJIT runtime will land here.
- *
- * @param fName The function name we want to call.
- * @param paramc number of arguments of the function we want to call
- * @param params arugments of the function we want to call.
- */
+* @brief Runtime callback for PolyJIT.
+*
+* All calls to the PolyJIT runtime will land here.
+*
+* @param fName The function name we want to call.
+* @param paramc number of arguments of the function we want to call
+* @param params arugments of the function we want to call.
+*/
 static void pjit_callback(const char *fName, unsigned paramc, char **params) {
   /* Let's hope that we have called it before ;-)
    * Otherwise it will blow up. FIXME: Don't blow up. */
@@ -175,10 +175,10 @@ namespace polli {
 static uint64_t __polli_dso_handle = 1;
 
 /**
- * @brief Print statistics about the memory consumption for this manager.
- *
- * @param OS the outstream we print to.
- */
+* @brief Print statistics about the memory consumption for this manager.
+*
+* @param OS the outstream we print to.
+*/
 void PolyJITMemoryManager::print(llvm::raw_ostream &OS) {
   log(Info) << "Memory consumption:\n";
   log(Info, 2) << "Allocated CodeSections: " << NumAllocatedCodeSections
@@ -188,32 +188,30 @@ void PolyJITMemoryManager::print(llvm::raw_ostream &OS) {
   log(Info, 2) << "Allocated kBytes: " << AllocatedBytes / 1024 << "\n";
 }
 
-PolyJITMemoryManager::~PolyJITMemoryManager() {
-}
+PolyJITMemoryManager::~PolyJITMemoryManager() {}
 
-uint64_t
-PolyJITMemoryManager::getSymbolAddress(const std::string &Name) {
+uint64_t PolyJITMemoryManager::getSymbolAddress(const std::string &Name) {
   if (Name.find("__dso_handle") != std::string::npos)
     return __polli_dso_handle;
   return SectionMemoryManager::getSymbolAddress(Name);
 }
 
 /**
- * @brief Allocate a new code section.
- *
- * We just override it to track the amount of memory allocated.
- *
- * @param Size
- * @param Alignment
- * @param SectionID
- * @param SectionName
- *
- * @return pointer to the allocated code section.
- */
-uint8_t *
-PolyJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment,
-                                          unsigned SectionID,
-                                          StringRef SectionName) {
+* @brief Allocate a new code section.
+*
+* We just override it to track the amount of memory allocated.
+*
+* @param Size
+* @param Alignment
+* @param SectionID
+* @param SectionName
+*
+* @return pointer to the allocated code section.
+*/
+uint8_t *PolyJITMemoryManager::allocateCodeSection(uintptr_t Size,
+                                                   unsigned Alignment,
+                                                   unsigned SectionID,
+                                                   StringRef SectionName) {
   AllocatedBytes += Size;
   NumAllocatedCodeSections++;
   return SectionMemoryManager::allocateCodeSection(Size, Alignment, SectionID,
@@ -221,18 +219,18 @@ PolyJITMemoryManager::allocateCodeSection(uintptr_t Size, unsigned Alignment,
 }
 
 /**
- * @brief Allocate a new data section.
- *
- * We just override it to track the amount of memory allocated.
- *
- * @param Size
- * @param Alignment
- * @param SectionID
- * @param SectionName
- * @param IsReadOnly
- *
- * @return pointer to the allocated data section
- */
+* @brief Allocate a new data section.
+*
+* We just override it to track the amount of memory allocated.
+*
+* @param Size
+* @param Alignment
+* @param SectionID
+* @param SectionName
+* @param IsReadOnly
+*
+* @return pointer to the allocated data section
+*/
 uint8_t *PolyJITMemoryManager::allocateDataSection(uintptr_t Size,
                                                    unsigned Alignment,
                                                    unsigned SectionID,
@@ -282,17 +280,16 @@ PolyJIT::PolyJIT(Module &Main) : M(Main) {
   // support wasn't enabled in the build configuration.
   EE->RegisterJITEventListener(
       JITEventListener::createOProfileJITEventListener());
-  EE->RegisterJITEventListener(
-      JITEventListener::createIntelJITEventListener());
+  EE->RegisterJITEventListener(JITEventListener::createIntelJITEventListener());
 }
 
 /**
- * @brief Get a new Execution engine for the given module.
- *
- * @param M The module that needs a new execution engine.
- *
- * @return A new execution engine for M.
- */
+* @brief Get a new Execution engine for the given module.
+*
+* @param M The module that needs a new execution engine.
+*
+* @return A new execution engine for M.
+*/
 ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   std::string ErrorMsg;
 
@@ -354,21 +351,20 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
 }
 
 /**
- * @brief Run a specialized version of a function.
- *
- * The specialized version needs to be in 'main' form, i.e., its signature
- * has to be:
- *  void fn_name(int argc, char **argv);
- *
- * The FunctionCloner's MainCreator policy takes care of that. All the real
- * parameters are passed via argv.
- *
- * @param NewF the specialized function in main form.
- * @param ArgValues the parameter _values_ for the formal parameters.
- */
-void
-PolyJIT::runSpecializedFunction(llvm::Function *NewF,
-                                const std::vector<GenericValue> &ArgValues) {
+* @brief Run a specialized version of a function.
+*
+* The specialized version needs to be in 'main' form, i.e., its signature
+* has to be:
+*  void fn_name(int argc, char **argv);
+*
+* The FunctionCloner's MainCreator policy takes care of that. All the real
+* parameters are passed via argv.
+*
+* @param NewF the specialized function in main form.
+* @param ArgValues the parameter _values_ for the formal parameters.
+*/
+void PolyJIT::runSpecializedFunction(
+    llvm::Function *NewF, const std::vector<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
   static ManagedModules SpecializedModules;
 
@@ -392,11 +388,11 @@ PolyJIT::runSpecializedFunction(llvm::Function *NewF,
 }
 
 /**
- * @brief Place the call to the polli runtime inside all extracted SCoPs.
- *
- * @param M
- * @param Mods the set of managed modules.
- */
+* @brief Place the call to the polli runtime inside all extracted SCoPs.
+*
+* @param M
+* @param Mods the set of managed modules.
+*/
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
   DEBUG(log(LogType::Info) << "inject :: insert call to JIT runtime\n");
   LLVMContext &Ctx = M.getContext();
@@ -476,11 +472,11 @@ void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
 }
 
 /**
- * @brief Link extracted Scops into a module for execution.
- *
- * @param The set of managed modules to link into a single one.
- * @param The module to link into.
- */
+* @brief Link extracted Scops into a module for execution.
+*
+* @param The set of managed modules to link into a single one.
+* @param The module to link into.
+*/
 void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   /* We need to link the functions back in for execution */
   for (ManagedModules::iterator src = Mods.begin(), se = Mods.end(); src != se;
@@ -509,10 +505,10 @@ static ModulePtrT copyModule(Module &M) {
 }
 
 /**
- * @brief Extract all jitable Scops into a separate module
- *
- * @param The module to extract all jitable Scops from
- */
+* @brief Extract all jitable Scops into a separate module
+*
+* @param The module to extract all jitable Scops from
+*/
 void PolyJIT::extractJitableScops(Module &M) {
   LIKWID_MARKER_START("ExtractScops");
   PassManager PM;
@@ -524,7 +520,7 @@ void PolyJIT::extractJitableScops(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(polly::createScopDetectionPass());
   PM.add(new JitScopDetection(opt::EnableJitable));
-//  PM.add(new AliasCheckGenerator());
+  //  PM.add(new AliasCheckGenerator());
 
   ScopMapper *SM = new ScopMapper();
   if (!opt::DisableRecompile)
@@ -580,10 +576,10 @@ void PolyJIT::extractJitableScops(Module &M) {
 }
 
 /**
- * @brief Optimize the module before executing it for the first time.
- *
- * @param M The 'main' module we prepare for execution.
- */
+* @brief Optimize the module before executing it for the first time.
+*
+* @param M The 'main' module we prepare for execution.
+*/
 void PolyJIT::prepareOptimizedIR(Module &M) {
   PassManager PM;
   PassManager PostProcess;
@@ -625,13 +621,13 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
 }
 
 /**
- * @brief Run the EntryFn. Starts this PolyJIT session.
- *
- * @param inputArgs
- * @param envp
- *
- * @return
- */
+* @brief Run the EntryFn. Starts this PolyJIT session.
+*
+* @param inputArgs
+* @param envp
+*
+* @return
+*/
 int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
                      const char *const *envp) {
   /*
@@ -702,10 +698,10 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
 }
 
 /**
- * @brief Run Polly's default set of preoptimization on a module.
- *
- * @param The module to run the preoptimization on.
- */
+* @brief Run Polly's default set of preoptimization on a module.
+*
+* @param The module to run the preoptimization on.
+*/
 void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   FunctionPassManager FPM(&M);
 
@@ -722,15 +718,15 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
 }
 
 /**
- * @brief Shutdown the JIT and clean up the mess we made.
- *
- * Before we actually do the cleanup, we print some nice stats about the
- * current session.
- *
- * @param result Our exit-code
- *
- * @return
- */
+* @brief Shutdown the JIT and clean up the mess we made.
+*
+* Before we actually do the cleanup, we print some nice stats about the
+* current session.
+*
+* @param result Our exit-code
+*
+* @return
+*/
 int PolyJIT::shutdown(int result) {
   LLVMContext &Context = M.getContext();
 
@@ -764,12 +760,6 @@ int PolyJIT::shutdown(int result) {
   }
 
   for (auto &JitModule : RawModules) {
-    ExecutionEngine *EE = JitModule.second;
-    if (EE)
-      delete EE;
-  }
-
-  for (auto &JitModule : InstrumentedModules) {
     ExecutionEngine *EE = JitModule.second;
     if (EE)
       delete EE;
