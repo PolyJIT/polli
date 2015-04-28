@@ -45,20 +45,19 @@ void initializePolliPasses(PassRegistry &Registry) {
   initializePapiRegionPreparePass(Registry);
   initializePapiCScopProfilingPass(Registry);
   initializePapiCScopProfilingInitPass(Registry);
-  Console->warn("PolyJIT - Initialization complete.");
 }
 
 static void printConfig() {
-  Console->warn("PolyJIT - Config:");
-  Console->warn(" polyjit.jitable: {}", opt::EnableJitable);
-  Console->warn(" polyjit.recompile: {}", !opt::DisableRecompile);
-  Console->warn(" polyjit.execute: {}", !opt::DisableExecution);
-  Console->warn(" polyjit.instrument: {}", opt::InstrumentRegions);
+  Console->info("PolyJIT - Config:");
+  Console->info(" polyjit.jitable: {}", opt::EnableJitable);
+  Console->info(" polyjit.recompile: {}", !opt::DisableRecompile);
+  Console->info(" polyjit.execute: {}", !opt::DisableExecution);
+  Console->info(" polyjit.instrument: {}", opt::InstrumentRegions);
 }
 
 void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
   if (polly::PollyDelinearize && opt::EnableJitable) {
-    Console->warn(" polly.delinearize: disabled (blocked by jitable)");
+    Console->info(" polly.delinearize: disabled (blocked by jitable)");
     polly::PollyDelinearize = false;
   }
 

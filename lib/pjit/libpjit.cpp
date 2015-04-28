@@ -15,15 +15,20 @@
 #include "llvm/LinkAllPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/PrettyStackTrace.h"
 
 #include "spdlog/spdlog.h"
 
 #include <vector>
+#include <cstdlib>
 
 using namespace llvm;
 using namespace polli;
 
 namespace {
+using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
+StackTracePtr StackTrace;
+
 static FunctionDispatcher Disp;
 auto Console = spdlog::stderr_logger_st("polli");
 
@@ -31,17 +36,24 @@ using UniqueMod = std::unique_ptr<Module>;
 
 static Module &getModule(const char *prototype) {
   static DenseMap<const char *, UniqueMod> ModuleIndex;
-  
+
   if(!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
     SMDiagnostic Err;
-    
-    std::unique_ptr<Module> Mod = parseIR(Buf, Err, Ctx);
-    Console->warn("Prototype module {} registered.", Mod->getModuleIdentifier());
+
+    UniqueMod Mod = parseIR(Buf, Err, Ctx);
+    if (Mod)
+      Console->warn("Prototype registered.");
+    else {
+      Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
+                     Err.getLineNo(), Err.getColumnNo(),
+                     Err.getMessage().str());
+      Console->error("{:s}", prototype);
+    }
     ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
-  } 
-  
+  }
+
   return *ModuleIndex[prototype];
 }
 
@@ -50,9 +62,28 @@ static Function *getFunction(Module &M) {
   return M.begin();
 }
 
+static void do_shutdown() {
+  LIKWID_MARKER_STOP("main-thread");
+  LIKWID_MARKER_CLOSE;
+  Console->warn("PolyJIT shut down.");
+}
+
+static void set_options_from_environment() {
+  opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
+}
+
 class StaticInitializer {
 public:
   StaticInitializer() {
+    Console->warn("PolyJIT activated.");
+    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
+
+    LIKWID_MARKER_INIT;
+    LIKWID_MARKER_START("main-thread");
+
+    atexit(do_shutdown);
+    set_options_from_environment();
+
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
     initializeCore(Registry);
@@ -76,6 +107,10 @@ public:
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
   }
+
+  ~StaticInitializer() {
+    do_shutdown();
+  }
 };
 static StaticInitializer InitializeEverything;
 } // end of anonymous namespace
@@ -98,8 +133,6 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
     return;
   }
 
-  /* Let's hope that we have called it before ;-)
-   * Otherwise it will blow up. FIXME: Don't blow up. */
   LIKWID_MARKER_START("JitSelectParams");
 
   std::vector<Param> ParamV;

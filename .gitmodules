@@ -1,3 +1,12 @@
 [submodule "external/spdlog"]
 	path = external/spdlog
 	url = https://github.com/gabime/spdlog
+[submodule "cppformat"]
+	path = cppformat
+	url = https://github.com/cppformat/cppformat
+
+[submodule "external/sqlpp11"]
+	path = external/sqlpp11
+[submodule "external/cppformat"]
+	path = external/cppformat
+	url = https://github.com/cppformat/cppformat

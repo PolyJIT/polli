@@ -59,6 +59,15 @@ endif ()
 add_library(likwid SHARED IMPORTED)
 set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
 
+if (NOT DEFINED PQXX_FOUND)
+  find_package(Pqxx REQUIRED)
+  include_directories(BEFORE ${PQXX_INCLUDE_DIR})
+  link_directories(${PQXX_LIBRARY})
+endif ()
+
+add_library(pqxx SHARED IMPORTED)
+set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
+
 option(ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
 
 # Add appropriate flags for GCC
@@ -74,6 +83,8 @@ configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/
+  ${CMAKE_CURRENT_BINARY_DIR}/external/
   ${CMAKE_CURRENT_SOURCE_DIR}/external/spdlog/include
   ${CMAKE_CURRENT_BINARY_DIR}/external/spdlog/include
 )
@@ -92,6 +103,13 @@ install(DIRECTORY external/spdlog/include/
   PATTERN ".svn" EXCLUDE
   )
 
+install(DIRECTORY external/
+  DESTINATION include
+  FILES_MATCHING
+  PATTERN "cppformat/*.h"
+  PATTERN ".svn" EXCLUDE
+  )
+
 install(DIRECTORY ${POLLI_BINARY_DIR}/include/
   DESTINATION include
   FILES_MATCHING
@@ -104,6 +122,13 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/external/spdlog/include/
   DESTINATION include
   FILES_MATCHING
   PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE
+  )
+
+install(DIRECTORY ${POLLI_BINARY_DIR}/external/
+  DESTINATION include
+  FILES_MATCHING
+  PATTERN "cppformat/*.h"
   PATTERN ".svn" EXCLUDE
   )
 
