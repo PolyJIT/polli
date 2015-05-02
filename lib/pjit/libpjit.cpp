@@ -43,8 +43,10 @@ static Module &getModule(const char *prototype) {
     SMDiagnostic Err;
 
     UniqueMod Mod = parseIR(Buf, Err, Ctx);
-    if (Mod)
+    if (Mod) {
       Console->warn("Prototype registered.");
+      Console->error("{:s}", prototype);
+    }
     else {
       Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
                      Err.getLineNo(), Err.getColumnNo(),

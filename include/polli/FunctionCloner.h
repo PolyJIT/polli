@@ -25,33 +25,25 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-using namespace llvm;
+#include "llvm/Support/raw_ostream.h"
 
+using namespace llvm;
 namespace polli {
+
 template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
 class FunctionCloner : public CreationPolicy,
                        public DrainPolicy,
                        public SinkPolicy {
-  ValueToValueMapTy &VMap;
-  Module *TgtM;
-
-  Function *SrcF;
-  Function *TgtF;
-
 public:
   explicit FunctionCloner<CreationPolicy, DrainPolicy, SinkPolicy>(
       ValueToValueMapTy &map, Module *m = NULL)
-      : VMap(map), TgtM(m) {
-    SrcF = NULL;
-    TgtF = NULL;
-  }
-  ;
+      : VMap(map), TgtM(m), SrcF(nullptr), TgtF(nullptr) {}
 
   void setTarget(Function *F) { TgtF = F; }
-  void setSource(Function *F) { SrcF = F; }
+  FunctionCloner& setSource(Function *F) { SrcF = F; return *this; }
 
   /* Optional: Set the pass we piggy-back ourself on. This enables
-   * access to BasicBlockUtils which require Passes to operate on. */
+  * access to BasicBlockUtils which require Passes to operate on. */
   void setSinkHostPass(Pass *HostP) {
     SinkPolicy &pPolicy = *this;
     pPolicy.setPass(HostP);
@@ -69,13 +61,13 @@ public:
     if (!TgtF)
       TgtF = CreationPolicy::Create(SrcF, TgtM);
 
-    TgtF->copyAttributesFrom(SrcF);
-
     CreationPolicy::MapArguments(VMap, SrcF, TgtF);
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
     CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
+
+    TgtF->copyAttributesFrom(SrcF);
 
     // Store function mapping for the linker.
     VMap[SrcF] = TgtF;
@@ -83,15 +75,14 @@ public:
     DrainPolicy::Apply(SrcF, TgtF, VMap);
     SinkPolicy::Apply(TgtF, SrcF, VMap);
 
-    // No need for the mapping anymore.
-    for (Function::const_arg_iterator Arg = SrcF->arg_begin(),
-                                      AE = SrcF->arg_end();
-         Arg != AE; ++Arg) {
-      VMap.erase(Arg);
-    }
-
     return TgtF;
   }
+
+private:
+  ValueToValueMapTy &VMap;
+  Module *TgtM;
+  Function *SrcF;
+  Function *TgtF;
 };
 
 /*
@@ -137,112 +128,11 @@ struct DestroyEndpoint {
   }
 };
 
-struct InstrumentEndpoint {
-  void setPass(Pass *HostPass) { P = HostPass; }
-  void setPrototype(Value *Prototype) {
-    PrototypeF = Prototype;
-  }
-
-  Pass *getPass() { return P; }
-
-  void Apply(Function *TgtF, Function *, ValueToValueMapTy &) {
-    if (TgtF->isDeclaration())
-      return;
-
-    Module *M = TgtF->getParent();
-    LLVMContext &Ctx = M->getContext();
-    IRBuilder<> Builder(Ctx);
-
-    StringRef cbName = StringRef("pjit_main");
-    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
-    Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
-        Type::getInt32Ty(Ctx), PtoArr, NULL));
-    PJITCB->setLinkage(GlobalValue::ExternalLinkage);
-
-    std::vector<Value *> Args(3);
-    BasicBlock *BB = TgtF->begin();
-    Builder.SetInsertPoint(BB->getFirstInsertionPt());
-
-    /* Create a generic IR sequence of this example C-code:
-     *
-     * void foo(int n, int A[42]) {
-     *  void *params[2];
-     *  params[0] = &n;
-     *  params[1] = A;
-     *
-     *  pjit_callback("foo", 2, params);
-     * }
-     */
-
-    /* Prepare a stack array for the parameters. We will pass a pointer to
-     * this array into our callback function. */
-    int argc = TgtF->arg_size();
-    Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc, true);
-    Value *Params =
-        Builder.CreateAlloca(Type::getInt8PtrTy(Ctx), ParamC, "params");
-
-    /* Store each parameter as pointer in the params array */
-    int i = 0;
-    Value *One = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
-    for (Function::arg_iterator Arg = TgtF->arg_begin(), ArgE = TgtF->arg_end();
-         Arg != ArgE; ++Arg) {
-
-      /* Allocate a slot on the stack for the i'th argument and store it */
-      Value *Slot = Builder.CreateAlloca(Arg->getType(), One);
-      Builder.CreateStore(Arg, Slot);
-
-      /* Get the appropriate slot in the parameters array and store
-       * the stack slot in form of a i8*. */
-      Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
-      Value *Dest = Builder.CreateGEP(Params, ArrIdx);
-
-      // Builder.CreateAlignedStore(Slot8, Dest, 8);
-      Builder.CreateStore(Builder.CreateBitCast(Slot, Type::getInt8PtrTy(Ctx)),
-                          Dest);
-      i++;
-    }
-
-    Args[0] = (PrototypeF) ? PrototypeF
-                           : Builder.CreateGlobalStringPtr(TgtF->getName());
-    Args[1] = ParamC;
-    Args[2] = Params;
-
-    // Replace terminator after PolyJIT call with a return void.
-    CallInst *CallPolyJIT = Builder.CreateCall(PJITCB, Args);
-    BasicBlock *CallBB = CallPolyJIT->getParent();
-
-    // Split the old stuff away to get one clean edge to jump to.
-    BasicBlock::iterator SplitIt = CallBB->getTerminator();
-    BasicBlock *NewBB;
-
-    NewBB = CallBB->splitBasicBlock(SplitIt, CallBB->getName() + ".p.split");
-
-    // We will fail (more or less silent) if this is not true.
-    if (NewBB) {
-      // Prepare the new exit BB;
-      BasicBlock *ExitBB = BasicBlock::Create(Ctx, "exit", TgtF);
-      Builder.SetInsertPoint(ExitBB);
-      Builder.CreateRetVoid();
-
-      Value *True = ConstantInt::get(Type::getInt1Ty(Ctx), 1);
-      ReplaceInstWithInst(CallBB->getTerminator(),
-                          BranchInst::Create(ExitBB, NewBB, True));
-    }
-  }
-
-private:
-  Pass *P;
-  Value *PrototypeF;
-};
-
 typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
 DefaultFunctionCloner;
 
 typedef FunctionCloner<CopyCreator, DestroyEndpoint, IgnoreTarget>
 MovingFunctionCloner;
 
-typedef FunctionCloner<CopyCreator, IgnoreSource, InstrumentEndpoint>
-InstrumentingFunctionCloner;
 }
 #endif // POLLI_FUNCTION_CLONER_H
