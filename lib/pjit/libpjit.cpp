@@ -43,8 +43,10 @@ static Module &getModule(const char *prototype) {
     SMDiagnostic Err;
 
     UniqueMod Mod = parseIR(Buf, Err, Ctx);
-    if (Mod)
+    if (Mod) {
       Console->warn("Prototype registered.");
+      Console->error("{:s}", prototype);
+    }
     else {
       Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
                      Err.getLineNo(), Err.getColumnNo(),
@@ -62,13 +64,13 @@ static Function *getFunction(Module &M) {
   return M.begin();
 }
 
-static void do_shutdown() {
+static inline void do_shutdown() {
   LIKWID_MARKER_STOP("main-thread");
   LIKWID_MARKER_CLOSE;
   Console->warn("PolyJIT shut down.");
 }
 
-static void set_options_from_environment() {
+static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
 }
 

@@ -46,8 +46,8 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
-  JitScopDetection *NSD = &getAnalysis<JitScopDetection>();
-  DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  JitScopDetection &NSD = getAnalysis<JitScopDetection>();
+  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
   if(F.hasFnAttribute(Attribute::OptimizeNone))
     return false;
@@ -58,11 +58,11 @@ bool ScopMapper::runOnFunction(Function &F) {
 
   /* Extract each SCoP in this function into a new one. */
   int i = 0;
-  for (ScopSet::iterator RP = NSD->jit_begin(), RE = NSD->jit_end(); RP != RE;
+  for (ScopSet::iterator RP = NSD.jit_begin(), RE = NSD.jit_end(); RP != RE;
        ++RP) {
     const Region *R = *RP;
 
-    CodeExtractor Extractor(*DT, *(R->getNode()));
+    CodeExtractor Extractor(DT, *(R->getNode()));
 
     unsigned LineBegin, LineEnd;
     std::string FileName;
@@ -80,7 +80,7 @@ bool ScopMapper::runOnFunction(Function &F) {
         ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
         /* FIXME: Do not depend on this set. */
         CreatedFunctions.insert(ExtractedF);
-        NSD->ignoreFunction(ExtractedF);
+        NSD.ignoreFunction(ExtractedF);
       }
     } else {
       log(Error, 2) << " failed :: Scop " << R->getNameStr()

@@ -294,18 +294,7 @@ public:
    */
   ParamVector<ParamT> getSpecValues(ParamVector<ParamT> &AllValues,
                                     Function *TgtF) {
-    ParamVector<ParamT> SpecVals(AllValues.size());
-    //Module *M = TgtF->getParent();
-    //FunctionPassManager *FPM = new FunctionPassManager(M);
-    //FunctionPass *RI = llvm::createRegionInfoPass();
-
-    //FPM->add(RI);
-    //FPM->run(*TgtF);
-
-    //delete FPM;
-    //delete RI;
-
-    return SpecVals;
+    return SpecVals(AllValues.size());
   }
 
   /**
