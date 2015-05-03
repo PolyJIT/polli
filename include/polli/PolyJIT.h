@@ -271,7 +271,7 @@ private:
    *
    * @param The module to extract all jitable Scops from
    */
-  void extractJitableScops(llvm::Module &);
+  //void extractJitableScops(llvm::Module &);
 
   /**
    * @brief Run Polly's default set of preoptimization on a module.

@@ -509,71 +509,71 @@ static ModulePtrT copyModule(Module &M) {
 *
 * @param The module to extract all jitable Scops from
 */
-void PolyJIT::extractJitableScops(Module &M) {
-  LIKWID_MARKER_START("ExtractScops");
-  PassManager PM;
-
-  if (opt::InstrumentRegions)
-    PM.add(new PapiCScopProfilingInit());
-
-  PM.add(llvm::createTypeBasedAliasAnalysisPass());
-  PM.add(llvm::createBasicAliasAnalysisPass());
-  PM.add(polly::createScopDetectionPass());
-  PM.add(new JitScopDetection(opt::EnableJitable));
-  //  PM.add(new AliasCheckGenerator());
-
-  ScopMapper *SM = new ScopMapper();
-  if (!opt::DisableRecompile)
-    PM.add(SM);
-
-  if (opt::InstrumentRegions)
-    PM.add(polli::createPapiCScopProfilingPass());
-
-  PM.run(M);
-
-  ValueToValueMapTy VMap;
-  ModulePtrT MoveTargetMod;
-  ModulePtrT InstrumentTargetMod;
-  StringRef ModuleName = M.getModuleIdentifier();
-
-  /* Move the extracted SCoP functions into separate modules. */
-  for (ScopMapper::iterator f = SM->begin(), fe = SM->end(); f != fe; ++f) {
-    Function *F = (*f);
-    StringRef FunctionName = F->getName();
-
-    /* Prepare a fresh module for this function. */
-    MoveTargetMod = copyModule(M);
-    InstrumentTargetMod = copyModule(M);
-    MoveTargetMod->setModuleIdentifier((ModuleName + "." + FunctionName).str() +
-                                       ".prototype");
-    InstrumentTargetMod->setModuleIdentifier(
-        (ModuleName + "." + FunctionName + ".instrumented").str());
-
-    RawModules[MoveTargetMod] = EE;
-    InstrumentedModules[InstrumentTargetMod] = EE;
-
-    MovingFunctionCloner MoveCloner(VMap, MoveTargetMod);
-    InstrumentingFunctionCloner InstCloner(VMap, InstrumentTargetMod);
-
-    MoveCloner.setSource(F);
-    Function *OrigF = MoveCloner.start();
-
-    InstCloner.setSource(OrigF);
-    InstCloner.setSinkHostPass(SM);
-    Function *InstF = InstCloner.start();
-
-    // This maps the function name in the source module to the instrumented
-    // version in the extracted version.
-    F->setName(InstF->getName());
-
-    // Set up the mapping for this prototype.
-    Disp->setPrototypeMapping(InstF, OrigF);
-  }
-
-  if (opt::OutputFilename.size() == 0)
-    StoreModule(M, M.getModuleIdentifier() + ".extr");
-  LIKWID_MARKER_STOP("ExtractScops");
-}
+//void PolyJIT::extractJitableScops(Module &M) {
+//  LIKWID_MARKER_START("ExtractScops");
+//  PassManager PM;
+//
+//  if (opt::InstrumentRegions)
+//    PM.add(new PapiCScopProfilingInit());
+//
+//  PM.add(llvm::createTypeBasedAliasAnalysisPass());
+//  PM.add(llvm::createBasicAliasAnalysisPass());
+//  PM.add(polly::createScopDetectionPass());
+//  PM.add(new JitScopDetection(opt::EnableJitable));
+//  //  PM.add(new AliasCheckGenerator());
+//
+//  ScopMapper *SM = new ScopMapper();
+//  if (!opt::DisableRecompile)
+//    PM.add(SM);
+//
+//  if (opt::InstrumentRegions)
+//    PM.add(polli::createPapiCScopProfilingPass());
+//
+//  PM.run(M);
+//
+//  ValueToValueMapTy VMap;
+//  ModulePtrT MoveTargetMod;
+//  ModulePtrT InstrumentTargetMod;
+//  StringRef ModuleName = M.getModuleIdentifier();
+//
+//  /* Move the extracted SCoP functions into separate modules. */
+//  for (ScopMapper::iterator f = SM->begin(), fe = SM->end(); f != fe; ++f) {
+//    Function *F = (*f);
+//    StringRef FunctionName = F->getName();
+//
+//    /* Prepare a fresh module for this function. */
+//    MoveTargetMod = copyModule(M);
+//    InstrumentTargetMod = copyModule(M);
+//    MoveTargetMod->setModuleIdentifier((ModuleName + "." + FunctionName).str() +
+//                                       ".prototype");
+//    InstrumentTargetMod->setModuleIdentifier(
+//        (ModuleName + "." + FunctionName + ".instrumented").str());
+//
+//    RawModules[MoveTargetMod] = EE;
+//    InstrumentedModules[InstrumentTargetMod] = EE;
+//
+//    MovingFunctionCloner MoveCloner(VMap, MoveTargetMod);
+//    InstrumentingFunctionCloner InstCloner(VMap, InstrumentTargetMod);
+//
+//    MoveCloner.setSource(F);
+//    Function *OrigF = MoveCloner.start();
+//
+//    InstCloner.setSource(OrigF);
+//    InstCloner.setSinkHostPass(SM);
+//    Function *InstF = InstCloner.start();
+//
+//    // This maps the function name in the source module to the instrumented
+//    // version in the extracted version.
+//    F->setName(InstF->getName());
+//
+//    // Set up the mapping for this prototype.
+//    Disp->setPrototypeMapping(InstF, OrigF);
+//  }
+//
+//  if (opt::OutputFilename.size() == 0)
+//    StoreModule(M, M.getModuleIdentifier() + ".extr");
+//  LIKWID_MARKER_STOP("ExtractScops");
+//}
 
 /**
 * @brief Optimize the module before executing it for the first time.
@@ -652,7 +652,7 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
     runPollyPreoptimizationPasses(M);
 
   /* Extract suitable Scops */
-  extractJitableScops(M);
+  //extractJitableScops(M);
 
   // FIXME: Why do we fail, if we do not strip them all off?!
   PassManager PM;
