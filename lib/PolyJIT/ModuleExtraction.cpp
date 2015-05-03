@@ -260,7 +260,6 @@ struct InstrumentEndpoint {
 
     Module *M = TgtF->getParent();
     LLVMContext &Ctx = M->getContext();
-    IRBuilder<> Builder(Ctx);
 
     StringRef cbName = StringRef("pjit_main");
     PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
@@ -270,8 +269,13 @@ struct InstrumentEndpoint {
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
     std::vector<Value *> Args(3);
-    BasicBlock *BB = TgtF->begin();
-    Builder.SetInsertPoint(BB->getFirstInsertionPt());
+
+    TgtF->deleteBody();
+    TgtF->setLinkage(GlobalValue::InternalLinkage);
+
+    BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", TgtF);
+    IRBuilder<> Builder(BB);
+    Builder.SetInsertPoint(BB);
 
     /* Create a generic IR sequence of this example C-code:
      *
@@ -335,26 +339,8 @@ struct InstrumentEndpoint {
     Args[1] = ParamC;
     Args[2] = Params;
 
-    // Replace terminator after PolyJIT call with a return void.
-    CallInst *CallPolyJIT = Builder.CreateCall(PJITCB, Args);
-    BasicBlock *CallBB = CallPolyJIT->getParent();
-
-    // Split the old stuff away to get one clean edge to jump to.
-    BasicBlock::iterator SplitIt = CallBB->getTerminator();
-    BasicBlock *NewBB =
-        CallBB->splitBasicBlock(SplitIt, CallBB->getName() + ".pjit.split");
-
-    // We will fail (more or less silent) if this is not true.
-    if (NewBB) {
-      // Prepare the new exit BB;
-      BasicBlock *ExitBB = BasicBlock::Create(Ctx, "pjit.exit", TgtF);
-      Builder.SetInsertPoint(ExitBB);
-      Builder.CreateRetVoid();
-
-      Value *True = ConstantInt::get(Type::getInt1Ty(Ctx), 1);
-      ReplaceInstWithInst(CallBB->getTerminator(),
-                          BranchInst::Create(ExitBB, NewBB, True));
-    }
+    Builder.CreateCall(PJITCB, Args);
+    Builder.CreateRetVoid();
 
     SrcF->getType()->print(outs() << "\nSrcF:");
     TgtF->print(outs() << "\nTgtF:");

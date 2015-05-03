@@ -64,13 +64,13 @@ static Function *getFunction(Module &M) {
   return M.begin();
 }
 
-static void do_shutdown() {
+static inline void do_shutdown() {
   LIKWID_MARKER_STOP("main-thread");
   LIKWID_MARKER_CLOSE;
   Console->warn("PolyJIT shut down.");
 }
 
-static void set_options_from_environment() {
+static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
 }
 
