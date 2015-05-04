@@ -165,6 +165,22 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
     Console->error("variant generation failed.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
+  auto DebugFn = [](int argc, char **params) -> std::string {
+    std::stringstream res;
+
+    for (int i = 0; i < argc; i++) {
+      if (i > 0)
+        res << ", ";
+      res << (uint64_t*)params[i];
+    }
+
+    return res.str();
+  };
+  std::string paramlist = DebugFn(paramc, params);
+
+  Console->warn("running with params: #{:d} ({:s})", paramc,
+                paramlist);
+
   PolyJIT::runSpecializedFunction(NewF, Args);
   S.ExecCount++;
 }
