@@ -61,6 +61,198 @@ Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
   return Variant;
 }
 
+/**
+ * @brief  Convert srcF signature into a 'main' function format,
+ * i.e. f(int argc, char** argv). This way the parameters can be passed by
+ * the MCJIT while it does not support real parameter passing at run time.
+ *
+ * The parameters are unpacked inside the function again, maybe it does not
+ * get too inefficient ;-).
+ */
+struct MainCreator {
+  /**
+   * @brief Unpack the parameters from the array onto the stack. O2 version.
+   *
+   * @param Builder IRBuilder we use to create the unpack stuff.
+   * @param VMap Value-to-Value map to track rewritten arguments.
+   * @param SrcF Source function we convert to main() format.
+   * @param TgtF Target function we convert into.
+   */
+  static void CreateUnpackParamsO2(IRBuilder<> &Builder,
+                                   ValueToValueMapTy &VMap, Function *SrcF,
+                                   Function *TgtF) {
+    // 2nd argument is our array, 1st is argc
+    Function::arg_iterator TgtArg = TgtF->arg_begin();
+    Argument *ArgC = TgtArg;
+    Value *ArgV = ++TgtArg;
+
+    ArgC->setName("argc");
+    ArgV->setName("argv");
+
+    // Unpack params. Allocate space on the stack and store the pointers.
+    // TODO:This is very inefficient.
+    // Some parameters are not required anymore.
+    unsigned i = 0;
+    for (Argument &Arg : SrcF->args()) {
+      Type *ArgTy = Arg.getType();
+      Value *ArrIdx =
+          Builder.CreateConstInBoundsGEP2_64(ArgV, 0, i++, "arrayidx");
+      Value *LoadArr = Builder.CreateLoad(ArrIdx);
+      Value *CastVal = Builder.CreateBitCast(LoadArr, ArgTy->getPointerTo());
+
+      CastVal = Builder.CreateLoad(CastVal);
+
+      VMap[&Arg] = CastVal;
+    }
+  }
+
+  /**
+   * @brief Map arguments from an array back to single values.
+   *
+   * @param VMap Value-To-Value tracker.
+   * @param SrcF Source function.
+   * @param TgtF Target function.
+   */
+  static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
+                           Function *TgtF) {
+    LLVMContext &Context = TgtF->getContext();
+    IRBuilder<> Builder(Context);
+
+    BasicBlock *EntryBB = BasicBlock::Create(Context, "entry.param", TgtF);
+    Builder.SetInsertPoint(EntryBB);
+
+    CreateUnpackParamsO2(Builder, VMap, SrcF, TgtF);
+  }
+
+  /**
+   * @brief Create a new target function to perform the main creator policy on.
+   *
+   * @param SrcF Source function to create a main-version from.
+   * @param TgtM Target module to create the new function into.
+   *
+   * @return A new function, with main()-compatible signature.
+   */
+  static Function *Create(Function *SrcF, Module *TgtM) {
+    LLVMContext &Context = TgtM->getContext();
+    Type *RetType = IntegerType::getInt32Ty(Context);
+    ArrayType *PtoArr =
+        ArrayType::get(Type::getInt8PtrTy(Context), SrcF->arg_size());
+
+    Constant *C = TgtM->getOrInsertFunction(SrcF->getName(), RetType,
+                                            Type::getInt32Ty(Context),
+                                            PointerType::get(PtoArr, 0), NULL);
+
+    Function *F = cast<Function>(C);
+    F->setLinkage(SrcF->getLinkage());
+    return F;
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// SpecializeEndpoint policy.
+//
+// Specializes the endpoint with a list of parameter values.
+// All uses of the a Value are replaced with the parameter value associated
+// to this value.
+//
+template <class ParamT> class SpecializeEndpoint {
+private:
+  ParamVector<ParamT> SpecValues;
+
+public:
+  void setParameters(ParamVector<ParamT> const &Values) { SpecValues = Values; }
+
+  Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
+    Function::arg_iterator result = F->arg_begin(), end = F->arg_end();
+
+    // 'Cheap' find
+    while (result != end && result->getName() != ArgName)
+      ++result;
+
+    return result;
+  }
+
+  /**
+   * @brief TODO: Add comments here.
+   *
+   * @param AllValues
+   * @param TgtF
+   *
+   * @return
+   */
+  ParamVector<ParamT> getSpecValues(ParamVector<ParamT> &AllValues,
+                                    Function *TgtF) {
+    return SpecVals(AllValues.size());
+  }
+
+  /**
+   * @brief Apply the parameter value specialization in the endpoint.
+   *
+   * It is necessary that SpecValues is already set. Next we align the
+   * specialization values with the formal function arguments and substitute
+   * all uses of this argument with a constant representing the specialization
+   * value.
+   *
+   * @param TgtF The function we specialize.
+   * @param SrcF Our source function.
+   * @param VMap A value-to-value map that tracks cloned values/function args.
+   */
+  void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+    // Connect Entry block of TgtF with Cloned version of SrcF's entry block.
+    LLVMContext &Context = TgtF->getContext();
+    IRBuilder<> Builder(Context);
+    BasicBlock *EntryBB = &TgtF->getEntryBlock();
+    BasicBlock *SrcEntryBB = &SrcF->getEntryBlock();
+    BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
+
+    Builder.SetInsertPoint(EntryBB);
+    Builder.CreateBr(ClonedEntryBB);
+
+    for (unsigned i = 0; i < SpecValues.size(); ++i) {
+      ParamT P = SpecValues[i];
+      Function::arg_iterator Arg = getArgument(SrcF, P.Name);
+
+      // Could not find the argument, should not happen.
+      if (Arg == TgtF->arg_end())
+        continue;
+
+      // Get a constant value for P.
+      if (Constant *Replacement = P.Val) {
+        Value *NewArg = VMap[Arg];
+
+        if (!isa<Constant>(NewArg))
+          NewArg->replaceAllUsesWith(Replacement);
+      }
+    }
+
+    /** FIXME: This requires the usage of MainCreator policy.
+     *
+     * We assume that we use the MainCreator policy, so we replace all
+     * returns with return 0;
+     *
+     * @name MainCreator policy interface required.
+     * @{ */
+    Constant *Zero = ConstantInt::get(IntegerType::getInt32Ty(Context), 0);
+    for (Function::iterator BB = TgtF->begin(), BE = TgtF->end(); BB != BE;
+         ++BB)
+      if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB->getTerminator())) {
+        ReplaceInstWithInst(Ret, ReturnInst::Create(Context, Zero));
+      }
+    /**  @} */
+  }
+};
+
+
+/**
+ * @brief Create a new variant of this function using the function key K.
+ *
+ * This creates a copy of the existing prototype function and substitutes
+ * all uses of K's name with K's value.
+ *
+ * @param K the function key K we want to substitute in.
+ *
+ * @return a copy of the base function, with the values of K substituted.
+ */
 Function *VariantFunction::createVariant(const FunctionKey &K) {
   ValueToValueMapTy VMap;
 
