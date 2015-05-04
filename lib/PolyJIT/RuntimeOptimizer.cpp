@@ -45,8 +45,8 @@ using namespace polly;
 
 namespace polli {
 
-Function *OptimizeForRuntime(Function *F) {
-  Module *M = F->getParent();
+Function &OptimizeForRuntime(Function &F) {
+  Module *M = F.getParent();
   PassManagerBuilder Builder;
 
   FunctionPassManager PM = FunctionPassManager(M);
@@ -56,7 +56,7 @@ Function *OptimizeForRuntime(Function *F) {
   Builder.OptLevel = 3;
 
   Builder.populateFunctionPassManager(PM);
-  PM.run(*F);
+  PM.run(F);
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
 

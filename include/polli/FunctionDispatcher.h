@@ -574,7 +574,7 @@ public:
 
     // Create a variant function & specialize a new variant, based on key.
     VariantFunctionTy VarFun =
-        std::make_shared<VariantFunction>(F, FMap[F->getName()]);
+        std::make_shared<VariantFunction>(*F, *(FMap[F->getName()]));
 
     VariantFunctions.insert(std::make_pair(F, VarFun));
     return VarFun;

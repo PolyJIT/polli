@@ -62,13 +62,13 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
   Module *M, *NewM;
 
   // Prepare a new module to hold our new function.
-  M = SourceF->getParent();
+  M = SourceF.getParent();
   NewM = new Module(M->getModuleIdentifier(), M->getContext());
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
   NewM->setMaterializer(M->getMaterializer());
   NewM->setModuleIdentifier(
-      (M->getModuleIdentifier() + "." + SourceF->getName()).str() +
+      (M->getModuleIdentifier() + "." + SourceF.getName()).str() +
       K.getShortName().str() + ".ll");
 
   // Perform parameter value substitution.
@@ -81,7 +81,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
    * and substitute all known parameter values.
    */
   Specializer.setParameters(K);
-  Specializer.setSource(SourceF);
+  Specializer.setSource(&SourceF);
 
-  return OptimizeForRuntime(Specializer.start());
+  return &(OptimizeForRuntime(*Specializer.start()));
 }
