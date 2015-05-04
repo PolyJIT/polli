@@ -100,6 +100,12 @@
 
 #include "polli/Options.h"
 
+
+#include "spdlog/spdlog.h"
+namespace {
+auto Console = spdlog::stderr_logger_st("polli");
+}
+
 namespace llvm {
 class LLVMContext;
 } // lines 65-65
@@ -374,16 +380,21 @@ void PolyJIT::runSpecializedFunction(
   if (!SpecializedModules.count(NewM)) {
     LIKWID_MARKER_START("CodeGenJIT");
     ExecutionEngine *EE = PolyJIT::GetEngine(NewM);
+    Console->warn("new engine registered");
     SpecializedModules[NewM] = EE;
     SpecializedModules[NewM]->finalizeObject();
     LIKWID_MARKER_STOP("CodeGenJIT");
+    Console->warn("code generation complete");
   }
 
   LIKWID_MARKER_START(NewF->getName().str().c_str());
   ExecutionEngine *NewEE = SpecializedModules[NewM];
   assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
   LIKWID_MARKER_THREADINIT;
+
+  Console->warn("execution of {:>s} begins", NewF->getName().str());
   NewEE->runFunction(NewF, ArgValues);
+  Console->warn("execution of {:>s} completed", NewF->getName().str());
   LIKWID_MARKER_STOP(NewF->getName().str().c_str());
 }
 

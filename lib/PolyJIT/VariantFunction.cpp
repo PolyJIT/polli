@@ -7,6 +7,9 @@
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
+#define FMT_HEADER_ONLY
+#include "cppformat/format.h"
+
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -54,15 +57,9 @@ static std::string demangle(const std::string &Name) {
 void VariantFunction::print(llvm::raw_ostream &OS) {
   std::string Message;
 
-  OS << demangle(SourceF->getName()) << " :: "
-     << demangle(BaseF->getName()) << " :: "
-     << Variants.size() << "; "
-     << S.ExecCount << "; "
-     << S.MFLOPS << "; "
-     << S.flpops << "; "
-     << S.RealTime << "; "
-     << S.ProcTime << "\n";
-
+  OS << fmt::format("{:<s} is mapped to {:>s} and carries {:d} variants.",
+                    SourceF.getName().str(), BaseF.getName().str(),
+                    Variants.size());
   DEBUG(printVariants(OS));
 }
 

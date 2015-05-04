@@ -44,8 +44,8 @@ static Module &getModule(const char *prototype) {
 
     UniqueMod Mod = parseIR(Buf, Err, Ctx);
     if (Mod) {
-      Console->warn("Prototype registered.");
-      Console->error("{:s}", prototype);
+      Console->warn("prototype module registered successfully.");
+      Console->warn("{:s}", prototype);
     }
     else {
       Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
@@ -138,23 +138,31 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   LIKWID_MARKER_START("JitSelectParams");
 
   std::vector<Param> ParamV;
+  Console->warn("fetching runtime parameters:");
   getRuntimeParameters(F, paramc, params, ParamV);
 
   ParamVector<Param> Params(std::move(ParamV));
+  Console->warn("fetched: {:>s}", Params.getShortName().str());
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
+  Console->warn("create new variant for: {:>s}", F->getName().str());
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+  VarFun->print(outs() << "created: ");
 
   SmallVector<GenericValue, 2> Args;
   GenericValue ArgC;
+  Console->warn("preparing argument vector");
   ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
   Args[0] = ArgC;
   Args[1] = PTOGV(params);
+  Console->warn("prepared argument vector");
   LIKWID_MARKER_STOP("JitSelectParams");
 
   Stats &S = VarFun->stats();
   LIKWID_MARKER_START("JitOptVariant");
   Function *NewF = VarFun->getOrCreateVariant(Params);
+  if (!NewF)
+    Console->error("variant generation failed.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
   PolyJIT::runSpecializedFunction(NewF, Args);

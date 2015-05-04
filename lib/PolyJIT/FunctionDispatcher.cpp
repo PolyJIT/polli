@@ -11,7 +11,12 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/Casting.h"
 
+#include "spdlog/spdlog.h"
 #include <map>
+
+namespace {
+auto Console = spdlog::stderr_logger_st("polli");
+}
 
 void getRuntimeParameters(Function *F, unsigned paramc, char **params,
                           std::vector<Param> &ParamV) {
@@ -51,6 +56,7 @@ Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
 
   Function *Variant = createVariant(K);
   Variants[K] = Variant;
+  Console->warn("variant generated");
 
   return Variant;
 }
@@ -60,6 +66,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
 
   /* Copy properties of our source module */
   Module *M, *NewM;
+  Console->warn("creating new variant for key: {:>s}", K.getShortName().str());
 
   // Prepare a new module to hold our new function.
   M = SourceF.getParent();
