@@ -145,11 +145,11 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
 
-  std::vector<GenericValue> ArgValues(2);
+  SmallVector<GenericValue, 2> Args;
   GenericValue ArgC;
   ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
-  ArgValues[0] = ArgC;
-  ArgValues[1] = PTOGV(params);
+  Args[0] = ArgC;
+  Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
 
   Stats &S = VarFun->stats();
@@ -157,7 +157,7 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   Function *NewF = VarFun->getOrCreateVariant(Params);
   LIKWID_MARKER_STOP("JitOptVariant");
 
-  PolyJIT::runSpecializedFunction(NewF, ArgValues);
+  PolyJIT::runSpecializedFunction(NewF, Args);
   S.ExecCount++;
 }
 }

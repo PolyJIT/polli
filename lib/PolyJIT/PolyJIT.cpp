@@ -364,7 +364,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
 * @param ArgValues the parameter _values_ for the formal parameters.
 */
 void PolyJIT::runSpecializedFunction(
-    llvm::Function *NewF, const std::vector<GenericValue> &ArgValues) {
+    llvm::Function *NewF, const ArrayRef<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
   static ManagedModules SpecializedModules;
 
