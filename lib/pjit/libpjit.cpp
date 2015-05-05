@@ -109,15 +109,63 @@ public:
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
   }
-
-  ~StaticInitializer() {
-    do_shutdown();
-  }
 };
 static StaticInitializer InitializeEverything;
 } // end of anonymous namespace
 
 extern "C" {
+/**
+* @brief Run a specialized version of a function.
+*
+* The specialized version needs to be in 'main' form, i.e., its signature
+* has to be:
+*  void fn_name(int argc, char *argv);
+*
+* The FunctionCloner's MainCreator policy takes care of that. All the real
+* parameters are passed via argv.
+*
+* @param NewF the specialized function in main form.
+* @param ArgValues the parameter _values_ for the formal parameters.
+*/
+static void runSpecializedFunction(
+    llvm::Function *NewF, const ArrayRef<GenericValue> &ArgValues) {
+  assert(NewF && "Cannot execute a NULL function!");
+  static ManagedModules SpecializedModules;
+
+  Module *NewM = NewF->getParent();
+
+  // Fetch or Create a new ExecutionEngine for this Module.
+  if (!SpecializedModules.count(NewM)) {
+    LIKWID_MARKER_START("CodeGenJIT");
+    ExecutionEngine *EE = PolyJIT::GetEngine(NewM);
+    Console->warn("new engine registered");
+    SpecializedModules[NewM] = EE;
+    SpecializedModules[NewM]->finalizeObject();
+    LIKWID_MARKER_STOP("CodeGenJIT");
+    Console->warn("code generation complete");
+  }
+
+  LIKWID_MARKER_START(NewF->getName().str().c_str());
+  ExecutionEngine *NewEE = SpecializedModules[NewM];
+
+  if (NewEE) {
+    LIKWID_MARKER_THREADINIT;
+
+    Console->warn("execution of {:>s} begins", NewF->getName().str());
+    void *FPtr = NewEE->getPointerToFunction(NewF);
+    int (*PF)(int, char *) = (int(*)(int, char *))(intptr_t)FPtr;
+
+    // Call the function.
+    GenericValue rv;
+    rv.IntVal = APInt(32, PF(ArgValues[0].IntVal.getZExtValue(),
+                             (char *)GVTOP(ArgValues[1])));
+    Console->warn("execution of {:>s} completed", NewF->getName().str());
+  } else {
+    Console->error("no execution engine found.");
+  }
+  LIKWID_MARKER_STOP(NewF->getName().str().c_str());
+}
+
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -127,13 +175,32 @@ extern "C" {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void pjit_main(const char *fName, unsigned paramc, char **params) {
+void pjit_main(const char *fName, unsigned paramc, void *params) {
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
     Console->error("Could not find a function in: {}", M.getModuleIdentifier());
     return;
   }
+
+  auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
+    std::stringstream res;
+
+    int i = 0;
+    for (Argument &Arg : F.args()) {
+      if (i > 0)
+        res << ", ";
+      if (Arg.getType()->isPointerTy()) {
+        res << ((uint32_t **)params)[i++];
+      } else {
+        res << *((uint32_t **)params)[i++];
+      }
+    }
+
+    return res.str();
+  };
+  std::string paramlist = DebugFn(*F, paramc, params);
+  Console->warn("running with params: #{:d} ({:s})", paramc, paramlist);
 
   LIKWID_MARKER_START("JitSelectParams");
 
@@ -150,12 +217,8 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   VarFun->print(outs() << "created: ");
 
   SmallVector<GenericValue, 2> Args;
-  GenericValue ArgC;
-  Console->warn("preparing argument vector");
-  ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
-  Args[0] = ArgC;
+  Args[0].IntVal = APInt(32, F->arg_size(), false);
   Args[1] = PTOGV(params);
-  Console->warn("prepared argument vector");
   LIKWID_MARKER_STOP("JitSelectParams");
 
   Stats &S = VarFun->stats();
@@ -165,23 +228,7 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
     Console->error("variant generation failed.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
-  auto DebugFn = [](int argc, char **params) -> std::string {
-    std::stringstream res;
-
-    for (int i = 0; i < argc; i++) {
-      if (i > 0)
-        res << ", ";
-      res << (uint64_t*)params[i];
-    }
-
-    return res.str();
-  };
-  std::string paramlist = DebugFn(paramc, params);
-
-  Console->warn("running with params: #{:d} ({:s})", paramc,
-                paramlist);
-
-  PolyJIT::runSpecializedFunction(NewF, Args);
+  runSpecializedFunction(NewF, Args);
   S.ExecCount++;
 }
 }

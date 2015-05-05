@@ -235,7 +235,7 @@ static inline void printParameters(const Function *F, RTParams &Params) {
  * @param params The array of parameters we got as input.
  * @param paramV A vector where we store the runtime parameters in.
  */
-void getRuntimeParameters(Function *F, unsigned paramc, char **params,
+void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV);
 
 /**

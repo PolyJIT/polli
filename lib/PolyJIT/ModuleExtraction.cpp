@@ -291,26 +291,31 @@ struct InstrumentEndpoint {
     /* Prepare a stack array for the parameters. We will pass a pointer to
      * this array into our callback function. */
     int argc = TgtF->arg_size() + getGlobalCount(SrcF);
-    Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc, true);
+    Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc);
     Value *Params =
         Builder.CreateAlloca(Type::getInt8PtrTy(Ctx), ParamC, "params");
 
     /* Store each parameter as pointer in the params array */
     int i = 0;
-    Value *One = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
+    Value *Size1 = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
     for (Argument &Arg : TgtF->args()) {
-      /* Allocate a slot on the stack for the i'th argument and store it */
-      Value *Slot = Builder.CreateAlloca(Arg.getType(), One);
-      Builder.CreateStore(&Arg, Slot);
-
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
-      Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
-      Value *Dest = Builder.CreateGEP(Params, ArrIdx);
+      Value *IdxI = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
 
-      // Builder.CreateAlignedStore(Slot8, Dest, 8);
-      Builder.CreateStore(Builder.CreateBitCast(Slot, Type::getInt8PtrTy(Ctx)),
-                          Dest);
+      Value *Slot;
+      if (Arg.getType()->isPointerTy()) {
+        Slot = &Arg;
+      } else {
+        /* Allocate a slot on the stack for the i'th argument and store it */
+        Slot = Builder.CreateAlloca(Arg.getType(), Size1);
+        Builder.CreateStore(&Arg, Slot, "pjit.stack.param");
+
+      }
+
+      Value *Dest = Builder.CreateGEP(Params, IdxI);
+      Value *Cast = Builder.CreateBitCast(Slot, Arg.getType()->getPointerTo());
+      Builder.CreateStore(Cast, Dest);
     }
 
     // Append required global variables.

@@ -18,7 +18,7 @@ namespace {
 auto Console = spdlog::stderr_logger_st("polli");
 }
 
-void getRuntimeParameters(Function *F, unsigned paramc, char **params,
+void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
   int i = 0;
   for (const Argument &Arg : F->args()) {
@@ -31,16 +31,16 @@ void getRuntimeParameters(Function *F, unsigned paramc, char **params,
       P.Name = Arg.getName();
       switch(IntTy->getBitWidth()) {
       case 8:
-        P.Val = ConstantInt::get(IntTy, *(uint8_t *)params[i], true);
+        P.Val = ConstantInt::get(IntTy, *((uint8_t **)params)[i]);
         break;
       case 16:
-        P.Val = ConstantInt::get(IntTy, *(uint16_t *)params[i], true);
+        P.Val = ConstantInt::get(IntTy, *((uint16_t **)params)[i]);
         break;
       case 32:
-        P.Val = ConstantInt::get(IntTy, *(uint32_t *)params[i], true);
+        P.Val = ConstantInt::get(IntTy, *((uint32_t **)params)[i]);
         break;
       case 64:
-        P.Val = ConstantInt::get(IntTy, *(uint64_t *)params[i], true);
+        P.Val = ConstantInt::get(IntTy, *((uint64_t **)params)[i]);
         break;
       }
 
@@ -92,16 +92,17 @@ struct MainCreator {
     // Unpack params. Allocate space on the stack and store the pointers.
     // TODO:This is very inefficient.
     // Some parameters are not required anymore.
+    LLVMContext &Ctx = Builder.getContext();
     unsigned i = 0;
     for (Argument &Arg : SrcF->args()) {
+      Value *Idx0 = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
+      Value *IdxI = ConstantInt::get(Type::getInt8Ty(Ctx), i++);
+
       Type *ArgTy = Arg.getType();
       Value *ArrIdx =
-          Builder.CreateConstInBoundsGEP2_64(ArgV, 0, i++, "arrayidx");
+          Builder.CreateInBoundsGEP(ArgV, { Idx0, IdxI }, "pprof.param.idx");
       Value *LoadArr = Builder.CreateLoad(ArrIdx);
-      Value *CastVal = Builder.CreateBitCast(LoadArr, ArgTy->getPointerTo());
-
-      CastVal = Builder.CreateLoad(CastVal);
-
+      Value *CastVal = Builder.CreateBitCast(LoadArr, ArgTy);
       VMap[&Arg] = CastVal;
     }
   }
@@ -133,16 +134,14 @@ struct MainCreator {
    * @return A new function, with main()-compatible signature.
    */
   static Function *Create(Function *SrcF, Module *TgtM) {
-    LLVMContext &Context = TgtM->getContext();
-    Type *RetType = IntegerType::getInt32Ty(Context);
-    ArrayType *PtoArr =
-        ArrayType::get(Type::getInt8PtrTy(Context), SrcF->arg_size());
+    LLVMContext &Ctx = TgtM->getContext();
+    Type *RetType = IntegerType::getInt32Ty(Ctx);
+    PointerType *PtoArr = ArrayType::get(Type::getInt8PtrTy(Ctx),
+                                         SrcF->arg_size())->getPointerTo();
 
-    Constant *C = TgtM->getOrInsertFunction(SrcF->getName(), RetType,
-                                            Type::getInt32Ty(Context),
-                                            PointerType::get(PtoArr, 0), NULL);
+    Function *F = cast<Function>(TgtM->getOrInsertFunction(
+        SrcF->getName(), RetType, Type::getInt32Ty(Ctx), PtoArr, NULL));
 
-    Function *F = cast<Function>(C);
     F->setLinkage(SrcF->getLinkage());
     return F;
   }
