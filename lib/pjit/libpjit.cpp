@@ -106,7 +106,6 @@ public:
     InitializeNativeTargetAsmParser();
   }
 };
-static StaticInitializer InitializeEverything;
 } // end of anonymous namespace
 
 extern "C" {
@@ -172,6 +171,8 @@ static void runSpecializedFunction(
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, void *params) {
+  static StaticInitializer InitializeEverything;
+
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
