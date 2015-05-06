@@ -29,24 +29,9 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
       Param P;
       P.Ty = IntTy;
       P.Name = Arg.getName();
-      switch(IntTy->getBitWidth()) {
-      case 8:
-        P.Val = ConstantInt::get(IntTy, *((uint8_t **)params)[i]);
-        break;
-      case 16:
-        P.Val = ConstantInt::get(IntTy, *((uint16_t **)params)[i]);
-        break;
-      case 32:
-        P.Val = ConstantInt::get(IntTy, *((uint32_t **)params)[i]);
-        break;
-      case 64:
-        P.Val = ConstantInt::get(IntTy, *((uint64_t **)params)[i]);
-        break;
-      }
-
+      P.Val = ConstantInt::get(IntTy, *((uint64_t **)params)[i++]);
       ParamV.push_back(P);
     }
-    i++;
   }
 }
 
