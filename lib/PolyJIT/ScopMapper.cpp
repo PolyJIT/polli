@@ -72,10 +72,7 @@ bool ScopMapper::runOnFunction(Function &F) {
                          LineBegin, LineEnd, R->getNameStr()););
 
     if (Extractor.isEligible()) {
-      Function *ExtractedF = Extractor.extractCodeRegion();
-      DEBUG(log(Debug, 2) << " into: " << ExtractedF->getName() << "\n");
-
-      if (ExtractedF) {
+      if (Function *ExtractedF = Extractor.extractCodeRegion()) {
         ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
         ExtractedF->addFnAttr("polyjit-jit-candidate");
