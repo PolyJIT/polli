@@ -75,20 +75,19 @@ struct MainCreator {
     ArgV->setName("argv");
 
     // Unpack params. Allocate space on the stack and store the pointers.
-    // TODO:This is very inefficient.
     // Some parameters are not required anymore.
     LLVMContext &Ctx = Builder.getContext();
     unsigned i = 0;
     for (Argument &Arg : SrcF->args()) {
-      Value *Idx0 = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
-      Value *IdxI = ConstantInt::get(Type::getInt8Ty(Ctx), i++);
+      Value *Idx0 = ConstantInt::get(Type::getInt64Ty(Ctx), 0);
+      Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), i++);
 
       Type *ArgTy = Arg.getType();
       Value *ArrIdx =
-          Builder.CreateInBoundsGEP(ArgV, { Idx0, IdxI }, "pprof.param.idx");
-      Value *LoadArr = Builder.CreateLoad(ArrIdx);
-      Value *CastVal = Builder.CreateBitCast(LoadArr, ArgTy);
-      VMap[&Arg] = CastVal;
+          Builder.CreateInBoundsGEP(ArgV, { IdxI }, "pprof.param.idx");
+      Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo());
+      Value *LoadArr = Builder.CreateLoad(CastVal);
+      VMap[&Arg] = LoadArr;
     }
   }
 
