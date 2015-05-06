@@ -122,43 +122,38 @@ extern "C" {
 * @param NewF the specialized function in main form.
 * @param ArgValues the parameter _values_ for the formal parameters.
 */
-static void runSpecializedFunction(
-    llvm::Function *NewF, const ArrayRef<GenericValue> &ArgValues) {
+static void runSpecializedFunction(llvm::Function &NewF, int paramc,
+                                   char **params) {
   assert(NewF && "Cannot execute a NULL function!");
-  static ManagedModules SpecializedModules;
+  static ManagedModules Mods;
 
-  Module *NewM = NewF->getParent();
+  Module *NewM = NewF.getParent();
 
   // Fetch or Create a new ExecutionEngine for this Module.
-  if (!SpecializedModules.count(NewM)) {
-    LIKWID_MARKER_START("CodeGenJIT");
-    ExecutionEngine *EE = PolyJIT::GetEngine(NewM);
-    Console->warn("new engine registered");
-    SpecializedModules[NewM] = EE;
-    SpecializedModules[NewM]->finalizeObject();
-    LIKWID_MARKER_STOP("CodeGenJIT");
-    Console->warn("code generation complete");
-  }
+  LIKWID_MARKER_START("CodeGenJIT");
+  ExecutionEngine *EE = nullptr;
+  if (!Mods.count(NewM)) {
+    EE = PolyJIT::GetEngine(NewM);
+    Mods[NewM] = EE;
+    Mods[NewM]->finalizeObject();
+  } else
+    EE = Mods[NewM];
+  LIKWID_MARKER_STOP("CodeGenJIT");
 
-  LIKWID_MARKER_START(NewF->getName().str().c_str());
-  ExecutionEngine *NewEE = SpecializedModules[NewM];
-
-  if (NewEE) {
+  if (EE) {
+    LIKWID_MARKER_START(NewF.getName().str().c_str());
     LIKWID_MARKER_THREADINIT;
 
-    Console->warn("execution of {:>s} begins", NewF->getName().str());
-    void *FPtr = NewEE->getPointerToFunction(NewF);
-    int (*PF)(int, char *) = (int(*)(int, char *))(intptr_t)FPtr;
-
-    // Call the function.
-    GenericValue rv;
-    rv.IntVal = APInt(32, PF(ArgValues[0].IntVal.getZExtValue(),
-                             (char *)GVTOP(ArgValues[1])));
-    Console->warn("execution of {:>s} completed", NewF->getName().str());
+    Console->warn("execution of {:>s} begins (#{:d} params)",
+                  NewF.getName().str(), paramc);
+    void *FPtr = EE->getPointerToFunction(&NewF);
+    void (*PF)(int, char **) = (void(*)(int, char **))FPtr;
+    PF(paramc, params);
+    Console->warn("execution of {:>s} completed", NewF.getName().str());
+    LIKWID_MARKER_STOP(NewF.getName().str().c_str());
   } else {
     Console->error("no execution engine found.");
   }
-  LIKWID_MARKER_STOP(NewF->getName().str().c_str());
 }
 
 /**
@@ -170,14 +165,14 @@ static void runSpecializedFunction(
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void pjit_main(const char *fName, unsigned paramc, void *params) {
+int pjit_main(const char *fName, unsigned paramc, char **params) {
   static StaticInitializer InitializeEverything;
 
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
     Console->error("Could not find a function in: {}", M.getModuleIdentifier());
-    return;
+    return 0;
   }
 
   auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
@@ -188,44 +183,42 @@ void pjit_main(const char *fName, unsigned paramc, void *params) {
       if (i > 0)
         res << ", ";
       if (Arg.getType()->isPointerTy()) {
-        res << ((uint32_t **)params)[i++];
+        res << ((uint64_t **)params)[i++];
       } else {
-        res << *((uint32_t **)params)[i++];
+        res << ((uint32_t **)params)[i++][0];
       }
     }
 
     return res.str();
   };
-  std::string paramlist = DebugFn(*F, paramc, params);
-  Console->warn("running with params: #{:d} ({:s})", paramc, paramlist);
 
   LIKWID_MARKER_START("JitSelectParams");
 
   std::vector<Param> ParamV;
-  Console->warn("fetching runtime parameters:");
   getRuntimeParameters(F, paramc, params, ParamV);
 
   ParamVector<Param> Params(std::move(ParamV));
-  Console->warn("fetched: {:>s}", Params.getShortName().str());
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
-  Console->warn("create new variant for: {:>s}", F->getName().str());
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
-  VarFun->print(outs() << "created: ");
+  VarFun->print(outs() << "\nvariant created: ");
 
   SmallVector<GenericValue, 2> Args;
   Args[0].IntVal = APInt(32, F->arg_size(), false);
   Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
 
-  Stats &S = VarFun->stats();
+  //Stats &S = VarFun->stats();
   LIKWID_MARKER_START("JitOptVariant");
-  Function *NewF = VarFun->getOrCreateVariant(Params);
-  if (!NewF)
-    Console->error("variant generation failed.");
+  if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
+    std::string paramlist = DebugFn(*F, paramc, GVTOP(Args[1]));
+    Console->warn("running with params: #{:d} ({:s})", paramc, paramlist);
+    runSpecializedFunction(*NewF, paramc, params);
+  } else
+      llvm_unreachable("FIXME: call the old prototype.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
-  runSpecializedFunction(NewF, Args);
-  S.ExecCount++;
+  //S.ExecCount++;
+  return 0;
 }
 }
