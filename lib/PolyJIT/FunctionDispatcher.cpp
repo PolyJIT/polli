@@ -79,7 +79,6 @@ struct MainCreator {
     LLVMContext &Ctx = Builder.getContext();
     unsigned i = 0;
     for (Argument &Arg : SrcF->args()) {
-      Value *Idx0 = ConstantInt::get(Type::getInt64Ty(Ctx), 0);
       Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), i++);
 
       Type *ArgTy = Arg.getType();
