@@ -119,9 +119,8 @@ struct MainCreator {
    */
   static Function *Create(Function *SrcF, Module *TgtM) {
     LLVMContext &Ctx = TgtM->getContext();
-    Type *RetType = IntegerType::getInt32Ty(Ctx);
-    PointerType *PtoArr = ArrayType::get(Type::getInt8PtrTy(Ctx),
-                                         SrcF->arg_size())->getPointerTo();
+    Type *RetType = Type::getVoidTy(Ctx);
+    PointerType *PtoArr = Type::getInt8PtrTy(Ctx)->getPointerTo();
 
     Function *F = cast<Function>(TgtM->getOrInsertFunction(
         SrcF->getName(), RetType, Type::getInt32Ty(Ctx), PtoArr, NULL));
