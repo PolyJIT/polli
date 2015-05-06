@@ -26,13 +26,12 @@ using namespace llvm;
 using namespace polli;
 
 namespace {
-using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
-StackTracePtr StackTrace;
-
-static FunctionDispatcher Disp;
-auto Console = spdlog::stderr_logger_st("polli");
-
 using UniqueMod = std::unique_ptr<Module>;
+using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
+
+static StackTracePtr StackTrace;
+static FunctionDispatcher Disp;
+static auto Console = spdlog::stderr_logger_st("polli");
 
 static Module &getModule(const char *prototype) {
   static DenseMap<const char *, UniqueMod> ModuleIndex;
@@ -43,17 +42,14 @@ static Module &getModule(const char *prototype) {
     SMDiagnostic Err;
 
     UniqueMod Mod = parseIR(Buf, Err, Ctx);
-    if (Mod) {
-      Console->warn("prototype module registered successfully.");
-      Console->warn("{:s}", prototype);
-    }
-    else {
+    if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
+      ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
+    } else {
       Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
                      Err.getLineNo(), Err.getColumnNo(),
                      Err.getMessage().str());
       Console->error("{:s}", prototype);
     }
-    ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
   }
 
   return *ModuleIndex[prototype];
@@ -77,7 +73,7 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
-    Console->warn("PolyJIT activated.");
+    Console->warn("loading polyjit");
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
     LIKWID_MARKER_INIT;

@@ -226,11 +226,11 @@ struct RemoveGlobalsPolicy {
       if (ArgCount-- > 0)
         Args.push_back(Arg.getType());
 
-    FunctionType *FType = FunctionType::get(SrcF->getReturnType(), Args, false);
-    return Function::Create(FType, SrcF->getLinkage(), SrcF->getName(), TgtM);
+    return Function::Create(
+        FunctionType::get(SrcF->getReturnType(), Args, false),
+        SrcF->getLinkage(), SrcF->getName(), TgtM);
   }
 };
-
 
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
@@ -310,7 +310,6 @@ struct InstrumentEndpoint {
         /* Allocate a slot on the stack for the i'th argument and store it */
         Slot = Builder.CreateAlloca(Arg.getType(), Size1);
         Builder.CreateStore(&Arg, Slot, "pjit.stack.param");
-
       }
 
       Value *Dest = Builder.CreateGEP(Params, IdxI);
