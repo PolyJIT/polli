@@ -506,15 +506,6 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   sys::DynamicLibrary::AddSymbol(cbName, (void *)&pjit_callback);
 }
 
-static ModulePtrT copyModule(Module &M) {
-  ModulePtrT NewM = new Module(M.getModuleIdentifier(), M.getContext());
-  NewM->setTargetTriple(M.getTargetTriple());
-  NewM->setDataLayout(M.getDataLayout());
-  NewM->setMaterializer(M.getMaterializer());
-
-  return NewM;
-}
-
 /**
 * @brief Extract all jitable Scops into a separate module
 *

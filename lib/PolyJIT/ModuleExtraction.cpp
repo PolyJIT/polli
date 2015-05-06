@@ -346,31 +346,12 @@ struct InstrumentEndpoint {
 
     Builder.CreateCall(PJITCB, Args);
     Builder.CreateRetVoid();
-
-    SrcF->getType()->print(outs() << "\nSrcF:");
-    TgtF->print(outs() << "\nTgtF:");
   }
-
-static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
-                                   Module &M) {
-  using MoveFunction =
-      FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
-
-  // Prepare the source function.
-  // We need to substitute all instructions that use ConstantExpressions.
-  apply<InstrList>(F, constantExprToInstruction);
-
-  // First create a new prototype function.
-  MoveFunction Cloner(VMap, &M);
-  return Cloner.setSource(&F).start();
-}
 
 private:
   Pass *P;
   Value *PrototypeF;
 };
-
-
 
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;

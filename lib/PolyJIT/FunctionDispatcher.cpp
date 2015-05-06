@@ -206,21 +206,6 @@ public:
           NewArg->replaceAllUsesWith(Replacement);
       }
     }
-
-    /** FIXME: This requires the usage of MainCreator policy.
-     *
-     * We assume that we use the MainCreator policy, so we replace all
-     * returns with return 0;
-     *
-     * @name MainCreator policy interface required.
-     * @{ */
-    Constant *Zero = ConstantInt::get(IntegerType::getInt32Ty(Context), 0);
-    for (Function::iterator BB = TgtF->begin(), BE = TgtF->end(); BB != BE;
-         ++BB)
-      if (ReturnInst *Ret = dyn_cast<ReturnInst>(BB->getTerminator())) {
-        ReplaceInstWithInst(Ret, ReturnInst::Create(Context, Zero));
-      }
-    /**  @} */
   }
 };
 
