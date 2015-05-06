@@ -213,7 +213,7 @@ struct RemoveGlobalsPolicy {
     size_t i = 0;
     for (auto &Arg : TgtF->args())
       if (i++ >= ArgCount) {
-        if (GlobalValue *GV = M.getGlobalVariable(Arg.getName()))
+        if (GlobalValue *GV = M.getGlobalVariable(Arg.getName(), true))
           VMap[&Arg] = GV;
       }
   }
@@ -324,18 +324,15 @@ struct InstrumentEndpoint {
       GlobalArgs++;
     for (; i < argc; i++) {
       StringRef Name = (GlobalArgs++)->getName();
-      if (GlobalVariable *GV = M->getGlobalVariable(Name)) {
-        /* Allocate a slot on the stack for the i'th argument and store it */
-        Value *GlobalPtr =
-            Builder.CreateConstGEP1_64(GV, 0, "polyjit.global.gep." + Name);
-
+      if (GlobalVariable *GV =
+              M->getGlobalVariable(Name, /*AllowInternals*/ true)) {
         /* Get the appropriate slot in the parameters array and store
          * the stack slot in form of a i8*. */
         Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
         Value *Dest = Builder.CreateGEP(Params, ArrIdx);
 
         Builder.CreateStore(
-            Builder.CreateBitCast(GlobalPtr, Type::getInt8PtrTy(Ctx)), Dest);
+            Builder.CreateBitCast(GV, Type::getInt8PtrTy(Ctx)), Dest);
       }
     }
 
