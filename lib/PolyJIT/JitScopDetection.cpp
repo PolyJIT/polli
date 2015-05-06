@@ -214,7 +214,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   if (F.isDeclaration())
     return false;
 
-  if (IgnoredFunctions.count(&F))
+  if (F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
   SD = &getAnalysis<ScopDetection>();

@@ -52,8 +52,8 @@ bool ScopMapper::runOnFunction(Function &F) {
   if(F.hasFnAttribute(Attribute::OptimizeNone))
     return false;
 
-  // Ignore functions created by us.
-  if (CreatedFunctions.count(&F))
+  // That would recurse forever.
+  if(F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
   /* Extract each SCoP in this function into a new one. */
@@ -78,9 +78,8 @@ bool ScopMapper::runOnFunction(Function &F) {
       if (ExtractedF) {
         ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
-        /* FIXME: Do not depend on this set. */
+        ExtractedF->addFnAttr("polyjit-jit-candidate");
         CreatedFunctions.insert(ExtractedF);
-        NSD.ignoreFunction(ExtractedF);
       }
     } else {
       log(Error, 2) << " failed :: Scop " << R->getNameStr()

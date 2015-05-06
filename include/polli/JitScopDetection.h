@@ -59,11 +59,6 @@ public:
   ScopSet::iterator jit_end() { return JitableScops.end(); }
   void enable(bool doEnable) { Enabled = doEnable; }
 
-  // Ignore this function during detection.
-  void ignoreFunction(const Function *F) {
-    IgnoredFunctions.insert(F);
-  }
-
   /// @name FunctionPass interface
   //@{
   virtual void getAnalysisUsage(AnalysisUsage &AU) const;
@@ -94,8 +89,6 @@ private:
   ScopSet JitableScops;
 
   ParamMap RequiredParams;
-
-  std::set<const Function *> IgnoredFunctions;
 };
 } // end of polli namespace
 #endif
