@@ -271,7 +271,7 @@ struct InstrumentEndpoint {
     std::vector<Value *> Args(3);
 
     TgtF->deleteBody();
-    TgtF->setLinkage(GlobalValue::InternalLinkage);
+    TgtF->setLinkage(SrcF->getLinkage());
 
     BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", TgtF);
     IRBuilder<> Builder(BB);
