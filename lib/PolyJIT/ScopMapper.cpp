@@ -73,6 +73,7 @@ bool ScopMapper::runOnFunction(Function &F) {
 
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
+        Console->warn("extract: {:s}", ExtractedF->getName().str());
         ExtractedF->setLinkage(GlobalValue::InternalLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
         ExtractedF->addFnAttr("polyjit-jit-candidate");
@@ -83,6 +84,9 @@ bool ScopMapper::runOnFunction(Function &F) {
                     << " not eligible for extraction\n";
     }
   }
+
+  if (i > 0)
+    F.print(outs() << "\n after:");
 
   return true;
 }

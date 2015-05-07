@@ -235,8 +235,9 @@ struct RemoveGlobalsPolicy {
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
   using MoveFunction =
-      FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
+      FunctionCloner<AddGlobalsPolicy, DestroyEndpoint, IgnoreTarget>;
 
+  outs() << fmt::format("Source to Prototype -> {:s}", F.getName().str());
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
   apply<InstrList>(F, constantExprToInstruction);
@@ -373,6 +374,8 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Value *Prototype = Builder.CreateGlobalStringPtr(
         PrototypeModStr, F->getName() + ".prototype");
 
+    outs() << fmt::format("Instrument prototype to source module -> {:s}",
+                          ProtoF->getName().str());
     InstrumentingFunctionCloner InstCloner(VMap, &M);
     InstCloner.setSource(ProtoF);
     InstCloner.setSinkHostPass(&SM);

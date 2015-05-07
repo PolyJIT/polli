@@ -25,6 +25,8 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include "llvm/IR/Verifier.h"
+
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -72,8 +74,43 @@ public:
     // Store function mapping for the linker.
     VMap[SrcF] = TgtF;
 
+    SrcF->getType()->print(outs() << "\nDrain-SRC:" + SrcF->getName() + " - ");
+    SrcF->print(outs() << "\n");
+
+    outs() << "VerifyF\n";
+    verifyFunction(*SrcF, &outs());
+
+    outs() << "VerifyM\n";
+    verifyModule(*SrcF->getParent(), &outs());
+
+    TgtF->getType()->print(outs() << "\nDrain-TGT:" + TgtF->getName() + " - ");
+    TgtF->print(outs() << "\n");
+
+    outs() << "VerifyF\n";
+    verifyFunction(*TgtF, &outs());
+
+    outs() << "VerifyM\n";
+    verifyModule(*TgtF->getParent(), &outs());
+
     DrainPolicy::Apply(SrcF, TgtF, VMap);
     SinkPolicy::Apply(TgtF, SrcF, VMap);
+
+    TgtF->getType()->print(outs() << "\nSink-SRC:" + SrcF->getName() + " - ");
+    TgtF->print(outs() << "\n");
+
+    outs() << "VerifyF\n";
+    verifyFunction(*TgtF, &outs());
+    outs() << "VerifyM\n";
+    verifyModule(*TgtF->getParent(), &outs());
+
+    SrcF->getType()->print(outs() << "\nSink-TGT:" + TgtF->getName() + " - ");
+    SrcF->print(outs() << "\n");
+
+    outs() << "VerifyF\n";
+    verifyFunction(*SrcF, &outs());
+    outs() << "VerifyM\n";
+    verifyModule(*SrcF->getParent(), &outs());
+    outs() << "\n";
 
     return TgtF;
   }
