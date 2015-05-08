@@ -266,6 +266,7 @@ struct InstrumentEndpoint {
       errs() << "oops, TgtF has no module";
     }
 
+    outs() << "pjit_main...\n";
     LLVMContext &Ctx = M->getContext();
 
     llvm::StringRef cbName = "pjit_main";
@@ -277,9 +278,11 @@ struct InstrumentEndpoint {
 
     std::vector<Value *> Args(3);
 
+    outs() << "purge TgtF...\n";
     TgtF->deleteBody();
     TgtF->setLinkage(SrcF->getLinkage());
 
+    outs() << "new entry...\n";
     BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", TgtF);
     IRBuilder<> Builder(BB);
     Builder.SetInsertPoint(BB);
@@ -308,9 +311,7 @@ struct InstrumentEndpoint {
     Value *Params =
         Builder.CreateAlloca(StackArrayT, Size1, "params");
 
-    /* Store each parameter as pointer in the params array */
-    int i = 0;
-    Value *Size1 = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
+    outs() << "args...\n";
     for (Argument &Arg : TgtF->args()) {
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
@@ -331,6 +332,7 @@ struct InstrumentEndpoint {
           Dest);
     }
 
+    outs() << "globals...\n";
     // Append required global variables.
     Function::arg_iterator GlobalArgs = SrcF->arg_begin();
     for (int j = 0; j < i; j++)
@@ -355,7 +357,9 @@ struct InstrumentEndpoint {
     Args[1] = ParamC;
     Args[2] = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
 
+    outs() << "jit callback...\n";
     Builder.CreateCall(PJITCB, Args);
+    outs() << "return...\n";
     Builder.CreateRetVoid();
   }
 
@@ -388,14 +392,14 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Value *Prototype = Builder.CreateGlobalStringPtr(
         PrototypeModStr, F->getName() + ".prototype");
 
-    outs() << fmt::format("Instrument prototype to source module -> {:s}",
+    outs() << fmt::format("\nInstrument prototype to source module -> {:s}\n",
                           ProtoF->getName().str());
     InstrumentingFunctionCloner InstCloner(VMap, &M);
     InstCloner.setSource(ProtoF).setSinkHostPass(&SM).setPrototype(Prototype);
 
     Function *InstF = InstCloner.start();
+    outs() << fmt::format("\ninstrument prototpe completed\n");
     InstF->addFnAttr(Attribute::OptimizeNone);
-
     F->replaceAllUsesWith(InstF);
   }
 
