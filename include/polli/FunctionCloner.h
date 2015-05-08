@@ -13,12 +13,14 @@
 #ifndef POLLI_FUNCTION_CLONER_H
 #define POLLI_FUNCTION_CLONER_H
 
+#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -72,6 +74,21 @@ public:
   void setSinkHostPass(Pass *HostP) {
     SinkPolicy &pPolicy = *this;
     pPolicy.setPass(HostP);
+    return *this;
+  }
+
+  void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
+    for (Instruction &I : inst_range(SrcF)) {
+      if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
+        CallSite CS = CallSite(&I);
+        if (Function *CalledF = CS.getCalledFunction()) {
+          Function *NewF = cast<Function>(TgtM->getOrInsertFunction(
+              CalledF->getName(), CalledF->getFunctionType(),
+              CalledF->getAttributes()));
+          VMap[CalledF] = NewF;
+        }
+      }
+    }
   }
 
   /* Clone the source function into the target function.
@@ -105,16 +122,17 @@ public:
     outs() << "VerifyF\n";
     verifyFunction(*SrcF, &outs());
 
-    outs() << "VerifyM\n";
-    verifyModule(*SrcF->getParent(), &outs());
-
-    TgtF->getType()->print(outs() << "\nDrain-TGT:" + TgtF->getName() + " - ");
-    TgtF->print(outs() << "\n");
+    // Collect all calls for remapping.
+    outs() << fmt::format("remapping calls {:d}\n", RemapCalls);
+    if (RemapCalls) {
+      mapCalls(*SrcF, TgtM, VMap);
+    }
 
     polli::verifyFunctions("before transform: ", SrcF, TgtF);
 
-    outs() << "VerifyM\n";
-    verifyModule(*TgtF->getParent(), &outs());
+    outs() << "cloning...\n";
+    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
+    TgtF->copyAttributesFrom(SrcF);
 
     DrainPolicy::Apply(SrcF, TgtF, VMap);
     SinkPolicy::Apply(TgtF, SrcF, VMap);
