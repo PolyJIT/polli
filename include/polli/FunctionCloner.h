@@ -181,17 +181,28 @@ struct IgnoreTarget {
   };
 };
 
-struct DestroyEndpoint {
-  static void Apply(Function *TgtF, Function *, ValueToValueMapTy &VMap) {
+struct DestroySource {
+  static void Apply(Function *SrcF, Function *, ValueToValueMapTy &VMap) {
+    SrcF->deleteBody();
+    SrcF->setLinkage(GlobalValue::InternalLinkage);
+    VMap.erase(SrcF);
+  }
+};
+
+struct DestroyTarget {
+  static void Apply(Function *, Function *TgtF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
+    TgtF->setLinkage(GlobalValue::InternalLinkage);
     VMap.erase(TgtF);
   }
 };
 
+
+
 typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
 DefaultFunctionCloner;
 
-typedef FunctionCloner<CopyCreator, DestroyEndpoint, IgnoreTarget>
+typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
 MovingFunctionCloner;
 
 }

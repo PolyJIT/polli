@@ -235,7 +235,7 @@ struct RemoveGlobalsPolicy {
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
   using MoveFunction =
-      FunctionCloner<AddGlobalsPolicy, DestroyEndpoint, IgnoreTarget>;
+      FunctionCloner<AddGlobalsPolicy, DestroySource, IgnoreTarget>;
 
   outs() << fmt::format("Source to Prototype -> {:s}", F.getName().str());
   // Prepare the source function.
