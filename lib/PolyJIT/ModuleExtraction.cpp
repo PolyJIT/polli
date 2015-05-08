@@ -361,8 +361,8 @@ bool ModuleExtractor::runOnFunction(Function &F) {
   ValueToValueMapTy VMap;
   IRBuilder<> Builder(F.begin());
 
-  std::for_each(SM.begin(), SM.end(), [&](Function *F) {
-    StringRef FunctionName = F->getName();
+  for (Function *F : SM.functions()) {
+    llvm::StringRef FunctionName = F->getName();
 
     ModulePtrT PrototypeM = copyModule(VMap, M);
     PrototypeM->setModuleIdentifier((ModuleName + "." + FunctionName).str() +
@@ -386,7 +386,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
     F->replaceAllUsesWith(InstF);
     ProtoF->setName("prototype");
-  });
+  }
 
   return true;
 }

@@ -58,10 +58,7 @@ bool ScopMapper::runOnFunction(Function &F) {
 
   /* Extract each SCoP in this function into a new one. */
   int i = 0;
-  for (ScopSet::iterator RP = NSD.jit_begin(), RE = NSD.jit_end(); RP != RE;
-       ++RP) {
-    const Region *R = *RP;
-
+  for (const Region *R : NSD.jitScops()) {
     CodeExtractor Extractor(DT, *(R->getNode()));
 
     unsigned LineBegin, LineEnd;

@@ -25,11 +25,13 @@ namespace polli {
 
 class ScopMapper : public FunctionPass {
 public:
-  typedef std::set<Function *> FunctionSet;
-  typedef FunctionSet::iterator iterator;
+  using FunctionSet = std::set<Function *>;
+  using FunctionSetIt = FunctionSet::iterator;
 
-  iterator begin() { return CreatedFunctions.begin(); }
-  iterator end() { return CreatedFunctions.end(); }
+  iterator_range<FunctionSetIt> functions() {
+    return iterator_range<FunctionSetIt>(CreatedFunctions.begin(),
+                                         CreatedFunctions.end());
+  }
   FunctionSet &getCreatedFunctions() { return CreatedFunctions; }
 
   static char ID;

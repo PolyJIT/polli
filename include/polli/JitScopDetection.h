@@ -55,8 +55,12 @@ public:
   /* JIT Scops */
   int countJS(const Region *R) { return JitableScops.count(R); }
   unsigned sizeJS() { return JitableScops.size(); }
-  ScopSet::iterator jit_begin() { return JitableScops.begin(); }
-  ScopSet::iterator jit_end() { return JitableScops.end(); }
+
+  iterator_range<ScopSet::iterator> jitScops() {
+    return iterator_range<ScopSet::iterator>(JitableScops.begin(),
+                                             JitableScops.end());
+  }
+
   void enable(bool doEnable) { Enabled = doEnable; }
 
   /// @name FunctionPass interface
