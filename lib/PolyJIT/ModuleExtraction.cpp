@@ -86,11 +86,6 @@ static Value *getPointerOperand(Instruction &I) {
   return V;
 }
 
-static inline Instruction *getInsertPoint(Instruction &I) {
-  Function *F = I.getParent()->getParent();
-  return F->getEntryBlock().begin();
-}
-
 static inline size_t getGlobalCount(Function *F) {
   size_t n = 0;
   if (F->hasFnAttribute("polyjit-global-count"))
@@ -108,7 +103,7 @@ static inline void constantExprToInstruction(Instruction &I,
   if (V) {
     if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
       Instruction *Inst = C->getAsInstruction();
-      Inst->insertBefore(getInsertPoint(I));
+      Inst->insertBefore(&I);
       C->replaceAllUsesWith(Inst);
     }
   }
