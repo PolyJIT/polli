@@ -268,8 +268,8 @@ struct InstrumentEndpoint {
 
     LLVMContext &Ctx = M->getContext();
 
-    PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
     llvm::StringRef cbName = "pjit_main";
+    PointerType *PtoArr = Type::getInt8PtrTy(Ctx);
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
         cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt32Ty(Ctx), PtoArr, NULL));
@@ -295,12 +295,18 @@ struct InstrumentEndpoint {
      * }
      */
 
+    /* Store each parameter as pointer in the params array */
+    int i = 0;
+    Value *Size1 = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
+    Value *Idx0 = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
+
     /* Prepare a stack array for the parameters. We will pass a pointer to
      * this array into our callback function. */
     int argc = TgtF->arg_size() + getGlobalCount(SrcF);
     Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc);
+    ArrayType *StackArrayT = ArrayType::get(Type::getInt8PtrTy(Ctx), argc);
     Value *Params =
-        Builder.CreateAlloca(Type::getInt8PtrTy(Ctx), ParamC, "params");
+        Builder.CreateAlloca(StackArrayT, Size1, "params");
 
     /* Store each parameter as pointer in the params array */
     int i = 0;
@@ -308,7 +314,7 @@ struct InstrumentEndpoint {
     for (Argument &Arg : TgtF->args()) {
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
-      Value *IdxI = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
+      Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
 
       Value *Slot;
       if (Arg.getType()->isPointerTy()) {
@@ -319,9 +325,10 @@ struct InstrumentEndpoint {
         Builder.CreateStore(&Arg, Slot, "pjit.stack.param");
       }
 
-      Value *Dest = Builder.CreateGEP(Params, IdxI);
-      Value *Cast = Builder.CreateBitCast(Slot, Arg.getType()->getPointerTo());
-      Builder.CreateStore(Cast, Dest);
+      Value *Dest = Builder.CreateGEP(Params, { Idx0, ArrIdx} );
+      Builder.CreateStore(
+          Builder.CreateBitCast(Slot, StackArrayT->getArrayElementType()),
+          Dest);
     }
 
     // Append required global variables.
@@ -335,17 +342,18 @@ struct InstrumentEndpoint {
         /* Get the appropriate slot in the parameters array and store
          * the stack slot in form of a i8*. */
         Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
-        Value *Dest = Builder.CreateGEP(Params, ArrIdx);
+        Value *Dest = Builder.CreateGEP(Params, { Idx0, ArrIdx });
 
         Builder.CreateStore(
-            Builder.CreateBitCast(GV, Type::getInt8PtrTy(Ctx)), Dest);
+            Builder.CreateBitCast(GV, StackArrayT->getArrayElementType()),
+            Dest);
       }
     }
 
     Args[0] = (PrototypeF) ? PrototypeF
                            : Builder.CreateGlobalStringPtr(TgtF->getName());
     Args[1] = ParamC;
-    Args[2] = Params;
+    Args[2] = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
 
     Builder.CreateCall(PJITCB, Args);
     Builder.CreateRetVoid();
