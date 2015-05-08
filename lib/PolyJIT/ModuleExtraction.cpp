@@ -235,7 +235,7 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
 
   // First create a new prototype function.
   MoveFunction Cloner(VMap, &M);
-  return Cloner.setSource(&F).start();
+  return Cloner.setSource(&F).start(true);
 }
 
 struct InstrumentEndpoint {
