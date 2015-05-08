@@ -183,8 +183,7 @@ struct AddGlobalsPolicy {
     // Set the global count attribute in the _source_ function, because
     // the function cloner will copy over all attributes from SrcF to
     // TgtF afterwards.
-    SrcF->addFnAttr("polyjit-global-count",
-                    fmt::format("{:d}", ReqGlobals.size()));
+    SrcF->addFnAttr("polyjit-global-count", fmt::format("{:d}", ReqGlobals.size()));
     return F;
   }
 };
