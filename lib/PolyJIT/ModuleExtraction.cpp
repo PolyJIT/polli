@@ -17,7 +17,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 using namespace llvm;
-using namespace spdlog::details::fmt;
+using namespace spdlog::details;
 
 namespace polli {
 char ModuleExtractor::ID = 0;
