@@ -82,9 +82,6 @@ bool ScopMapper::runOnFunction(Function &F) {
     }
   }
 
-  if (i > 0)
-    F.print(outs() << "\n after:");
-
   return true;
 }
 

@@ -268,8 +268,8 @@ struct InstrumentEndpoint {
 
     LLVMContext &Ctx = M->getContext();
 
-    StringRef cbName = StringRef("pjit_main");
     PointerType *PtoArr = PointerType::get(Type::getInt8PtrTy(Ctx), 0);
+    llvm::StringRef cbName = "pjit_main";
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
         cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt32Ty(Ctx), PtoArr, NULL));
@@ -383,15 +383,12 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     outs() << fmt::format("Instrument prototype to source module -> {:s}",
                           ProtoF->getName().str());
     InstrumentingFunctionCloner InstCloner(VMap, &M);
-    InstCloner.setSource(ProtoF);
-    InstCloner.setSinkHostPass(&SM);
-    InstCloner.setPrototype(Prototype);
+    InstCloner.setSource(ProtoF).setSinkHostPass(&SM).setPrototype(Prototype);
 
     Function *InstF = InstCloner.start();
     InstF->addFnAttr(Attribute::OptimizeNone);
 
     F->replaceAllUsesWith(InstF);
-    ProtoF->setName("prototype");
   }
 
   return true;
