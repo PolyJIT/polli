@@ -29,8 +29,12 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#define FMT_HEADER_ONLY
+#include "spdlog/details/format.h"
 
 using namespace llvm;
+using namespace spdlog::details;
+
 namespace polli {
 
 static inline void verifyFunctions(std::string Prefix, const Function *SrcF,
@@ -71,7 +75,7 @@ public:
 
   /* Optional: Set the pass we piggy-back ourself on. This enables
   * access to BasicBlockUtils which require Passes to operate on. */
-  void setSinkHostPass(Pass *HostP) {
+  FunctionCloner& setSinkHostPass(Pass *HostP) {
     SinkPolicy &pPolicy = *this;
     pPolicy.setPass(HostP);
     return *this;
@@ -96,31 +100,18 @@ public:
    * target module.
    * If target module does not exist, create the target
    * function in the source module. */
-  Function *start() {
+  Function *start(bool RemapCalls = false) {
     if (!TgtM)
       TgtM = SrcF->getParent();
 
     polli::verifyFunctions("create: ", SrcF, nullptr);
     if (!TgtF)
       TgtF = CreationPolicy::Create(SrcF, TgtM);
-
     CreationPolicy::MapArguments(VMap, SrcF, TgtF);
     polli::verifyFunctions("done create: ", SrcF, nullptr);
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
-    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
-
-    TgtF->copyAttributesFrom(SrcF);
-
-    // Store function mapping for the linker.
-    VMap[SrcF] = TgtF;
-
-    SrcF->getType()->print(outs() << "\nDrain-SRC:" + SrcF->getName() + " - ");
-    SrcF->print(outs() << "\n");
-
-    outs() << "VerifyF\n";
-    verifyFunction(*SrcF, &outs());
 
     // Collect all calls for remapping.
     outs() << fmt::format("remapping calls {:d}\n", RemapCalls);
@@ -134,22 +125,16 @@ public:
     CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
     TgtF->copyAttributesFrom(SrcF);
 
+    outs() << "policies...\n";
+    SinkPolicy::Apply(SrcF, TgtF, VMap);
+    outs() << "sink done...\n";
     DrainPolicy::Apply(SrcF, TgtF, VMap);
-    SinkPolicy::Apply(TgtF, SrcF, VMap);
-
-    TgtF->getType()->print(outs() << "\nSink-SRC:" + SrcF->getName() + " - ");
-    TgtF->print(outs() << "\n");
-
-    outs() << "VerifyF\n";
-    verifyFunction(*TgtF, &outs());
-    outs() << "VerifyM\n";
-    verifyModule(*TgtF->getParent(), &outs());
-
-    SrcF->getType()->print(outs() << "\nSink-TGT:" + TgtF->getName() + " - ");
-    SrcF->print(outs() << "\n");
+    outs() << "drain done...\n";
 
     polli::verifyFunctions("after transform: ", SrcF, TgtF);
 
+    // Store function mapping for the linker.
+    VMap[SrcF] = TgtF;
     return TgtF;
   }
 
@@ -173,7 +158,7 @@ struct CopyCreator {
       NewArg->setName(Arg->getName());
       VMap[Arg] = NewArg++;
     }
-  }
+}
 
   static Function *Create(Function *SrcF, Module *TgtM) {
     return Function::Create(SrcF->getFunctionType(), SrcF->getLinkage(),
