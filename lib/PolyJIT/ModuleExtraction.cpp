@@ -1,26 +1,23 @@
+#include "polli/FunctionCloner.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/ScopMapper.h"
-#include "polli/FunctionCloner.h"
 
+#include "llvm/Pass.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/IR/Function.h"
-#include "llvm/Pass.h"
-
-#define FMT_HEADER_ONLY
-#include "cppformat/format.h"
-
 using namespace llvm;
+using namespace spdlog::details::fmt;
 
 namespace polli {
 char ModuleExtractor::ID = 0;
