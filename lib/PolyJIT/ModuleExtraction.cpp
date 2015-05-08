@@ -246,11 +246,26 @@ struct InstrumentEndpoint {
 
   Pass *getPass() { return P; }
 
-  void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &) {
+  void Apply(Function *SrcF, Function *TgtF, ValueToValueMapTy &) {
+    if (!SrcF) {
+      errs() << "No source function!";
+      return;
+    }
+
+    if (!TgtF) {
+      errs() << "No target function!";
+      return;
+    }
+
     if (TgtF->isDeclaration())
       return;
 
     Module *M = TgtF->getParent();
+    if (!M) {
+      assert(M && "TgtF has no parent module!");
+      errs() << "oops, TgtF has no module";
+    }
+
     LLVMContext &Ctx = M->getContext();
 
     StringRef cbName = StringRef("pjit_main");
