@@ -21,16 +21,39 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/IR/Verifier.h"
-
-#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 namespace polli {
+
+static inline void verifyFunctions(std::string Prefix, const Function *SrcF,
+                            const Function *TgtF) {
+  if (SrcF) {
+    outs() << "(sourcef) " << Prefix;
+    if (verifyFunction(*SrcF, &outs())) {
+      SrcF->print(outs() << "\n");
+      outs() << "(sourcef) printing done.\n";
+    } else
+      outs() << "OK\n";
+  } else
+    outs() << "SrcF == null!\n";
+
+  if (TgtF) {
+    outs() << "(targetf) " << Prefix;
+    if (verifyFunction(*TgtF, &outs())) {
+      TgtF->print(outs() << "\n");
+      outs() << "(targetf) printing done.\n";
+    } else {
+      outs() << "OK\n";
+    }
+  } else
+    outs() << "TgtF == null!\n";
+}
 
 template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
 class FunctionCloner : public CreationPolicy,
@@ -60,10 +83,12 @@ public:
     if (!TgtM)
       TgtM = SrcF->getParent();
 
+    polli::verifyFunctions("create: ", SrcF, nullptr);
     if (!TgtF)
       TgtF = CreationPolicy::Create(SrcF, TgtM);
 
     CreationPolicy::MapArguments(VMap, SrcF, TgtF);
+    polli::verifyFunctions("done create: ", SrcF, nullptr);
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
@@ -86,8 +111,7 @@ public:
     TgtF->getType()->print(outs() << "\nDrain-TGT:" + TgtF->getName() + " - ");
     TgtF->print(outs() << "\n");
 
-    outs() << "VerifyF\n";
-    verifyFunction(*TgtF, &outs());
+    polli::verifyFunctions("before transform: ", SrcF, TgtF);
 
     outs() << "VerifyM\n";
     verifyModule(*TgtF->getParent(), &outs());
@@ -106,11 +130,7 @@ public:
     SrcF->getType()->print(outs() << "\nSink-TGT:" + TgtF->getName() + " - ");
     SrcF->print(outs() << "\n");
 
-    outs() << "VerifyF\n";
-    verifyFunction(*SrcF, &outs());
-    outs() << "VerifyM\n";
-    verifyModule(*SrcF->getParent(), &outs());
-    outs() << "\n";
+    polli::verifyFunctions("after transform: ", SrcF, TgtF);
 
     return TgtF;
   }
