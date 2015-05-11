@@ -202,7 +202,7 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
   VarFun->print(outs() << "\nvariant created: ");
 
-  SmallVector<GenericValue, 2> Args;
+  SmallVector<GenericValue, 2> Args(2);
   Args[0].IntVal = APInt(32, F->arg_size(), false);
   Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
