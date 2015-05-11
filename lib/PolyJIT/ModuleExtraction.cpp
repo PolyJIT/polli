@@ -4,8 +4,11 @@
 
 #include "llvm/Pass.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
@@ -15,6 +18,7 @@
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/CodeExtractor.h"
 
 using namespace llvm;
 using namespace spdlog::details;
@@ -34,7 +38,10 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
   return NewM;
 }
 
-void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {}
+void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<ScopMapper>();
+  AU.addRequired<DominatorTreeWrapperPass>();
+}
 
 void ModuleExtractor::releaseMemory() {}
 
@@ -246,7 +253,7 @@ struct RemoveGlobalsPolicy {
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
   using ExtractFunction =
-      FunctionCloner<AddGlobalsPolicy, DestroySource, IgnoreTarget>;
+      FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
 
   outs() << fmt::format("Source to Prototype -> {:s}\n", F.getName().str());
   // Prepare the source function.
@@ -362,8 +369,8 @@ struct InstrumentEndpoint {
     }
 
     SmallVector<Value *, 3> Args;
-    Args.push_back((PrototypeF) ? PrototypeF : Builder.CreateGlobalStringPtr(
-                                                   To->getName()));
+    Args.push_back((PrototypeF) ? PrototypeF
+                                : Builder.CreateGlobalStringPtr(To->getName()));
     Args.push_back(ParamC);
     Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
 
@@ -382,30 +389,58 @@ using InstrumentingFunctionCloner =
 
 bool ModuleExtractor::runOnModule(Module &M) {
   SetVector<Function *> Functions;
+  bool Changed = false;
 
   for (Function &F : M) {
     if (F.isDeclaration())
       continue;
-
     if (F.hasFnAttribute("polyjit-jit-candidate"))
-      Functions.insert(&F);
+      continue;
+
+    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
+    ScopMapper &SM = getAnalysis<ScopMapper>(F);
+
+    for (const Region *R : SM.regions()) {
+      std::vector<BasicBlock *> Blocks;
+      for (BasicBlock *BB : R->blocks())
+        Blocks.push_back(BB);
+
+      CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
+      if (Extractor.isEligible()) {
+        if (Function *ExtractedF = Extractor.extractCodeRegion()) {
+          //ExtractedF->setLinkage(GlobalValue::InternalLinkage);
+          ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
+          ExtractedF->addFnAttr("polyjit-jit-candidate");
+          Functions.insert(ExtractedF);
+          Changed |= true;
+        }
+      }
+
+      Blocks.clear();
+    }
   }
 
   for (Function *F : Functions) {
-    IRBuilder<> Builder(F->begin());
+    if (F->isDeclaration())
+      continue;
+
     ValueToValueMapTy VMap;
     Module *M = F->getParent();
     StringRef ModuleName = F->getParent()->getModuleIdentifier();
-
-    llvm::StringRef FunctionName = F->getName();
-
+    StringRef FromName = F->getName();
     ModulePtrT PrototypeM = copyModule(VMap, *M);
-    PrototypeM->setModuleIdentifier((ModuleName + "." + FunctionName).str() +
+
+    PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
 
     Function *ProtoF = extractPrototypeM(VMap, *F, *PrototypeM);
+
+    // Make sure that we do not destroy the function before we're done
+    // using the IRBuilder, otherwise this will end poorly.
+    assert(F->begin() && "Body of function got destroyed too early!");
+    IRBuilder<> Builder(F->begin());
     Value *Prototype = Builder.CreateGlobalStringPtr(
-        moduleToString(*PrototypeM), F->getName() + ".prototype");
+        moduleToString(*PrototypeM), FromName + ".prototype");
 
     outs() << fmt::format("\nInstrument prototype to source module -> {:s}\n",
                           ProtoF->getName().str());
@@ -416,13 +451,14 @@ bool ModuleExtractor::runOnModule(Module &M) {
     Function *InstF = InstCloner.start(/* RemapCalls */ true);
     outs() << fmt::format("\ninstrument prototpe completed\n");
     InstF->addFnAttr(Attribute::OptimizeNone);
+    InstF->addFnAttr(Attribute::NoInline);
 
     F->replaceAllUsesWith(InstF);
     F->eraseFromParent();
     VMap.clear();
   }
 
-  return true;
+  return Changed;
 }
 
 void ModuleExtractor::print(raw_ostream &, const Module *) const {}

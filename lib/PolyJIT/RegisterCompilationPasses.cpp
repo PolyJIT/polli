@@ -56,10 +56,8 @@ static void printConfig() {
 }
 
 void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
-  if (polly::PollyDelinearize && opt::EnableJitable) {
-    Console->info(" polly.delinearize: disabled (blocked by jitable)");
+  if (polly::PollyDelinearize && opt::EnableJitable)
     polly::PollyDelinearize = false;
-  }
 
   if (opt::InstrumentRegions)
     PM.add(new PapiCScopProfilingInit());
@@ -68,9 +66,6 @@ void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
 
   if (opt::InstrumentRegions)
     PM.add(new PapiCScopProfiling());
-
-  if (!opt::DisableRecompile)
-    PM.add(new ScopMapper());
 }
 
 static void setupLogging() {
@@ -93,6 +88,9 @@ static void registerModuleExtractor(const llvm::PassManagerBuilder &,
                                     llvm::legacy::PassManagerBase &PM) {
   if (!opt::Enabled)
     return;
+
+  if (polly::PollyDelinearize && opt::EnableJitable)
+    polly::PollyDelinearize = false;
 
   if (!opt::DisableRecompile)
     PM.add(new ModuleExtractor());

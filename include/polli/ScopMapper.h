@@ -12,14 +12,11 @@
 #ifndef POLLI_SCOP_MAPPER_H
 #define POLLI_SCOP_MAPPER_H
 
+#include "llvm/Pass.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
-
-#include "llvm/Pass.h"
-
-#include <set>
-
-using namespace llvm;
 
 namespace polli {
 
@@ -27,26 +24,24 @@ namespace polli {
 ///
 /// This extracts all SCoPs of a function into separate functions and
 /// replaces the SCoP with a call to the extracted function.
-class ScopMapper : public FunctionPass {
+class ScopMapper : public llvm::FunctionPass {
 public:
-  using FunctionSet = std::set<Function *>;
-  using FunctionSetIt = FunctionSet::iterator;
+  using RegionSet = llvm::SetVector<const llvm::Region *>;
 
-  iterator_range<FunctionSetIt> functions() {
-    return iterator_range<FunctionSetIt>(CreatedFunctions.begin(),
-                                         CreatedFunctions.end());
+  llvm::iterator_range<RegionSet::iterator> regions() {
+    return llvm::iterator_range<RegionSet::iterator>(MappableRegions.begin(),
+                                                     MappableRegions.end());
   }
-  FunctionSet &getCreatedFunctions() { return CreatedFunctions; }
 
   static char ID;
   explicit ScopMapper() : FunctionPass(ID) {}
 
   /// @name FunctionPass interface
   //@{
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-  virtual void releaseMemory() { CreatedFunctions.clear(); }
-  virtual bool runOnFunction(Function &F);
-  virtual void print(raw_ostream &, const Module *) const {}
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
+  virtual void releaseMemory() { MappableRegions.clear(); }
+  virtual bool runOnFunction(llvm::Function &F);
+  virtual void print(llvm::raw_ostream &, const llvm::Module *) const {}
   //@}
 private:
   //===--------------------------------------------------------------------===//
@@ -55,7 +50,7 @@ private:
   // DO NOT IMPLEMENT
   const ScopMapper &operator=(const ScopMapper &);
 
-  FunctionSet CreatedFunctions;
+  RegionSet MappableRegions;
 };
 }
 #endif // POLLI_SCOP_MAPPER_H

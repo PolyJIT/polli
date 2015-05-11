@@ -178,12 +178,12 @@ public:
    * @param SrcF Our source function.
    * @param VMap A value-to-value map that tracks cloned values/function args.
    */
-  void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap) {
+  void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
     // Connect Entry block of TgtF with Cloned version of SrcF's entry block.
-    LLVMContext &Context = TgtF->getContext();
+    LLVMContext &Context = To->getContext();
     IRBuilder<> Builder(Context);
-    BasicBlock *EntryBB = &TgtF->getEntryBlock();
-    BasicBlock *SrcEntryBB = &SrcF->getEntryBlock();
+    BasicBlock *EntryBB = &To->getEntryBlock();
+    BasicBlock *SrcEntryBB = &From->getEntryBlock();
     BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
 
     Builder.SetInsertPoint(EntryBB);
@@ -191,10 +191,10 @@ public:
 
     for (unsigned i = 0; i < SpecValues.size(); ++i) {
       ParamT P = SpecValues[i];
-      Function::arg_iterator Arg = getArgument(SrcF, P.Name);
+      Function::arg_iterator Arg = getArgument(From, P.Name);
 
       // Could not find the argument, should not happen.
-      if (Arg == TgtF->arg_end())
+      if (Arg == To->arg_end())
         continue;
 
       // Get a constant value for P.

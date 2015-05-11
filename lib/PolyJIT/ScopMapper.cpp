@@ -55,22 +55,11 @@ bool ScopMapper::runOnFunction(Function &F) {
     return false;
 
   /* Extract each SCoP in this function into a new one. */
-  int i = 0;
   for (const Region *R : NSD.jitScops()) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
 
-    unsigned LineBegin, LineEnd;
-    std::string FileName;
-    getDebugLocation(R, LineBegin, LineEnd, FileName);
-
     if (Extractor.isEligible()) {
-      if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-        ExtractedF->setLinkage(GlobalValue::InternalLinkage);
-        ExtractedF->setName(ExtractedF->getName() + ".pjit.scop" + Twine(i++));
-        ExtractedF->addFnAttr("polyjit-jit-candidate");
-        Changed |= true;
-        CreatedFunctions.insert(ExtractedF);
-      }
+      MappableRegions.insert(R);
     } else {
       log(Error, 2) << " failed :: Scop " << R->getNameStr()
                     << " not eligible for extraction\n";
@@ -82,4 +71,4 @@ bool ScopMapper::runOnFunction(Function &F) {
 
 char ScopMapper::ID = 0;
 static RegisterPass<ScopMapper>
-    X("polli-map-scops", "PolyJIT - Extract SCoPs into their own function");
+    X("polli-map-scops", "PolyJIT - Mark SCoPs for runtime extraction");
