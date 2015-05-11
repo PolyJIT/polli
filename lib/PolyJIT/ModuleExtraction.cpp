@@ -177,7 +177,6 @@ struct AddGlobalsPolicy {
     for (const GlobalValue *GV : ReqGlobals) {
       AttrBuilder Builder;
       Builder.addAttribute(Attribute::NonNull);
-      Builder.addAttribute(Attribute::Dereferenceable);
 
       NewArg->addAttr(AttributeSet::get(TgtF->getContext(), 1, Builder));
       NewArg->setName(GV->getName());
