@@ -248,7 +248,7 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, DestroySource, IgnoreTarget>;
 
-  outs() << fmt::format("Source to Prototype -> {:s}", F.getName().str());
+  outs() << fmt::format("Source to Prototype -> {:s}\n", F.getName().str());
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
   InstrList Converted = apply<InstrList>(F, constantExprToInstruction);
