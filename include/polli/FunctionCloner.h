@@ -121,7 +121,6 @@ public:
 
     outs() << "cloning...\n";
     CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
-    TgtF->copyAttributesFrom(SrcF);
 
     outs() << "policies...\n";
     SinkPolicy::Apply(SrcF, TgtF, VMap);
