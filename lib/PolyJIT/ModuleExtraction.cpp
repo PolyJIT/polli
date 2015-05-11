@@ -85,6 +85,25 @@ static Value *getPointerOperand(Instruction &I) {
   return V;
 }
 
+static void setPointerOperand(Instruction &I, Value &V) {
+  IRBuilder<> Builder = IRBuilder<>(&I);
+
+  Value *NewV;
+  if (isa<LoadInst>(&I)) {
+    NewV = Builder.CreateLoad(&V);
+  } else if (StoreInst *S = dyn_cast<StoreInst>(&I)) {
+    NewV = Builder.CreateStore(S->getValueOperand(), &V);
+  } else {
+    return;
+  }
+  // else if (GetElementPtrInst *G = dyn_cast<GetElementPtrInst>(&I)) {
+  //  NewV = Builder.CreateGEP
+  //  G->setOperand(0, &V);
+  //}
+
+  I.replaceAllUsesWith(NewV);
+}
+
 static inline size_t getGlobalCount(Function *F) {
   size_t n = 0;
   if (F->hasFnAttribute("polyjit-global-count"))
@@ -103,7 +122,8 @@ static inline void constantExprToInstruction(Instruction &I,
     if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
       Instruction *Inst = C->getAsInstruction();
       Inst->insertBefore(&I);
-      C->replaceAllUsesWith(Inst);
+      setPointerOperand(I, *Inst);
+      Converted.push_back(&I);
     }
   }
 }
@@ -231,7 +251,11 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   outs() << fmt::format("Source to Prototype -> {:s}", F.getName().str());
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
-  apply<InstrList>(F, constantExprToInstruction);
+  InstrList Converted = apply<InstrList>(F, constantExprToInstruction);
+
+  for (Instruction *I : Converted) {
+    I->eraseFromParent();
+  }
 
   // First create a new prototype function.
   MoveFunction Cloner(VMap, &M);
