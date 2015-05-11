@@ -60,18 +60,18 @@ static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
   verifyFn(Prefix + "(targetf) ", TgtF);
 }
 
-template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
-class FunctionCloner : public CreationPolicy,
-                       public DrainPolicy,
-                       public SinkPolicy {
+template <class OnCreate, class SourceAfterClone, class TargetAfterClone>
+class FunctionCloner : public OnCreate,
+                       public SourceAfterClone,
+                       public TargetAfterClone {
 public:
-  explicit FunctionCloner<CreationPolicy, DrainPolicy, SinkPolicy>(
+  explicit FunctionCloner(
       ValueToValueMapTy &map, Module *m = NULL)
-      : VMap(map), TgtM(m), SrcF(nullptr), TgtF(nullptr) {}
+      : VMap(map), ToM(m), From(nullptr), To(nullptr) {}
 
-  void setTarget(Function *F) { TgtF = F; }
+  void setTarget(Function *F) { To = F; }
   FunctionCloner &setSource(Function *F) {
-    SrcF = F;
+    From = F;
     return *this;
   }
 
@@ -103,47 +103,46 @@ public:
    * If target module does not exist, create the target
    * function in the source module. */
   Function *start(bool RemapCalls = false) {
-    if (!TgtM)
-      TgtM = SrcF->getParent();
+    if (!ToM)
+      ToM = From->getParent();
 
-    polli::verifyFunctions("create: ", SrcF, nullptr);
-    if (!TgtF)
-      TgtF = CreationPolicy::Create(SrcF, TgtM);
-    CreationPolicy::MapArguments(VMap, SrcF, TgtF);
-    polli::verifyFunctions("done create: ", SrcF, nullptr);
+    polli::verifyFunctions("OnCreate: ", From, To);
+    if (!To)
+      To = OnCreate::Create(From, ToM);
+    OnCreate::MapArguments(VMap, From, To);
+    polli::verifyFunctions("OnCreate done: ", From, To);
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
 
     // Collect all calls for remapping.
-    outs() << fmt::format("remapping calls {:d}\n", RemapCalls);
     if (RemapCalls) {
-      mapCalls(*SrcF, TgtM, VMap);
+      mapCalls(*From, ToM, VMap);
+      outs() << fmt::format("remapping function calls done\n", RemapCalls);
     }
 
-    polli::verifyFunctions("before transform: ", SrcF, TgtF);
+    polli::verifyFunctions("before transform: ", From, To);
 
-    outs() << "cloning...\n";
-    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
+    CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
+    outs() << "cloning done...\n";
 
-    outs() << "policies...\n";
-    SinkPolicy::Apply(SrcF, TgtF, VMap);
-    outs() << "sink done...\n";
-    DrainPolicy::Apply(SrcF, TgtF, VMap);
-    outs() << "drain done...\n";
+    SourceAfterClone::Apply(From, To, VMap);
+    outs() << "source done...\n";
+    TargetAfterClone::Apply(From, To, VMap);
+    outs() << "target done...\n";
 
-    polli::verifyFunctions("after transform: ", SrcF, TgtF);
+    polli::verifyFunctions("after transform: ", From, To);
 
     // Store function mapping for the linker.
-    VMap[SrcF] = TgtF;
-    return TgtF;
+    VMap[From] = To;
+    return To;
   }
 
 private:
   ValueToValueMapTy &VMap;
-  Module *TgtM;
-  Function *SrcF;
-  Function *TgtF;
+  Module *ToM;
+  Function *From;
+  Function *To;
 };
 
 /*
