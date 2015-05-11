@@ -270,45 +270,30 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
 struct InstrumentEndpoint {
   void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
+  void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
+    assert(From && "No source function!");
+    assert(To && "No target function!");
 
-  void Apply(Function *SrcF, Function *TgtF, ValueToValueMapTy &) {
-    if (!SrcF) {
-      errs() << "No source function!";
-      return;
-    }
-
-    if (!TgtF) {
-      errs() << "No target function!";
-      return;
-    }
-
-    if (TgtF->isDeclaration())
+    if (To->isDeclaration())
       return;
 
-    Module *M = TgtF->getParent();
-    if (!M) {
-      assert(M && "TgtF has no parent module!");
-      errs() << "oops, TgtF has no module";
-    }
+    Module *M = To->getParent();
+    assert(M && "TgtF has no parent module!");
 
     outs() << "pjit_main...\n";
     LLVMContext &Ctx = M->getContext();
 
-    llvm::StringRef cbName = "pjit_main";
-    PointerType *PtoArr = Type::getInt8PtrTy(Ctx);
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        cbName, Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
-        Type::getInt32Ty(Ctx), PtoArr, NULL));
+        "pjit_main", Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
+        Type::getInt32Ty(Ctx), Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
-    std::vector<Value *> Args(3);
-
     outs() << "purge TgtF...\n";
-    TgtF->deleteBody();
-    TgtF->setLinkage(SrcF->getLinkage());
+    To->deleteBody();
+    To->setLinkage(From->getLinkage());
 
     outs() << "new entry...\n";
-    BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", TgtF);
+    BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", To);
     IRBuilder<> Builder(BB);
     Builder.SetInsertPoint(BB);
 
@@ -330,13 +315,13 @@ struct InstrumentEndpoint {
 
     /* Prepare a stack array for the parameters. We will pass a pointer to
      * this array into our callback function. */
-    int argc = TgtF->arg_size() + getGlobalCount(SrcF);
+    int argc = To->arg_size() + getGlobalCount(From);
     Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc);
     ArrayType *StackArrayT = ArrayType::get(Type::getInt8PtrTy(Ctx), argc);
     Value *Params = Builder.CreateAlloca(StackArrayT, Size1, "params");
 
     outs() << "args...\n";
-    for (Argument &Arg : TgtF->args()) {
+    for (Argument &Arg : To->args()) {
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
       Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
@@ -358,7 +343,7 @@ struct InstrumentEndpoint {
 
     outs() << "globals...\n";
     // Append required global variables.
-    Function::arg_iterator GlobalArgs = SrcF->arg_begin();
+    Function::arg_iterator GlobalArgs = From->arg_begin();
     for (int j = 0; j < i; j++)
       GlobalArgs++;
     for (; i < argc; i++) {
@@ -376,10 +361,11 @@ struct InstrumentEndpoint {
       }
     }
 
-    Args[0] = (PrototypeF) ? PrototypeF
-                           : Builder.CreateGlobalStringPtr(TgtF->getName());
-    Args[1] = ParamC;
-    Args[2] = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
+    SmallVector<Value *, 3> Args;
+    Args.push_back((PrototypeF) ? PrototypeF : Builder.CreateGlobalStringPtr(
+                                                   To->getName()));
+    Args.push_back(ParamC);
+    Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
 
     outs() << "jit callback...\n";
     Builder.CreateCall(PJITCB, Args);
