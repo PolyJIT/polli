@@ -75,14 +75,6 @@ public:
     return *this;
   }
 
-  /* Optional: Set the pass we piggy-back ourself on. This enables
-  * access to BasicBlockUtils which require Passes to operate on. */
-  FunctionCloner &setSinkHostPass(Pass *HostP) {
-    SinkPolicy &pPolicy = *this;
-    pPolicy.setPass(HostP);
-    return *this;
-  }
-
   void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
     for (Instruction &I : inst_range(SrcF)) {
       if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {

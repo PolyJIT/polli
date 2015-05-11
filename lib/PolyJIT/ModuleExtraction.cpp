@@ -262,10 +262,8 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
 }
 
 struct InstrumentEndpoint {
-  void setPass(Pass *HostPass) { P = HostPass; }
   void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
-  Pass *getPass() { return P; }
 
   void Apply(Function *SrcF, Function *TgtF, ValueToValueMapTy &) {
     if (!SrcF) {
@@ -384,7 +382,6 @@ struct InstrumentEndpoint {
   }
 
 private:
-  Pass *P;
   Value *PrototypeF;
 };
 
@@ -414,10 +411,11 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
     outs() << fmt::format("\nInstrument prototype to source module -> {:s}\n",
                           ProtoF->getName().str());
-    InstrumentingFunctionCloner InstCloner(VMap, &M);
-    InstCloner.setSource(ProtoF).setSinkHostPass(&SM).setPrototype(Prototype);
 
-    Function *InstF = InstCloner.start();
+    InstrumentingFunctionCloner InstCloner(VMap, M);
+    InstCloner.setSource(ProtoF).setPrototype(Prototype);
+
+    Function *InstF = InstCloner.start(/* RemapCalls */ true);
     outs() << fmt::format("\ninstrument prototpe completed\n");
     InstF->addFnAttr(Attribute::OptimizeNone);
     F->replaceAllUsesWith(InstF);
