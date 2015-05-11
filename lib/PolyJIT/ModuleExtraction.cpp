@@ -262,6 +262,11 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   return Cloner.setSource(&F).start(true);
 }
 
+// @brief Instrument the endpoint after cloning.
+//
+// This endpoint is used to instrument a function as soon as cloning is
+// complete. Usually this is used in the drain endpoint.
+//
 struct InstrumentEndpoint {
   void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
