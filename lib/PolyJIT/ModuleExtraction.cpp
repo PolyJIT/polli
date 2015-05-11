@@ -215,16 +215,19 @@ struct AddGlobalsPolicy {
  * function attribute.
  */
 struct RemoveGlobalsPolicy {
-  static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
-                           Function *TgtF) {
-    size_t ArgCount = SrcF->arg_size() - getGlobalCount(SrcF);
-    Module &M = *TgtF->getParent();
+  static void MapArguments(ValueToValueMapTy &VMap, Function *From,
+                           Function *To) {
+    size_t FromArgCnt = From->arg_size() - getGlobalCount(From);
+    Module &ToM = *To->getParent();
+    Function::arg_iterator ToArg = From->arg_begin();
 
     size_t i = 0;
-    for (auto &Arg : TgtF->args())
-      if (i++ >= ArgCount) {
-        if (GlobalValue *GV = M.getGlobalVariable(Arg.getName(), true))
-          VMap[&Arg] = GV;
+    for (auto &FromArg : From->args())
+      if (i++ >= FromArgCnt) {
+        if (GlobalValue *GV = ToM.getGlobalVariable(FromArg.getName(), true))
+          VMap[&FromArg] = GV;
+      } else {
+        VMap[&FromArg] = ToArg++;
       }
   }
 
