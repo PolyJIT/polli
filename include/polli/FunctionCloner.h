@@ -120,7 +120,7 @@ public:
     polli::verifyFunctions("before transform: ", SrcF, TgtF);
 
     outs() << "cloning...\n";
-    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/false, Returns);
+    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     outs() << "policies...\n";
     SinkPolicy::Apply(SrcF, TgtF, VMap);
