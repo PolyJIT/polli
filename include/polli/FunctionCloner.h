@@ -38,15 +38,19 @@ using namespace spdlog::details;
 namespace polli {
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
+  outs() << Prefix;
   if (F && !F->isDeclaration()) {
-    outs() << Prefix;
-    F->print(outs() << "\n");
+    //F->print(outs() << "\n");
     if (verifyFunction(*F, &outs())) {
-      outs() << Prefix << " printing done.\n";
+      outs() << " printing done.\n";
     } else
-      outs() << Prefix << "OK\n";
-  } else
-    outs() << Prefix << " OK (F is nullptr or declaration)\n";
+      outs() << " OK\n";
+  } else if (F && F->isDeclaration()) {
+    F->getType()->print(outs() << "\nOK (declare) : ");
+    outs() << "\n";
+  } else {
+    outs() << "\nOK (F is nullptr)\n";
+  }
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
