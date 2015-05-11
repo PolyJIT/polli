@@ -66,11 +66,14 @@ public:
       : VMap(map), TgtM(m), SrcF(nullptr), TgtF(nullptr) {}
 
   void setTarget(Function *F) { TgtF = F; }
-  FunctionCloner& setSource(Function *F) { SrcF = F; return *this; }
+  FunctionCloner &setSource(Function *F) {
+    SrcF = F;
+    return *this;
+  }
 
   /* Optional: Set the pass we piggy-back ourself on. This enables
   * access to BasicBlockUtils which require Passes to operate on. */
-  FunctionCloner& setSinkHostPass(Pass *HostP) {
+  FunctionCloner &setSinkHostPass(Pass *HostP) {
     SinkPolicy &pPolicy = *this;
     pPolicy.setPass(HostP);
     return *this;
@@ -153,7 +156,7 @@ struct CopyCreator {
       NewArg->setName(Arg->getName());
       VMap[Arg] = NewArg++;
     }
-}
+  }
 
   static Function *Create(Function *SrcF, Module *TgtM) {
     return Function::Create(SrcF->getFunctionType(), SrcF->getLinkage(),
@@ -165,14 +168,14 @@ struct CopyCreator {
  * Endpoint policies for the function cloner host.
  */
 struct IgnoreSource {
-  static void Apply(Function *, Function *, ValueToValueMapTy &) {
-    /* Do nothing */
+  static void Apply(Function *, Function *, ValueToValueMapTy &){
+      /* Do nothing */
   };
 };
 
 struct IgnoreTarget {
-  static void Apply(Function *, Function *, ValueToValueMapTy &) {
-    /* Do nothing */
+  static void Apply(Function *, Function *, ValueToValueMapTy &){
+      /* Do nothing */
   };
 };
 
@@ -192,13 +195,10 @@ struct DestroyTarget {
   }
 };
 
-
-
 typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
-DefaultFunctionCloner;
+    DefaultFunctionCloner;
 
 typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
-MovingFunctionCloner;
-
+    MovingFunctionCloner;
 }
 #endif // POLLI_FUNCTION_CLONER_H

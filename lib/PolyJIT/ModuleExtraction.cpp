@@ -38,8 +38,7 @@ void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopMapper>();
 }
 
-void ModuleExtractor::releaseMemory() {
-}
+void ModuleExtractor::releaseMemory() {}
 
 /**
  * @brief Convert a module to a string.
@@ -183,7 +182,8 @@ struct AddGlobalsPolicy {
     // Set the global count attribute in the _source_ function, because
     // the function cloner will copy over all attributes from SrcF to
     // TgtF afterwards.
-    SrcF->addFnAttr("polyjit-global-count", fmt::format("{:d}", ReqGlobals.size()));
+    SrcF->addFnAttr("polyjit-global-count",
+                    fmt::format("{:d}", ReqGlobals.size()));
     return F;
   }
 };
@@ -240,9 +240,7 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
 
 struct InstrumentEndpoint {
   void setPass(Pass *HostPass) { P = HostPass; }
-  void setPrototype(Value *Prototype) {
-    PrototypeF = Prototype;
-  }
+  void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
   Pass *getPass() { return P; }
 
@@ -308,8 +306,7 @@ struct InstrumentEndpoint {
     int argc = TgtF->arg_size() + getGlobalCount(SrcF);
     Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc);
     ArrayType *StackArrayT = ArrayType::get(Type::getInt8PtrTy(Ctx), argc);
-    Value *Params =
-        Builder.CreateAlloca(StackArrayT, Size1, "params");
+    Value *Params = Builder.CreateAlloca(StackArrayT, Size1, "params");
 
     outs() << "args...\n";
     for (Argument &Arg : TgtF->args()) {
@@ -326,7 +323,7 @@ struct InstrumentEndpoint {
         Builder.CreateStore(&Arg, Slot, "pjit.stack.param");
       }
 
-      Value *Dest = Builder.CreateGEP(Params, { Idx0, ArrIdx} );
+      Value *Dest = Builder.CreateGEP(Params, {Idx0, ArrIdx});
       Builder.CreateStore(
           Builder.CreateBitCast(Slot, StackArrayT->getArrayElementType()),
           Dest);
@@ -344,7 +341,7 @@ struct InstrumentEndpoint {
         /* Get the appropriate slot in the parameters array and store
          * the stack slot in form of a i8*. */
         Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
-        Value *Dest = Builder.CreateGEP(Params, { Idx0, ArrIdx });
+        Value *Dest = Builder.CreateGEP(Params, {Idx0, ArrIdx});
 
         Builder.CreateStore(
             Builder.CreateBitCast(GV, StackArrayT->getArrayElementType()),
@@ -406,8 +403,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
   return true;
 }
 
-void ModuleExtractor::print(raw_ostream &, const Module *) const {
-}
+void ModuleExtractor::print(raw_ostream &, const Module *) const {}
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
