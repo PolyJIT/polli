@@ -69,10 +69,8 @@ void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
   if (opt::InstrumentRegions)
     PM.add(new PapiCScopProfiling());
 
-  if (!opt::DisableRecompile) {
+  if (!opt::DisableRecompile)
     PM.add(new ScopMapper());
-    PM.add(new ModuleExtractor());
-  }
 }
 
 static void setupLogging() {
@@ -91,7 +89,19 @@ static void registerPolli(const llvm::PassManagerBuilder &,
   registerPolliPasses(PM);
 }
 
+static void registerModuleExtractor(const llvm::PassManagerBuilder &,
+                                    llvm::legacy::PassManagerBase &PM) {
+  if (!opt::Enabled)
+    return;
+
+  if (!opt::DisableRecompile)
+    PM.add(new ModuleExtractor());
+}
+
 static llvm::RegisterStandardPasses
     RegisterPolliInstrumentation(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
                                  registerPolli);
+static llvm::RegisterStandardPasses
+    RegisterPolliModuleExtraction(llvm::PassManagerBuilder::EP_OptimizerLast,
+                                  registerModuleExtractor);
 }

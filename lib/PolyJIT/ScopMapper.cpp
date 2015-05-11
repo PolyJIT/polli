@@ -41,8 +41,6 @@ using namespace polly;
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JitScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
-  AU.addRequired<RegionInfoPass>();
-  AU.setPreservesAll();
 }
 
 bool ScopMapper::runOnFunction(Function &F) {

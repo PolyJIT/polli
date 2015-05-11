@@ -388,26 +388,32 @@ private:
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
 
-bool ModuleExtractor::runOnFunction(Function &F) {
-  ScopMapper &SM = getAnalysis<ScopMapper>();
+bool ModuleExtractor::runOnModule(Module &M) {
+  SetVector<Function *> Functions;
 
-  Module &M = *(F.getParent());
-  StringRef ModuleName = F.getParent()->getModuleIdentifier();
-  ValueToValueMapTy VMap;
-  IRBuilder<> Builder(F.begin());
+  for (Function &F : M) {
+    if (F.isDeclaration())
+      continue;
 
-  for (Function *F : SM.functions()) {
+    if (F.hasFnAttribute("polyjit-jit-candidate"))
+      Functions.insert(&F);
+  }
+
+  for (Function *F : Functions) {
+    IRBuilder<> Builder(F->begin());
+    ValueToValueMapTy VMap;
+    Module *M = F->getParent();
+    StringRef ModuleName = F->getParent()->getModuleIdentifier();
+
     llvm::StringRef FunctionName = F->getName();
 
-    ModulePtrT PrototypeM = copyModule(VMap, M);
+    ModulePtrT PrototypeM = copyModule(VMap, *M);
     PrototypeM->setModuleIdentifier((ModuleName + "." + FunctionName).str() +
                                     ".prototype");
 
     Function *ProtoF = extractPrototypeM(VMap, *F, *PrototypeM);
-
-    std::string PrototypeModStr = moduleToString(*PrototypeM);
     Value *Prototype = Builder.CreateGlobalStringPtr(
-        PrototypeModStr, F->getName() + ".prototype");
+        moduleToString(*PrototypeM), F->getName() + ".prototype");
 
     outs() << fmt::format("\nInstrument prototype to source module -> {:s}\n",
                           ProtoF->getName().str());
@@ -418,7 +424,10 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Function *InstF = InstCloner.start(/* RemapCalls */ true);
     outs() << fmt::format("\ninstrument prototpe completed\n");
     InstF->addFnAttr(Attribute::OptimizeNone);
+
     F->replaceAllUsesWith(InstF);
+    F->eraseFromParent();
+    VMap.clear();
   }
 
   return true;
