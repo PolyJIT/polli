@@ -34,9 +34,7 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
   return NewM;
 }
 
-void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<ScopMapper>();
-}
+void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {}
 
 void ModuleExtractor::releaseMemory() {}
 
