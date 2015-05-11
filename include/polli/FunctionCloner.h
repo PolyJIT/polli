@@ -37,28 +37,23 @@ using namespace spdlog::details;
 
 namespace polli {
 
-static inline void verifyFunctions(std::string Prefix, const Function *SrcF,
-                            const Function *TgtF) {
-  if (SrcF) {
-    outs() << "(sourcef) " << Prefix;
-    if (verifyFunction(*SrcF, &outs())) {
-      SrcF->print(outs() << "\n");
-      outs() << "(sourcef) printing done.\n";
+static inline void verifyFn(const Twine &Prefix, const Function *F) {
+  if (F && !F->isDeclaration()) {
+    outs() << Prefix;
+    F->print(outs() << "\n");
+    if (verifyFunction(*F, &outs())) {
+      outs() << Prefix << " printing done.\n";
     } else
-      outs() << "OK\n";
+      outs() << Prefix << "OK\n";
   } else
-    outs() << "SrcF == null!\n";
+    outs() << Prefix << " OK (F is nullptr or declaration)\n";
+}
 
-  if (TgtF) {
-    outs() << "(targetf) " << Prefix;
-    if (verifyFunction(*TgtF, &outs())) {
-      TgtF->print(outs() << "\n");
-      outs() << "(targetf) printing done.\n";
-    } else {
-      outs() << "OK\n";
-    }
-  } else
-    outs() << "TgtF == null!\n";
+static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
+                                   const Function *TgtF) {
+
+  verifyFn(Prefix + "(sourcef) ", SrcF);
+  verifyFn(Prefix + "(targetf) ", TgtF);
 }
 
 template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
