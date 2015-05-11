@@ -240,7 +240,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
   FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>
       Specializer(VMap, NewM);
 
-  assert(!BaseF->isDeclaration() && "Uninstrumented function is a declaration");
+  assert(!BaseF.isDeclaration() && "Uninstrumented function is a declaration");
 
   /* Perform a parameter specialization by taking the unchanged base function
    * and substitute all known parameter values.

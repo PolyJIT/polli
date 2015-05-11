@@ -124,7 +124,6 @@ extern "C" {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
-  assert(NewF && "Cannot execute a NULL function!");
   static ManagedModules Mods;
 
   Module *NewM = NewF.getParent();
