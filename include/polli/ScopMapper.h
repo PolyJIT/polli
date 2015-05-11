@@ -23,6 +23,10 @@ using namespace llvm;
 
 namespace polli {
 
+/// @brief Extract SCoPs from the host function into a separate function.
+///
+/// This extracts all SCoPs of a function into separate functions and
+/// replaces the SCoP with a call to the extracted function.
 class ScopMapper : public FunctionPass {
 public:
   using FunctionSet = std::set<Function *>;
