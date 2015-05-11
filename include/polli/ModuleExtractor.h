@@ -12,19 +12,20 @@
 #ifndef POLLI_MODULE_EXTRACTOR_H
 #define POLLI_MODULE_EXTRACTOR_H
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Pass.h"
 
 namespace polli {
-class ModuleExtractor : public llvm::ModulePass {
+class ModuleExtractor : public llvm::FunctionPass {
 public:
   static char ID;
-  explicit ModuleExtractor() : llvm::ModulePass(ID) {}
+  explicit ModuleExtractor() : llvm::FunctionPass(ID) {}
 
   /// @name FunctionPass interface
   //@{
   virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
   virtual void releaseMemory();
-  virtual bool runOnModule(llvm::Module &M);
+  virtual bool runOnFunction(llvm::Function &M);
   virtual void print(llvm::raw_ostream &, const llvm::Module *) const;
   //@}
 private:

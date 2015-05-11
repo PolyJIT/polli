@@ -41,13 +41,12 @@ using namespace polly;
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JitScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
-  //AU.setPreservesAll();
+  AU.setPreservesAll();
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
   JitScopDetection &NSD = getAnalysis<JitScopDetection>();
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  bool Changed = false;
 
   // We already processed these.
   if (F.hasFnAttribute(Attribute::OptimizeNone) ||
@@ -61,12 +60,11 @@ bool ScopMapper::runOnFunction(Function &F) {
     if (Extractor.isEligible()) {
       MappableRegions.insert(R);
     } else {
-      log(Error, 2) << " failed :: Scop " << R->getNameStr()
-                    << " not eligible for extraction\n";
+      outs() << R->getNameStr() << " not eligible\n";
     }
   }
 
-  return Changed;
+  return false;
 }
 
 char ScopMapper::ID = 0;

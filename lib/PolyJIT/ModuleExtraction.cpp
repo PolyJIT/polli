@@ -387,36 +387,28 @@ private:
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
 
-bool ModuleExtractor::runOnModule(Module &M) {
+bool ModuleExtractor::runOnFunction(Function &F) {
   SetVector<Function *> Functions;
   bool Changed = false;
 
-  for (Function &F : M) {
-    if (F.isDeclaration())
-      continue;
-    if (F.hasFnAttribute("polyjit-jit-candidate"))
-      continue;
+  if (F.isDeclaration())
+    return false;
+  if (F.hasFnAttribute("polyjit-jit-candidate"))
+    return false;
 
-    DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>(F).getDomTree();
-    ScopMapper &SM = getAnalysis<ScopMapper>(F);
+  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  ScopMapper &SM = getAnalysis<ScopMapper>();
 
-    for (const Region *R : SM.regions()) {
-      std::vector<BasicBlock *> Blocks;
-      for (BasicBlock *BB : R->blocks())
-        Blocks.push_back(BB);
-
-      CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
-      if (Extractor.isEligible()) {
-        if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-          //ExtractedF->setLinkage(GlobalValue::InternalLinkage);
-          ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
-          ExtractedF->addFnAttr("polyjit-jit-candidate");
-          Functions.insert(ExtractedF);
-          Changed |= true;
-        }
+  for (const Region *R : SM.regions()) {
+    CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
+    if (Extractor.isEligible()) {
+      if (Function *ExtractedF = Extractor.extractCodeRegion()) {
+        ExtractedF->setLinkage(GlobalValue::InternalLinkage);
+        ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
+        ExtractedF->addFnAttr("polyjit-jit-candidate");
+        Functions.insert(ExtractedF);
+        Changed |= true;
       }
-
-      Blocks.clear();
     }
   }
 
@@ -454,7 +446,6 @@ bool ModuleExtractor::runOnModule(Module &M) {
     InstF->addFnAttr(Attribute::NoInline);
 
     F->replaceAllUsesWith(InstF);
-    F->eraseFromParent();
     VMap.clear();
   }
 

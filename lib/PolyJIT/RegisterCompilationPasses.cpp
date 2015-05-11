@@ -97,9 +97,9 @@ static void registerModuleExtractor(const llvm::PassManagerBuilder &,
 }
 
 static llvm::RegisterStandardPasses
-    RegisterPolliInstrumentation(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
+    RegisterPolliInstrumentation(llvm::PassManagerBuilder::EP_EarlyAsPossible,
                                  registerPolli);
 static llvm::RegisterStandardPasses
-    RegisterPolliModuleExtraction(llvm::PassManagerBuilder::EP_OptimizerLast,
+    RegisterPolliModuleExtraction(llvm::PassManagerBuilder::EP_EarlyAsPossible,
                                   registerModuleExtractor);
 }
