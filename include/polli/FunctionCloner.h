@@ -177,16 +177,12 @@ struct IgnoreTarget {
 struct DestroySource {
   static void Apply(Function *SrcF, Function *, ValueToValueMapTy &VMap) {
     SrcF->deleteBody();
-    SrcF->setLinkage(GlobalValue::InternalLinkage);
-    VMap.erase(SrcF);
   }
 };
 
 struct DestroyTarget {
   static void Apply(Function *, Function *TgtF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
-    TgtF->setLinkage(GlobalValue::InternalLinkage);
-    VMap.erase(TgtF);
   }
 };
 
