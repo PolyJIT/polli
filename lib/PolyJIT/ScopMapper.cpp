@@ -41,37 +41,34 @@ using namespace polly;
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JitScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
+  //AU.setPreservesAll();
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
   JitScopDetection &NSD = getAnalysis<JitScopDetection>();
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  bool Changed = false;
 
-  if(F.hasFnAttribute(Attribute::OptimizeNone))
-    return false;
-
-  // That would recurse forever.
-  if(F.hasFnAttribute("polyjit-jit-candidate"))
+  // We already processed these.
+  if (F.hasFnAttribute(Attribute::OptimizeNone) ||
+      F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
   /* Extract each SCoP in this function into a new one. */
   int i = 0;
   for (const Region *R : NSD.jitScops()) {
-    CodeExtractor Extractor(DT, *(R->getNode()));
+    CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
 
     unsigned LineBegin, LineEnd;
     std::string FileName;
     getDebugLocation(R, LineBegin, LineEnd, FileName);
 
-    DEBUG(Console->debug("mapper :: extract :: {0}:{1}:{2} - {3}", FileName,
-                         LineBegin, LineEnd, R->getNameStr()););
-
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-        Console->warn("extract: {:s}", ExtractedF->getName().str());
         ExtractedF->setLinkage(GlobalValue::InternalLinkage);
-        ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
+        ExtractedF->setName(ExtractedF->getName() + ".pjit.scop" + Twine(i++));
         ExtractedF->addFnAttr("polyjit-jit-candidate");
+        Changed |= true;
         CreatedFunctions.insert(ExtractedF);
       }
     } else {
@@ -80,7 +77,7 @@ bool ScopMapper::runOnFunction(Function &F) {
     }
   }
 
-  return true;
+  return Changed;
 }
 
 char ScopMapper::ID = 0;
