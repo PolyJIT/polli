@@ -245,7 +245,7 @@ struct RemoveGlobalsPolicy {
 
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
-  using MoveFunction =
+  using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, DestroySource, IgnoreTarget>;
 
   outs() << fmt::format("Source to Prototype -> {:s}", F.getName().str());
@@ -258,7 +258,7 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   }
 
   // First create a new prototype function.
-  MoveFunction Cloner(VMap, &M);
+  ExtractFunction Cloner(VMap, &M);
   return Cloner.setSource(&F).start(true);
 }
 
