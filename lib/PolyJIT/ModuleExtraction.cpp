@@ -632,7 +632,14 @@ bool ModuleExtractor::runOnFunction(Function &F) {
   return Changed;
 }
 
-void ModuleExtractor::print(raw_ostream &, const Module *) const {}
+void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
+  int i = 0;
+  for (const Function *F : InstrumentedFunctions) {
+    os << fmt::format("{:d} {:s} ", i++, F->getName().str());
+    F->print(os);
+    os << "\n";
+  }
+}
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
