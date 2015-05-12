@@ -133,8 +133,14 @@ static void registerModuleExtractor(const llvm::PassManagerBuilder &,
   if (polly::PollyDelinearize && opt::EnableJitable)
     polly::PollyDelinearize = false;
 
-  if (!opt::DisableRecompile)
-    PM.add(new ModuleExtractor());
+  if (!opt::DisableRecompile) {
+    llvm::Pass *P = new ModuleExtractor();
+    PM.add(P);
+    if (opt::AnalyzeIR) {
+      PM.add(new FunctionPassPrinter(P->lookupPassInfo(&ModuleExtractor::ID),
+                                     outs(), false));
+    }
+  }
 }
 
 static llvm::RegisterStandardPasses
