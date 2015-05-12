@@ -25,10 +25,10 @@ public:
 
   /// @name FunctionPass interface
   //@{
-  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
-  virtual void releaseMemory();
-  virtual bool runOnFunction(llvm::Function &M);
-  virtual void print(llvm::raw_ostream &, const llvm::Module *) const;
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
+  virtual void releaseMemory() override;
+  virtual bool runOnFunction(llvm::Function &M) override;
+  virtual void print(llvm::raw_ostream &, const llvm::Module *) const override;
   //@}
 private:
   llvm::SetVector<llvm::Function *> InstrumentedFunctions;
