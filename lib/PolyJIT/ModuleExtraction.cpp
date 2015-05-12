@@ -43,7 +43,9 @@ void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
-void ModuleExtractor::releaseMemory() {}
+void ModuleExtractor::releaseMemory() {
+  InstrumentedFunctions.clear();
+}
 
 /**
  * @brief Convert a module to a string.
@@ -446,6 +448,8 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstF->addFnAttr(Attribute::NoInline);
 
     F->replaceAllUsesWith(InstF);
+
+    InstrumentedFunctions.insert(InstF);
     VMap.clear();
   }
 

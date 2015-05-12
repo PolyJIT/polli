@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 #ifndef POLLI_MODULE_EXTRACTOR_H
 #define POLLI_MODULE_EXTRACTOR_H
+
+#include "llvm/ADT/SetVector.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Pass.h"
@@ -29,6 +31,7 @@ public:
   virtual void print(llvm::raw_ostream &, const llvm::Module *) const;
   //@}
 private:
+  llvm::SetVector<llvm::Function *> InstrumentedFunctions;
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   ModuleExtractor(const ModuleExtractor &);
