@@ -87,6 +87,44 @@ static void registerPolli(const llvm::PassManagerBuilder &,
   registerPolliPasses(PM);
 }
 
+/**
+ * @brief Copy of opt's FunctionPassPrinter.
+ *
+ * We just fetch it here, for printing via polli-analyze (even from clang).
+ */
+struct FunctionPassPrinter : public FunctionPass {
+  const PassInfo *PassToPrint;
+  raw_ostream &Out;
+  static char ID;
+  std::string PassName;
+  bool QuietPass;
+
+  FunctionPassPrinter(const PassInfo *PI, raw_ostream &out, bool Quiet)
+      : FunctionPass(ID), PassToPrint(PI), Out(out), QuietPass(Quiet) {
+    std::string PassToPrintName = PassToPrint->getPassName();
+    PassName = "FunctionPass Printer: " + PassToPrintName;
+  }
+
+  bool runOnFunction(Function &F) override {
+    if (!QuietPass)
+      Out << "Printing analysis '" << PassToPrint->getPassName()
+          << "' for function '" << F.getName() << "':\n";
+
+    // Get and print pass...
+    getAnalysisID<Pass>(PassToPrint->getTypeInfo()).print(Out, F.getParent());
+    return false;
+  }
+
+  const char *getPassName() const override { return PassName.c_str(); }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequiredID(PassToPrint->getTypeInfo());
+    AU.setPreservesAll();
+  }
+};
+
+char FunctionPassPrinter::ID = 0;
+
 static void registerModuleExtractor(const llvm::PassManagerBuilder &,
                                     llvm::legacy::PassManagerBase &PM) {
   if (!opt::Enabled)
