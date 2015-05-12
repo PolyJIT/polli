@@ -2,8 +2,11 @@
 #include "polli/ModuleExtractor.h"
 #include "polli/ScopMapper.h"
 
+#define DEBUG_TYPE "polli-extract"
+
 #include "llvm/Pass.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/Attributes.h"
@@ -22,6 +25,10 @@
 
 using namespace llvm;
 using namespace spdlog::details;
+
+STATISTIC(Instrumented, "Number of instrumented functions");
+STATISTIC(MappedGlobals, "Number of global to argument redirections");
+STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
 
 namespace polli {
 char ModuleExtractor::ID = 0;
@@ -188,6 +195,7 @@ struct AddGlobalsPolicy {
       NewArg->addAttr(AttributeSet::get(TgtF->getContext(), 1, Builder));
       NewArg->setName(GV->getName());
       VMap[GV] = NewArg++;
+      MappedGlobals++;
     }
   }
 
@@ -231,8 +239,10 @@ struct RemoveGlobalsPolicy {
     size_t i = 0;
     for (auto &FromArg : From->args())
       if (i++ >= FromArgCnt) {
-        if (GlobalValue *GV = ToM.getGlobalVariable(FromArg.getName(), true))
+        if (GlobalValue *GV = ToM.getGlobalVariable(FromArg.getName(), true)) {
           VMap[&FromArg] = GV;
+          UnmappedGlobals++;
+        }
       } else {
         VMap[&FromArg] = ToArg++;
       }
@@ -451,6 +461,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
     InstrumentedFunctions.insert(InstF);
     VMap.clear();
+    Instrumented++;
   }
 
   return Changed;
