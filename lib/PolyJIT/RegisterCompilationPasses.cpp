@@ -15,6 +15,8 @@
 #include "polli/InstrumentRegions.h"
 #include "polli/ModuleExtractor.h"
 
+#include "polly/RegisterPasses.h"
+
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -81,6 +83,7 @@ static void registerPolli(const llvm::PassManagerBuilder &,
 
   setupLogging();
   printConfig();
+  registerPollyPasses(PM);
   registerPolliPasses(PM);
 }
 
