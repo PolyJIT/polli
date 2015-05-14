@@ -1,18 +1,12 @@
+#define DEBUG_TYPE "polyjit"
 #include "polli/VariantFunction.h"
 #include "polli/Utils.h"
-
-#include <cxxabi.h>
-#include <stdlib.h>
-
-#define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
-
-#define FMT_HEADER_ONLY
-#include "cppformat/format.h"
-
 #include "llvm/Support/raw_ostream.h"
+#include "spdlog/spdlog.h"
 
 using namespace llvm;
+using namespace spdlog::details;
 
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
