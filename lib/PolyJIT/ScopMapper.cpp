@@ -45,8 +45,10 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
-  JitScopDetection &NSD = getAnalysis<JitScopDetection>();
-  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  JSD = &getAnalysis<JitScopDetection>();
+  DTP = &getAnalysis<DominatorTreeWrapperPass>();
+
+  DominatorTree &DT = DTP->getDomTree();
 
   // We already processed these.
   if (F.hasFnAttribute(Attribute::OptimizeNone) ||
@@ -54,7 +56,7 @@ bool ScopMapper::runOnFunction(Function &F) {
     return false;
 
   /* Extract each SCoP in this function into a new one. */
-  for (const Region *R : NSD.jitScops()) {
+  for (const Region *R : JSD->jitScops()) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
 
     if (Extractor.isEligible()) {
