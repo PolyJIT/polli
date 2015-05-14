@@ -24,14 +24,14 @@
 #include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
 #include "llvm/InitializePasses.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/IR/LegacyPassManager.h"         // for FunctionPassManager
-#include "llvm/PassAnalysisSupport.h" // for AnalysisUsage, etc
-#include "llvm/PassSupport.h"         // for INITIALIZE_PASS_DEPENDENCY, etc
-#include "llvm/Support/CommandLine.h" // for desc, opt
-#include "llvm/Support/Debug.h"       // for dbgs, DEBUG
-#include "llvm/Support/raw_ostream.h" // for raw_ostream
-#include "polli/JitScopDetection.h"   // for ParamList, etc
-#include "polly/ScopDetection.h"      // for ScopDetection, etc
+#include "llvm/IR/LegacyPassManager.h" // for FunctionPassManager
+#include "llvm/PassAnalysisSupport.h"  // for AnalysisUsage, etc
+#include "llvm/PassSupport.h"          // for INITIALIZE_PASS_DEPENDENCY, etc
+#include "llvm/Support/CommandLine.h"  // for desc, opt
+#include "llvm/Support/Debug.h"        // for dbgs, DEBUG
+#include "llvm/Support/raw_ostream.h"  // for raw_ostream
+#include "polli/JitScopDetection.h"    // for ParamList, etc
+#include "polly/ScopDetection.h"       // for ScopDetection, etc
 #include "polly/ScopDetectionDiagnostic.h" // for ReportNonAffBranch, etc
 #include "polly/Support/SCEVValidator.h"   // for getParamsInNonAffineExpr, etc
 
@@ -96,8 +96,7 @@ public:
 };
 
 class NonAffineLogChecker
-    : public RejectLogChecker<NonAffineLogChecker,
-                              std::pair<bool, ParamList> > {
+    : public RejectLogChecker<NonAffineLogChecker, std::pair<bool, ParamList>> {
 private:
   const Region *R;
   ScalarEvolution *SE;
@@ -172,8 +171,7 @@ static void printParameters(ParamList &L) {
 // but do not recurse further if the first child has been found.
 //
 // Return the number of regions erased from Regs.
-static unsigned eraseAllChildren(std::set<const Region *> &Regs,
-                                 const Region &R) {
+static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   unsigned Count = 0;
   for (auto &SubRegion : R) {
     if (Regs.find(SubRegion.get()) != Regs.end()) {
@@ -255,8 +253,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
       // Record all necessary parameters for later use.
       if (isValid) {
         ParamList params = NonAffineResult.second;
-        RequiredParams[R]
-            .insert(RequiredParams[R].end(), params.begin(), params.end());
+        RequiredParams[R].insert(RequiredParams[R].end(), params.begin(),
+                                 params.end());
       }
     }
 

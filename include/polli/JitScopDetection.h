@@ -66,11 +66,8 @@ public:
   /// @name FunctionPass interface
   //@{
   virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-
   virtual void releaseMemory();
-
   virtual bool runOnFunction(Function &F);
-
   virtual void print(raw_ostream &OS, const Module *) const;
   //@}
 private:
@@ -91,7 +88,6 @@ private:
 
   ScopSet AccumulatedScops;
   ScopSet JitableScops;
-
   ParamMap RequiredParams;
 };
 } // end of polli namespace
