@@ -35,25 +35,6 @@ void VariantFunction::printHeader(llvm::raw_ostream &OS) {
      << "FLOPs [#]; Real Time [s]; Virtual Time [s]\n\n";
 }
 
-static std::string demangle(const std::string &Name) {
-  char *demangled;
-  size_t size = 0;
-  int status;
-
-  demangled = abi::__cxa_demangle(Name.c_str(), nullptr, &size, &status);
-
-  if (demangled) {
-    log(Info) << " Content: " << demangled;
-  }
-
-  if (status != 0) {
-    free((void *)demangled);
-    return Name;
-  }
-
-  return std::string(demangled);
-}
-
 void VariantFunction::print(llvm::raw_ostream &OS) {
   std::string Message;
 
