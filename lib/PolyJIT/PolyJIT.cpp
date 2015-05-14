@@ -100,6 +100,12 @@
 
 #include "polli/Options.h"
 
+
+#include "spdlog/spdlog.h"
+namespace {
+auto Console = spdlog::stderr_logger_st("polli");
+}
+
 namespace llvm {
 class LLVMContext;
 } // lines 65-65
@@ -364,7 +370,7 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
 * @param ArgValues the parameter _values_ for the formal parameters.
 */
 void PolyJIT::runSpecializedFunction(
-    llvm::Function *NewF, const std::vector<GenericValue> &ArgValues) {
+    llvm::Function *NewF, const ArrayRef<GenericValue> &ArgValues) {
   assert(NewF && "Cannot execute a NULL function!");
   static ManagedModules SpecializedModules;
 
@@ -374,16 +380,21 @@ void PolyJIT::runSpecializedFunction(
   if (!SpecializedModules.count(NewM)) {
     LIKWID_MARKER_START("CodeGenJIT");
     ExecutionEngine *EE = PolyJIT::GetEngine(NewM);
+    Console->warn("new engine registered");
     SpecializedModules[NewM] = EE;
     SpecializedModules[NewM]->finalizeObject();
     LIKWID_MARKER_STOP("CodeGenJIT");
+    Console->warn("code generation complete");
   }
 
   LIKWID_MARKER_START(NewF->getName().str().c_str());
   ExecutionEngine *NewEE = SpecializedModules[NewM];
   assert(NewEE && "Failed to create a new ExecutionEngine for this module!");
   LIKWID_MARKER_THREADINIT;
+
+  Console->warn("execution of {:>s} begins", NewF->getName().str());
   NewEE->runFunction(NewF, ArgValues);
+  Console->warn("execution of {:>s} completed", NewF->getName().str());
   LIKWID_MARKER_STOP(NewF->getName().str().c_str());
 }
 
@@ -493,15 +504,6 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   /* Register our callback with the system linker, so the MCJIT can find it
    * during object compilation */
   sys::DynamicLibrary::AddSymbol(cbName, (void *)&pjit_callback);
-}
-
-static ModulePtrT copyModule(Module &M) {
-  ModulePtrT NewM = new Module(M.getModuleIdentifier(), M.getContext());
-  NewM->setTargetTriple(M.getTargetTriple());
-  NewM->setDataLayout(M.getDataLayout());
-  NewM->setMaterializer(M.getMaterializer());
-
-  return NewM;
 }
 
 /**

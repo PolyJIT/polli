@@ -27,14 +27,19 @@ using namespace polli;
 
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
-StackTracePtr StackTrace;
 
+static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
-auto Console = spdlog::stderr_logger_st("polli");
+static auto Console = spdlog::stderr_logger_st("polli");
 
-using UniqueMod = std::unique_ptr<Module>;
-
+/**
+ * @brief Read the LLVM-IR module from the given prototype string.
+ *
+ * @param prototype The prototype string we want to read in.
+ * @return llvm::Module& The LLVM-IR module we just read.
+ */
 static Module &getModule(const char *prototype) {
+  using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
 
   if(!ModuleIndex.count(prototype)) {
@@ -43,22 +48,28 @@ static Module &getModule(const char *prototype) {
     SMDiagnostic Err;
 
     UniqueMod Mod = parseIR(Buf, Err, Ctx);
-    if (Mod) {
-      Console->warn("Prototype registered.");
-      Console->error("{:s}", prototype);
-    }
-    else {
+    if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
+      ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
+    } else {
       Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
                      Err.getLineNo(), Err.getColumnNo(),
                      Err.getMessage().str());
       Console->error("{:s}", prototype);
     }
-    ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
   }
 
   return *ModuleIndex[prototype];
 }
 
+/**
+ * @brief Get the protoype function stored in this module.
+ *
+ * This assumes that it operates on a prototype module of PolyJIT. Such
+ * a module only contains one function.
+ *
+ * @param M The prototype module.
+ * @return llvm::Function* The first function in the given module.
+ */
 static Function *getFunction(Module &M) {
   Disp.setPrototypeMapping(M.begin(), M.begin());
   return M.begin();
@@ -77,7 +88,7 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
-    Console->warn("PolyJIT activated.");
+    Console->warn("loading polyjit");
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
     LIKWID_MARKER_INIT;
@@ -109,15 +120,56 @@ public:
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
   }
-
-  ~StaticInitializer() {
-    do_shutdown();
-  }
 };
-static StaticInitializer InitializeEverything;
 } // end of anonymous namespace
 
 extern "C" {
+/**
+* @brief Run a specialized version of a function.
+*
+* The specialized version needs to be in 'main' form, i.e., its signature
+* has to be:
+*  void fn_name(int argc, char *argv);
+*
+* The FunctionCloner's MainCreator policy takes care of that. All the real
+* parameters are passed via argv.
+*
+* @param NewF the specialized function in main form.
+* @param ArgValues the parameter _values_ for the formal parameters.
+*/
+static void runSpecializedFunction(llvm::Function &NewF, int paramc,
+                                   char **params) {
+  static ManagedModules Mods;
+
+  Module *NewM = NewF.getParent();
+
+  // Fetch or Create a new ExecutionEngine for this Module.
+  LIKWID_MARKER_START("CodeGenJIT");
+  ExecutionEngine *EE = nullptr;
+  if (!Mods.count(NewM)) {
+    EE = PolyJIT::GetEngine(NewM);
+    EE->finalizeObject();
+    Mods[NewM] = EE;
+  } else
+    EE = Mods[NewM];
+  LIKWID_MARKER_STOP("CodeGenJIT");
+
+  if (EE) {
+    LIKWID_MARKER_START(NewF.getName().str().c_str());
+    LIKWID_MARKER_THREADINIT;
+
+    Console->warn("execution of {:>s} begins (#{:d} params)",
+                  NewF.getName().str(), paramc);
+    void *FPtr = EE->getPointerToFunction(&NewF);
+    void (*PF)(int, char **) = (void(*)(int, char **))FPtr;
+    PF(paramc, params);
+    Console->warn("execution of {:>s} completed", NewF.getName().str());
+    LIKWID_MARKER_STOP(NewF.getName().str().c_str());
+  } else {
+    Console->error("no execution engine found.");
+  }
+}
+
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -127,13 +179,32 @@ extern "C" {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void pjit_main(const char *fName, unsigned paramc, char **params) {
+int pjit_main(const char *fName, unsigned paramc, char **params) {
+  static StaticInitializer InitializeEverything;
+
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
     Console->error("Could not find a function in: {}", M.getModuleIdentifier());
-    return;
+    return 0;
   }
+
+  auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
+    std::stringstream res;
+
+    int i = 0;
+    for (Argument &Arg : F.args()) {
+      if (i > 0)
+        res << ", ";
+      if (Arg.getType()->isPointerTy()) {
+        res << ((uint64_t **)params)[i++];
+      } else {
+        res << ((uint32_t **)params)[i++][0];
+      }
+    }
+
+    return res.str();
+  };
 
   LIKWID_MARKER_START("JitSelectParams");
 
@@ -144,20 +215,24 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+  VarFun->print(outs() << "\nvariant created: ");
 
-  std::vector<GenericValue> ArgValues(2);
-  GenericValue ArgC;
-  ArgC.IntVal = APInt(sizeof(size_t) * 8, F->arg_size(), false);
-  ArgValues[0] = ArgC;
-  ArgValues[1] = PTOGV(params);
+  SmallVector<GenericValue, 2> Args(2);
+  Args[0].IntVal = APInt(32, F->arg_size(), false);
+  Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
 
-  Stats &S = VarFun->stats();
+  //Stats &S = VarFun->stats();
   LIKWID_MARKER_START("JitOptVariant");
-  Function *NewF = VarFun->getOrCreateVariant(Params);
+  if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
+    std::string paramlist = DebugFn(*F, paramc, GVTOP(Args[1]));
+    Console->warn("running with params: #{:d} ({:s})", paramc, paramlist);
+    runSpecializedFunction(*NewF, paramc, params);
+  } else
+      llvm_unreachable("FIXME: call the old prototype.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
-  PolyJIT::runSpecializedFunction(NewF, ArgValues);
-  S.ExecCount++;
+  //S.ExecCount++;
+  return 0;
 }
 }

@@ -154,11 +154,11 @@ private:
   Stats S;
 
   // @brief Our base function to create new variants from.
-  llvm::Function *BaseF;
+  llvm::Function &BaseF;
 
   // @brief Our source function. This is the function that contained
   // the call to our JIT environment.
-  llvm::Function *SourceF;
+  llvm::Function &SourceF;
 
   // @brief All variants of our base function, indexed by key.
   //
@@ -171,8 +171,8 @@ private:
   llvm::Function *createVariant(const FunctionKey &K);
 
 protected:
-  llvm::Function *getBaseFunction() const { return BaseF; }
-  llvm::Function *getSourceFunction() const { return SourceF; }
+  llvm::Function &getBaseFunction() const { return BaseF; }
+  llvm::Function &getSourceFunction() const { return SourceF; }
 
   typedef std::map<const FunctionKey, llvm::Function *> VariantsT;
   VariantsT getVariants() const {
@@ -191,7 +191,7 @@ public:
    * @param BaseF
    * @param SourceF
    */
-  explicit VariantFunction(llvm::Function *BaseF, llvm::Function *SourceF)
+  explicit VariantFunction(llvm::Function &BaseF, llvm::Function &SourceF)
       : BaseF(BaseF), SourceF(SourceF) {}
 
   /**
@@ -223,26 +223,6 @@ public:
    * @return
    */
   llvm::Function *getOrCreateVariant(const FunctionKey &K);
-
-  /**
-   * @name Copy Constructor/Assignment/Conversion/Destruction
-   * @{ */
-  VariantFunction() : BaseF(nullptr), SourceF(nullptr) {}
-
-  VariantFunction(const VariantFunction &Other)
-      : S(Other.S), BaseF(Other.BaseF), SourceF(Other.SourceF),
-        Variants(Other.Variants) {}
-
-  VariantFunction &operator=(const VariantFunction &Other) {
-    if (this != &Other) {
-      BaseF = Other.getBaseFunction();
-      SourceF = Other.getSourceFunction();
-      Variants = Other.getVariants();
-      S = Other.S;
-    }
-
-    return *this;
-  }
 
   ~VariantFunction() { Variants.clear(); }
   /**  @} */

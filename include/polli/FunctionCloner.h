@@ -13,40 +13,81 @@
 #ifndef POLLI_FUNCTION_CLONER_H
 #define POLLI_FUNCTION_CLONER_H
 
+#include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "llvm/Support/raw_ostream.h"
+#define FMT_HEADER_ONLY
+#include "spdlog/details/format.h"
 
 using namespace llvm;
+using namespace spdlog::details;
+
 namespace polli {
 
-template <class CreationPolicy, class DrainPolicy, class SinkPolicy>
-class FunctionCloner : public CreationPolicy,
-                       public DrainPolicy,
-                       public SinkPolicy {
+static inline void verifyFn(const Twine &Prefix, const Function *F) {
+  outs() << Prefix;
+  if (F && !F->isDeclaration()) {
+    //F->print(outs() << "\n");
+    if (verifyFunction(*F, &outs())) {
+      outs() << " printing done.\n";
+    } else
+      outs() << " OK\n";
+  } else if (F && F->isDeclaration()) {
+    F->getType()->print(outs() << "\nOK (declare) : ");
+    outs() << "\n";
+  } else {
+    outs() << "\nOK (F is nullptr)\n";
+  }
+}
+
+static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
+                                   const Function *TgtF) {
+
+  verifyFn(Prefix + "(sourcef) ", SrcF);
+  verifyFn(Prefix + "(targetf) ", TgtF);
+}
+
+template <class OnCreate, class SourceAfterClone, class TargetAfterClone>
+class FunctionCloner : public OnCreate,
+                       public SourceAfterClone,
+                       public TargetAfterClone {
 public:
-  explicit FunctionCloner<CreationPolicy, DrainPolicy, SinkPolicy>(
+  explicit FunctionCloner(
       ValueToValueMapTy &map, Module *m = NULL)
-      : VMap(map), TgtM(m), SrcF(nullptr), TgtF(nullptr) {}
+      : VMap(map), ToM(m), From(nullptr), To(nullptr) {}
 
-  void setTarget(Function *F) { TgtF = F; }
-  FunctionCloner& setSource(Function *F) { SrcF = F; return *this; }
+  void setTarget(Function *F) { To = F; }
+  FunctionCloner &setSource(Function *F) {
+    From = F;
+    return *this;
+  }
 
-  /* Optional: Set the pass we piggy-back ourself on. This enables
-  * access to BasicBlockUtils which require Passes to operate on. */
-  void setSinkHostPass(Pass *HostP) {
-    SinkPolicy &pPolicy = *this;
-    pPolicy.setPass(HostP);
+  void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
+    for (Instruction &I : inst_range(SrcF)) {
+      if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
+        CallSite CS = CallSite(&I);
+        if (Function *CalledF = CS.getCalledFunction()) {
+          Function *NewF = cast<Function>(TgtM->getOrInsertFunction(
+              CalledF->getName(), CalledF->getFunctionType(),
+              CalledF->getAttributes()));
+          NewF->setLinkage(CalledF->getLinkage());
+          VMap[CalledF] = NewF;
+        }
+      }
+    }
   }
 
   /* Clone the source function into the target function.
@@ -54,35 +95,47 @@ public:
    * target module.
    * If target module does not exist, create the target
    * function in the source module. */
-  Function *start() {
-    if (!TgtM)
-      TgtM = SrcF->getParent();
+  Function *start(bool RemapCalls = false) {
+    if (!ToM)
+      ToM = From->getParent();
 
-    if (!TgtF)
-      TgtF = CreationPolicy::Create(SrcF, TgtM);
-
-    CreationPolicy::MapArguments(VMap, SrcF, TgtF);
+    polli::verifyFunctions("OnCreate: ", From, To);
+    if (!To)
+      To = OnCreate::Create(From, ToM);
+    OnCreate::MapArguments(VMap, From, To);
+    polli::verifyFunctions("OnCreate done: ", From, To);
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
-    CloneFunctionInto(TgtF, SrcF, VMap, /* ModuleLevelChanges=*/true, Returns);
 
-    TgtF->copyAttributesFrom(SrcF);
+    // Collect all calls for remapping.
+    if (RemapCalls) {
+      mapCalls(*From, ToM, VMap);
+      outs() << fmt::format("remapping function calls done\n", RemapCalls);
+    }
+
+    polli::verifyFunctions("before transform: ", From, To);
+
+    CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
+    outs() << "cloning done...\n";
+
+    SourceAfterClone::Apply(From, To, VMap);
+    outs() << "source done...\n";
+    TargetAfterClone::Apply(From, To, VMap);
+    outs() << "target done...\n";
+
+    polli::verifyFunctions("after transform: ", From, To);
 
     // Store function mapping for the linker.
-    VMap[SrcF] = TgtF;
-
-    DrainPolicy::Apply(SrcF, TgtF, VMap);
-    SinkPolicy::Apply(TgtF, SrcF, VMap);
-
-    return TgtF;
+    VMap[From] = To;
+    return To;
   }
 
 private:
   ValueToValueMapTy &VMap;
-  Module *TgtM;
-  Function *SrcF;
-  Function *TgtF;
+  Module *ToM;
+  Function *From;
+  Function *To;
 };
 
 /*
@@ -110,29 +163,33 @@ struct CopyCreator {
  * Endpoint policies for the function cloner host.
  */
 struct IgnoreSource {
-  static void Apply(Function *, Function *, ValueToValueMapTy &) {
-    /* Do nothing */
+  static void Apply(Function *, Function *, ValueToValueMapTy &){
+      /* Do nothing */
   };
 };
 
 struct IgnoreTarget {
-  static void Apply(Function *, Function *, ValueToValueMapTy &) {
-    /* Do nothing */
+  static void Apply(Function *, Function *, ValueToValueMapTy &){
+      /* Do nothing */
   };
 };
 
-struct DestroyEndpoint {
-  static void Apply(Function *TgtF, Function *, ValueToValueMapTy &VMap) {
+struct DestroySource {
+  static void Apply(Function *SrcF, Function *, ValueToValueMapTy &VMap) {
+    SrcF->deleteBody();
+  }
+};
+
+struct DestroyTarget {
+  static void Apply(Function *, Function *TgtF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
-    VMap.erase(TgtF);
   }
 };
 
 typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
-DefaultFunctionCloner;
+    DefaultFunctionCloner;
 
-typedef FunctionCloner<CopyCreator, DestroyEndpoint, IgnoreTarget>
-MovingFunctionCloner;
-
+typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
+    MovingFunctionCloner;
 }
 #endif // POLLI_FUNCTION_CLONER_H

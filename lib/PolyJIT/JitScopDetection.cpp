@@ -24,14 +24,14 @@
 #include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
 #include "llvm/InitializePasses.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/IR/LegacyPassManager.h"         // for FunctionPassManager
-#include "llvm/PassAnalysisSupport.h" // for AnalysisUsage, etc
-#include "llvm/PassSupport.h"         // for INITIALIZE_PASS_DEPENDENCY, etc
-#include "llvm/Support/CommandLine.h" // for desc, opt
-#include "llvm/Support/Debug.h"       // for dbgs, DEBUG
-#include "llvm/Support/raw_ostream.h" // for raw_ostream
-#include "polli/JitScopDetection.h"   // for ParamList, etc
-#include "polly/ScopDetection.h"      // for ScopDetection, etc
+#include "llvm/IR/LegacyPassManager.h" // for FunctionPassManager
+#include "llvm/PassAnalysisSupport.h"  // for AnalysisUsage, etc
+#include "llvm/PassSupport.h"          // for INITIALIZE_PASS_DEPENDENCY, etc
+#include "llvm/Support/CommandLine.h"  // for desc, opt
+#include "llvm/Support/Debug.h"        // for dbgs, DEBUG
+#include "llvm/Support/raw_ostream.h"  // for raw_ostream
+#include "polli/JitScopDetection.h"    // for ParamList, etc
+#include "polly/ScopDetection.h"       // for ScopDetection, etc
 #include "polly/ScopDetectionDiagnostic.h" // for ReportNonAffBranch, etc
 #include "polly/Support/SCEVValidator.h"   // for getParamsInNonAffineExpr, etc
 
@@ -53,6 +53,7 @@ using namespace llvm;
 using namespace llvm::legacy;
 using namespace polly;
 using namespace polli;
+using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
@@ -96,8 +97,7 @@ public:
 };
 
 class NonAffineLogChecker
-    : public RejectLogChecker<NonAffineLogChecker,
-                              std::pair<bool, ParamList> > {
+    : public RejectLogChecker<NonAffineLogChecker, std::pair<bool, ParamList>> {
 private:
   const Region *R;
   ScalarEvolution *SE;
@@ -172,13 +172,12 @@ static void printParameters(ParamList &L) {
 // but do not recurse further if the first child has been found.
 //
 // Return the number of regions erased from Regs.
-static unsigned eraseAllChildren(std::set<const Region *> &Regs,
-                                 const Region &R) {
+static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   unsigned Count = 0;
   for (auto &SubRegion : R) {
-    if (Regs.find(SubRegion.get()) != Regs.end()) {
+    if (Regs.count(SubRegion.get())) {
       ++Count;
-      Regs.erase(SubRegion.get());
+      Regs.remove(SubRegion.get());
     } else {
       Count += eraseAllChildren(Regs, *SubRegion);
     }
@@ -211,10 +210,13 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
 #endif
 
 bool JitScopDetection::runOnFunction(Function &F) {
+  if (!Enabled)
+    return false;
+
   if (F.isDeclaration())
     return false;
 
-  if (IgnoredFunctions.count(&F))
+  if (F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
   SD = &getAnalysis<ScopDetection>();
@@ -223,9 +225,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
   Console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));
-
-  if (!Enabled)
-    return false;
 
   for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
                                             ie = SD->reject_end();
@@ -255,8 +254,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
       // Record all necessary parameters for later use.
       if (isValid) {
         ParamList params = NonAffineResult.second;
-        RequiredParams[R]
-            .insert(RequiredParams[R].end(), params.begin(), params.end());
+        RequiredParams[R].insert(RequiredParams[R].end(), params.begin(),
+                                 params.end());
       }
     }
 
@@ -292,18 +291,37 @@ bool JitScopDetection::runOnFunction(Function &F) {
 }
 
 void JitScopDetection::print(raw_ostream &OS, const Module *) const {
-  for (ParamMap::const_iterator r = RequiredParams.begin(),
-                                RE = RequiredParams.end();
-       r != RE; ++r) {
-    const Region *R = r->first;
-    ParamList Params = r->second;
+  using reject_iterator = std::map<const Region *, RejectLog>::const_iterator;
+  using reject_range = iterator_range<reject_iterator>;
 
-    OS.indent(4) << R->getNameStr() << "(";
-    for (ParamList::iterator i = Params.begin(), e = Params.end(); i != e;
-         ++i) {
-      (*i)->print(OS.indent(1));
+  unsigned count = JitableScops.size();
+  unsigned i = 0;
+
+  OS << fmt::format("{:d} regions require runtime support:\n", count);
+  for (const Region *R : JitableScops) {
+    const ParamList &L = RequiredParams.at(R);
+    OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
+                                R->getNameStr(), L.size());
+    unsigned j = 0;
+    for (const SCEV *S : L) {
+      OS.indent(4) << fmt::format("{:d} - ", j);
+      S->print(OS);
+      OS << "\n";
     }
-    OS << " )\n";
+
+    const reject_range Rejects(SD->reject_begin(), SD->reject_end());
+    for (auto &Reject : Rejects) {
+      if (Reject.first == R) {
+        unsigned k = 0;
+        polly::RejectLog Log = Reject.second;
+        OS.indent(4) << fmt::format("{:d} reasons can be fixed at run time:\n",
+                                    Log.size());
+        for (auto &Entry : Reject.second) {
+          OS.indent(6) << fmt::format("{:d} - {:s}\n", k++,
+                                      Entry->getMessage());
+        }
+      }
+    }
   }
 }
 

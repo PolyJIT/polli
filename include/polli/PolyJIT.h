@@ -173,7 +173,7 @@ public:
    */
   static void
   runSpecializedFunction(llvm::Function *NewF,
-                         const std::vector<llvm::GenericValue> &ArgValues);
+                         const llvm::ArrayRef<llvm::GenericValue> &ArgValues);
 
 private:
   /**
