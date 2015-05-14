@@ -53,6 +53,7 @@ using namespace llvm;
 using namespace llvm::legacy;
 using namespace polly;
 using namespace polli;
+using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
@@ -290,18 +291,37 @@ bool JitScopDetection::runOnFunction(Function &F) {
 }
 
 void JitScopDetection::print(raw_ostream &OS, const Module *) const {
-  for (ParamMap::const_iterator r = RequiredParams.begin(),
-                                RE = RequiredParams.end();
-       r != RE; ++r) {
-    const Region *R = r->first;
-    ParamList Params = r->second;
+  using reject_iterator = std::map<const Region *, RejectLog>::const_iterator;
+  using reject_range = iterator_range<reject_iterator>;
 
-    OS.indent(4) << R->getNameStr() << "(";
-    for (ParamList::iterator i = Params.begin(), e = Params.end(); i != e;
-         ++i) {
-      (*i)->print(OS.indent(1));
+  unsigned count = JitableScops.size();
+  unsigned i = 0;
+
+  OS << fmt::format("{:d} regions require runtime support:\n", count);
+  for (const Region *R : JitableScops) {
+    const ParamList &L = RequiredParams.at(R);
+    OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
+                                R->getNameStr(), L.size());
+    unsigned j = 0;
+    for (const SCEV *S : L) {
+      OS.indent(4) << fmt::format("{:d} - ", j);
+      S->print(OS);
+      OS << "\n";
     }
-    OS << " )\n";
+
+    const reject_range Rejects(SD->reject_begin(), SD->reject_end());
+    for (auto &Reject : Rejects) {
+      if (Reject.first == R) {
+        unsigned k = 0;
+        polly::RejectLog Log = Reject.second;
+        OS.indent(4) << fmt::format("{:d} reasons can be fixed at run time:\n",
+                                    Log.size());
+        for (auto &Entry : Reject.second) {
+          OS.indent(6) << fmt::format("{:d} - {:s}\n", k++,
+                                      Entry->getMessage());
+        }
+      }
+    }
   }
 }
 
