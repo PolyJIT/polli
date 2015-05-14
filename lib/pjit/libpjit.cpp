@@ -26,7 +26,6 @@ using namespace llvm;
 using namespace polli;
 
 namespace {
-using UniqueMod = std::unique_ptr<Module>;
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 
 static StackTracePtr StackTrace;
@@ -40,6 +39,7 @@ static auto Console = spdlog::stderr_logger_st("polli");
  * @return llvm::Module& The LLVM-IR module we just read.
  */
 static Module &getModule(const char *prototype) {
+  using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
 
   if(!ModuleIndex.count(prototype)) {
