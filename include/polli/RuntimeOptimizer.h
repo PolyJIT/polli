@@ -28,6 +28,6 @@ namespace polli {
 //
 // @param F The function to optimize
 // @return The optimized function.
-Function *OptimizeForRuntime(Function *F);
+Function &OptimizeForRuntime(Function &F);
 }
 #endif // RUNTIMEOPTIMIZER_H

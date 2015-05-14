@@ -35,6 +35,12 @@
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/ScopDetection.h"
 
+#include "spdlog/spdlog.h"
+
+namespace {
+auto Console = spdlog::stderr_logger_st("polli");
+}
+
 namespace llvm {
 class Function;
 }
@@ -45,8 +51,9 @@ using namespace polly;
 
 namespace polli {
 
-Function *OptimizeForRuntime(Function *F) {
-  Module *M = F->getParent();
+Function &OptimizeForRuntime(Function &F) {
+  Module *M = F.getParent();
+  Console->warn("optimizing {:>s}", F.getName().str());
   PassManagerBuilder Builder;
 
   FunctionPassManager PM = FunctionPassManager(M);
@@ -56,9 +63,12 @@ Function *OptimizeForRuntime(Function *F) {
   Builder.OptLevel = 3;
 
   Builder.populateFunctionPassManager(PM);
-  PM.run(*F);
+  PM.run(F);
 
+  Console->warn("optimization complete");
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
+
+  F.print(outs() << "\n");
 
   return F;
 }

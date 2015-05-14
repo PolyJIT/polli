@@ -41,56 +41,34 @@ using namespace polly;
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JitScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
-  AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
-  JitScopDetection &NSD = getAnalysis<JitScopDetection>();
-  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  JSD = &getAnalysis<JitScopDetection>();
+  DTP = &getAnalysis<DominatorTreeWrapperPass>();
 
-  if(F.hasFnAttribute(Attribute::OptimizeNone))
-    return false;
+  DominatorTree &DT = DTP->getDomTree();
 
-  // Ignore functions created by us.
-  if (CreatedFunctions.count(&F))
+  // We already processed these.
+  if (F.hasFnAttribute(Attribute::OptimizeNone) ||
+      F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
   /* Extract each SCoP in this function into a new one. */
-  int i = 0;
-  for (ScopSet::iterator RP = NSD.jit_begin(), RE = NSD.jit_end(); RP != RE;
-       ++RP) {
-    const Region *R = *RP;
-
-    CodeExtractor Extractor(DT, *(R->getNode()));
-
-    unsigned LineBegin, LineEnd;
-    std::string FileName;
-    getDebugLocation(R, LineBegin, LineEnd, FileName);
-
-    DEBUG(Console->debug("mapper :: extract :: {0}:{1}:{2} - {3}", FileName,
-                         LineBegin, LineEnd, R->getNameStr()););
+  for (const Region *R : JSD->jitScops()) {
+    CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
 
     if (Extractor.isEligible()) {
-      Function *ExtractedF = Extractor.extractCodeRegion();
-      DEBUG(log(Debug, 2) << " into: " << ExtractedF->getName() << "\n");
-
-      if (ExtractedF) {
-        ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
-        ExtractedF->setName(ExtractedF->getName() + ".scop" + Twine(i++));
-        /* FIXME: Do not depend on this set. */
-        CreatedFunctions.insert(ExtractedF);
-        NSD.ignoreFunction(ExtractedF);
-      }
+      MappableRegions.insert(R);
     } else {
-      log(Error, 2) << " failed :: Scop " << R->getNameStr()
-                    << " not eligible for extraction\n";
+      outs() << R->getNameStr() << " not eligible\n";
     }
   }
 
-  return true;
+  return false;
 }
 
 char ScopMapper::ID = 0;
 static RegisterPass<ScopMapper>
-    X("polli-map-scops", "PolyJIT - Extract SCoPs into their own function");
+    X("polli-map-scops", "PolyJIT - Mark SCoPs for runtime extraction");

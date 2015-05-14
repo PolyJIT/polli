@@ -1,37 +1,76 @@
-# polli - PolyJIT's JIT compiler
+# PolyJIT - Polyhedral JIT compilation
 
-polli is a polyhedral JIT compiler. It enhances LLVM's Polly plugin by
-providing additional run-time information for Polly's SCoP detection
-process to increase the number of valid SCoPs in a program.
+PolyJIT provides polyhedral compilation techniques at run-time of
+a program. By exploiting run-time information that is not available at
+compile-time some constraints due to the linear nature of the polyhedral
+model can be relaxed or ignored all-together, e.g. non-linear parameters in
+array-subscript expressions or may-aliases.
 
-polli is derived from LLVM's lli implementation and provides similar
-flags and options to control the first code generation stage.
+PolyJIT is implemented in 2 stages. The first stage selects suitable targets
+for just-in-time compilation (LLVMPolyJIT). This can be integrated into
+clang just as any other clang compiler plugin. The selected JIT candidates
+are instrumented with library calls that let us enter the JIT environment
+on demand.
+
+The second stage (libPolyJIT) is a runtime module that needs to be linked
+to instrumented binaries. It provides the JIT itself and becomes active
+as soon as one of the selected candidates gets called the first time.
 
 * [PolyJIT](http://www.infosun.fim.uni-passau.de/cl/PolyJIT/)
+
+PolyJIT relies on the work of the following projects:
+
 * [Polly](http://polly.llvm.org)
 * [LLVM](http://llvm.org)
+* [Likwid](https://code.google.com/p/likwid)
+* [PAPI](http://icl.cs.utk.edu/papi/)
+* [cppformat](https://github.com/cppformat/cppformat)
+* [spdlog](https://github.com/gabime/spdlog)
+* [libpqxx](http://pqxx.org/development/libpqxx/)
 
-## Build
+## Installation
+```
+TODO
+```
 
-  TODO.
+## LLVMPolyJIT components
 
-## Usage
+The following sections describe the components available in the static
+clang/llvm compiler plugin.
 
- * Polli Options:
-   - -L=<directory>
-     Specify a library search path
-   - -caddy
-     Enable Caddy (Requires a special build of Polly).
-   - -instrument
-     Enable instrumenting of SCoPs
-   - -jitable
-     Enable Non AffineSCoPs. Requires at least -polly-detect-track-failures.
-   - -l=<library prefix>
-     Specify libraries to link to. polli will load the library into its own address
-     space.
-   - -no-execution
-     Disable execution just produce all intermediate files.
-   - -no-recompilation
-     Disable recompilation of SCoPs.
-   - -tempdir
-     Place temporary files into unique subdir
+### Configuration options
+```
+TODO
+```
+
+### JIT ScopDetection
+```
+TODO
+```
+
+### SCoP extraction
+```
+TODO
+```
+
+### JIT instrumentation
+```
+TODO
+```
+
+### PAPI instrumentation
+```
+TODO
+```
+
+## libPolyJIT components
+
+The following sections describe the components available in the run-time
+library.
+
+### Configuration options
+
+### Function variant generation
+```
+TODO
+```

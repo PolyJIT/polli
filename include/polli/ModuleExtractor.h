@@ -11,6 +11,9 @@
 //===----------------------------------------------------------------------===//
 #ifndef POLLI_MODULE_EXTRACTOR_H
 #define POLLI_MODULE_EXTRACTOR_H
+
+#include "llvm/ADT/SetVector.h"
+#include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Pass.h"
 
@@ -22,12 +25,13 @@ public:
 
   /// @name FunctionPass interface
   //@{
-  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
-  virtual void releaseMemory();
-  virtual bool runOnFunction(llvm::Function &F);
-  virtual void print(llvm::raw_ostream &, const llvm::Module *) const;
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
+  virtual void releaseMemory() override;
+  virtual bool runOnFunction(llvm::Function &M) override;
+  virtual void print(llvm::raw_ostream &, const llvm::Module *) const override;
   //@}
 private:
+  llvm::SetVector<llvm::Function *> InstrumentedFunctions;
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   ModuleExtractor(const ModuleExtractor &);

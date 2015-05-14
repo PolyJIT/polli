@@ -272,10 +272,8 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
   }
 
   if (NSD) {
-    for (ScopSet::iterator It = NSD->jit_begin(),
-                                          SE = NSD->jit_end();
-         It != SE; ++It) {
-      if (processRegion(*It)) {
+    for (const Region *R : NSD->jitScops()) {
+      if (processRegion(R)) {
         ++InstrumentedRegions;
         ++InstrumentedJITScops;
       }

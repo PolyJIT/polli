@@ -1,15 +1,12 @@
+#define DEBUG_TYPE "polyjit"
 #include "polli/VariantFunction.h"
 #include "polli/Utils.h"
-
-#include <cxxabi.h>
-#include <stdlib.h>
-
-#define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
-
 #include "llvm/Support/raw_ostream.h"
+#include "spdlog/spdlog.h"
 
 using namespace llvm;
+using namespace spdlog::details;
 
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
@@ -32,37 +29,12 @@ void VariantFunction::printHeader(llvm::raw_ostream &OS) {
      << "FLOPs [#]; Real Time [s]; Virtual Time [s]\n\n";
 }
 
-static std::string demangle(const std::string &Name) {
-  char *demangled;
-  size_t size = 0;
-  int status;
-
-  demangled = abi::__cxa_demangle(Name.c_str(), nullptr, &size, &status);
-
-  if (demangled) {
-    log(Info) << " Content: " << demangled;
-  }
-
-  if (status != 0) {
-    free((void *)demangled);
-    return Name;
-  }
-
-  return std::string(demangled);
-}
-
 void VariantFunction::print(llvm::raw_ostream &OS) {
   std::string Message;
 
-  OS << demangle(SourceF->getName()) << " :: "
-     << demangle(BaseF->getName()) << " :: "
-     << Variants.size() << "; "
-     << S.ExecCount << "; "
-     << S.MFLOPS << "; "
-     << S.flpops << "; "
-     << S.RealTime << "; "
-     << S.ProcTime << "\n";
-
+  OS << fmt::format("{:<s} is mapped to {:>s} and carries {:d} variants.",
+                    SourceF.getName().str(), BaseF.getName().str(),
+                    Variants.size());
   DEBUG(printVariants(OS));
 }
 
