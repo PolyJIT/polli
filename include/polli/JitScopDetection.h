@@ -16,6 +16,7 @@
 
 #include "polly/ScopDetection.h"
 
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/IR/Function.h"
@@ -24,24 +25,22 @@
 
 #include <vector>
 #include <map>
-#include <set>
 
-using namespace llvm;
 using namespace polly;
 
-typedef std::set<const Region *> ScopSet;
-typedef std::vector<const SCEV *> ParamList;
-typedef std::map<const Region *, ParamList> ParamMap;
+using ScopSet = llvm::SetVector<const llvm::Region *>;
+using ParamList = std::vector<const llvm::SCEV *>;
+using ParamMap = std::map<const llvm::Region *, ParamList>;
 
 namespace polli {
-class JitScopDetection : public FunctionPass {
+class JitScopDetection : public llvm::FunctionPass {
 public:
   static char ID;
   explicit JitScopDetection(bool enable = true)
-      : FunctionPass(ID), Enabled(enable) {}
+      : llvm::FunctionPass(ID), Enabled(enable) {}
 
-  typedef ParamMap::iterator iterator;
-  typedef ParamMap::const_iterator const_iterator;
+  using iterator = ParamMap::iterator;
+  using const_iterator = ParamMap::const_iterator;
 
   iterator begin() { return RequiredParams.begin(); }
   iterator end() { return RequiredParams.end(); }

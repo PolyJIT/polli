@@ -174,9 +174,9 @@ static void printParameters(ParamList &L) {
 static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   unsigned Count = 0;
   for (auto &SubRegion : R) {
-    if (Regs.find(SubRegion.get()) != Regs.end()) {
+    if (Regs.count(SubRegion.get())) {
       ++Count;
-      Regs.erase(SubRegion.get());
+      Regs.remove(SubRegion.get());
     } else {
       Count += eraseAllChildren(Regs, *SubRegion);
     }
