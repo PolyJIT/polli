@@ -210,6 +210,9 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
 #endif
 
 bool JitScopDetection::runOnFunction(Function &F) {
+  if (!Enabled)
+    return false;
+
   if (F.isDeclaration())
     return false;
 
@@ -222,9 +225,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
   Console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));
-
-  if (!Enabled)
-    return false;
 
   for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
                                             ie = SD->reject_end();
