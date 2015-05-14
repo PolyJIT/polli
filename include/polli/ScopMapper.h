@@ -39,10 +39,9 @@ public:
 
   /// @name FunctionPass interface
   //@{
-  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
-  virtual void releaseMemory() { MappableRegions.clear(); }
-  virtual bool runOnFunction(llvm::Function &F);
-  virtual void print(llvm::raw_ostream &, const llvm::Module *) const {}
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
+  void releaseMemory() override { MappableRegions.clear(); }
+  bool runOnFunction(llvm::Function &F) override;
   //@}
 private:
   //===--------------------------------------------------------------------===//
