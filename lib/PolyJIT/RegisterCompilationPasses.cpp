@@ -15,6 +15,7 @@
 #include "polli/InstrumentRegions.h"
 #include "polli/ModuleExtractor.h"
 
+#include "polly/Canonicalization.h"
 #include "polly/RegisterPasses.h"
 
 #include "llvm/IR/LegacyPassManager.h"
@@ -32,6 +33,7 @@
 
 using namespace llvm;
 using namespace polli;
+using namespace spdlog::details;
 
 #include <iostream>
 #include <stdio.h>
@@ -57,18 +59,41 @@ static void printConfig() {
   Console->info(" polyjit.instrument: {}", opt::InstrumentRegions);
 }
 
-void registerPolliPasses(llvm::legacy::PassManagerBase &PM) {
-  if (polly::PollyDelinearize && opt::EnableJitable)
-    polly::PollyDelinearize = false;
+/**
+ * @brief Copy of opt's FunctionPassPrinter.
+ *
+ * We just fetch it here, for printing via polli-analyze (even from clang).
+ */
+template <class T> struct FunctionPassPrinter : public FunctionPass {
+  std::string PassName;
+  raw_ostream &Out;
+  static char ID;
+  T *P;
 
-  if (opt::InstrumentRegions)
-    PM.add(new PapiCScopProfilingInit());
+  FunctionPassPrinter(raw_ostream &out)
+      : FunctionPass(ID), PassName("PolyJIT - FunctionPassPrinter"), Out(out) {}
 
-  PM.add(new JitScopDetection(opt::EnableJitable));
+  bool runOnFunction(Function &F) override {
+    P = &getAnalysis<T>();
 
-  if (opt::InstrumentRegions)
-    PM.add(new PapiCScopProfiling());
-}
+    Out << fmt::format("Printing analysis '{:s}' for function '{:s}':\n",
+                       P->getPassName(), F.getName().str());
+    P->print(Out, F.getParent());
+    return true;
+  }
+
+  const char *getPassName() const override { return PassName.c_str(); }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.addRequired<T>();
+    //FIXME: We preserve everything, but LLVM will kill all passes that are
+    //       needed by the module extractor in our compilation pipeline.
+    //AU.setPreservesAll();
+  }
+};
+
+template <> char FunctionPassPrinter<JitScopDetection>::ID = 0;
+template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
 
 static void setupLogging() {
   spdlog::set_async_mode(1048576);
@@ -76,77 +101,39 @@ static void setupLogging() {
   spdlog::set_level(spdlog::level::warn);
 }
 
-static void registerPolli(const llvm::PassManagerBuilder &,
-                          llvm::legacy::PassManagerBase &PM) {
+static void registerPolyJIT(const llvm::PassManagerBuilder &,
+                            llvm::legacy::PassManagerBase &PM) {
   if (!opt::Enabled)
     return;
 
   setupLogging();
   printConfig();
+
   registerPollyPasses(PM);
-  registerPolliPasses(PM);
-}
-
-/**
- * @brief Copy of opt's FunctionPassPrinter.
- *
- * We just fetch it here, for printing via polli-analyze (even from clang).
- */
-struct FunctionPassPrinter : public FunctionPass {
-  const PassInfo *PassToPrint;
-  raw_ostream &Out;
-  static char ID;
-  std::string PassName;
-  bool QuietPass;
-
-  FunctionPassPrinter(const PassInfo *PI, raw_ostream &out, bool Quiet)
-      : FunctionPass(ID), PassToPrint(PI), Out(out), QuietPass(Quiet) {
-    std::string PassToPrintName = PassToPrint->getPassName();
-    PassName = "FunctionPass Printer: " + PassToPrintName;
-  }
-
-  bool runOnFunction(Function &F) override {
-    if (!QuietPass)
-      Out << "Printing analysis '" << PassToPrint->getPassName()
-          << "' for function '" << F.getName() << "':\n";
-
-    // Get and print pass...
-    getAnalysisID<Pass>(PassToPrint->getTypeInfo()).print(Out, F.getParent());
-    return false;
-  }
-
-  const char *getPassName() const override { return PassName.c_str(); }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.addRequiredID(PassToPrint->getTypeInfo());
-    AU.setPreservesAll();
-  }
-};
-
-char FunctionPassPrinter::ID = 0;
-
-static void registerModuleExtractor(const llvm::PassManagerBuilder &,
-                                    llvm::legacy::PassManagerBase &PM) {
-  if (!opt::Enabled)
-    return;
 
   if (polly::PollyDelinearize && opt::EnableJitable)
     polly::PollyDelinearize = false;
 
+  if (opt::InstrumentRegions)
+    PM.add(new PapiCScopProfilingInit());
+
+  // Schedule us inbetween detection and polly's codegen.
+  PM.add(new JitScopDetection(opt::EnableJitable));
+  if (opt::AnalyzeIR)
+    PM.add(new FunctionPassPrinter<JitScopDetection>(outs()));
+
+  if (opt::InstrumentRegions)
+    PM.add(new PapiCScopProfiling());
+
   if (!opt::DisableRecompile) {
-    llvm::Pass *P = new ModuleExtractor();
-    PM.add(P);
-    if (opt::AnalyzeIR) {
-      PM.add(new FunctionPassPrinter(P->lookupPassInfo(&ModuleExtractor::ID),
-                                     outs(), false));
-    }
+    PM.add(new ScopMapper());
+    PM.add(new ModuleExtractor());
+    if (opt::AnalyzeIR)
+      PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }
 }
 
 static llvm::RegisterStandardPasses
-    RegisterPolliInstrumentation(llvm::PassManagerBuilder::EP_EarlyAsPossible,
-                                 registerPolli);
-static llvm::RegisterStandardPasses
-    RegisterPolliModuleExtraction(llvm::PassManagerBuilder::EP_EarlyAsPossible,
-                                  registerModuleExtractor);
+    RegisterPolyJIT(llvm::PassManagerBuilder::EP_EarlyAsPossible,
+                    registerPolyJIT);
 }
