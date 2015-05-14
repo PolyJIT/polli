@@ -33,6 +33,12 @@ static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 static auto Console = spdlog::stderr_logger_st("polli");
 
+/**
+ * @brief Read the LLVM-IR module from the given prototype string.
+ *
+ * @param prototype The prototype string we want to read in.
+ * @return llvm::Module& The LLVM-IR module we just read.
+ */
 static Module &getModule(const char *prototype) {
   static DenseMap<const char *, UniqueMod> ModuleIndex;
 
@@ -55,6 +61,15 @@ static Module &getModule(const char *prototype) {
   return *ModuleIndex[prototype];
 }
 
+/**
+ * @brief Get the protoype function stored in this module.
+ *
+ * This assumes that it operates on a prototype module of PolyJIT. Such
+ * a module only contains one function.
+ *
+ * @param M The prototype module.
+ * @return llvm::Function* The first function in the given module.
+ */
 static Function *getFunction(Module &M) {
   Disp.setPrototypeMapping(M.begin(), M.begin());
   return M.begin();
