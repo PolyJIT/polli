@@ -13,6 +13,8 @@
 #ifndef POLLI_FUNCTION_CLONER_H
 #define POLLI_FUNCTION_CLONER_H
 
+#include "polli/Options.h"
+
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -29,25 +31,33 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#define FMT_HEADER_ONLY
-#include "spdlog/details/format.h"
+#include "spdlog/spdlog.h"
 
 using namespace llvm;
+using namespace spdlog;
 using namespace spdlog::details;
 
 namespace polli {
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
-  outs() << Prefix;
+  if (opt::LogLevel > polli::Debug)
+    return;
+
+  auto Console = spdlog::stderr_logger_st("polli");
+
+  std::string buffer;
+  llvm::raw_string_ostream s(buffer);
+  s << Prefix;
   if (F && !F->isDeclaration()) {
-    if (!verifyFunction(*F, &outs()))
-      outs() << " OK\n";
+    if (!verifyFunction(*F, &s))
+      s << " OK";
   } else if (F && F->isDeclaration()) {
-    F->getType()->print(outs() << " OK (declare) : ");
-    outs() << "\n";
+    F->getType()->print(s << " OK (declare) : ");
   } else {
-    outs() << " OK (F is nullptr)\n";
+    s << " OK (F is nullptr)";
   }
+
+  Console->debug(s.str());
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
