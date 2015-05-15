@@ -39,26 +39,6 @@ SmallVector<char, 255> *DefaultDir;
 
 static bool DirReady = false;
 
-llvm::raw_ostream &log(const LogType T, const size_t Level) {
-  switch (T) {
-  case Error:
-    errs().changeColor(raw_ostream::Colors::RED) << " E ";
-    return errs().indent(Level).resetColor() << " :: ";
-    break;
-  case Warning:
-    errs().changeColor(raw_ostream::Colors::YELLOW) << " W ";
-    return errs().indent(Level).resetColor() << " :: ";
-    break;
-  case Debug:
-    dbgs().changeColor(raw_ostream::Colors::GREEN) << " D ";
-    return dbgs().indent(Level).resetColor() << " :: ";
-    break;
-  case Info:
-    return errs().indent(Level).resetColor();
-    break;
-  }
-}
-
 void initializeOutputDir() {
   DefaultDir = new SmallVector<char, 255>();
   SmallVector<char, 255> cwd;
@@ -111,25 +91,4 @@ void StoreModules(ManagedModules &Modules) {
     ModulePtrT M = (Modules_MI).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
-}
-
-std::string demangle(const std::string &Name) {
-  char *demangled;
-  size_t size = 0;
-  int status;
-
-  demangled = abi::__cxa_demangle(Name.c_str(), nullptr, &size, &status);
-
-  if (demangled) {
-    log(Info) << " S: " << size;
-    log(Info) << "St: " << status << "\n";
-    log(Info) << " Content: " << demangled;
-  }
-
-  if (status != 0) {
-    free((void *)demangled);
-    return Name;
-  }
-
-  return std::string(demangled);
 }

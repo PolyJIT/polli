@@ -1,6 +1,7 @@
 set(POLLI_TEST_DIRECTORIES
   "JitScops"
   "Globals"
+  "Run"
 )
 
 set(POLLI_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
