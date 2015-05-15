@@ -23,56 +23,63 @@
 extern llvm::cl::OptionCategory PolliCategory;
 
 namespace polli {
-  enum LogType {
-    Error,
-    Warning,
-    Debug,
-    Info
-  };
+enum LogType { Error, Warning, Debug, Info };
 
-  namespace opt {
-    extern std::vector<std::string> LibPaths;
-    extern std::vector<std::string> Libraries;
+namespace opt {
+extern std::vector<std::string> LibPaths;
+extern std::vector<std::string> Libraries;
 
-    extern std::string InputFile;
-    extern std::vector<std::string> InputArgv;
+extern std::string InputFile;
+extern std::vector<std::string> InputArgv;
 
-    extern std::string EntryFunc;
-    extern std::string FakeArgv0;
+extern std::string EntryFunc;
+extern std::string FakeArgv0;
 
-    extern bool DisableCoreFiles;
+extern bool DisableCoreFiles;
 
-    extern bool InstrumentRegions;
-    extern bool EnableJitable;
-    extern bool DisableRecompile;
-    extern bool DisableExecution;
-    extern bool AnalyzeIR;
-    extern char OptLevel;
+extern bool InstrumentRegions;
+extern bool EnableJitable;
+extern bool DisableRecompile;
+extern bool DisableExecution;
+extern bool AnalyzeIR;
+extern char OptLevel;
 
-    extern std::string OutputFilename;
-    extern std::string TargetTriple;
-    extern std::string MArch;
-    extern std::string MCPU;
-    extern std::vector<std::string> MAttrs;
+extern std::string OutputFilename;
+extern std::string TargetTriple;
+extern std::string MArch;
+extern std::string MCPU;
+extern std::vector<std::string> MAttrs;
 
-    extern llvm::Reloc::Model RelocModel;
-    extern llvm::CodeModel::Model CModel;
+extern llvm::Reloc::Model RelocModel;
+extern llvm::CodeModel::Model CModel;
 
-    extern bool EnableJITExceptionHandling;
-    extern bool GenerateSoftFloatCalls;
+extern bool EnableJITExceptionHandling;
+extern bool GenerateSoftFloatCalls;
 
-    extern llvm::FloatABI::ABIType FloatABIForCalls;
+extern llvm::FloatABI::ABIType FloatABIForCalls;
 
-    extern bool EmitJitDebugInfo;
-    extern bool EmitJitDebugInfoToDisk;
+extern bool EmitJitDebugInfo;
+extern bool EmitJitDebugInfoToDisk;
 
-    extern bool AnalyseOnly;
-    extern std::string ReportFilename;
+extern bool AnalyseOnly;
+extern std::string ReportFilename;
 
-    extern bool DisablePreopt;
-    extern bool GenerateOutput;
-    extern polli::LogType LogLevel;
-    extern bool Enabled;
-  }
+extern bool DisablePreopt;
+extern bool GenerateOutput;
+
+/**
+ * @brief What logs should be visible to the user.
+ *
+ * Default is 'warn'
+ */
+extern polli::LogType LogLevel;
+
+/**
+ * @brief Should PolyJIT be enabled?
+ *
+ * This pushes PolyJIT's static passes into the compilation pipeline.
+ */
+extern bool Enabled;
+}
 }
 #endif
