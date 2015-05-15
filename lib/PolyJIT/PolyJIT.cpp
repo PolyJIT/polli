@@ -186,12 +186,10 @@ static uint64_t __polli_dso_handle = 1;
 * @param OS the outstream we print to.
 */
 void PolyJITMemoryManager::print(llvm::raw_ostream &OS) {
-  log(Info) << "Memory consumption:\n";
-  log(Info, 2) << "Allocated CodeSections: " << NumAllocatedCodeSections
-               << "\n";
-  log(Info, 2) << "Allocated DataSections: " << NumAllocatedDataSections
-               << "\n";
-  log(Info, 2) << "Allocated kBytes: " << AllocatedBytes / 1024 << "\n";
+  Console->info("memory consumption:");
+  Console->info("  code sections allocated: {:d}", NumAllocatedCodeSections);
+  Console->info("  data sections allocated: {:d}", NumAllocatedDataSections);
+  Console->info("  kbytes allocated: {:d}", AllocatedBytes / 1024);
 }
 
 PolyJITMemoryManager::~PolyJITMemoryManager() {}
@@ -640,11 +638,12 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   if (opt::AnalyzeIR) {
     opt::DisableExecution = true;
     opt::DisableRecompile = true;
-    log(Debug) << "opt :: AnalyzeIR disabled Execution & Recompilation.\n";
+    Console->notice(
+        "analyze mode enabled, this disables execution and recompilation");
   }
 
   if (!Main && !opt::AnalyzeIR) {
-    log(Error) << '\'' << EntryFn << "\' function not found in module.\n";
+    Console->error("function not found in module: '{:s}'", EntryFn);
     return -1;
   }
 
@@ -732,12 +731,6 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
 int PolyJIT::shutdown(int result) {
   LLVMContext &Context = M.getContext();
 
-  VariantFunction::printHeader(log(Info));
-  for (const auto &Elem : Disp->functions()) {
-    VariantFunctionTy VarFun = Elem.second;
-    VarFun->print(log(LogType::Info));
-  }
-
   // Run static destructors.
   EE->runStaticConstructorsDestructors(true);
 
@@ -754,10 +747,10 @@ int PolyJIT::shutdown(int result) {
     ResultGV.IntVal = APInt(32, result);
     Args.push_back(ResultGV);
     EE->runFunction(ExitF, Args);
-    log(Error) << "ERROR: exit(" << result << ") returned!\n";
+    Console->error("exit() returned: {:d}", result);
     abort();
   } else {
-    log(Error) << "ERROR: exit defined with wrong prototype!\n";
+    Console->error("exit() defined with wrong prototype!");
     abort();
   }
 

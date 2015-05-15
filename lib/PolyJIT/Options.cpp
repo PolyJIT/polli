@@ -17,7 +17,10 @@
 #include <string>
 #include <vector>
 
+#include "spdlog/spdlog.h"
+
 using namespace llvm;
+using namespace spdlog;
 
 llvm::cl::OptionCategory
     PolliCategory("Polli Options", "Configure the runtime options of polli");
@@ -54,7 +57,7 @@ bool AnalyseOnly;
 std::string ReportFilename;
 bool DisablePreopt;
 bool GenerateOutput;
-LogType LogLevel;
+polli::LogType LogLevel;
 bool Enabled;
 }
 }
@@ -187,10 +190,16 @@ static cl::opt<bool, true> GenerateOutputX(
 
 static cl::opt<polli::LogType, true>
     LogLevelX("polli-log-level", cl::desc("Log level for output messages"),
-              cl::values(clEnumVal(Info, "Info messages (very spammy!)"),
-                         clEnumVal(Debug, "Up to debug messages"),
-                         clEnumVal(Warning, "Up to warning messages"),
-                         clEnumVal(Error, "Error messages only"), clEnumValEnd),
+              cl::values(clEnumVal(polli::Trace, "all messages"),
+                         clEnumVal(polli::Debug, "up to debug messages"),
+                         clEnumVal(polli::Info, "up to info messages"),
+                         clEnumVal(polli::Notice, "up to notice messages"),
+                         clEnumVal(polli::Warn, "up to warn messages"),
+                         clEnumVal(polli::Err, "up to error messages"),
+                         clEnumVal(polli::Critical, "up to critical messages"),
+                         clEnumVal(polli::Alert, "up to alert messages"),
+                         clEnumVal(polli::Emerg, "up to emergency messages"),
+                         clEnumVal(polli::Off, "silence"), clEnumValEnd),
               cl::location(LogLevel), cl::cat(PolliCategory));
 
 static cl::opt<std::string, true>

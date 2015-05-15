@@ -23,7 +23,18 @@
 extern llvm::cl::OptionCategory PolliCategory;
 
 namespace polli {
-enum LogType { Error, Warning, Debug, Info };
+enum LogType {
+  Trace,
+  Debug,
+  Info,
+  Notice,
+  Warn,
+  Err,
+  Critical,
+  Alert,
+  Emerg,
+  Off
+};
 
 namespace opt {
 extern std::vector<std::string> LibPaths;
