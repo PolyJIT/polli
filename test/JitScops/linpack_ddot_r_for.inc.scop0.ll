@@ -1,7 +1,14 @@
-; RUN: polli -polli-analyze -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-delinearize=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
-; CHECK: OK :: Non affine access function: {(8 * %3),+,(8 * %2)}<%for.inc>
-; CHECK: OK :: Non affine access function: {(8 * %1),+,(8 * %0)}<%for.inc>
+; CHECK: 1 regions require runtime support:
+; CHECK:   0 region for.inc => for.cond.return.loopexit1_crit_edge.exitStub requires 4 params
+; CHECK:     0 - (8 * %2)
+; CHECK:     0 - %3
+; CHECK:     0 - (8 * %0)
+; CHECK:     0 - %1
+; CHECK:     2 reasons can be fixed at run time:
+; CHECK:       0 - Non affine access function: {(8 * %3),+,(8 * %2)}<%for.inc>
+; CHECK:       1 - Non affine access function: {(8 * %1),+,(8 * %0)}<%for.inc>
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -15,15 +22,15 @@ for.cond.return.loopexit1_crit_edge.exitStub:     ; preds = %for.inc
 
 for.inc:                                          ; preds = %for.inc, %newFuncRoot
   %indvar11 = phi i64 [ 0, %newFuncRoot ], [ %indvar.next12, %for.inc ]
-  %dtemp.06.reload = load double* %dtemp.06.reg2mem
+  %dtemp.06.reload = load double, double* %dtemp.06.reg2mem
   %5 = mul i64 %0, %indvar11
   %6 = add i64 %1, %5
-  %arrayidx15 = getelementptr double* %dy, i64 %6
+  %arrayidx15 = getelementptr double, double* %dy, i64 %6
   %7 = mul i64 %2, %indvar11
   %8 = add i64 %3, %7
-  %arrayidx = getelementptr double* %dx, i64 %8
-  %9 = load double* %arrayidx, align 8
-  %10 = load double* %arrayidx15, align 8
+  %arrayidx = getelementptr double, double* %dx, i64 %8
+  %9 = load double, double* %arrayidx, align 8
+  %10 = load double, double* %arrayidx15, align 8
   %mul16 = fmul double %9, %10
   %add17 = fadd double %dtemp.06.reload, %mul16
   %indvar.next12 = add i64 %indvar11, 1

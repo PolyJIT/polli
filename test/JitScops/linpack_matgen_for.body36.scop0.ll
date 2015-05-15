@@ -1,7 +1,10 @@
-; RUN: polli -polli-analyze -polly-use-runtime-alias-checks=false -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
-; CHECK: OK :: Possible aliasing: "a", "b"
-; CHECK: OK :: Possible aliasing: "a", "b"
+; CHECK: 1 regions require runtime support:
+; CHECK:   0 region for.body36 => for.cond33.for.inc49_crit_edge requires 0 params
+; CHECK:     2 reasons can be fixed at run time:
+; CHECK:       0 - Possible aliasing: "b", "a"
+; CHECK:       1 - Possible aliasing: "b", "a"
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -17,11 +20,11 @@ for.body36:                                       ; preds = %for.body36, %newFun
   %indvar = phi i64 [ 0, %newFuncRoot ], [ %indvar.next, %for.body36 ]
   %2 = add i64 %0, %indvar
   %add40 = trunc i64 %2 to i32
-  %arrayidx45 = getelementptr double* %b, i64 %indvar
-  %3 = load double* %arrayidx45, align 8
+  %arrayidx45 = getelementptr double, double* %b, i64 %indvar
+  %3 = load double, double* %arrayidx45, align 8
   %idxprom41 = sext i32 %add40 to i64
-  %arrayidx42 = getelementptr inbounds double* %a, i64 %idxprom41
-  %4 = load double* %arrayidx42, align 8
+  %arrayidx42 = getelementptr inbounds double, double* %a, i64 %idxprom41
+  %4 = load double, double* %arrayidx42, align 8
   %add43 = fadd double %3, %4
   store double %add43, double* %arrayidx45, align 8
   %indvar.next = add i64 %indvar, 1
