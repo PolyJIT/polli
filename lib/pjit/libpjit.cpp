@@ -1,6 +1,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
 
 #include "llvm/Support/MemoryBuffer.h"
@@ -123,7 +124,74 @@ public:
 };
 } // end of anonymous namespace
 
-extern "C" {
+
+/**
+* @brief Get a new Execution engine for the given module.
+*
+* @param M The module that needs a new execution engine.
+*
+* @return A new execution engine for M.
+*/
+static ExecutionEngine *getEngine(Module *M) {
+  std::string ErrorMsg;
+
+  // If we are supposed to override the target triple, do so now.
+  if (!opt::TargetTriple.empty())
+    M->setTargetTriple(Triple::normalize(opt::TargetTriple));
+
+  std::unique_ptr<Module> Owner(M);
+
+  EngineBuilder builder(std::move(Owner));
+  auto MemMan =
+      std::unique_ptr<PolyJITMemoryManager>(new PolyJITMemoryManager());
+
+  CodeGenOpt::Level OLvl;
+  switch (opt::OptLevel) {
+  default:
+    OLvl = CodeGenOpt::Default;
+    break;
+  case '0':
+    OLvl = CodeGenOpt::None;
+    break;
+  case '1':
+    OLvl = CodeGenOpt::Less;
+    break;
+  case '2':
+    OLvl = CodeGenOpt::Default;
+    break;
+  case '3':
+    OLvl = CodeGenOpt::Aggressive;
+    break;
+  }
+
+  builder.setMArch(opt::MArch);
+  builder.setMCPU(opt::MCPU);
+  builder.setMAttrs(opt::MAttrs);
+  builder.setRelocationModel(opt::RelocModel);
+  builder.setCodeModel(opt::CModel);
+  builder.setErrorStr(&ErrorMsg);
+  builder.setEngineKind(EngineKind::JIT);
+  builder.setMCJITMemoryManager(std::move(MemMan));
+  builder.setOptLevel(OLvl);
+
+  llvm::TargetOptions Options;
+  Options.UseSoftFloat = opt::GenerateSoftFloatCalls;
+  if (opt::FloatABIForCalls != FloatABI::Default)
+    Options.FloatABIType = opt::FloatABIForCalls;
+  if (opt::GenerateSoftFloatCalls)
+    opt::FloatABIForCalls = FloatABI::Soft;
+
+  // Remote target execution doesn't handle EH or debug registration.
+  Options.JITEmitDebugInfo = opt::EmitJitDebugInfo;
+  Options.JITEmitDebugInfoToDisk = opt::EmitJitDebugInfoToDisk;
+
+  builder.setTargetOptions(Options);
+  ExecutionEngine *EE = builder.create();
+  if (!EE)
+    std::cerr << "ERROR: " << ErrorMsg << "\n";
+  return EE;
+}
+
 /**
 * @brief Run a specialized version of a function.
 *
@@ -170,6 +238,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   }
 }
 
+extern "C" {
 /**
  * @brief Runtime callback for PolyJIT.
  *
