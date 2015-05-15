@@ -84,6 +84,11 @@ static inline void do_shutdown() {
 
 static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
+
+  if (char *OLvl = std::getenv("POLLI_OPT_LEVEL"))
+    opt::OptLevel = *OLvl;
+
+  opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
 }
 
 class StaticInitializer {
