@@ -195,7 +195,8 @@ static cl::opt<polli::LogType, true>
                          clEnumVal(polli::Alert, "up to alert messages"),
                          clEnumVal(polli::Emerg, "up to emergency messages"),
                          clEnumVal(polli::Off, "silence"), clEnumValEnd),
-              cl::location(LogLevel), cl::cat(PolliCategory));
+              cl::location(LogLevel), cl::init(polli::Warn),
+              cl::cat(PolliCategory));
 
 static cl::opt<std::string, true>
     ReportFilenameX("polli-report-file",
