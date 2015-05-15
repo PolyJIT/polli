@@ -41,7 +41,6 @@ std::string FakeArgv0;
 bool DisableCoreFiles;
 bool AnalyzeIR;
 char OptLevel;
-std::string OutputFilename;
 std::string TargetTriple;
 std::string MArch;
 std::string MCPU;
@@ -98,10 +97,6 @@ static cl::opt<char, true>
                             "(default = '-O2')"),
               cl::Prefix, cl::ZeroOrMore, cl::location(OptLevel),
               cl::init(' '));
-
-static cl::opt<std::string, true>
-    OutputFilenameX("o", cl::desc("Override output filename"),
-                    cl::value_desc("filename"), cl::location(OutputFilename));
 
 static cl::opt<std::string, true>
     TargetTripleX("mtriple", cl::desc("Override target triple for module"),

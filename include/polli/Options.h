@@ -55,7 +55,6 @@ extern bool DisableExecution;
 extern bool AnalyzeIR;
 extern char OptLevel;
 
-extern std::string OutputFilename;
 extern std::string TargetTriple;
 extern std::string MArch;
 extern std::string MCPU;

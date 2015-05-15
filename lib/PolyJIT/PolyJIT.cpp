@@ -670,9 +670,6 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   /* Optimize with O3&Polly */
   prepareOptimizedIR(M);
 
-  /* Store module before execution */
-  if (opt::OutputFilename.size() > 0)
-    StoreModule(M, opt::OutputFilename);
   LIKWID_MARKER_STOP("PreoptMain");
 
   LIKWID_MARKER_START("CodeGenMain");
