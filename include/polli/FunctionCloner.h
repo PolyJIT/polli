@@ -40,16 +40,13 @@ namespace polli {
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
   outs() << Prefix;
   if (F && !F->isDeclaration()) {
-    //F->print(outs() << "\n");
-    if (verifyFunction(*F, &outs())) {
-      outs() << " printing done.\n";
-    } else
+    if (!verifyFunction(*F, &outs()))
       outs() << " OK\n";
   } else if (F && F->isDeclaration()) {
-    F->getType()->print(outs() << "\nOK (declare) : ");
+    F->getType()->print(outs() << " OK (declare) : ");
     outs() << "\n";
   } else {
-    outs() << "\nOK (F is nullptr)\n";
+    outs() << " OK (F is nullptr)\n";
   }
 }
 
@@ -99,30 +96,23 @@ public:
     if (!ToM)
       ToM = From->getParent();
 
-    polli::verifyFunctions("OnCreate: ", From, To);
     if (!To)
       To = OnCreate::Create(From, ToM);
     OnCreate::MapArguments(VMap, From, To);
-    polli::verifyFunctions("OnCreate done: ", From, To);
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
 
     // Collect all calls for remapping.
-    if (RemapCalls) {
+    if (RemapCalls)
       mapCalls(*From, ToM, VMap);
-      outs() << fmt::format("remapping function calls done\n", RemapCalls);
-    }
 
     polli::verifyFunctions("before transform: ", From, To);
 
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
-    outs() << "cloning done...\n";
 
     SourceAfterClone::Apply(From, To, VMap);
-    outs() << "source done...\n";
     TargetAfterClone::Apply(From, To, VMap);
-    outs() << "target done...\n";
 
     polli::verifyFunctions("after transform: ", From, To);
 
