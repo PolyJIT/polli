@@ -215,7 +215,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   LIKWID_MARKER_START("CodeGenJIT");
   ExecutionEngine *EE = nullptr;
   if (!Mods.count(NewM)) {
-    EE = PolyJIT::GetEngine(NewM);
+    EE = getEngine(NewM);
     EE->finalizeObject();
     Mods[NewM] = EE;
   } else
