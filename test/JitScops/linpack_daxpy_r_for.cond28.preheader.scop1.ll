@@ -1,7 +1,10 @@
-; RUN: polli -polli-analyze -polly-use-runtime-alias-checks=false -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
-; CHECK: OK :: Possible aliasing: "dy", "dx"
-; CHECK: OK :: Possible aliasing: "dy", "dx"
+;CHECK: 1 regions require runtime support:
+;CHECK:   0 region for.cond28.preheader => for.end41.loopexit requires 0 params
+;CHECK:     2 reasons can be fixed at run time:
+;CHECK:       0 - Possible aliasing: "dy", "dx"
+;CHECK:       1 - Possible aliasing: "dy", "dx"
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -23,10 +26,10 @@ for.body30.lr.ph:                                 ; preds = %for.cond28.preheade
 for.body30:                                       ; preds = %for.body30, %for.body30.lr.ph
   %indvar = phi i64 [ 0, %for.body30.lr.ph ], [ %indvar.next, %for.body30 ]
   %.moved.to.for.body30 = zext i32 %n to i64
-  %arrayidx38 = getelementptr double* %dy, i64 %indvar
-  %arrayidx34 = getelementptr double* %dx, i64 %indvar
-  %0 = load double* %arrayidx38, align 8
-  %1 = load double* %arrayidx34, align 8
+  %arrayidx38 = getelementptr double, double* %dy, i64 %indvar
+  %arrayidx34 = getelementptr double, double* %dx, i64 %indvar
+  %0 = load double, double* %arrayidx38, align 8
+  %1 = load double, double* %arrayidx34, align 8
   %mul35 = fmul double %1, %da
   %add36 = fadd double %0, %mul35
   store double %add36, double* %arrayidx38, align 8

@@ -1,12 +1,15 @@
-; RUN: polli -polli-analyze -polly-use-runtime-alias-checks=false -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem"
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem"
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx"
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
-; CHECK: OK :: Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
+; CHECK: 1 regions require runtime support:
+; CHECK:   0 region for.cond21.preheader => return.loopexit requires 0 params
+; CHECK:     7 reasons can be fixed at run time:
+; CHECK:       0 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem"
+; CHECK:       1 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem"
+; CHECK:       2 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx"
+; CHECK:       3 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
+; CHECK:       4 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
+; CHECK:       5 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
+; CHECK:       6 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.13.reg2mem", "dx", "dy"
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -30,11 +33,11 @@ for.inc30.lr.ph:                                  ; preds = %for.cond21.preheade
 for.inc30:                                        ; preds = %for.inc30, %for.inc30.lr.ph
   %indvar = phi i64 [ 0, %for.inc30.lr.ph ], [ %indvar.next, %for.inc30 ]
   %.moved.to.for.inc30 = zext i32 %n to i64
-  %dtemp.13.reload = load double* %dtemp.13.reg2mem
-  %arrayidx25 = getelementptr double* %dx, i64 %indvar
-  %arrayidx27 = getelementptr double* %dy, i64 %indvar
-  %0 = load double* %arrayidx25, align 8
-  %1 = load double* %arrayidx27, align 8
+  %dtemp.13.reload = load double, double* %dtemp.13.reg2mem
+  %arrayidx25 = getelementptr double, double* %dx, i64 %indvar
+  %arrayidx27 = getelementptr double, double* %dy, i64 %indvar
+  %0 = load double, double* %arrayidx25, align 8
+  %1 = load double, double* %arrayidx27, align 8
   %mul28 = fmul double %0, %1
   %add29 = fadd double %dtemp.13.reload, %mul28
   %indvar.next = add i64 %indvar, 1
@@ -43,12 +46,12 @@ for.inc30:                                        ; preds = %for.inc30, %for.inc
   br i1 %exitcond, label %for.inc30, label %for.cond21.return.loopexit_crit_edge
 
 for.cond21.return.loopexit_crit_edge:             ; preds = %for.inc30
-  %2 = load double* %dtemp.13.reg2mem
+  %2 = load double, double* %dtemp.13.reg2mem
   store double %2, double* %dtemp.1.lcssa.reg2mem
   br label %return.loopexit
 
 return.loopexit:                                  ; preds = %for.cond21.return.loopexit_crit_edge, %for.cond21.preheader
-  %dtemp.1.lcssa.reload = load double* %dtemp.1.lcssa.reg2mem
+  %dtemp.1.lcssa.reload = load double, double* %dtemp.1.lcssa.reg2mem
   store double %dtemp.1.lcssa.reload, double* %retval.0.reg2mem
   br label %return.exitStub
 }

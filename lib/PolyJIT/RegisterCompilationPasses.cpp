@@ -98,7 +98,7 @@ template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
 static void setupLogging() {
   spdlog::set_async_mode(1048576);
   spdlog::set_pattern("%v");
-  spdlog::set_level(spdlog::level::warn);
+  spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
 }
 
 static void registerPolyJIT(const llvm::PassManagerBuilder &,

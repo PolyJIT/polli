@@ -37,18 +37,6 @@ typedef llvm::Module* ModulePtrT;
 typedef llvm::DenseMap<ModulePtrT, llvm::ExecutionEngine *> ManagedModules;
 
 extern llvm::SmallVector<char, 255> *DefaultDir;
-
-/**
- * @brief Get a stream to place log-output into.
- *
- * @param T The log type we want.
- * @param Level indentation level, default: 0
- *
- * @return stream to put our log output to.
- */
-llvm::raw_ostream &log(const polli::LogType T = polli::Info,
-                       const size_t Level = 0);
-
 /**
  * @brief Initialize the output directory to put all intermediate files into.
  */
@@ -77,14 +65,5 @@ void StoreModules(ManagedModules &Modules);
  * @return the indented output stream.
  */
 llvm::raw_ostream &report(const size_t Indent = 0);
-
-/**
- * @brief Demangle a C++ name.
- *
- * @param Name
- *
- * @return the demangled name, if possible. Otherwise, the input.
- */
-std::string demangle(const std::string &Name);
 
 #endif // POLLI_UTILS_H

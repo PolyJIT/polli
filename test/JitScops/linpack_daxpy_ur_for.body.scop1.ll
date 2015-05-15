@@ -1,8 +1,17 @@
-; RUN: polli -polli-analyze -jitable -polly-detect-keep-going %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-delinearize=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
-; CHECK: OK :: Non affine access function: {(8 * %1),+,(8 * %0)}<%for.body>
-; CHECK: OK :: Non affine access function: {(8 * %3),+,(8 * %2)}<%for.body>
-; CHECK: OK :: Non affine access function: {(8 * %1),+,(8 * %0)}<%for.body>
+; CHECK: 1 regions require runtime support:
+; CHECK:   0 region for.body => for.cond.for.end94.loopexit2_crit_edge.exitStub requires 6 params
+; CHECK:     0 - (8 * %0)
+; CHECK:     0 - %1
+; CHECK:     0 - (8 * %2)
+; CHECK:     0 - %3
+; CHECK:     0 - (8 * %0)
+; CHECK:     0 - %1
+; CHECK:     3 reasons can be fixed at run time:
+; CHECK:       0 - Non affine access function: {(8 * %1),+,(8 * %0)}<%for.body>
+; CHECK:       1 - Non affine access function: {(8 * %3),+,(8 * %2)}<%for.body>
+; CHECK:       2 - Non affine access function: {(8 * %1),+,(8 * %0)}<%for.body>
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"
@@ -18,12 +27,12 @@ for.body:                                         ; preds = %for.body, %newFuncR
   %indvar13 = phi i64 [ 0, %newFuncRoot ], [ %indvar.next14, %for.body ]
   %5 = mul i64 %0, %indvar13
   %6 = add i64 %1, %5
-  %arrayidx24 = getelementptr double* %dy, i64 %6
+  %arrayidx24 = getelementptr double, double* %dy, i64 %6
   %7 = mul i64 %2, %indvar13
   %8 = add i64 %3, %7
-  %arrayidx20 = getelementptr double* %dx, i64 %8
-  %9 = load double* %arrayidx24, align 8
-  %10 = load double* %arrayidx20, align 8
+  %arrayidx20 = getelementptr double, double* %dx, i64 %8
+  %9 = load double, double* %arrayidx24, align 8
+  %10 = load double, double* %arrayidx20, align 8
   %mul21 = fmul double %10, %da
   %add22 = fadd double %9, %mul21
   store double %add22, double* %arrayidx24, align 8
