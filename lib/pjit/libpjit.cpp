@@ -19,6 +19,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 
 #include "spdlog/spdlog.h"
+#include <likwid.h>
 
 #include <vector>
 #include <cstdlib>
@@ -32,6 +33,12 @@ using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 static auto Console = spdlog::stderr_logger_st("polli");
+
+/**
+ * @brief Likwid requires initialization per thread.
+ *
+ */
+static __thread bool likwid_thread_initialized = false;
 
 /**
  * @brief Read the LLVM-IR module from the given prototype string.
@@ -212,6 +219,11 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
+  if (!likwid_thread_initialized) {
+    LIKWID_MARKER_THREADINIT;
+    likwid_thread_initialized = true;
+  }
+
   static ManagedModules Mods;
 
   Module *NewM = NewF.getParent();
@@ -229,8 +241,6 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
 
   if (EE) {
     LIKWID_MARKER_START(NewF.getName().str().c_str());
-    LIKWID_MARKER_THREADINIT;
-
     Console->warn("execution of {:>s} begins (#{:d} params)",
                   NewF.getName().str(), paramc);
     void *FPtr = EE->getPointerToFunction(&NewF);
