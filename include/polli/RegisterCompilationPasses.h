@@ -25,7 +25,21 @@ class PassRegistry;
 }
 
 namespace polli {
-void registerPolli(llvm::legacy::PassManagerBase &PM);
-void initializePolliPasses(llvm::PassRegistry &Registry);
+  /**
+   * @brief Register PolyJIT's passes with the PassManager
+   *
+   * @param PM The PassManager we put PolyJIT's compilation passes into.
+   * @return void
+   */
+  void registerPolli(llvm::legacy::PassManagerBase &PM);
+
+  /**
+   * @brief Initialize PolyJIT's compilation passes.
+   *
+   * @param Registry The registry we put ourselves in. Usually PolyJIT wants to
+   *                 run as early as possible, like Polly.
+   * @return void
+   */
+  void initializePolliPasses(llvm::PassRegistry &Registry);
 }
 #endif

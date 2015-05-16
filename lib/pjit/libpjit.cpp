@@ -32,8 +32,6 @@ using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
-static auto Console = spdlog::stderr_logger_st("polli");
-
 /**
  * @brief Likwid requires initialization per thread.
  *
@@ -49,8 +47,9 @@ static __thread bool likwid_thread_initialized = false;
 static Module &getModule(const char *prototype) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
+  static auto Console = spdlog::stderr_logger_st("polli");
 
-  if(!ModuleIndex.count(prototype)) {
+  if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
     SMDiagnostic Err;
@@ -86,7 +85,8 @@ static Function *getFunction(Module &M) {
 static inline void do_shutdown() {
   LIKWID_MARKER_STOP("main-thread");
   LIKWID_MARKER_CLOSE;
-  Console->warn("PolyJIT shut down.");
+  static auto Console = spdlog::stderr_logger_st("polli");
+  Console->debug("PolyJIT shut down.");
 }
 
 static inline void set_options_from_environment() {
@@ -101,7 +101,9 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
-    Console->warn("loading polyjit");
+
+    static auto Console = spdlog::stderr_logger_st("polli");
+    Console->debug("loading polyjit");
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
     LIKWID_MARKER_INIT;
@@ -219,6 +221,7 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
+  static auto Console = spdlog::stderr_logger_st("polli");
   if (!likwid_thread_initialized) {
     LIKWID_MARKER_THREADINIT;
     likwid_thread_initialized = true;
@@ -241,12 +244,12 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
 
   if (EE) {
     LIKWID_MARKER_START(NewF.getName().str().c_str());
-    Console->warn("execution of {:>s} begins (#{:d} params)",
+    Console->debug("execution of {:>s} begins (#{:d} params)",
                   NewF.getName().str(), paramc);
     void *FPtr = EE->getPointerToFunction(&NewF);
-    void (*PF)(int, char **) = (void(*)(int, char **))FPtr;
+    void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
     PF(paramc, params);
-    Console->warn("execution of {:>s} completed", NewF.getName().str());
+    Console->debug("execution of {:>s} completed", NewF.getName().str());
     LIKWID_MARKER_STOP(NewF.getName().str().c_str());
   } else {
     Console->error("no execution engine found.");
@@ -265,6 +268,7 @@ extern "C" {
  */
 int pjit_main(const char *fName, unsigned paramc, char **params) {
   static StaticInitializer InitializeEverything;
+  static auto Console = spdlog::stderr_logger_st("polli");
 
   Module &M = getModule(fName);
   Function *F = getFunction(M);
@@ -299,24 +303,28 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
-  VarFun->print(outs() << "\nvariant created: ");
+
+  std::string buf;
+  raw_string_ostream os(buf);
+  VarFun->print(os);
+  Console->debug("variant created:\n{:s}", os.str());
 
   SmallVector<GenericValue, 2> Args(2);
   Args[0].IntVal = APInt(32, F->arg_size(), false);
   Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
 
-  //Stats &S = VarFun->stats();
+  // Stats &S = VarFun->stats();
   LIKWID_MARKER_START("JitOptVariant");
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
     std::string paramlist = DebugFn(*F, paramc, GVTOP(Args[1]));
-    Console->warn("running with params: #{:d} ({:s})", paramc, paramlist);
+    Console->debug("running with params: #{:d} ({:s})", paramc, paramlist);
     runSpecializedFunction(*NewF, paramc, params);
   } else
-      llvm_unreachable("FIXME: call the old prototype.");
+    llvm_unreachable("FIXME: call the old prototype.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
-  //S.ExecCount++;
+  // S.ExecCount++;
   return 0;
 }
 }

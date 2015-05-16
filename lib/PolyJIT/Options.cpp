@@ -26,6 +26,13 @@ llvm::cl::OptionCategory
     PolliCategory("Polli Options", "Configure the runtime options of polli");
 
 namespace polli {
+
+void setupLogging() {
+  spdlog::set_async_mode(1048576);
+  spdlog::set_pattern("%v");
+  spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
+}
+
 namespace opt {
 bool InstrumentRegions;
 bool EnableJitable;
