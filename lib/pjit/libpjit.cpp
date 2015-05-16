@@ -314,17 +314,17 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
 
-  //Stats &S = VarFun->stats();
+  // Stats &S = VarFun->stats();
   LIKWID_MARKER_START("JitOptVariant");
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
     std::string paramlist = DebugFn(*F, paramc, GVTOP(Args[1]));
     Console->debug("running with params: #{:d} ({:s})", paramc, paramlist);
     runSpecializedFunction(*NewF, paramc, params);
   } else
-      llvm_unreachable("FIXME: call the old prototype.");
+    llvm_unreachable("FIXME: call the old prototype.");
   LIKWID_MARKER_STOP("JitOptVariant");
 
-  //S.ExecCount++;
+  // S.ExecCount++;
   return 0;
 }
 }
