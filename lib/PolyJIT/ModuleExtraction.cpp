@@ -369,17 +369,19 @@ struct RemoveGlobalsPolicy {
    * @param To Target function.
    * @return llvm::Function*
    */
-  static Function *Create(Function *SrcF, Module *TgtM) {
+  static Function *Create(Function *From, Module *ToM) {
     ArgListT Args;
-    size_t ArgCount = SrcF->arg_size() - getGlobalCount(SrcF);
+    size_t ArgCount = From->arg_size() - getGlobalCount(From);
 
-    for (auto &Arg : SrcF->args())
-      if (ArgCount-- > 0)
+    size_t i = 0;
+    for (auto &Arg : From->args())
+      if (i++ < ArgCount) {
         Args.push_back(Arg.getType());
+      }
 
     return Function::Create(
-        FunctionType::get(SrcF->getReturnType(), Args, false),
-        SrcF->getLinkage(), SrcF->getName(), TgtM);
+        FunctionType::get(From->getReturnType(), Args, false),
+        From->getLinkage(), From->getName(), ToM);
   }
 };
 
@@ -525,7 +527,7 @@ struct InstrumentEndpoint {
               M->getGlobalVariable(Name, /*AllowInternals*/ true)) {
         /* Get the appropriate slot in the parameters array and store
          * the stack slot in form of a i8*. */
-        Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
+        Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
         Value *Dest = Builder.CreateGEP(Params, {Idx0, ArrIdx});
 
         Builder.CreateStore(
