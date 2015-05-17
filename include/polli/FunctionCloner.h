@@ -169,6 +169,12 @@ struct IgnoreSource {
 };
 
 struct IgnoreTarget {
+  static void Apply(Function *, Function *, ValueToValueMapTy &){
+      /* Do nothing */
+  };
+};
+
+struct ConnectTarget {
   static void Apply(Function *From, Function *To, ValueToValueMapTy &VMap){
     /* We have to connect the function entry block to the entry block of the
      * target function unconditionally. This way, CreationPolicies can
@@ -183,7 +189,7 @@ struct IgnoreTarget {
 
     Builder.SetInsertPoint(EntryBB);
     Builder.CreateBr(ClonedEntryBB);
-  };
+  }
 };
 
 struct DestroySource {
