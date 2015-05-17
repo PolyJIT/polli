@@ -84,9 +84,9 @@ struct MainCreator {
 
       Type *ArgTy = Arg.getType();
       Value *ArrIdx =
-          Builder.CreateInBoundsGEP(ArgV, { IdxI }, "pprof.param.idx");
+          Builder.CreateInBoundsGEP(ArgV, { IdxI });
       Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo());
-      Value *LoadArr = Builder.CreateLoad(CastVal);
+      Value *LoadArr = Builder.CreateLoad(CastVal, "polyjit.param.idx");
       VMap[&Arg] = LoadArr;
     }
   }
