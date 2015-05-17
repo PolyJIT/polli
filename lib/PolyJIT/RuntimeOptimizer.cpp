@@ -67,12 +67,6 @@ Function &OptimizeForRuntime(Function &F) {
 
   Console->debug("optimization complete");
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
-
-  std::string buf;
-  raw_string_ostream os(buf);
-  F.print(os << "\n");
-  Console->debug("{:s}", os.str());
-
   return F;
 }
 }

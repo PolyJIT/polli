@@ -304,20 +304,12 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
 
-  std::string buf;
-  raw_string_ostream os(buf);
-  VarFun->print(os);
-  Console->debug("variant created:\n{:s}", os.str());
-
-  SmallVector<GenericValue, 2> Args(2);
-  Args[0].IntVal = APInt(32, F->arg_size(), false);
-  Args[1] = PTOGV(params);
   LIKWID_MARKER_STOP("JitSelectParams");
 
   // Stats &S = VarFun->stats();
   LIKWID_MARKER_START("JitOptVariant");
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
-    std::string paramlist = DebugFn(*F, paramc, GVTOP(Args[1]));
+    std::string paramlist = DebugFn(*F, paramc, params);
     Console->debug("running with params: #{:d} ({:s})", paramc, paramlist);
     runSpecializedFunction(*NewF, paramc, params);
   } else
