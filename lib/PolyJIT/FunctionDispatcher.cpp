@@ -29,9 +29,10 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
       Param P;
       P.Ty = IntTy;
       P.Name = Arg.getName();
-      P.Val = ConstantInt::get(IntTy, *((uint64_t **)params)[i++]);
+      P.Val = ConstantInt::get(IntTy, ((uint64_t **)params)[i][0]);
       ParamV.push_back(P);
     }
+    i++;
   }
 }
 
