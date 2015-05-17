@@ -60,7 +60,7 @@ Function &OptimizeForRuntime(Function &F) {
 
   Builder.VerifyInput = true;
   Builder.VerifyOutput = true;
-  Builder.OptLevel = 3;
+  Builder.OptLevel = 0;
 
   Builder.populateFunctionPassManager(PM);
   PM.run(F);
