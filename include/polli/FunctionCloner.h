@@ -169,8 +169,20 @@ struct IgnoreSource {
 };
 
 struct IgnoreTarget {
-  static void Apply(Function *, Function *, ValueToValueMapTy &){
-      /* Do nothing */
+  static void Apply(Function *From, Function *To, ValueToValueMapTy &VMap){
+    /* We have to connect the function entry block to the entry block of the
+     * target function unconditionally. This way, CreationPolicies can
+     * modifiy the function entry.
+     */
+
+    LLVMContext &Context = To->getContext();
+    IRBuilder<> Builder(Context);
+    BasicBlock *EntryBB = &To->getEntryBlock();
+    BasicBlock *SrcEntryBB = &From->getEntryBlock();
+    BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
+
+    Builder.SetInsertPoint(EntryBB);
+    Builder.CreateBr(ClonedEntryBB);
   };
 };
 
