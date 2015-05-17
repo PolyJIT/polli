@@ -237,16 +237,22 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
       K.getShortName().str() + ".ll");
 
   // Perform parameter value substitution.
-  FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>
-      Specializer(VMap, NewM);
+  if (!opt::DisableRecompile) {
+    FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>
+        Specializer(VMap, NewM);
 
-  assert(!BaseF.isDeclaration() && "Uninstrumented function is a declaration");
+    /* Perform a parameter specialization by taking the unchanged base function
+     * and substitute all known parameter values.
+     */
+    Specializer.setParameters(K);
+    Specializer.setSource(&SourceF);
 
-  /* Perform a parameter specialization by taking the unchanged base function
-   * and substitute all known parameter values.
-   */
-  Specializer.setParameters(K);
-  Specializer.setSource(&SourceF);
+    return &(OptimizeForRuntime(*Specializer.start()));
+  } else {
+    FunctionCloner<MainCreator, IgnoreSource, IgnoreTarget> Specializer(VMap,
+                                                                        NewM);
+    Specializer.setSource(&SourceF);
 
-  return &(OptimizeForRuntime(*Specializer.start()));
+    return &(OptimizeForRuntime(*Specializer.start()));
+  }
 }
