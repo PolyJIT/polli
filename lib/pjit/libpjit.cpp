@@ -257,6 +257,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
 }
 
 extern "C" {
+StaticInitializer InitializeEverything;
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -267,7 +268,6 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 int pjit_main(const char *fName, unsigned paramc, char **params) {
-  static StaticInitializer InitializeEverything;
   static auto Console = spdlog::stderr_logger_st("polli");
 
   Module &M = getModule(fName);
