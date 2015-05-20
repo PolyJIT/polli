@@ -53,19 +53,17 @@ namespace polli {
 
 Function &OptimizeForRuntime(Function &F) {
   Module *M = F.getParent();
-  Console->debug("optimizing {:>s}", F.getName().str());
   PassManagerBuilder Builder;
 
   FunctionPassManager PM = FunctionPassManager(M);
 
   Builder.VerifyInput = true;
   Builder.VerifyOutput = true;
-  Builder.OptLevel = 0;
+  Builder.OptLevel = 3;
 
   Builder.populateFunctionPassManager(PM);
   PM.run(F);
 
-  Console->debug("optimization complete");
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
   return F;
 }
