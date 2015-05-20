@@ -48,7 +48,6 @@ if (BUILD_SHARED_LIBS)
   target_link_libraries(PolyJIT PRIVATE
     likwid
     Polly
-    pprof
     pthread
   )
 endif()
