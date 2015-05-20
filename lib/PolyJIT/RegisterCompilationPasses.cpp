@@ -108,9 +108,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (polly::PollyDelinearize && opt::EnableJitable)
     polly::PollyDelinearize = false;
 
-  if (opt::InstrumentRegions)
-    PM.add(new PapiCScopProfilingInit());
-
   // Schedule us inbetween detection and polly's codegen.
   PM.add(new JitScopDetection(opt::EnableJitable));
   if (opt::AnalyzeIR)
