@@ -110,8 +110,7 @@ static void printRunIDs(const IdVector &IDs) {
   std::cout << "]\n";
 }
 
-static IdVector
-ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c) {
+static IdVector ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c) {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
@@ -182,8 +181,8 @@ static void OpenNewConnection(const DbOptions &Opts) {
   c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
 }
 
-bool ReadRun(Run<PPEvent> &Events,
-             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
+bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
+             const Options &opt) {
   DbOptions Opts = getDBOptionsFromEnv();
   bool gotValidRun = false;
 
