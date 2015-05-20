@@ -86,7 +86,7 @@ static inline void do_shutdown() {
   LIKWID_MARKER_STOP("main-thread");
   LIKWID_MARKER_CLOSE;
   static auto Console = spdlog::stderr_logger_st("polli");
-  Console->debug("PolyJIT shut down.");
+  DEBUG(Console->debug("PolyJIT shut down."));
 }
 
 static inline void set_options_from_environment() {
@@ -244,12 +244,12 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
 
   if (EE) {
     LIKWID_MARKER_START(NewF.getName().str().c_str());
-    Console->debug("execution of {:>s} begins (#{:d} params)",
-                  NewF.getName().str(), paramc);
+    DEBUG(Console->debug("execution of {:>s} begins (#{:d} params)",
+                  NewF.getName().str(), paramc));
     void *FPtr = EE->getPointerToFunction(&NewF);
     void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
     PF(paramc, params);
-    Console->debug("execution of {:>s} completed", NewF.getName().str());
+    DEBUG(Console->debug("execution of {:>s} completed", NewF.getName().str()));
     LIKWID_MARKER_STOP(NewF.getName().str().c_str());
   } else {
     Console->error("no execution engine found.");
@@ -310,7 +310,8 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   LIKWID_MARKER_START("JitOptVariant");
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
     std::string paramlist = DebugFn(*F, paramc, params);
-    Console->debug("running with params: #{:d} ({:s})", paramc, paramlist);
+    DEBUG(
+        Console->debug("running with params: #{:d} ({:s})", paramc, paramlist));
     runSpecializedFunction(*NewF, paramc, params);
   } else
     llvm_unreachable("FIXME: call the old prototype.");
