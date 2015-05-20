@@ -23,6 +23,14 @@
 extern llvm::cl::OptionCategory PolliCategory;
 
 namespace polli {
+
+/**
+ * @brief Initialize spdlog with default values.
+ *
+ * @return void
+ */
+void setupLogging();
+
 enum LogType {
   Trace,
   Debug,

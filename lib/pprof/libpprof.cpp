@@ -79,3 +79,11 @@ void papi_region_setup() {
             err);
 }
 }
+
+class StaticInitializer {
+public:
+  StaticInitializer() {
+    papi_region_setup();
+  }
+};
+static StaticInitializer InitializeLib;

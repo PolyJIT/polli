@@ -53,7 +53,6 @@ namespace polli {
 
 Function &OptimizeForRuntime(Function &F) {
   Module *M = F.getParent();
-  Console->warn("optimizing {:>s}", F.getName().str());
   PassManagerBuilder Builder;
 
   FunctionPassManager PM = FunctionPassManager(M);
@@ -65,11 +64,7 @@ Function &OptimizeForRuntime(Function &F) {
   Builder.populateFunctionPassManager(PM);
   PM.run(F);
 
-  Console->warn("optimization complete");
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
-
-  F.print(outs() << "\n");
-
   return F;
 }
 }

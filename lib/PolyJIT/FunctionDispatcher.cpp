@@ -29,9 +29,10 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
       Param P;
       P.Ty = IntTy;
       P.Name = Arg.getName();
-      P.Val = ConstantInt::get(IntTy, *((uint64_t **)params)[i++]);
+      P.Val = ConstantInt::get(IntTy, ((uint64_t **)params)[i][0]);
       ParamV.push_back(P);
     }
+    i++;
   }
 }
 
@@ -41,7 +42,6 @@ Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
 
   Function *Variant = createVariant(K);
   Variants[K] = Variant;
-  Console->warn("variant generated");
 
   return Variant;
 }
@@ -83,9 +83,9 @@ struct MainCreator {
 
       Type *ArgTy = Arg.getType();
       Value *ArrIdx =
-          Builder.CreateInBoundsGEP(ArgV, { IdxI }, "pprof.param.idx");
+          Builder.CreateInBoundsGEP(ArgV, { IdxI });
       Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo());
-      Value *LoadArr = Builder.CreateLoad(CastVal);
+      Value *LoadArr = Builder.CreateLoad(CastVal, "polyjit.param.idx");
       VMap[&Arg] = LoadArr;
     }
   }
@@ -224,7 +224,6 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
 
   /* Copy properties of our source module */
   Module *M, *NewM;
-  Console->warn("creating new variant for key: {:>s}", K.getShortName().str());
 
   // Prepare a new module to hold our new function.
   M = SourceF.getParent();
@@ -237,16 +236,22 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
       K.getShortName().str() + ".ll");
 
   // Perform parameter value substitution.
-  FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>
-      Specializer(VMap, NewM);
+  if (!opt::DisableRecompile) {
+    FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>
+        Specializer(VMap, NewM);
 
-  assert(!BaseF.isDeclaration() && "Uninstrumented function is a declaration");
+    /* Perform a parameter specialization by taking the unchanged base function
+     * and substitute all known parameter values.
+     */
+    Specializer.setParameters(K);
+    Specializer.setSource(&SourceF);
 
-  /* Perform a parameter specialization by taking the unchanged base function
-   * and substitute all known parameter values.
-   */
-  Specializer.setParameters(K);
-  Specializer.setSource(&SourceF);
+    return &(OptimizeForRuntime(*Specializer.start()));
+  } else {
+    FunctionCloner<MainCreator, IgnoreSource, ConnectTarget> Specializer(VMap,
+                                                                         NewM);
+    Specializer.setSource(&SourceF);
 
-  return &(OptimizeForRuntime(*Specializer.start()));
+    return &(OptimizeForRuntime(*Specializer.start()));
+  }
 }

@@ -51,15 +51,15 @@ std::string now() {
 
 namespace pgsql {
 static std::string CONNECTION_FMT_STR = "user={} port={} host={} dbname={}";
-static std::string NEW_RUN_SQL = "INSERT INTO run (finished, command, "
-                                 "project_name, experiment_name, run_group) "
-                                 "VALUES (TIMESTAMP '{}', '{}', "
-                                 "'{}', '{}', '{}') RETURNING id;";
-static std::string NEW_RUN_RESULT_SQL = "INSERT INTO papi_results (type, id, "
-                                        "timestamp, run_id) VALUES";
 
 void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   using namespace fmt;
+  static std::string NEW_RUN_SQL = "INSERT INTO run (finished, command, "
+                                   "project_name, experiment_name, run_group) "
+                                   "VALUES (TIMESTAMP '{}', '{}', "
+                                   "'{}', '{}', '{}') RETURNING id;";
+  static std::string NEW_RUN_RESULT_SQL = "INSERT INTO papi_results (type, id, "
+                                          "timestamp, run_id) VALUES";
 
   DbOptions Opts = getDBOptionsFromEnv();
   std::string connection_str =
@@ -96,11 +96,6 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
 
 static std::unique_ptr<pqxx::connection> c;
 
-static std::string SELECT_RUN =
-    "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
-    "timestamp;";
-static std::string SELECT_RUN_IDs = "SELECT id FROM run WHERE run_group = $1;";
-
 using IdVector = std::vector<uint32_t>;
 static IdVector RunIDs;
 
@@ -115,8 +110,7 @@ static void printRunIDs(const IdVector &IDs) {
   std::cout << "]\n";
 }
 
-static IdVector
-ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c) {
+static IdVector ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c) {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
@@ -170,6 +164,12 @@ static Run<PPEvent> ReadRun(std::unique_ptr<pqxx::connection> &c,
 
 static void PrepareReadStatements(std::unique_ptr<pqxx::connection> &c,
                                   const DbOptions &DbOpts) {
+  static std::string SELECT_RUN =
+      "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
+      "timestamp;";
+  static std::string SELECT_RUN_IDs =
+      "SELECT id FROM run WHERE run_group = $1;";
+
   c->prepare("select_run", SELECT_RUN);
   c->prepare("select_run_ids", SELECT_RUN_IDs);
 }
@@ -181,8 +181,8 @@ static void OpenNewConnection(const DbOptions &Opts) {
   c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
 }
 
-bool ReadRun(Run<PPEvent> &Events,
-             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
+bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
+             const Options &opt) {
   DbOptions Opts = getDBOptionsFromEnv();
   bool gotValidRun = false;
 

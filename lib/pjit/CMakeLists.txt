@@ -39,7 +39,6 @@ if (BUILD_SHARED_LIBS)
     PolyJIT
     likwid
     Polly
-    pprof
     pthread
   )
 endif()

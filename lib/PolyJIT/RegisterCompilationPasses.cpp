@@ -95,12 +95,6 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 template <> char FunctionPassPrinter<JitScopDetection>::ID = 0;
 template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
 
-static void setupLogging() {
-  spdlog::set_async_mode(1048576);
-  spdlog::set_pattern("%v");
-  spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
-}
-
 static void registerPolyJIT(const llvm::PassManagerBuilder &,
                             llvm::legacy::PassManagerBase &PM) {
   if (!opt::Enabled)
@@ -113,9 +107,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 
   if (polly::PollyDelinearize && opt::EnableJitable)
     polly::PollyDelinearize = false;
-
-  if (opt::InstrumentRegions)
-    PM.add(new PapiCScopProfilingInit());
 
   // Schedule us inbetween detection and polly's codegen.
   PM.add(new JitScopDetection(opt::EnableJitable));
