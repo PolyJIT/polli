@@ -270,12 +270,14 @@ StaticInitializer InitializeEverything;
 int pjit_main(const char *fName, unsigned paramc, char **params) {
   static auto Console = spdlog::stderr_logger_st("polli");
 
+  LIKWID_MARKER_START("GetOrParsePrototype");
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
     Console->error("Could not find a function in: {}", M.getModuleIdentifier());
     return 0;
   }
+  LIKWID_MARKER_STOP("GetOrParsePrototype");
 
   auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
     std::stringstream res;
@@ -307,7 +309,6 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   LIKWID_MARKER_STOP("JitSelectParams");
 
   // Stats &S = VarFun->stats();
-  LIKWID_MARKER_START("JitOptVariant");
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
     std::string paramlist = DebugFn(*F, paramc, params);
     DEBUG(
@@ -315,7 +316,6 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
     runSpecializedFunction(*NewF, paramc, params);
   } else
     llvm_unreachable("FIXME: call the old prototype.");
-  LIKWID_MARKER_STOP("JitOptVariant");
 
   // S.ExecCount++;
   return 0;

@@ -12,6 +12,7 @@
 #include "llvm/Support/Casting.h"
 
 #include "spdlog/spdlog.h"
+#include <likwid.h>
 #include <map>
 
 namespace {
@@ -37,12 +38,14 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
 }
 
 Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
+  LIKWID_MARKER_START("JitOptVariant");
   if (Variants.count(K))
     return Variants[K];
 
   Function *Variant = createVariant(K);
   Variants[K] = Variant;
 
+  LIKWID_MARKER_STOP("JitOptVariant");
   return Variant;
 }
 
