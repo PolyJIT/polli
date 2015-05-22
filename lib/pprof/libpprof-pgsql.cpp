@@ -18,6 +18,7 @@ struct DbOptions {
   std::string pass;
   std::string name;
   std::string uuid;
+  std::string exp_uuid;
 };
 
 DbOptions getDBOptionsFromEnv() {
@@ -29,6 +30,7 @@ DbOptions getDBOptionsFromEnv() {
   const char *name = std::getenv("PPROF_DB_NAME");
   const char *port = std::getenv("PPROF_DB_PORT");
   const char *uuid = std::getenv("PPROF_DB_RUN_GROUP");
+  const char *exp_uuid = std::getenv("PPROF_EXPERIMENT_ID");
 
   Opts.host = host ? host : "localhost";
   Opts.port = port ? stoi(port) : 49153;
@@ -36,6 +38,7 @@ DbOptions getDBOptionsFromEnv() {
   Opts.user = user ? user : "pprof";
   Opts.pass = pass ? pass : "pprof";
   Opts.uuid = uuid ? uuid : "00000000-0000-0000-0000-000000000000";
+  Opts.exp_uuid = exp_uuid ? exp_uuid : "00000000-0000-0000-0000-000000000000";
 
   return Opts;
 }
@@ -54,10 +57,11 @@ static std::string CONNECTION_FMT_STR = "user={} port={} host={} dbname={}";
 
 void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   using namespace fmt;
-  static std::string NEW_RUN_SQL = "INSERT INTO run (finished, command, "
-                                   "project_name, experiment_name, run_group) "
-                                   "VALUES (TIMESTAMP '{}', '{}', "
-                                   "'{}', '{}', '{}') RETURNING id;";
+  static std::string NEW_RUN_SQL =
+      "INSERT INTO run (finished, command, "
+      "project_name, experiment_name, run_group, experiment_group) "
+      "VALUES (TIMESTAMP '{}', '{}', "
+      "'{}', '{}', '{}', '{}') RETURNING id;";
   static std::string NEW_RUN_RESULT_SQL = "INSERT INTO papi_results (type, id, "
                                           "timestamp, run_id) VALUES";
 
@@ -69,7 +73,7 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   pqxx::connection c(connection_str);
   pqxx::work w(c);
   pqxx::result r = w.exec(format(NEW_RUN_SQL, now(), opts.command, opts.project,
-                                 opts.experiment, Opts.uuid));
+                                 opts.experiment, Opts.uuid, Opts.exp_uuid));
 
   long run_id;
   r[0]["id"].to(run_id);
