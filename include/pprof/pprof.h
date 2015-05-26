@@ -134,8 +134,10 @@ struct Options {
   bool use_db;
   bool use_csv;
   bool use_file;
+  bool execute_atexit;
 };
 
+Options *getOptions();
 Options getPprofOptionsFromEnv();
 } // end of namespace pprof
 

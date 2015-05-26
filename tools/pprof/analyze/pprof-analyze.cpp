@@ -244,7 +244,9 @@ static int main(const Options Opts) {
 
 int main(int argc, const char **argv) {
   using namespace pprof;
-  pprof::Options Opts = pprof::getPprofOptionsFromEnv();
+  pprof::Options &Opts = *getOptions();
+  Opts.execute_atexit = false;
+
   if (Opts.use_db) {
     return pgsql::main(Opts);
   }

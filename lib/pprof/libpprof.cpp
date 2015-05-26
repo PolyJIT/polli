@@ -22,6 +22,13 @@
 
 using namespace pprof;
 
+namespace pprof {
+Options *getOptions() {
+  static Options opts = getPprofOptionsFromEnv();
+  return &opts;
+}
+}
+
 /**
  * @brief Storage container for all PAPI region events.
  */
@@ -45,7 +52,10 @@ void papi_region_exit(uint64_t id) {
 }
 
 void papi_atexit_handler(void) {
-  Options opts = getPprofOptionsFromEnv();
+  Options &opts = *getOptions();
+  if (!opts.execute_atexit)
+    return;
+
   PapiEvents.push_back(PPEvent(0, RegionExit, "STOP"));
 
   if (opts.use_db)
