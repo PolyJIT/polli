@@ -55,7 +55,8 @@ std::string now() {
 
 namespace pgsql {
 
-static std::string CONNECTION_FMT_STR = "user={} port={} host={} dbname={}";
+static std::string CONNECTION_FMT_STR =
+    "user={} port={} host={} dbname={} password={}";
 struct DBConnection {
   std::unique_ptr<pqxx::connection> c;
 
@@ -64,7 +65,8 @@ public:
     using namespace fmt;
     DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
-        format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name);
+        format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name,
+               Opts.pass);
 
     c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
     if (c) {
