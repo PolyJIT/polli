@@ -189,15 +189,10 @@ static ExecutionEngine *getEngine(Module *M) {
   builder.setOptLevel(OLvl);
 
   llvm::TargetOptions Options;
-  Options.UseSoftFloat = opt::GenerateSoftFloatCalls;
   if (opt::FloatABIForCalls != FloatABI::Default)
     Options.FloatABIType = opt::FloatABIForCalls;
   if (opt::GenerateSoftFloatCalls)
     opt::FloatABIForCalls = FloatABI::Soft;
-
-  // Remote target execution doesn't handle EH or debug registration.
-  Options.JITEmitDebugInfo = opt::EmitJitDebugInfo;
-  Options.JITEmitDebugInfoToDisk = opt::EmitJitDebugInfoToDisk;
 
   builder.setTargetOptions(Options);
   ExecutionEngine *EE = builder.create();

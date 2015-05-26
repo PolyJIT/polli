@@ -46,7 +46,6 @@ auto Console = spdlog::stderr_logger_st("polli");
 namespace polli {
 
 void initializePolliPasses(PassRegistry &Registry) {
-  initializePapiRegionPreparePass(Registry);
   initializePapiCScopProfilingPass(Registry);
   initializePapiCScopProfilingInitPass(Registry);
 }

@@ -146,8 +146,9 @@ SanitizeRun(pprof::Run<PPEvent> &Events) {
     Past = Ev;
   }
 
-  std::cout << "Ev: " << Events.size() << " VEv: " << ValidEvents.size() << "\n"
-            << Events.size() - ValidEvents.size() << " events are invalid.\n";
+  size_t InvalidCnt = Events.size() - ValidEvents.size();
+  if (InvalidCnt > 0)
+    std::cout << Events.size() - ValidEvents.size() << " events are invalid.\n";
   return ValidEvents;
 }
 
@@ -215,22 +216,27 @@ static int main(const Options Opts) {
 
 namespace pgsql {
 static int main(const Options Opts) {
+  using namespace fmt;
   std::cout << "Using Postgres DB backend\n";
+  using RunRegions = std::map<uint32_t, PPStringRegion>;
 
-  std::map<uint32_t, PPStringRegion> Regions;
-  Run<PPEvent> SingleRun;
-  Metrics M;
+  for (std::string run_group : ReadAvailableRunGroups()) {
+    Metrics M;
+    M.clear();
 
-  M.clear();
-  while (ReadRun(SingleRun, Regions, Opts)) {
-    Metrics RunM = GetMetrics(SanitizeRun(SingleRun));
-    aggregate(RunM, M);
-    StoreRunMetrics(SingleRun.ID, RunM);
-    SingleRun.clear();
+    std::cout << fmt::format("Working on run_group: {:s}\n", run_group);
+    for (uint32_t run_id : ReadAvailableRunIDs(run_group)) {
+      RunRegions Regions;
+      Run<PPEvent> SingleRun = pgsql::ReadRun(run_id, Regions);
+      Metrics RunM = GetMetrics(SanitizeRun(SingleRun));
+      aggregate(RunM, M);
+      StoreRunMetrics(SingleRun.ID, RunM);
+      SingleRun.clear();
+    }
+    M = FinalizeStats(M);
+    PrintStats(std::cout, M);
   }
 
-  M = FinalizeStats(M);
-  PrintStats(std::cout, M);
   return 0;
 }
 }

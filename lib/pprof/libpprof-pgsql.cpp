@@ -5,6 +5,7 @@
 #include <ctime>
 #include <stdlib.h>
 #include <string>
+#include <set>
 
 #define FMT_HEADER_ONLY
 #include <cppformat/format.h>
@@ -53,10 +54,77 @@ std::string now() {
 }
 
 namespace pgsql {
+
 static std::string CONNECTION_FMT_STR = "user={} port={} host={} dbname={}";
+struct DBConnection {
+  std::unique_ptr<pqxx::connection> c;
+
+public:
+  DBConnection() {
+    using namespace fmt;
+    DbOptions Opts = getDBOptionsFromEnv();
+    std::string connection_str =
+        format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name);
+
+    c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
+    if (c) {
+      static std::string SELECT_RUN =
+          "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
+          "timestamp;";
+      static std::string SELECT_RUN_IDs =
+          "SELECT id FROM run WHERE run_group = $1;";
+      static std::string SELECT_RUN_GROUPS =
+          "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
+
+      c->prepare("select_run", SELECT_RUN);
+      c->prepare("select_run_ids", SELECT_RUN_IDs);
+      c->prepare("select_run_groups", SELECT_RUN_GROUPS);
+    }
+  }
+
+  ~DBConnection() {
+    c->disconnect();
+    c.reset(nullptr);
+  }
+};
+static DBConnection DB;
+
+UuidSet ReadAvailableRunGroups() {
+  using namespace fmt;
+
+  DbOptions Opts = getDBOptionsFromEnv();
+  pqxx::read_transaction txn(*DB.c);
+  pqxx::result r = txn.prepared("select_run_groups")(Opts.exp_uuid).exec();
+
+  UuidSet RunGroups;
+  for (size_t i = 0; i < r.size(); i++) {
+    RunGroups.insert(r[i][0].as<std::string>());
+  }
+
+  return RunGroups;
+}
+
+IdVector ReadAvailableRunIDs(std::string run_group) {
+  using namespace fmt;
+
+  DbOptions Opts = getDBOptionsFromEnv();
+  pqxx::read_transaction txn(*DB.c);
+  pqxx::result r = txn.prepared("select_run_ids")(run_group).exec();
+
+  IdVector RunIDs(r.size());
+  for (size_t i = 0; i < r.size(); i++) {
+    RunIDs[i] = r[i][0].as<uint32_t>();
+  }
+
+  txn.commit();
+  return RunIDs;
+}
 
 void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   using namespace fmt;
+  static std::string SEARCH_PROJECT_SQL =
+      "SELECT name FROM project WHERE name = '{}';";
+
   static std::string NEW_RUN_SQL =
       "INSERT INTO run (finished, command, "
       "project_name, experiment_name, run_group, experiment_group) "
@@ -72,6 +140,15 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
 
   pqxx::connection c(connection_str);
   pqxx::work w(c);
+  pqxx::result project_exists =
+      w.exec(format(SEARCH_PROJECT_SQL, opts.project));
+  if (project_exists.affected_rows() == 0) {
+    // Insert project
+    w.exec(format("INSERT INTO project (name, description, src_url, domain, "
+                  "group_name) VALUES ('{}', '{}', '{}', '{}', '{}');",
+                  opts.project, opts.project, opts.src_uri, opts.domain,
+                  opts.group));
+  }
   pqxx::result r = w.exec(format(NEW_RUN_SQL, now(), opts.command, opts.project,
                                  opts.experiment, Opts.uuid, Opts.exp_uuid));
 
@@ -98,57 +175,18 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   w.commit();
 }
 
-static std::unique_ptr<pqxx::connection> c;
-
-using IdVector = std::vector<uint32_t>;
-static IdVector RunIDs;
-
-static void printRunIDs(const IdVector &IDs) {
-  std::cout << "RunIds: [";
-  for (size_t i = 0; i < IDs.size(); i++) {
-    if (i != 0)
-      std::cout << ", ";
-
-    std::cout << IDs[i];
-  }
-  std::cout << "]\n";
-}
-
-static IdVector ReadAvailableRunIDs(std::unique_ptr<pqxx::connection> &c) {
+Run<PPEvent> ReadRun(uint32_t run_id,
+                     std::map<uint32_t, PPStringRegion> &Regions) {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::read_transaction txn(*c);
-  pqxx::result r = txn.prepared("select_run_ids")(Opts.uuid).exec();
-
-  IdVector RunIDs(r.size());
-  for (size_t i = 0; i < r.size(); i++) {
-    RunIDs[i] = r[i][0].as<uint32_t>();
-  }
-
-  std::cout << "Runs available in database:\n";
-  printRunIDs(RunIDs);
-  txn.commit();
-  return RunIDs;
-}
-
-static Run<PPEvent> ReadRun(std::unique_ptr<pqxx::connection> &c,
-                            IdVector &RunIDs,
-                            std::map<uint32_t, PPStringRegion> &Regions) {
-  using namespace fmt;
-
-  DbOptions Opts = getDBOptionsFromEnv();
-  uint32_t id = RunIDs.back();
-  Run<PPEvent> Events(id);
+  Run<PPEvent> Events(run_id);
   Events.clear();
 
-  if (RunIDs.size() == 0)
-    return Events;
+  pqxx::read_transaction txn(*DB.c);
+  pqxx::result r = txn.prepared("select_run")(run_id).exec();
 
-  pqxx::read_transaction txn(*c);
-  pqxx::result r = txn.prepared("select_run")(id).exec();
-
-  Events.ID = id;
+  Events.ID = run_id;
   for (size_t i = 0; i < r.size(); i++) {
     uint16_t ev_id = r[i][0].as<uint16_t>();
     uint32_t ev_ty = r[i][1].as<uint32_t>();
@@ -157,56 +195,7 @@ static Run<PPEvent> ReadRun(std::unique_ptr<pqxx::connection> &c,
     Events.push_back(PPEvent(ev_id, (PPEventType)ev_ty, ev_ts));
   }
 
-  std::cout << "Completed reading a run #" << id << "\n";
-  RunIDs.pop_back();
-
-  std::cout << "Remaining runs in database:\n";
-  printRunIDs(RunIDs);
-
   return Events;
-}
-
-static void PrepareReadStatements(std::unique_ptr<pqxx::connection> &c,
-                                  const DbOptions &DbOpts) {
-  static std::string SELECT_RUN =
-      "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
-      "timestamp;";
-  static std::string SELECT_RUN_IDs =
-      "SELECT id FROM run WHERE run_group = $1;";
-
-  c->prepare("select_run", SELECT_RUN);
-  c->prepare("select_run_ids", SELECT_RUN_IDs);
-}
-
-static void OpenNewConnection(const DbOptions &Opts) {
-  using namespace fmt;
-  std::string connection_str =
-      format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name);
-  c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
-}
-
-bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
-             const Options &opt) {
-  DbOptions Opts = getDBOptionsFromEnv();
-  bool gotValidRun = false;
-
-  if (!c) {
-    OpenNewConnection(Opts);
-    PrepareReadStatements(c, Opts);
-    RunIDs = ReadAvailableRunIDs(c);
-  }
-
-  if (c) {
-    Events.clear();
-    Events = pgsql::ReadRun(c, RunIDs, Regions);
-    gotValidRun = Events.size() > 0;
-
-    if (!gotValidRun) {
-      c->disconnect();
-      c.reset(nullptr);
-    }
-  }
-  return gotValidRun;
 }
 
 void StoreRunMetrics(long run_id, const Metrics &M) {
@@ -214,16 +203,18 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   using namespace fmt;
 
   const DbOptions Opts = getDBOptionsFromEnv();
-  if (!c)
-    OpenNewConnection(Opts);
-
   static std::string NewMetric =
       "INSERT INTO metrics (name, value, run_id) VALUES ('{}', {}, {});";
 
-  pqxx::work w(*c);
+  pqxx::work w(*DB.c);
 
-  for (auto e : M)
-    w.exec(format(NewMetric, e.first, e.second, run_id));
+  pqxx::result r =
+      w.exec(format("SELECT name FROM metrics WHERE run_id = {}", run_id));
+
+  if (r.affected_rows() == 0) {
+    for (auto e : M)
+      w.exec(format(NewMetric, e.first, e.second, run_id));
+  }
 
   w.commit();
 };
