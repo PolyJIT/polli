@@ -89,12 +89,6 @@ public:
     EventTy = (PPEventType)std::stoi(R.Exit);
   }
 
-  ~PPEvent() = default;
-  PPEvent(const PPEvent &Other) = default;
-  PPEvent &operator=(const PPEvent &Other) = default;
-  PPEvent(PPEvent &&Other) = default;
-  PPEvent &operator=(PPEvent &&Other) = default;
-
   uint32_t id() const { return ID; }
   PPEventType event() const { return EventTy; }
   uint64_t timestamp() const { return Timestamp; }
