@@ -136,12 +136,7 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
                                           "timestamp, run_id) VALUES";
 
   DbOptions Opts = getDBOptionsFromEnv();
-  std::string connection_str =
-      format("user={} port={} host={} dbname={}", Opts.user, Opts.port,
-             Opts.host, Opts.name);
-
-  pqxx::connection c(connection_str);
-  pqxx::work w(c);
+  pqxx::work w(*DB.c);
   pqxx::result project_exists =
       w.exec(format(SEARCH_PROJECT_SQL, opts.project));
   if (project_exists.affected_rows() == 0) {
