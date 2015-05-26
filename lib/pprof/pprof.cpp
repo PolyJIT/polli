@@ -32,6 +32,7 @@ Options getPprofOptionsFromEnv() {
   Opts.use_db = db ? (bool)stoi(db) : false;
   Opts.use_csv = csv ? (bool)stoi(csv) : false;
   Opts.use_file = file ? (bool)stoi(file) : true;
+  Opts.execute_atexit = true;
 
   return Opts;
 }
