@@ -268,16 +268,12 @@ PolyJIT::PolyJIT(Module &Main) : M(Main) {
     break;
   }
 
-  Options.UseSoftFloat = opt::GenerateSoftFloatCalls;
   if (opt::FloatABIForCalls != FloatABI::Default)
     Options.FloatABIType = opt::FloatABIForCalls;
   if (opt::GenerateSoftFloatCalls)
     opt::FloatABIForCalls = FloatABI::Soft;
 
   // Remote target execution doesn't handle EH or debug registration.
-  Options.JITEmitDebugInfo = opt::EmitJitDebugInfo;
-  Options.JITEmitDebugInfoToDisk = opt::EmitJitDebugInfoToDisk;
-
   EE = GetEngine(&M);
 
   // The following functions have no effect if their respective profiling
@@ -337,15 +333,10 @@ ExecutionEngine *PolyJIT::GetEngine(Module *M) {
   builder.setOptLevel(OLvl);
 
   llvm::TargetOptions Options;
-  Options.UseSoftFloat = opt::GenerateSoftFloatCalls;
   if (opt::FloatABIForCalls != FloatABI::Default)
     Options.FloatABIType = opt::FloatABIForCalls;
   if (opt::GenerateSoftFloatCalls)
     opt::FloatABIForCalls = FloatABI::Soft;
-
-  // Remote target execution doesn't handle EH or debug registration.
-  Options.JITEmitDebugInfo = opt::EmitJitDebugInfo;
-  Options.JITEmitDebugInfoToDisk = opt::EmitJitDebugInfoToDisk;
 
   builder.setTargetOptions(Options);
   ExecutionEngine *EE = builder.create();
@@ -592,7 +583,7 @@ void PolyJIT::prepareOptimizedIR(Module &M) {
   PM.add(llvm::createBasicAliasAnalysisPass());
   PM.add(polly::createPollyCanonicalizePass());
   PM.add(polly::createIslScheduleOptimizerPass());
-  PM.add(polly::createIslCodeGenerationPass());
+  PM.add(polly::createCodeGenerationPass());
 
   // Make sure we run polly as early as possible too.
   PM.run(M);
