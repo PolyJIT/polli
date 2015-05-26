@@ -33,7 +33,6 @@ add_polli_library(PolyJIT
   FunctionDispatcher.cpp
   InstrumentRegions.cpp
   JitScopDetection.cpp
-  PapiProfiling.cpp
   PolyJIT.cpp
   Options.cpp
   RuntimeOptimizer.cpp
