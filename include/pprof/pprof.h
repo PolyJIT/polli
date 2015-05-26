@@ -127,6 +127,9 @@ public:
 struct Options {
   std::string experiment;
   std::string project;
+  std::string domain;
+  std::string group;
+  std::string src_uri;
   std::string command;
   bool use_db;
   bool use_csv;

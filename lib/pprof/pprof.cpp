@@ -15,6 +15,9 @@ Options getPprofOptionsFromEnv() {
 
   const char *exp = std::getenv("PPROF_EXPERIMENT");
   const char *prj = std::getenv("PPROF_PROJECT");
+  const char *dom = std::getenv("PPROF_DOMAIN");
+  const char *grp = std::getenv("PPROF_GROUP");
+  const char *uri = std::getenv("PPROF_SRC_URI");
   const char *cmd = std::getenv("PPROF_CMD");
   const char *db = std::getenv("PPROF_USE_DATABASE");
   const char *csv = std::getenv("PPROF_USE_CSV");
@@ -22,6 +25,9 @@ Options getPprofOptionsFromEnv() {
 
   Opts.experiment = exp ? exp : "unknown";
   Opts.project = prj ? prj : "unknown";
+  Opts.domain = dom ? dom : "unknown";
+  Opts.group = grp ? grp : "unknown";
+  Opts.src_uri = uri ? uri : "unknown";
   Opts.command = cmd ? cmd : "unknown";
   Opts.use_db = db ? (bool)stoi(db) : false;
   Opts.use_csv = csv ? (bool)stoi(csv) : false;
