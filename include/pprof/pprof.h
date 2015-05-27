@@ -76,7 +76,7 @@ struct PPStringRegion {
 class PPEvent {
 public:
   PPEvent(uint64_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
-      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_virt_nsec()), DebugStr(dbgStr) {
+      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_nsec()), DebugStr(dbgStr) {
   }
   explicit PPEvent(uint64_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
@@ -97,7 +97,7 @@ public:
   /**
    * @brief Set the timestamp of this event to 'right now'
    */
-  void snapshot() { Timestamp = PAPI_get_virt_nsec(); }
+  void snapshot() { Timestamp = PAPI_get_real_nsec(); }
 private:
   uint32_t ID;
   PPEventType EventTy;
