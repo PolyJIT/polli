@@ -6,7 +6,6 @@
 #include <memory>
 
 #include <assert.h>
-
 #include <string>
 #include <stdlib.h>
 
@@ -76,7 +75,7 @@ std::ostream &operator<<(std::ostream &os, const PPStringRegion &R) {
   if (exStr.size() == 0)
     exStr = "ERROR:Exit";
 
- return os << R.ID << " " << entStr << " " << exStr << "\n";
+  return os << R.ID << " " << entStr << " " << exStr << "\n";
 }
 
 std::istream &operator>>(std::istream &is, PPEvent &event) {

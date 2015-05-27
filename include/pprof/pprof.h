@@ -106,9 +106,9 @@ private:
 };
 
 namespace pprof {
-template<typename T>
-class Run : public std::vector<T> {
+template <typename T> class Run : public std::vector<T> {
   typedef std::vector<T> vector;
+
 public:
   Run(long ID = -1, size_t Size = 0) : std::vector<T>(Size), ID(ID) {}
 

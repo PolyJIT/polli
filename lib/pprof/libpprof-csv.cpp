@@ -50,8 +50,8 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   if (writeHeader)
     out << "StartTime,Region,Duration\n";
 
-  for (Run<PPEvent>::iterator I = Events.begin(), IE = Events.end();
-       I != IE; ++I) {
+  for (Run<PPEvent>::iterator I = Events.begin(), IE = Events.end(); I != IE;
+       ++I) {
     switch (I->event()) {
     default:
       break;
