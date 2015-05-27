@@ -110,7 +110,7 @@ template<typename T>
 class Run : public std::vector<T> {
   typedef std::vector<T> vector;
 public:
-  Run(long ID = -1, size_t Size = 1024) : std::vector<T>(Size), ID(ID) {}
+  Run(long ID = -1, size_t Size = 0) : std::vector<T>(Size), ID(ID) {}
 
   using vector::begin;
   using vector::end;
