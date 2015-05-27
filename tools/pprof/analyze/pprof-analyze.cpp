@@ -70,6 +70,28 @@ static uint64_t getTimeInSCoPs(const pprof::Run<PPEvent> &Events) {
   return sum;
 }
 
+static uint64_t getTimeInSCoPs(const pprof::Run<pprof::Event> &Events) {
+  uint64_t T = 0;
+  pprof::Event Last;
+  for (const pprof::Event &Ev : Events) {
+    if ((PPEventType)Ev.Type != ScopEnter)
+      continue;
+
+    if (Last.Type == Unknown) {
+      Last = Ev;
+      T += Ev.Duration;
+    } else {
+      uint64_t LastEnd = Last.Start + Last.Duration;
+      if (LastEnd <= Ev.Start) {
+        Last = Ev;
+        T += Ev.Duration;
+      }
+    }
+  }
+
+  return T;
+}
+
 static inline uint64_t
 getTotalTimeInProgram(const pprof::Run<PPEvent> &Events) {
   return std::accumulate(Events.begin(), Events.end(), (uint64_t)0,
@@ -85,6 +107,15 @@ getTotalTimeInProgram(const pprof::Run<PPEvent> &Events) {
                            // Do nothing.
                            return newx;
                          });
+}
+
+static inline uint64_t
+getTotalTimeInProgram(const pprof::Run<pprof::Event> &Events) {
+  for (const pprof::Event &Ev : Events) {
+    if (Ev.ID == 0)
+      return Ev.Duration;
+  }
+  return 0;
 }
 
 using Metrics = std::map<std::string, double>;
@@ -195,6 +226,24 @@ static Metrics GetMetrics(Run<PPEvent> Run) {
   return M;
 }
 
+static Metrics GetMetrics(Run<pprof::Event> Run) {
+  Metrics M;
+
+  double t_scops_ns = getTimeInSCoPs(Run);
+  double t_total_ns = getTotalTimeInProgram(Run);
+  double t_scops_s = t_scops_ns / 1e9;
+  double t_total_s = t_total_ns / 1e9;
+  double pct_dyncov = t_scops_ns / t_total_ns * 100.0;
+
+  M[PPROF_TIME_SCOPS_NS] = t_scops_ns;
+  M[PPROF_TIME_TOTAL_NS] = t_total_ns;
+  M[PPROF_TIME_SCOPS_S] = t_scops_s;
+  M[PPROF_TIME_TOTAL_S] = t_total_s;
+  M[PPROF_DYNCOV] = pct_dyncov;
+
+  return M;
+}
+
 namespace file {
 static int main(const Options Opts) {
   Run<PPEvent> SingleRun;
@@ -218,7 +267,6 @@ namespace pgsql {
 static int main(const Options Opts) {
   using namespace fmt;
   std::cout << "Using Postgres DB backend\n";
-  using RunRegions = std::map<uint32_t, PPStringRegion>;
 
   for (std::string run_group : ReadAvailableRunGroups()) {
     Metrics M;
@@ -226,11 +274,12 @@ static int main(const Options Opts) {
 
     std::cout << fmt::format("Working on run_group: {:s}\n", run_group);
     for (uint32_t run_id : ReadAvailableRunIDs(run_group)) {
-      RunRegions Regions;
-      Run<PPEvent> SingleRun = pgsql::ReadRun(run_id, Regions);
-      Metrics RunM = GetMetrics(SanitizeRun(SingleRun));
-      aggregate(RunM, M);
-      StoreRunMetrics(SingleRun.ID, RunM);
+      Run<pprof::Event> SingleRun = pgsql::ReadSimpleRun(run_id);
+      if (SingleRun.size() > 0) {
+        Metrics RunM = GetMetrics(SingleRun);
+        aggregate(RunM, M);
+        StoreRunMetrics(SingleRun.ID, RunM);
+      }
       SingleRun.clear();
     }
     M = FinalizeStats(M);

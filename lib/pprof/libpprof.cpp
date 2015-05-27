@@ -36,19 +36,27 @@ static Run<PPEvent> PapiEvents;
 
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {
-  PapiEvents.push_back(PPEvent(id, ScopEnter, dbg));
+  PPEvent Ev(id, ScopEnter, dbg);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_region_exit_scop(uint64_t id, const char *dbg) {
-  PapiEvents.push_back(PPEvent(id, ScopExit, dbg));
+  PPEvent Ev(id, ScopExit, dbg);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_region_enter(uint64_t id) {
-  PapiEvents.push_back(PPEvent(id, RegionEnter));
+  PPEvent Ev(id, RegionEnter);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_region_exit(uint64_t id) {
-  PapiEvents.push_back(PPEvent(id, RegionExit));
+  PPEvent Ev(id, RegionExit);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_atexit_handler(void) {
@@ -70,8 +78,6 @@ void papi_atexit_handler(void) {
 }
 
 void papi_region_setup() {
-  PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
-
   int init = PAPI_library_init(PAPI_VER_CURRENT);
   if (init != PAPI_VER_CURRENT && init > 0)
     fprintf(stderr, "ERROR(PPROF): PAPI_library_init: Version mismatch\n");
@@ -87,6 +93,7 @@ void papi_region_setup() {
   if (err)
     fprintf(stderr, "ERROR(PAPI-Prof): Failed to setup atexit handler (%d).\n",
             err);
+  PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
 }
 }
 

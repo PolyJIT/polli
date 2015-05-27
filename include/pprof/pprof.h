@@ -54,13 +54,13 @@ void papi_region_setup();
 }
 
 enum PPEventType {
-  ScopEnter,
-  ScopExit,
-  RegionEnter,
-  RegionExit,
-  TraceEnter,
-  TraceExit,
-  Unknown,
+  ScopEnter = 0,
+  ScopExit = 1,
+  RegionEnter = 2,
+  RegionExit = 3,
+  TraceEnter = 4,
+  TraceExit = 5,
+  Unknown = 6,
 };
 
 struct PPStringRegion {
@@ -76,9 +76,9 @@ struct PPStringRegion {
 class PPEvent {
 public:
   PPEvent(uint64_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
-      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_virt_nsec()), DebugStr(dbgStr) {
+      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_nsec()), DebugStr(dbgStr) {
   }
-  explicit PPEvent(uint64_t ID, PPEventType Ty, uint64_t Timestamp,
+  explicit PPEvent(uint64_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(Timestamp), DebugStr(dbgStr) {}
 
@@ -91,26 +91,26 @@ public:
 
   uint32_t id() const { return ID; }
   PPEventType event() const { return EventTy; }
-  uint64_t timestamp() const { return Timestamp; }
+  long long int timestamp() const { return Timestamp; }
   std::string userString() const { return DebugStr; }
 
   /**
    * @brief Set the timestamp of this event to 'right now'
    */
-  void snapshot() { Timestamp = PAPI_get_virt_nsec(); }
+  void snapshot() { Timestamp = PAPI_get_real_nsec(); }
 private:
   uint32_t ID;
   PPEventType EventTy;
-  uint64_t Timestamp;
+  long long int Timestamp;
   std::string DebugStr;
 };
 
 namespace pprof {
-template<typename T>
-class Run : public std::vector<T> {
+template <typename T> class Run : public std::vector<T> {
   typedef std::vector<T> vector;
+
 public:
-  Run(long ID = -1, size_t Size = 1024) : std::vector<T>(Size), ID(ID) {}
+  Run(long ID = -1, size_t Size = 0) : std::vector<T>(Size), ID(ID) {}
 
   using vector::begin;
   using vector::end;
@@ -139,6 +139,45 @@ struct Options {
 
 Options *getOptions();
 Options getPprofOptionsFromEnv();
+
+struct Event {
+  uint32_t ID;
+  PPEventType Type;
+  uint64_t Start;
+  uint64_t Duration;
+  std::string Name;
+
+  Event(uint32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
+        uint64_t D = 0, std::string N = "")
+      : ID(ID), Type(T), Start(S), Duration(D), Name(N) {}
+};
+
+/**
+ * @brief Combines 2 profiling events into one.
+ *
+ * Profiling events have the format:
+ *  {ID} {Type} {Timestamp}
+ * After combining 2 matching events the result has the form:
+ *  {ID} {StartTime} {Duration}
+ *
+ * @param Ev The Entry event to simplify.
+ * @param ExitEv The Exit event to simplify.
+ * @param TimeOffset An offset to subtract from the timings.
+ * @return pprof::Event
+ */
+const Event simplify(const PPEvent &Ev, const PPEvent &ExitEv,
+                     uint64_t TimeOffset);
+/**
+ * @brief Get the exit event that matches this iterator.
+ *
+ * If we can't find a matching exit, we just return the end.
+ *
+ * @param It The iterator position we seek a matching exit event to.
+ * @param End The end.
+ * @return const Run< PPEvent >::iterator
+ */
+const Run<PPEvent>::iterator getMatchingExit(Run<PPEvent>::iterator It,
+                                             const Run<PPEvent>::iterator &End);
 } // end of namespace pprof
 
 #include <iostream>
