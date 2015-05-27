@@ -73,12 +73,16 @@ public:
       std::string SELECT_RUN =
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
+      std::string SELECT_SIMPLE_RUN =
+          "SELECT id,type,start,duration,name FROM pprof_events WHERE run_id=$1 ORDER BY "
+          "start;";
       std::string SELECT_RUN_IDs =
           "SELECT id FROM run WHERE run_group = $1;";
       std::string SELECT_RUN_GROUPS =
           "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
 
       c->prepare("select_run", SELECT_RUN);
+      c->prepare("select_simple_run", SELECT_SIMPLE_RUN);
       c->prepare("select_run_ids", SELECT_RUN_IDs);
       c->prepare("select_run_groups", SELECT_RUN_GROUPS);
     }
@@ -122,6 +126,30 @@ IdVector ReadAvailableRunIDs(std::string run_group) {
   return RunIDs;
 }
 
+static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
+  Run<pprof::Event> SRun;
+  SRun.ID = Events.ID;
+  Run<PPEvent>::iterator Start = Events.begin();
+
+  for (Run<PPEvent>::iterator I = Events.begin(), IE = Events.end(); I != IE;
+       ++I) {
+    switch (I->event()) {
+    default:
+      break;
+    case ScopEnter:
+    case RegionEnter:
+      PPEvent &S = *I;
+      PPEvent &E = *getMatchingExit(I, IE);
+      const pprof::Event Ev =
+          pprof::simplify(S, E, Start->timestamp());
+      SRun.push_back(Ev);
+      break;
+    }
+  }
+
+  return SRun;
+}
+
 void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   using namespace fmt;
   static std::string SEARCH_PROJECT_SQL =
@@ -132,9 +160,6 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
       "project_name, experiment_name, run_group, experiment_group) "
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
-  static std::string NEW_RUN_RESULT_SQL = "INSERT INTO papi_results (type, id, "
-                                          "timestamp, run_id) VALUES";
-
   DBConnection DB;
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::work w(*DB.c);
@@ -153,18 +178,23 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   long run_id;
   r[0]["id"].to(run_id);
 
+  Run<pprof::Event> SimpleEvents = GetSimplifiedRun(Events);
+
   int n = 500;
   size_t i;
-  for (i = 0; i < Events.size(); i += n) {
+  for (i = 0; i < SimpleEvents.size(); i += n) {
     std::stringstream vals;
-    for (size_t j = i; j < std::min(Events.size(), (size_t)(n + i)); j++) {
-      const PPEvent &Ev = Events[j];
+    for (size_t j = i; j < std::min(SimpleEvents.size(), (size_t)(n + i)); j++) {
+      const pprof::Event &Ev = SimpleEvents[j];
       if (j != i)
         vals << ",";
-      vals << format(" ({}, {}, {}, {})", Ev.event(), Ev.id(), Ev.timestamp(),
-                     run_id);
+      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d})", Ev.ID, Ev.Type, Ev.Start,
+                     Ev.Duration, Ev.Name, run_id);
     }
     vals << ";";
+
+    std::string NEW_RUN_RESULT_SQL =
+        "INSERT INTO pprof_events (id, type, start, duration, name, run_id) VALUES";
     w.exec(NEW_RUN_RESULT_SQL + vals.str());
     vals.clear();
     vals.flush();
@@ -191,6 +221,31 @@ Run<PPEvent> ReadRun(uint32_t run_id,
     uint64_t ev_ts = r[i][2].as<uint64_t>();
 
     Events.push_back(PPEvent(ev_id, (PPEventType)ev_ty, ev_ts));
+  }
+
+  return Events;
+}
+
+Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
+  using namespace fmt;
+
+  DbOptions Opts = getDBOptionsFromEnv();
+  Run<Event> Events(run_id);
+  Events.clear();
+
+  pqxx::read_transaction txn(*DB.c);
+  pqxx::result r = txn.prepared("select_simple_run")(run_id).exec();
+
+  Events.ID = run_id;
+  for (size_t i = 0; i < r.size(); i++) {
+    //id, start, duration, name
+    uint32_t ev_id = r[i][0].as<uint16_t>();
+    uint16_t ev_ty = r[i][1].as<uint16_t>();
+    uint64_t ev_start = r[i][2].as<uint64_t>();
+    uint64_t ev_duration = r[i][3].as<uint64_t>();
+    std::string ev_name = r[i][4].as<std::string>();
+
+    Events.push_back(Event(ev_id, (PPEventType)ev_ty, ev_start, ev_duration, ev_name));
   }
 
   return Events;
