@@ -55,14 +55,14 @@ std::string now() {
 
 namespace pgsql {
 
-static std::string CONNECTION_FMT_STR =
-    "user={} port={} host={} dbname={} password={}";
 struct DBConnection {
   std::unique_ptr<pqxx::connection> c;
 
 public:
   DBConnection() {
     using namespace fmt;
+    std::string CONNECTION_FMT_STR =
+      "user={} port={} host={} dbname={} password={}";
     DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
         format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name,
@@ -135,6 +135,7 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   static std::string NEW_RUN_RESULT_SQL = "INSERT INTO papi_results (type, id, "
                                           "timestamp, run_id) VALUES";
 
+  DBConnection DB;
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::work w(*DB.c);
   pqxx::result project_exists =
