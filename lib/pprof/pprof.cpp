@@ -36,6 +36,19 @@ Options getPprofOptionsFromEnv() {
 
   return Opts;
 }
+const Run<PPEvent>::iterator
+getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
+  const PPEvent &Ev = *It;
+
+  while (
+      ((It->id() != Ev.id()) || ((It->event() != PPEventType::ScopExit) &&
+                                 (It->event() != PPEventType::RegionExit))) &&
+      (It != End)) {
+    ++It;
+  }
+
+  return It;
+}
 }
 
 std::ostream &operator<<(std::ostream &os, const PPEvent &event) {

@@ -32,21 +32,6 @@ static std::string event2csv(const PPEvent &Ev, uint64_t TimeOffset,
                 Ev.userString(), (ExitEv.timestamp() - Ev.timestamp()));
 }
 
-static const Run<PPEvent>::iterator
-getMatchingExit(Run<PPEvent>::iterator It,
-                const Run<PPEvent>::iterator &End) {
-  const PPEvent &Ev = *It;
-
-  while (
-      ((It->id() != Ev.id()) || ((It->event() != PPEventType::ScopExit) &&
-                                 (It->event() != PPEventType::RegionExit))) &&
-      (It != End)) {
-    ++It;
-  }
-
-  return It;
-}
-
 namespace csv {
 void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   using namespace std;

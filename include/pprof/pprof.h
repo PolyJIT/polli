@@ -139,6 +139,18 @@ struct Options {
 
 Options *getOptions();
 Options getPprofOptionsFromEnv();
+
+/**
+ * @brief Get the exit event that matches this iterator.
+ *
+ * If we can't find a matching exit, we just return the end.
+ *
+ * @param It The iterator position we seek a matching exit event to.
+ * @param End The end.
+ * @return const Run< PPEvent >::iterator
+ */
+const Run<PPEvent>::iterator getMatchingExit(Run<PPEvent>::iterator It,
+                                             const Run<PPEvent>::iterator &End);
 } // end of namespace pprof
 
 #include <iostream>
