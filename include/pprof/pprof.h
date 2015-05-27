@@ -140,6 +140,22 @@ struct Options {
 Options *getOptions();
 Options getPprofOptionsFromEnv();
 
+
+/**
+ * @brief Combines 2 profiling events into one.
+ *
+ * Profiling events have the format:
+ *  {ID} {Type} {Timestamp}
+ * After combining 2 matching events the result has the form:
+ *  {ID} {StartTime} {Duration}
+ *
+ * @param Ev The Entry event to simplify.
+ * @param ExitEv The Exit event to simplify.
+ * @param TimeOffset An offset to subtract from the timings.
+ * @return pprof::Event
+ */
+const Event simplify(const PPEvent &Ev, const PPEvent &ExitEv,
+                     uint64_t TimeOffset);
 /**
  * @brief Get the exit event that matches this iterator.
  *

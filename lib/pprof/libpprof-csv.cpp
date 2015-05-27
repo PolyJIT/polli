@@ -24,14 +24,6 @@ CsvOptions getCSVoptions() {
   return Opts;
 }
 
-static std::string event2csv(const PPEvent &Ev, uint64_t TimeOffset,
-                             const PPEvent &ExitEv,
-                             uint32_t idx, uint32_t n) {
-  using namespace fmt;
-  return format("{:s}, {:s}, {:s}", (Ev.timestamp() - TimeOffset),
-                Ev.userString(), (ExitEv.timestamp() - Ev.timestamp()));
-}
-
 namespace csv {
 void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   using namespace std;
@@ -66,8 +58,9 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
     case ScopEnter:
     case RegionEnter:
       std::pair<uint32_t, std::string> Idx = IdMap[I->id()];
-      out << event2csv(*I, Start->timestamp(), *getMatchingExit(I, IE),
-                       Idx.first, IdMap.size()) << "\n";
+      const pprof::Event Ev =
+          pprof::simplify(*I, *getMatchingExit(I, IE), Start->timestamp());
+      out << format("{:d}, {:s}, {:d}\n", Ev.Start, Ev.Name, Ev.Duration);
       break;
     }
   }

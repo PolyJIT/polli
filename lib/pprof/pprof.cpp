@@ -8,6 +8,10 @@
 #include <assert.h>
 
 #include <string>
+#include <stdlib.h>
+
+#define FMT_HEADER_ONLY
+#include <cppformat/format.h>
 
 namespace pprof {
 Options getPprofOptionsFromEnv() {
@@ -36,6 +40,14 @@ Options getPprofOptionsFromEnv() {
 
   return Opts;
 }
+
+const pprof::Event simplify(const PPEvent &Ev, const PPEvent &ExitEv,
+                            uint64_t TimeOffset) {
+  using namespace fmt;
+  return pprof::Event(Ev.id(), Ev.event(), Ev.timestamp() - TimeOffset,
+                      ExitEv.timestamp() - Ev.timestamp(), Ev.userString());
+}
+
 const Run<PPEvent>::iterator
 getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
   const PPEvent &Ev = *It;
