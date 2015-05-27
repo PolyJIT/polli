@@ -152,17 +152,12 @@ static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
 
 void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   using namespace fmt;
-  static std::string SEARCH_PROJECT_SQL =
-      "SELECT name FROM project WHERE name = '{}';";
-
-  static std::string NEW_RUN_SQL =
-      "INSERT INTO run (finished, command, "
-      "project_name, experiment_name, run_group, experiment_group) "
-      "VALUES (TIMESTAMP '{}', '{}', "
-      "'{}', '{}', '{}', '{}') RETURNING id;";
   DBConnection DB;
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::work w(*DB.c);
+
+  std::string SEARCH_PROJECT_SQL =
+      "SELECT name FROM project WHERE name = '{}';";
   pqxx::result project_exists =
       w.exec(format(SEARCH_PROJECT_SQL, opts.project));
   if (project_exists.affected_rows() == 0) {
@@ -172,6 +167,11 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
                   opts.project, opts.project, opts.src_uri, opts.domain,
                   opts.group));
   }
+  std::string NEW_RUN_SQL =
+      "INSERT INTO run (finished, command, "
+      "project_name, experiment_name, run_group, experiment_group) "
+      "VALUES (TIMESTAMP '{}', '{}', "
+      "'{}', '{}', '{}', '{}') RETURNING id;";
   pqxx::result r = w.exec(format(NEW_RUN_SQL, now(), opts.command, opts.project,
                                  opts.experiment, Opts.uuid, Opts.exp_uuid));
 
