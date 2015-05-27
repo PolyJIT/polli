@@ -78,8 +78,6 @@ void papi_atexit_handler(void) {
 }
 
 void papi_region_setup() {
-  PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
-
   int init = PAPI_library_init(PAPI_VER_CURRENT);
   if (init != PAPI_VER_CURRENT && init > 0)
     fprintf(stderr, "ERROR(PPROF): PAPI_library_init: Version mismatch\n");
@@ -95,6 +93,7 @@ void papi_region_setup() {
   if (err)
     fprintf(stderr, "ERROR(PAPI-Prof): Failed to setup atexit handler (%d).\n",
             err);
+  PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
 }
 }
 
