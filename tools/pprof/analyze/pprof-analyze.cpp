@@ -267,7 +267,6 @@ namespace pgsql {
 static int main(const Options Opts) {
   using namespace fmt;
   std::cout << "Using Postgres DB backend\n";
-  using RunRegions = std::map<uint32_t, PPStringRegion>;
 
   for (std::string run_group : ReadAvailableRunGroups()) {
     Metrics M;
