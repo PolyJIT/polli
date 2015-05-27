@@ -36,19 +36,27 @@ static Run<PPEvent> PapiEvents;
 
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {
-  PapiEvents.push_back(PPEvent(id, ScopEnter, dbg));
+  PPEvent Ev(id, ScopEnter, dbg);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_region_exit_scop(uint64_t id, const char *dbg) {
-  PapiEvents.push_back(PPEvent(id, ScopExit, dbg));
+  PPEvent Ev(id, ScopExit, dbg);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_region_enter(uint64_t id) {
-  PapiEvents.push_back(PPEvent(id, RegionEnter));
+  PPEvent Ev(id, RegionEnter);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_region_exit(uint64_t id) {
-  PapiEvents.push_back(PPEvent(id, RegionExit));
+  PPEvent Ev(id, RegionExit);
+  Ev.snapshot();
+  PapiEvents.push_back(Ev);
 }
 
 void papi_atexit_handler(void) {
