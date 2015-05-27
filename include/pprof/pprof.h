@@ -54,13 +54,13 @@ void papi_region_setup();
 }
 
 enum PPEventType {
-  ScopEnter,
-  ScopExit,
-  RegionEnter,
-  RegionExit,
-  TraceEnter,
-  TraceExit,
-  Unknown,
+  ScopEnter = 0,
+  ScopExit = 1,
+  RegionEnter = 2,
+  RegionExit = 3,
+  TraceEnter = 4,
+  TraceExit = 5,
+  Unknown = 6,
 };
 
 struct PPStringRegion {
