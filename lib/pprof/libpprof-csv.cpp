@@ -27,6 +27,7 @@ CsvOptions getCSVoptions() {
 namespace csv {
 void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   using namespace std;
+  using namespace fmt;
 
   if (!opts.use_csv)
     return;
