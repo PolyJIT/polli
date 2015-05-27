@@ -140,6 +140,17 @@ struct Options {
 Options *getOptions();
 Options getPprofOptionsFromEnv();
 
+struct Event {
+  uint32_t ID;
+  PPEventType Type;
+  uint64_t Start;
+  uint64_t Duration;
+  std::string Name;
+
+  Event(uint32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
+        uint64_t D = 0, std::string N = "")
+      : ID(ID), Type(T), Start(S), Duration(D), Name(N) {}
+};
 
 /**
  * @brief Combines 2 profiling events into one.
