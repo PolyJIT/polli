@@ -78,7 +78,7 @@ public:
   PPEvent(uint64_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(PAPI_get_virt_nsec()), DebugStr(dbgStr) {
   }
-  explicit PPEvent(uint64_t ID, PPEventType Ty, uint64_t Timestamp,
+  explicit PPEvent(uint64_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(Timestamp), DebugStr(dbgStr) {}
 
@@ -91,7 +91,7 @@ public:
 
   uint32_t id() const { return ID; }
   PPEventType event() const { return EventTy; }
-  uint64_t timestamp() const { return Timestamp; }
+  long long int timestamp() const { return Timestamp; }
   std::string userString() const { return DebugStr; }
 
   /**
@@ -101,7 +101,7 @@ public:
 private:
   uint32_t ID;
   PPEventType EventTy;
-  uint64_t Timestamp;
+  long long int Timestamp;
   std::string DebugStr;
 };
 
