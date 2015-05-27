@@ -70,12 +70,12 @@ public:
 
     c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
     if (c) {
-      static std::string SELECT_RUN =
+      std::string SELECT_RUN =
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
-      static std::string SELECT_RUN_IDs =
+      std::string SELECT_RUN_IDs =
           "SELECT id FROM run WHERE run_group = $1;";
-      static std::string SELECT_RUN_GROUPS =
+      std::string SELECT_RUN_GROUPS =
           "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
 
       c->prepare("select_run", SELECT_RUN);
