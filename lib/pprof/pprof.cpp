@@ -49,16 +49,33 @@ const pprof::Event simplify(const PPEvent &Ev, const PPEvent &ExitEv,
 
 const Run<PPEvent>::iterator
 getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
-  const PPEvent &Ev = *It;
+  using namespace fmt;
+  const Run<PPEvent>::iterator Cur = It;
 
-  while (
-      ((It->id() != Ev.id()) || ((It->event() != PPEventType::ScopExit) &&
-                                 (It->event() != PPEventType::RegionExit))) &&
-      (It != End)) {
+  while (It != End) {
+    PPEventType T = It->event();
+    if (It->id() == Cur->id()) {
+      switch(Cur->event()) {
+        case RegionEnter:
+          if (T == RegionExit) {
+            return It;
+          }
+          break;
+        case ScopEnter:
+          if (T == ScopExit) {
+            return It;
+          }
+          break;
+        default:
+          break;
+      }
+    }
     ++It;
   }
 
-  return It;
+  //FIXME: Record an error event, this should not happen.
+  assert("BUG: No matching Exit to this Entry");
+  return Cur;
 }
 }
 
