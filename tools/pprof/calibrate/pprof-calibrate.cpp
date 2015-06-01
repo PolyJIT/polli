@@ -1,6 +1,6 @@
 #include "pprof/pprof.h"
 
-static long long papi_calib_cnt = 1000;
+static long long papi_calib_cnt = 100000;
 
 void papi_calibrate(void) {
   long long time = PAPI_get_virt_nsec();
