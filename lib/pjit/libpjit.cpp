@@ -54,7 +54,6 @@ static Module &getModule(const char *prototype) {
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
     SMDiagnostic Err;
 
-    UniqueMod Mod = parseIR(Buf, Err, Ctx);
     if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
     } else {

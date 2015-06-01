@@ -178,6 +178,12 @@ const Event simplify(const PPEvent &Ev, const PPEvent &ExitEv,
  */
 const Run<PPEvent>::iterator getMatchingExit(Run<PPEvent>::iterator It,
                                              const Run<PPEvent>::iterator &End);
+
+/**
+ * @brief Storage container for all PAPI region events.
+ */
+extern Run<PPEvent> PapiEvents;
+
 } // end of namespace pprof
 
 #include <iostream>

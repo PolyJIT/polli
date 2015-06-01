@@ -25,6 +25,7 @@ Options getPprofOptionsFromEnv() {
   const char *db = std::getenv("PPROF_USE_DATABASE");
   const char *csv = std::getenv("PPROF_USE_CSV");
   const char *file = std::getenv("PPROF_USE_FILE");
+  const char *exec = std::getenv("PPROF_ENABLE");
 
   Opts.experiment = exp ? exp : "unknown";
   Opts.project = prj ? prj : "unknown";
@@ -35,7 +36,7 @@ Options getPprofOptionsFromEnv() {
   Opts.use_db = db ? (bool)stoi(db) : false;
   Opts.use_csv = csv ? (bool)stoi(csv) : false;
   Opts.use_file = file ? (bool)stoi(file) : true;
-  Opts.execute_atexit = true;
+  Opts.execute_atexit = exec ? (bool)stoi(exec) : true;
 
   return Opts;
 }

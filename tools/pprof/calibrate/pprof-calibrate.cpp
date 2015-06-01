@@ -1,11 +1,6 @@
 #include "pprof/pprof.h"
 
-/**
- * @brief Storage container for all PAPI region events.
- */
-static pprof::Run<PPEvent> PapiEvents;
-
-static long long papi_calib_cnt = 1000;
+static long long papi_calib_cnt = 100000;
 
 void papi_calibrate(void) {
   long long time = PAPI_get_virt_nsec();
@@ -36,12 +31,12 @@ void papi_calibrate(void) {
   time2 = (PAPI_get_real_nsec() - time2);
 
   // Measurement is done per "pair" of PAPI calls.
-  double avg = time / (double)(PapiEvents.size() / 2);
-  double avg2 = time2 / (double)(PapiEvents.size() / 2);
+  double avg = time / (double)(pprof::PapiEvents.size() / 2);
+  double avg2 = time2 / (double)(pprof::PapiEvents.size() / 2);
 
   fprintf(stdout, "User time per call (ns): %f\n", avg);
   fprintf(stdout, "Real time per call (ns): %f\n", avg2);
-  fprintf(stdout, "PAPI-stack calls: %lu\n", PapiEvents.size() / 2);
+  fprintf(stdout, "PAPI-stack calls: %lu\n", pprof::PapiEvents.size() / 2);
   fprintf(stdout, "User time (s): %f\n", time / 1e9);
   fprintf(stdout, "Real time (s): %f\n", time2 / 1e9);
 }
