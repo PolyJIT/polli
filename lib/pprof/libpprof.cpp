@@ -27,12 +27,12 @@ Options *getOptions() {
   static Options opts = getPprofOptionsFromEnv();
   return &opts;
 }
-}
 
 /**
  * @brief Storage container for all PAPI region events.
  */
-static Run<PPEvent> PapiEvents;
+Run<PPEvent> PapiEvents;
+}
 
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {
