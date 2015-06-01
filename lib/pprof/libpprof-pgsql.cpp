@@ -49,7 +49,7 @@ std::string now() {
   time_t now;
   time(&now);
 
-  strftime(buf, sizeof buf, "%F %T", gmtime(&now));
+  strftime(buf, sizeof buf, "%F %T", localtime(&now));
   return std::string(buf);
 }
 
