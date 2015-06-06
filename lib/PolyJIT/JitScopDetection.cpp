@@ -73,7 +73,7 @@ static void printParameters(ParamList &L) {
     S->print(OS);
     OS << "]";
   }
-  Console->info("required @ run time: {:>30}", ParamStr);
+  Console->info("required @ run time: {:>30}", OS.str());
 }
 
 // Remove all direct and indirect children of region R from the region set Regs,
