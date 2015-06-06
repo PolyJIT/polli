@@ -37,6 +37,7 @@ add_polli_library(PolyJIT
   Options.cpp
   RuntimeOptimizer.cpp
   ScopMapper.cpp
+  ScopDetectionCheckers.cpp
   Utils.cpp
   VariantFunction.cpp
   RegisterCompilationPasses.cpp

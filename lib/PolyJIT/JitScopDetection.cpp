@@ -37,7 +37,7 @@
 
 #include "polly/LinkAllPasses.h"
 #include "polly/Canonicalization.h"
-
+#include "polli/ScopDetectionCheckers.h"
 #include "polli/Utils.h"
 
 #include "spdlog/spdlog.h"
@@ -56,100 +56,8 @@ using namespace polli;
 using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
-STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
-STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
-STATISTIC(JitNonAffineAccess, "Number of fixable non affine accesses");
-STATISTIC(AliasingIgnored, "Number of ignored aliasings");
 
 static auto Console = spdlog::stderr_logger_st("polli");
-
-template <typename LC, typename RetVal> class RejectLogChecker {
-public:
-  RetVal check(const RejectReason *Reason, const RetVal &Invalid = RetVal()) {
-    LC *lc = (LC *)this;
-
-    switch (Reason->getKind()) {
-    case rrkNonAffineAccess:
-      return lc->checkNonAffineAccess((ReportNonAffineAccess *)Reason);
-    case rrkNonAffBranch:
-      return lc->checkNonAffineBranch((ReportNonAffBranch *)Reason);
-    case rrkLoopBound:
-      return lc->checkLoopBound((ReportLoopBound *)Reason);
-    case rrkAlias:
-      return lc->checkAlias((ReportAlias *)Reason);
-    default:
-      return Invalid;
-    }
-  }
-};
-
-class AliasingLogChecker : public RejectLogChecker<AliasingLogChecker, bool> {
-public:
-  AliasingLogChecker(Function &, const Region *) {}
-
-  bool checkNonAffineAccess(ReportNonAffineAccess *Reason) { return false; }
-  bool checkNonAffineBranch(ReportNonAffBranch *Reason) { return false; }
-  bool checkLoopBound(ReportLoopBound *Reason) { return false; }
-  bool checkAlias(ReportAlias *Reason) {
-    ++AliasingIgnored;
-    return true;
-  }
-};
-
-class NonAffineLogChecker
-    : public RejectLogChecker<NonAffineLogChecker, std::pair<bool, ParamList>> {
-private:
-  const Region *R;
-  ScalarEvolution *SE;
-
-public:
-  NonAffineLogChecker(const Region *R, ScalarEvolution *SE) : R(R), SE(SE) {}
-
-  std::pair<bool, ParamList>
-  checkNonAffineAccess(ReportNonAffineAccess *Reason) {
-    ParamList Params;
-    if (!isNonAffineExpr(R, Reason->get(), *SE))
-      return std::make_pair<>(false, Params);
-
-    Params = polly::getParamsInNonAffineExpr(R, Reason->get(), *SE);
-    ++JitNonAffineAccess;
-    return std::make_pair<>(true, Params);
-  }
-
-  std::pair<bool, ParamList> checkNonAffineBranch(ReportNonAffBranch *Reason) {
-    ParamList Params;
-
-    // Check LHS & Add parameters
-    if (!isNonAffineExpr(R, Reason->lhs(), *SE))
-      return std::make_pair<>(false, Params);
-    Params = getParamsInNonAffineExpr(R, Reason->lhs(), *SE);
-
-    // Check RHS & Add parameters
-    if (!isNonAffineExpr(R, Reason->rhs(), *SE))
-      return std::make_pair<>(false, Params);
-    ParamList RHSParams;
-    RHSParams = getParamsInNonAffineExpr(R, Reason->rhs(), *SE);
-    Params.insert(Params.end(), RHSParams.begin(), RHSParams.end());
-
-    ++JitNonAffineCondition;
-    return std::make_pair<>(true, Params);
-  }
-
-  std::pair<bool, ParamList> checkLoopBound(ReportLoopBound *Reason) {
-    ParamList Params;
-    bool isValid = polly::isNonAffineExpr(R, Reason->loopCount(), *SE);
-    if (isValid) {
-      Params = getParamsInNonAffineExpr(R, Reason->loopCount(), *SE);
-      ++JitNonAffineLoopBound;
-    }
-    return std::make_pair<>(isValid, Params);
-  }
-
-  std::pair<bool, ParamList> checkAlias(ReportAlias *Reason) {
-    ParamList Params;
-    return std::make_pair<>(false, Params);
-  }
-};
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
@@ -226,40 +134,41 @@ bool JitScopDetection::runOnFunction(Function &F) {
   Console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));
 
-  for (ScopDetection::const_reject_iterator i = SD->reject_begin(),
-                                            ie = SD->reject_end();
-       i != ie; ++i) {
-    const Region *R = (*i).first;
-    RejectLog Log = (*i).second;
+  for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
+                                            RejE = SD->reject_end();
+       Rej != RejE; ++Rej) {
+    const Region *R = (*Rej).first;
+    RejectLog Log = (*Rej).second;
 
-    bool isValid = Log.size() > 0;
-    for (auto Reason : Log) {
-      NonAffineLogChecker NonAffine(R, SE);
-      AliasingLogChecker Aliasing(F, R);
+    NonAffineAccessChecker NonAffAccessChk(R, SE);
+    NonAffineBranchChecker NonAffBranchChk(R, SE);
+    NonAffineLoopBoundChecker LoopBoundChk(R, SE);
+    AliasingChecker AliasChk;
 
-      auto NonAffineResult =
-          NonAffine.check(Reason.get(), std::make_pair<>(false, ParamList()));
+    ParamList Params;
+    bool RegionIsValid = Log.size() > 0;
 
-      auto AliasResult = Aliasing.check(Reason.get(), false);
-
-      // Ask the checkers for their oppinion.
+    for (auto &Reason : Log) {
       bool IsFixable = false;
-      IsFixable |= NonAffineResult.first;
-      IsFixable |= AliasResult;
+      IsFixable |= isValid(NonAffAccessChk, *Reason);
+      IsFixable |= isValid(NonAffBranchChk, *Reason);
+      IsFixable |= isValid(LoopBoundChk, *Reason);
+      IsFixable |= isValid(AliasChk, *Reason);
 
-      Console->info() << ((IsFixable) ? "OK :: " : "FAIL :: ")
-                      << Reason->getMessage();
-      isValid &= IsFixable;
-
-      // Record all necessary parameters for later use.
-      if (isValid) {
-        ParamList params = NonAffineResult.second;
-        RequiredParams[R].insert(RequiredParams[R].end(), params.begin(),
-                                 params.end());
-      }
+      RegionIsValid &= IsFixable;
     }
 
-    if (isValid) {
+    if (RegionIsValid) {
+      ParamList &L = RequiredParams[R];
+      ParamList Tmp = NonAffAccessChk.params();
+      L.insert(L.end(), Tmp.begin(), Tmp.end());
+
+      Tmp = NonAffBranchChk.params();
+      L.insert(L.end(), Tmp.begin(), Tmp.end());
+
+      Tmp = LoopBoundChk.params();
+      L.insert(L.end(), Tmp.begin(), Tmp.end());
+
       /* The SCoP can be fixed at run time. However, we want need to make
        * sure to fetch the largest parent region that is fixable.
        * We need to do two steps:
@@ -278,7 +187,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
       if (!Parent) {
         Console->info() << "jit-scops :: " << F.getName().str()
                         << "::" << R->getNameStr();
-        printParameters(RequiredParams[R]);
+        printParameters(L);
 
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
