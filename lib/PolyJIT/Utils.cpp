@@ -47,9 +47,6 @@ void initializeOutputDir() {
   p::append(cwd, "polli");
   fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
 
-  DEBUG(log(Debug) << "Storing results in: "
-                   << StringRef(DefaultDir->data(), DefaultDir->size())
-                   << "\n");
   DirReady = true;
 }
 
@@ -68,7 +65,6 @@ void StoreModule(Module &M, const Twine &Name) {
   p::append(destPath, Name);
 
   std::string path = StringRef(destPath.data(), destPath.size()).str();
-  DEBUG(log(Debug, 2) << "Storing: " << M.getModuleIdentifier() << "\n");
   std::unique_ptr<tool_output_file> Out(
       new tool_output_file(path.c_str(), ErrorInfo, sys::fs::F_None));
 
