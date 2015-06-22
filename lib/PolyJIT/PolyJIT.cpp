@@ -394,7 +394,6 @@ void PolyJIT::runSpecializedFunction(
 * @param Mods the set of managed modules.
 */
 void PolyJIT::instrumentScops(Module &M, ManagedModules &Mods) {
-  DEBUG(log(LogType::Info) << "inject :: insert call to JIT runtime\n");
   LLVMContext &Ctx = M.getContext();
   IRBuilder<> Builder(Ctx);
 
@@ -482,7 +481,6 @@ void PolyJIT::linkJitableScops(ManagedModules &Mods, Module &M) {
   for (ManagedModules::iterator src = Mods.begin(), se = Mods.end(); src != se;
        ++src) {
     Module *SrcM = (*src).first;
-    DEBUG(log(Info, 2) << "link :: " << SrcM->getModuleIdentifier() << "\n");
     Linker::LinkModules(&M, SrcM, [](const DiagnosticInfo &Info) {
       DiagnosticPrinterRawOStream OS(errs());
       Info.print(OS);
@@ -671,16 +669,12 @@ int PolyJIT::runMain(const std::vector<std::string> &inputArgs,
   LIKWID_MARKER_STOP("CodeGenMain");
 
   if (!opt::DisableExecution) {
-    DEBUG(log(Info) << "run :: starting execution\n");
-
     // Run static constructors.
     EE->runStaticConstructorsDestructors(false);
 
     LIKWID_MARKER_START("RunMain");
     ret = EE->runFunctionAsMain(Main, inputArgs, envp);
     LIKWID_MARKER_STOP("RunMain");
-
-    DEBUG(log(Info) << "run :: execution finished (" << ret << ")\n");
   }
 
   return ret;
@@ -697,7 +691,6 @@ void PolyJIT::runPollyPreoptimizationPasses(Module &M) {
   registerCanonicalicationPasses(FPM);
   FPM.doInitialization();
 
-  DEBUG(log(Info) << "preopt :: applying preoptimization:\n");
   for (Module::iterator f = M.begin(), fe = M.end(); f != fe; ++f) {
     if (f->isDeclaration())
       continue;

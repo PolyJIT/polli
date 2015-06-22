@@ -103,11 +103,7 @@ static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
     const Region *R = (*i);
     AllScops.insert(R);
 
-    unsigned LineBegin, LineEnd;
     std::string FileName;
-    getDebugLocation(R, LineBegin, LineEnd, FileName);
-    Messages << "    " << FileName << ":" << LineBegin << ":" << LineEnd
-             << " - " << R->getNameStr() << "\n";
   }
 
   if (ValidScopCount > 0) {
