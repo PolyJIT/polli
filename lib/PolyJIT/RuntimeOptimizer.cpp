@@ -57,6 +57,9 @@ registerPolly(const llvm::PassManagerBuilder &Builder,
 Function &OptimizeForRuntime(Function &F) {
   Module *M = F.getParent();
   PassManagerBuilder Builder;
+  opt::GenerateOutput = true;
+
+  StoreModule(*M, M->getModuleIdentifier() + ".before.polly.ll");
   polly::opt::PollyParallel = true;
 
   FunctionPassManager PM = FunctionPassManager(M);
@@ -71,6 +74,8 @@ Function &OptimizeForRuntime(Function &F) {
   PM.doInitialization();
   PM.run(F);
   PM.doFinalization();
+  StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
+  opt::GenerateOutput = false;
 
   return F;
 }
