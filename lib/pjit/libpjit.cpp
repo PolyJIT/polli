@@ -9,6 +9,7 @@
 #include "llvm/Support/SourceMgr.h"
 
 #include "pprof/Tracing.h"
+#include "polli/Options.h"
 #include "polli/PolyJIT.h"
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
@@ -91,6 +92,10 @@ static inline void do_shutdown() {
 static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
 
+  if (char *LogLevel = std::getenv("POLLI_LOG_LEVEL")) {
+    opt::LogLevel = (polli::LogType)*LogLevel;
+  }
+
   if (char *OLvl = std::getenv("POLLI_OPT_LEVEL"))
     opt::OptLevel = *OLvl;
 
@@ -100,6 +105,7 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
+    set_options_from_environment();
 
     static auto Console = spdlog::stderr_logger_st("polli");
     Console->debug("loading polyjit");
@@ -109,7 +115,6 @@ public:
     LIKWID_MARKER_START("main-thread");
 
     atexit(do_shutdown);
-    set_options_from_environment();
 
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
