@@ -48,19 +48,29 @@ using namespace llvm::legacy;
 using namespace polly;
 
 namespace polli {
+static void
+registerPolly(const llvm::PassManagerBuilder &Builder,
+              llvm::legacy::PassManagerBase &PM) {
+  polly::registerPollyPasses(PM);
+}
 
 Function &OptimizeForRuntime(Function &F) {
   Module *M = F.getParent();
   PassManagerBuilder Builder;
+  polly::opt::PollyParallel = true;
 
   FunctionPassManager PM = FunctionPassManager(M);
 
   Builder.VerifyInput = true;
   Builder.VerifyOutput = true;
   Builder.OptLevel = 3;
-
+  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                             registerPolly);
   Builder.populateFunctionPassManager(PM);
+
+  PM.doInitialization();
   PM.run(F);
+  PM.doFinalization();
 
   DEBUG(StoreModule(*M, M->getModuleIdentifier()));
   return F;
