@@ -72,7 +72,6 @@ Function &OptimizeForRuntime(Function &F) {
   PM.run(F);
   PM.doFinalization();
 
-  DEBUG(StoreModule(*M, M->getModuleIdentifier()));
   return F;
 }
 }
