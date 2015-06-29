@@ -15,6 +15,7 @@
 #define DEBUG_TYPE "polyjit"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
+#include "polli/Options.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -30,10 +31,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "polly/RegisterPasses.h"
-#include "polly/Canonicalization.h"
-#include "polly/LinkAllPasses.h"
-#include "polly/ScopDetectionDiagnostic.h"
-#include "polly/ScopDetection.h"
+#include "polly/Options.h"
 
 #include "spdlog/spdlog.h"
 
