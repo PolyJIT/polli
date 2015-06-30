@@ -16,6 +16,7 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 #include "polli/Options.h"
+#include "polli/LikwidMarker.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -72,6 +73,7 @@ Function &OptimizeForRuntime(Function &F) {
   Builder.populateFunctionPassManager(PM);
 
   PM.doInitialization();
+  PM.add(polli::createLikwidMarkerPass());
   PM.run(F);
   PM.doFinalization();
   StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
