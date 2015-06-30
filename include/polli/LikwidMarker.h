@@ -12,5 +12,5 @@
 #include "llvm/Pass.h"
 
 namespace polli {
-llvm::FunctionPass *createLikwidMarkerPass();
+llvm::ModulePass *createLikwidMarkerPass();
 }

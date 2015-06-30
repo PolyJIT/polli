@@ -60,6 +60,7 @@ Function &OptimizeForRuntime(Function &F) {
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;
 
+  PassManager MPM;
   FunctionPassManager PM = FunctionPassManager(M);
 
   Builder.VerifyInput = true;
@@ -68,11 +69,14 @@ Function &OptimizeForRuntime(Function &F) {
   Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
                              registerPolly);
   Builder.populateFunctionPassManager(PM);
-
+  Builder.populateModulePassManager(MPM);
   PM.doInitialization();
-  PM.add(polli::createLikwidMarkerPass());
   PM.run(F);
   PM.doFinalization();
+
+  MPM.add(polli::createLikwidMarkerPass());
+  MPM.run(*M);
+
   StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
   opt::GenerateOutput = false;
 

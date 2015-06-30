@@ -20,18 +20,20 @@
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
 
+
 namespace polli {
-class LikwidMarker : public llvm::FunctionPass {
+class LikwidMarker : public llvm::ModulePass {
 public:
   static char ID;
-  explicit LikwidMarker(bool enable = true) : llvm::FunctionPass(ID) {}
+  explicit LikwidMarker(bool enable = true) : llvm::ModulePass(ID) {}
 
-  /// @name FunctionPass interface
+  /// @name ModulePass interface
   //@{
-  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
-  virtual void releaseMemory();
-  virtual bool runOnFunction(llvm::Function &F);
-  virtual void print(llvm::raw_ostream &OS, const llvm::Module *) const;
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
+  virtual void releaseMemory() override;
+  virtual bool runOnModule(llvm::Module &M) override;
+  virtual void print(llvm::raw_ostream &OS,
+                     const llvm::Module *) const override;
   //@}
 private:
   //===--------------------------------------------------------------------===//
@@ -54,48 +56,57 @@ void LikwidMarker::releaseMemory() {}
 
 void LikwidMarker::print(llvm::raw_ostream &OS, const llvm::Module *) const {}
 
-bool LikwidMarker::runOnFunction(llvm::Function &F) {
-  Module *M = F.getParent();
-  LLVMContext &Ctx = M->getContext();
-  Function *OmpStartFn = M->getFunction("GOMP_parallel_loop_runtime_start");
-  //Function *OmpStartFn = M->getFunction("GOMP_loop_runtime_next");
-  Function *OmpEndFn = M->getFunction("GOMP_parallel_end");
-  //Function *OmpEndFn = M->getFunction("GOMP_loop_end_nowait");
-  Function *ThreadInit = static_cast<Function *>(M->getOrInsertFunction(
+bool LikwidMarker::runOnModule(llvm::Module &M) {
+  LLVMContext &Ctx = getGlobalContext();
+  Function *OmpStartFn = M.getFunction("GOMP_loop_runtime_next");
+  Function *ThreadInit = static_cast<Function *>(M.getOrInsertFunction(
       "likwid_markerThreadInit", Type::getVoidTy(Ctx), nullptr));
   Function *Start = static_cast<Function *>(
-      M->getOrInsertFunction("likwid_markerStartRegion", Type::getVoidTy(Ctx),
-                             Type::getInt8PtrTy(Ctx, 0), nullptr));
+      M.getOrInsertFunction("likwid_markerStartRegion", Type::getVoidTy(Ctx),
+                            Type::getInt8PtrTy(Ctx, 0), nullptr));
   Function *Stop = static_cast<Function *>(
-      M->getOrInsertFunction("likwid_markerStopRegion", Type::getVoidTy(Ctx),
-                             Type::getInt8PtrTy(Ctx, 0), nullptr));
+      M.getOrInsertFunction("likwid_markerStopRegion", Type::getVoidTy(Ctx),
+                            Type::getInt8PtrTy(Ctx, 0), nullptr));
 
-  IRBuilder<> Builder(Ctx);
-  if (!OmpStartFn || !OmpEndFn)
+  if (!OmpStartFn)
     return false;
 
-  for (BasicBlock &BB : F) {
-    for (BasicBlock::iterator I = BB.begin(), IE = BB.end(); I != IE; ++I) {
-      if (CallInst *Call = dyn_cast<CallInst>(&*I)) {
-        if (Call->getCalledFunction() == OmpStartFn) {
-          Builder.SetInsertPoint(++I);
-          Builder.Insert(CallInst::Create(ThreadInit));
-          Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(F.getName()));
+  // Find the OpenMP sub function
+  Function *SubFn;
+  for (Function &F : M) {
+    for (BasicBlock &BB : F) {
+      for (BasicBlock::iterator I = BB.begin(), IE = BB.end(); I != IE; ++I) {
+        if (CallInst *Call = dyn_cast<CallInst>(&*I)) {
+          if (Call->getCalledFunction() == OmpStartFn) {
+            SubFn = &F;
+          }
         }
+      }
+    }
+  }
 
-        if (Call->getCalledFunction() == OmpEndFn) {
-          Builder.SetInsertPoint(I);
-          Builder.CreateCall(Stop, Builder.CreateGlobalStringPtr(F.getName()));
-        }
+  if (!SubFn)
+    return false;
+
+  BasicBlock &Entry = SubFn->getEntryBlock();
+  IRBuilder<> Builder(Ctx);
+
+  Builder.SetInsertPoint(Entry.getFirstInsertionPt());
+  Builder.Insert(CallInst::Create(ThreadInit));
+  Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(SubFn->getName()));
+
+  for (BasicBlock &BB : *SubFn) {
+    for (BasicBlock::iterator J = BB.begin(), JE = BB.end(); J != JE; ++J) {
+      if (isa<ReturnInst>(&*J)) {
+        Builder.SetInsertPoint(J);
+        Builder.CreateCall(Stop, Builder.CreateGlobalStringPtr(SubFn->getName()));
       }
     }
   }
   return true;
 }
 
-FunctionPass *createLikwidMarkerPass() {
-  return new LikwidMarker();
-}
+ModulePass *createLikwidMarkerPass() { return new LikwidMarker(); }
 }
 
 static RegisterPass<LikwidMarker>
