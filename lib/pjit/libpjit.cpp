@@ -22,6 +22,7 @@
 #include "spdlog/spdlog.h"
 #include <likwid.h>
 
+#include <stdlib.h>
 #include <vector>
 #include <cstdlib>
 
@@ -92,11 +93,11 @@ static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
 
   if (char *LogLevel = std::getenv("POLLI_LOG_LEVEL")) {
-    opt::LogLevel = (polli::LogType)*LogLevel;
+    opt::LogLevel = (polli::LogType)std::atoi(LogLevel);
   }
 
   if (char *OLvl = std::getenv("POLLI_OPT_LEVEL"))
-    opt::OptLevel = *OLvl;
+    opt::OptLevel = std::atoi(OLvl);
 
   opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
 }
