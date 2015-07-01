@@ -63,9 +63,10 @@ Function &OptimizeForRuntime(Function &F) {
 
   FunctionPassManager PM = FunctionPassManager(M);
 
-  Builder.VerifyInput = true;
-  Builder.VerifyOutput = true;
+  Builder.VerifyInput = false;
+  Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
+  Builder.DisableTailCalls = true;
   Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
                              registerPolly);
   Builder.populateFunctionPassManager(PM);
