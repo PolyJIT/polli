@@ -34,11 +34,6 @@ using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static auto Console = spdlog::stderr_logger_st("polli");
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
-/**
- * @brief Likwid requires initialization per thread.
- *
- */
-static __thread bool likwid_thread_initialized = false;
 
 static inline void lwMarkerStart(const char *R) { LIKWID_MARKER_START(R); }
 static inline void lwMarkerStop(const char *R) { LIKWID_MARKER_STOP(R); }

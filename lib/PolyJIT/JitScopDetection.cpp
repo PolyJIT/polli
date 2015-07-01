@@ -93,26 +93,6 @@ static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   return Count;
 }
 
-#ifndef NDEBUG
-#include <sstream>
-static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
-  std::stringstream Messages;
-  int ValidScopCount = 0;
-  for (ScopDetection::const_iterator i = SD.begin(), ie = SD.end(); i != ie;
-       ++i, ++ValidScopCount) {
-    const Region *R = (*i);
-    AllScops.insert(R);
-
-    std::string FileName;
-  }
-
-  if (ValidScopCount > 0) {
-    Console->debug() << "  valid scops ::";
-    Console->debug() << Messages.str();
-  }
-}
-#endif
-
 bool JitScopDetection::runOnFunction(Function &F) {
   if (!Enabled)
     return false;
@@ -127,7 +107,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
   SE = &getAnalysis<ScalarEvolution>();
   M = F.getParent();
 
-  DEBUG(printValidScops(AccumulatedScops, *SD));
   Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
@@ -186,7 +165,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        printParameters(L);
         Console->info("     Accepting SCoP: {}", R->getNameStr());
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
