@@ -6,13 +6,13 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
+#include <likwid.h>
 #include "polli/FunctionDispatcher.h"
 
 #include "llvm/IR/Function.h"
 #include "llvm/Support/Casting.h"
 
 #include "spdlog/spdlog.h"
-#include <likwid.h>
 #include <map>
 
 namespace {
