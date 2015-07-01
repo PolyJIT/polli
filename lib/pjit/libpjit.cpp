@@ -3,6 +3,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/IRReader/IRReader.h"
@@ -157,10 +158,8 @@ static ExecutionEngine *getEngine(Module *M) {
     M->setTargetTriple(Triple::normalize(opt::TargetTriple));
 
   std::unique_ptr<Module> Owner(M);
-
   EngineBuilder builder(std::move(Owner));
-  auto MemMan =
-      std::unique_ptr<PolyJITMemoryManager>(new PolyJITMemoryManager());
+  auto MemManager = std::unique_ptr<llvm::SectionMemoryManager>();
 
   CodeGenOpt::Level OLvl;
   switch (opt::OptLevel) {
@@ -188,7 +187,7 @@ static ExecutionEngine *getEngine(Module *M) {
   builder.setCodeModel(opt::CModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
-  builder.setMCJITMemoryManager(std::move(MemMan));
+  builder.setMCJITMemoryManager(std::move(MemManager));
   builder.setOptLevel(OLvl);
 
   llvm::TargetOptions Options;
