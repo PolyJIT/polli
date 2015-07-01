@@ -38,7 +38,7 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
 }
 
 Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
-  LIKWID_MARKER_START("JitOptVariant");
+  LIKWID_MARKER_START("polyjit.variant.get");
   if (Variants.count(K)) {
     Console->warn("Cache hit for {}", K.getShortName().str());
     return Variants[K];
@@ -49,7 +49,7 @@ Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
   Function *Variant = createVariant(K);
   Variants[K] = Variant;
 
-  LIKWID_MARKER_STOP("JitOptVariant");
+  LIKWID_MARKER_STOP("polyjit.variant.get");
   return Variant;
 }
 
