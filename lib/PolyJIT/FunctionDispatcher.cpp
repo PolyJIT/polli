@@ -16,7 +16,7 @@
 #include <map>
 
 namespace {
-auto Console = spdlog::stderr_logger_st("polli");
+auto Console = spdlog::stderr_logger_st("polli/dispatch");
 }
 
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
@@ -39,8 +39,12 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
 
 Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
   LIKWID_MARKER_START("JitOptVariant");
-  if (Variants.count(K))
+  if (Variants.count(K)) {
+    Console->warn("Cache hit for {}", K.getShortName().str());
     return Variants[K];
+  } else {
+    Console->warn("New Variant required.");
+  }
 
   Function *Variant = createVariant(K);
   Variants[K] = Variant;
@@ -238,6 +242,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
       (M->getModuleIdentifier() + "." + SourceF.getName()).str() +
       K.getShortName().str() + ".ll");
 
+  Console->warn("Create Variant for: {}", K.getShortName().str());
   // Perform parameter value substitution.
   if (!opt::DisableRecompile) {
     FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>

@@ -31,6 +31,7 @@ using namespace polli;
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 
+static auto Console = spdlog::stderr_logger_st("polli");
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 /**
@@ -48,7 +49,6 @@ static __thread bool likwid_thread_initialized = false;
 static Module &getModule(const char *prototype) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
-  static auto Console = spdlog::stderr_logger_st("polli");
 
   if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
@@ -85,8 +85,6 @@ static Function *getFunction(Module &M) {
 static inline void do_shutdown() {
   LIKWID_MARKER_STOP("main-thread");
   LIKWID_MARKER_CLOSE;
-  static auto Console = spdlog::stderr_logger_st("polli");
-  DEBUG(Console->debug("PolyJIT shut down."));
 }
 
 static inline void set_options_from_environment() {
@@ -106,9 +104,8 @@ class StaticInitializer {
 public:
   StaticInitializer() {
     set_options_from_environment();
+    setupLogging();
 
-    static auto Console = spdlog::stderr_logger_st("polli");
-    Console->debug("loading polyjit");
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
     LIKWID_MARKER_INIT;
@@ -220,7 +217,6 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
-  static auto Console = spdlog::stderr_logger_st("polli");
   if (!likwid_thread_initialized) {
     LIKWID_MARKER_THREADINIT;
     likwid_thread_initialized = true;
@@ -243,13 +239,13 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
 
   if (EE) {
     LIKWID_MARKER_START(NewF.getName().str().c_str());
-    DEBUG(Console->debug("execution of {:>s} begins (#{:d} params)",
-                  NewF.getName().str(), paramc));
+    Console->warn("execution of {:>s} begins (#{:d} params)",
+                  NewF.getName().str(), paramc);
     void *FPtr = EE->getPointerToFunction(&NewF);
     void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
     PF(paramc, params);
-    DEBUG(Console->debug("execution of {:>s} completed", NewF.getName().str()));
     LIKWID_MARKER_STOP(NewF.getName().str().c_str());
+    Console->warn("execution of {:>s} completed", NewF.getName().str());
   } else {
     Console->error("no execution engine found.");
   }
@@ -267,9 +263,7 @@ StaticInitializer InitializeEverything;
  * @param params arugments of the function we want to call.
  */
 int pjit_main(const char *fName, unsigned paramc, char **params) {
-  static auto Console = spdlog::stderr_logger_st("polli");
-
-  LIKWID_MARKER_START("GetOrParsePrototype");
+  Console->warn() << "pjit_main() called.";
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
@@ -277,6 +271,7 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
     return 0;
   }
   LIKWID_MARKER_STOP("GetOrParsePrototype");
+  Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F);
 
   auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
     std::stringstream res;
@@ -299,6 +294,7 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
 
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
+  Console->warn("\t ParamVector contains {} elements", ParamV.size());
 
   ParamVector<Param> Params(std::move(ParamV));
   // Assume that we have used a specializer that converts all functions into
@@ -307,16 +303,14 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
 
   LIKWID_MARKER_STOP("JitSelectParams");
 
-  // Stats &S = VarFun->stats();
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
+    Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(), (uint64_t)NewF);
     std::string paramlist = DebugFn(*F, paramc, params);
-    DEBUG(
-        Console->debug("running with params: #{:d} ({:s})", paramc, paramlist));
     runSpecializedFunction(*NewF, paramc, params);
   } else
     llvm_unreachable("FIXME: call the old prototype.");
 
-  // S.ExecCount++;
+  Console->warn("pjit_main complete");
   return 0;
 }
 }

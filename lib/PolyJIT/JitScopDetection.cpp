@@ -57,7 +57,7 @@ using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 
-static auto Console = spdlog::stderr_logger_st("polli");
+static auto Console = spdlog::stderr_logger_st("polli/jitsd");
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
@@ -127,13 +127,18 @@ bool JitScopDetection::runOnFunction(Function &F) {
   SE = &getAnalysis<ScalarEvolution>();
   M = F.getParent();
 
-  Console->info("jit-scops :: {:>30}", F.getName().str());
   DEBUG(printValidScops(AccumulatedScops, *SD));
-
+  Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
     const Region *R = (*Rej).first;
+
+    if (!R)
+      continue;
+    Console->info("==== Next Region: {:>60s}", R->getNameStr());
+    R->dump();
+
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -181,10 +186,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        Console->info() << "jit-scops :: " << F.getName().str()
-                        << "::" << R->getNameStr();
         printParameters(L);
-
+        Console->info("     Accepting SCoP: {}", R->getNameStr());
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
         ++JitScopsFound;

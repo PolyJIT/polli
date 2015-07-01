@@ -20,6 +20,8 @@
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
 
+#include "spdlog/spdlog.h"
+
 
 namespace polli {
 class LikwidMarker : public llvm::ModulePass {
@@ -57,6 +59,9 @@ void LikwidMarker::releaseMemory() {}
 void LikwidMarker::print(llvm::raw_ostream &OS, const llvm::Module *) const {}
 
 bool LikwidMarker::runOnModule(llvm::Module &M) {
+  auto Console = spdlog::stderr_logger_st("polli/likwid");
+
+  Console->warn("Working on {}", M.getModuleIdentifier());
   LLVMContext &Ctx = getGlobalContext();
   Function *OmpStartFn = M.getFunction("GOMP_loop_runtime_next");
   Function *ThreadInit = static_cast<Function *>(M.getOrInsertFunction(
@@ -85,8 +90,12 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
     }
   }
 
-  if (!SubFn)
+  if (!SubFn) {
+    Console->warn("No OpenMP SubFunction found.");
     return false;
+  } else {
+    Console->warn("OpenMP subfn found: {}", SubFn->getName().str());
+  }
 
   BasicBlock &Entry = SubFn->getEntryBlock();
   IRBuilder<> Builder(Ctx);

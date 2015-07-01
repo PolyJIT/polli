@@ -37,7 +37,7 @@
 #include "spdlog/spdlog.h"
 
 namespace {
-auto Console = spdlog::stderr_logger_st("polli");
+auto Console = spdlog::stderr_logger_st("polli/optimizer");
 }
 
 namespace llvm {
@@ -76,6 +76,8 @@ Function &OptimizeForRuntime(Function &F) {
 
   MPM.add(polli::createLikwidMarkerPass());
   MPM.run(*M);
+    Console->warn("\t LikwidMarker support active.");
+    Console->warn("\t LikwidMarker support NOT active.");
 
   StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
   opt::GenerateOutput = false;
