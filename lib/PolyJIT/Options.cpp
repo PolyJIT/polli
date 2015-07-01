@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "spdlog/spdlog.h"
+#include <unistd.h>
 
 using namespace llvm;
 using namespace spdlog;
@@ -64,6 +65,21 @@ bool GenerateSoftFloatCalls = false;
 bool EnableJITExceptionHandling = false;
 bool EmitJitDebugInfo = false;
 bool EmitJitDebugInfoToDisk = false;
+
+/**
+ * @brief Check, if we have likwid support at run-time.
+ *
+ * @return bool
+ */
+bool haveLikwid() {
+  auto Console = spdlog::stderr_logger_st("polli/options");
+  char *LIKWID_MODE = std::getenv("LIKWID_MODE");
+  for (char **current = environ; *current; current++) {
+    Console->warn(*current);
+  }
+
+  return LIKWID_MODE;
+}
 }
 }
 

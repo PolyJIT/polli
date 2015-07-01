@@ -35,6 +35,7 @@
 #include "polly/Options.h"
 
 #include "spdlog/spdlog.h"
+#include <unistd.h>
 
 namespace {
 auto Console = spdlog::stderr_logger_st("polli/optimizer");
@@ -60,7 +61,6 @@ Function &OptimizeForRuntime(Function &F) {
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;
 
-  PassManager MPM;
   FunctionPassManager PM = FunctionPassManager(M);
 
   Builder.VerifyInput = true;
@@ -69,15 +69,19 @@ Function &OptimizeForRuntime(Function &F) {
   Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
                              registerPolly);
   Builder.populateFunctionPassManager(PM);
-  Builder.populateModulePassManager(MPM);
   PM.doInitialization();
   PM.run(F);
   PM.doFinalization();
 
-  MPM.add(polli::createLikwidMarkerPass());
-  MPM.run(*M);
+  if (opt::haveLikwid()) {
     Console->warn("\t LikwidMarker support active.");
+    PassManager MPM;
+    Builder.populateModulePassManager(MPM);
+    MPM.add(polli::createLikwidMarkerPass());
+    MPM.run(*M);
+  } else {
     Console->warn("\t LikwidMarker support NOT active.");
+  }
 
   StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
   opt::GenerateOutput = false;

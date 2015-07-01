@@ -98,6 +98,13 @@ extern polli::LogType LogLevel;
  * This pushes PolyJIT's static passes into the compilation pipeline.
  */
 extern bool Enabled;
+
+/**
+ * @brief Check, if we're wrapped in a likwid binary, e.g., likwid-perfctr.
+ *
+ * @return bool
+ */
+bool haveLikwid();
 }
 }
 #endif
