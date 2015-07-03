@@ -251,8 +251,9 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   }
 }
 
+static StaticInitializer InitializeEverything;
+
 extern "C" {
-StaticInitializer InitializeEverything;
 /**
  * @brief Runtime callback for PolyJIT.
  *
