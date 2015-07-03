@@ -144,7 +144,6 @@ public:
 };
 } // end of anonymous namespace
 
-
 /**
 * @brief Get a new Execution engine for the given module.
 *
@@ -238,12 +237,12 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   lwMarkerStop("polyjit.codegen");
 
   if (EE) {
-    Console->warn("execution of {:>s} begins (#{:d} params)",
-                  NewF.getName().str(), paramc);
+    DEBUG(Console->warn("execution of {:>s} begins (#{:d} params)",
+                        NewF.getName().str(), paramc));
     void *FPtr = EE->getPointerToFunction(&NewF);
     void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
     PF(paramc, params);
-    Console->warn("execution of {:>s} completed", NewF.getName().str());
+    DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
   } else {
     Console->error("no execution engine found.");
   }
@@ -262,7 +261,7 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 int pjit_main(const char *fName, unsigned paramc, char **params) {
-  Console->warn() << "pjit_main() called.";
+  DEBUG(Console->warn() << "pjit_main() called.");
   lwMarkerStart("poyjit.prototype.get");
   Module &M = getModule(fName);
   Function *F = getFunction(M);
@@ -270,7 +269,8 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
     Console->error("Could not find a function in: {}", M.getModuleIdentifier());
     return 0;
   }
-  Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F);
+  DEBUG(
+      Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F));
   lwMarkerStop("poyjit.prototype.get");
 
   auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
@@ -294,7 +294,7 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
 
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
-  Console->warn("\t ParamVector contains {} elements", ParamV.size());
+  DEBUG(Console->warn("\t ParamVector contains {} elements", ParamV.size()));
 
   ParamVector<Param> Params(std::move(ParamV));
   // Assume that we have used a specializer that converts all functions into
@@ -304,13 +304,14 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   lwMarkerStop("polyjit.params.select");
 
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
-    Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(), (uint64_t)NewF);
+    DEBUG(Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(),
+                        (uint64_t)NewF));
     std::string paramlist = DebugFn(*F, paramc, params);
     runSpecializedFunction(*NewF, paramc, params);
   } else
     llvm_unreachable("FIXME: call the old prototype.");
 
-  Console->warn("pjit_main complete");
+  DEBUG(Console->warn("pjit_main complete"));
   return 0;
 }
 }

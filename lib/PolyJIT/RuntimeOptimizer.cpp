@@ -75,13 +75,13 @@ Function &OptimizeForRuntime(Function &F) {
   PM.doFinalization();
 
   if (opt::haveLikwid()) {
-    Console->warn("\t LikwidMarker support active.");
+    DEBUG(Console->warn("\t LikwidMarker support active."));
     PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createLikwidMarkerPass());
     MPM.run(*M);
   } else {
-    Console->warn("\t LikwidMarker support NOT active.");
+    DEBUG(Console->warn("\t LikwidMarker support NOT active."));
   }
 
   StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");

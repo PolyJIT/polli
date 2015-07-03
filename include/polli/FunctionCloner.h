@@ -27,6 +27,9 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
+
+#define DEBUG_TYPE "polli"
+#include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -117,14 +120,14 @@ public:
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
 
-    polli::verifyFunctions("\t>> ", From, To);
+    DEBUG(polli::verifyFunctions("\t>> ", From, To));
 
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
-    polli::verifyFunctions("\t<< ", From, To);
+    DEBUG(polli::verifyFunctions("\t<< ", From, To));
 
     // Store function mapping for the linker.
     VMap[From] = To;

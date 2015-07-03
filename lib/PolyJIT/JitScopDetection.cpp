@@ -107,7 +107,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   SE = &getAnalysis<ScalarEvolution>();
   M = F.getParent();
 
-  Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
+  DEBUG(Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str()));
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
@@ -115,9 +115,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
     if (!R)
       continue;
-    Console->info("==== Next Region: {:>60s}", R->getNameStr());
-    R->dump();
-
+    DEBUG(Console->info("==== Next Region: {:>60s}", R->getNameStr()));
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -165,7 +163,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        Console->info("     Accepting SCoP: {}", R->getNameStr());
+        DEBUG(Console->info("     Accepting SCoP: {}", R->getNameStr()));
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
         ++JitScopsFound;
