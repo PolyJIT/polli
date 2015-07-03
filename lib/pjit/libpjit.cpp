@@ -238,14 +238,12 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   lwMarkerStop("polyjit.codegen");
 
   if (EE) {
-    lwMarkerStart(NewF.getName().str().c_str());
     Console->warn("execution of {:>s} begins (#{:d} params)",
                   NewF.getName().str(), paramc);
     void *FPtr = EE->getPointerToFunction(&NewF);
     void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
     PF(paramc, params);
     Console->warn("execution of {:>s} completed", NewF.getName().str());
-    lwMarkerStop(NewF.getName().str().c_str());
   } else {
     Console->error("no execution engine found.");
   }
