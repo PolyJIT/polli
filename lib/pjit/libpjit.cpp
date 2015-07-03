@@ -11,7 +11,9 @@
 
 #include "pprof/Tracing.h"
 #include "polli/Options.h"
+#if 0
 #include "polli/PolyJIT.h"
+#endif
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
 #include "polly/RegisterPasses.h"

@@ -34,7 +34,7 @@ add_polli_library(PolyJIT
   InstrumentRegions.cpp
   JitScopDetection.cpp
   LikwidMarker.cpp
-  PolyJIT.cpp
+  #PolyJIT.cpp
   Options.cpp
   RuntimeOptimizer.cpp
   ScopMapper.cpp
