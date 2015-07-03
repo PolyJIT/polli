@@ -57,7 +57,7 @@ using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 
-static auto Console = spdlog::stderr_logger_st("polli");
+static auto Console = spdlog::stderr_logger_st("polli/jitsd");
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
@@ -93,26 +93,6 @@ static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   return Count;
 }
 
-#ifndef NDEBUG
-#include <sstream>
-static void printValidScops(ScopSet &AllScops, ScopDetection const &SD) {
-  std::stringstream Messages;
-  int ValidScopCount = 0;
-  for (ScopDetection::const_iterator i = SD.begin(), ie = SD.end(); i != ie;
-       ++i, ++ValidScopCount) {
-    const Region *R = (*i);
-    AllScops.insert(R);
-
-    std::string FileName;
-  }
-
-  if (ValidScopCount > 0) {
-    Console->debug() << "  valid scops ::";
-    Console->debug() << Messages.str();
-  }
-}
-#endif
-
 bool JitScopDetection::runOnFunction(Function &F) {
   if (!Enabled)
     return false;
@@ -127,13 +107,17 @@ bool JitScopDetection::runOnFunction(Function &F) {
   SE = &getAnalysis<ScalarEvolution>();
   M = F.getParent();
 
-  Console->info("jit-scops :: {:>30}", F.getName().str());
-  DEBUG(printValidScops(AccumulatedScops, *SD));
-
+  Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
     const Region *R = (*Rej).first;
+
+    if (!R)
+      continue;
+    Console->info("==== Next Region: {:>60s}", R->getNameStr());
+    R->dump();
+
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -181,10 +165,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // We found one of our parent regions in the set of jitable Scops.
       if (!Parent) {
-        Console->info() << "jit-scops :: " << F.getName().str()
-                        << "::" << R->getNameStr();
-        printParameters(L);
-
+        Console->info("     Accepting SCoP: {}", R->getNameStr());
         AccumulatedScops.insert(R);
         JitableScops.insert(R);
         ++JitScopsFound;

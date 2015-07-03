@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "spdlog/spdlog.h"
+#include <unistd.h>
 
 using namespace llvm;
 using namespace spdlog;
@@ -29,7 +30,6 @@ namespace polli {
 
 void setupLogging() {
   spdlog::set_async_mode(1048576);
-  spdlog::set_pattern("%v");
   spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
 }
 
@@ -65,11 +65,36 @@ bool GenerateSoftFloatCalls = false;
 bool EnableJITExceptionHandling = false;
 bool EmitJitDebugInfo = false;
 bool EmitJitDebugInfoToDisk = false;
+bool EmitEnv = false;
+
+/**
+ * @brief Check, if we have likwid support at run-time.
+ *
+ * @return bool
+ */
+bool haveLikwid() {
+  auto Console = spdlog::stderr_logger_st("polli/options");
+  char *LIKWID_MODE = std::getenv("LIKWID_MODE");
+
+  if (EmitEnv) {
+    for (char **current = environ; *current; current++) {
+      Console->warn(*current);
+    }
+  }
+
+  return LIKWID_MODE;
+}
 }
 }
 
 using namespace polli;
 using namespace polli::opt;
+
+static cl::opt<bool, true> EmitEnvX("polli-emit-env",
+                                    cl::desc("Emit environment."),
+                                    cl::location(EmitEnv), cl::init(false),
+                                    cl::cat(PolliCategory));
+
 static cl::opt<bool, true>
     InstrumentRegionsX("instrument", cl::desc("Enable instrumenting of SCoPs"),
                        cl::location(InstrumentRegions), cl::init(false),

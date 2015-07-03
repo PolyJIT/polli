@@ -18,6 +18,8 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/PolyJIT.h"
+#include "pprof/Tracing.h"
+#include "polli/Options.h"
 
 #include "llvm/ADT/Triple.h"
 #include "llvm/Bitcode/ReaderWriter.h"
@@ -43,9 +45,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-
-#include "polli/Options.h"
-#include "pprof/Tracing.h"
 
 #ifdef __CYGWIN__
 #include <cygwin/version.h>

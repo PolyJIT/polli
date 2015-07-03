@@ -15,6 +15,8 @@
 #define DEBUG_TYPE "polyjit"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
+#include "polli/Options.h"
+#include "polli/LikwidMarker.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -30,15 +32,13 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "polly/RegisterPasses.h"
-#include "polly/Canonicalization.h"
-#include "polly/LinkAllPasses.h"
-#include "polly/ScopDetectionDiagnostic.h"
-#include "polly/ScopDetection.h"
+#include "polly/Options.h"
 
 #include "spdlog/spdlog.h"
+#include <unistd.h>
 
 namespace {
-auto Console = spdlog::stderr_logger_st("polli");
+auto Console = spdlog::stderr_logger_st("polli/optimizer");
 }
 
 namespace llvm {
@@ -50,21 +50,43 @@ using namespace llvm::legacy;
 using namespace polly;
 
 namespace polli {
+static void registerPolly(const llvm::PassManagerBuilder &Builder,
+                          llvm::legacy::PassManagerBase &PM) {
+  polly::registerPollyPasses(PM);
+}
 
 Function &OptimizeForRuntime(Function &F) {
   Module *M = F.getParent();
   PassManagerBuilder Builder;
+  opt::GenerateOutput = true;
+  polly::opt::PollyParallel = true;
 
   FunctionPassManager PM = FunctionPassManager(M);
 
-  Builder.VerifyInput = true;
-  Builder.VerifyOutput = true;
+  Builder.VerifyInput = false;
+  Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
-
+  Builder.DisableTailCalls = true;
+  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                             registerPolly);
   Builder.populateFunctionPassManager(PM);
+  PM.doInitialization();
   PM.run(F);
+  PM.doFinalization();
 
-  DEBUG(StoreModule(*M, M->getModuleIdentifier()));
+  if (opt::haveLikwid()) {
+    Console->warn("\t LikwidMarker support active.");
+    PassManager MPM;
+    Builder.populateModulePassManager(MPM);
+    MPM.add(polli::createLikwidMarkerPass());
+    MPM.run(*M);
+  } else {
+    Console->warn("\t LikwidMarker support NOT active.");
+  }
+
+  StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
+  opt::GenerateOutput = false;
+
   return F;
 }
 }

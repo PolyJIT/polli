@@ -56,6 +56,8 @@ static void printConfig() {
   Console->info(" polyjit.recompile: {}", !opt::DisableRecompile);
   Console->info(" polyjit.execute: {}", !opt::DisableExecution);
   Console->info(" polyjit.instrument: {}", opt::InstrumentRegions);
+  Console->info(" polly.delinearize: {}", polly::PollyDelinearize);
+  Console->info(" polly.aliaschecks: {}", polly::PollyUseRuntimeAliasChecks);
 }
 
 /**
@@ -99,13 +101,16 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (!opt::Enabled)
     return;
 
+  if (polly::PollyDelinearize && opt::EnableJitable)
+    polly::PollyDelinearize = false;
+
+  if (polly::PollyUseRuntimeAliasChecks && opt::EnableJitable)
+    polly::PollyUseRuntimeAliasChecks = false;
+
   setupLogging();
   printConfig();
 
   registerPollyPasses(PM);
-
-  if (polly::PollyDelinearize && opt::EnableJitable)
-    polly::PollyDelinearize = false;
 
   // Schedule us inbetween detection and polly's codegen.
   PM.add(new JitScopDetection(opt::EnableJitable));

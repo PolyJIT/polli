@@ -3,13 +3,17 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "pprof/Tracing.h"
+#include "polli/Options.h"
+#if 0
 #include "polli/PolyJIT.h"
+#endif
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
 #include "polly/RegisterPasses.h"
@@ -21,6 +25,7 @@
 #include "spdlog/spdlog.h"
 #include <likwid.h>
 
+#include <stdlib.h>
 #include <vector>
 #include <cstdlib>
 
@@ -30,13 +35,15 @@ using namespace polli;
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 
+static auto Console = spdlog::stderr_logger_st("polli");
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
-/**
- * @brief Likwid requires initialization per thread.
- *
- */
-static __thread bool likwid_thread_initialized = false;
+
+static inline void lwMarkerStart(const char *R) { LIKWID_MARKER_START(R); }
+static inline void lwMarkerStop(const char *R) { LIKWID_MARKER_STOP(R); }
+static inline void lwMarkerInit() { LIKWID_MARKER_INIT; }
+static inline void lwMarkerClose() { LIKWID_MARKER_CLOSE; }
+static inline void lwMarkerThreadInit() { LIKWID_MARKER_THREADINIT; }
 
 /**
  * @brief Read the LLVM-IR module from the given prototype string.
@@ -47,7 +54,6 @@ static __thread bool likwid_thread_initialized = false;
 static Module &getModule(const char *prototype) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
-  static auto Console = spdlog::stderr_logger_st("polli");
 
   if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
@@ -82,17 +88,19 @@ static Function *getFunction(Module &M) {
 }
 
 static inline void do_shutdown() {
-  LIKWID_MARKER_STOP("main-thread");
-  LIKWID_MARKER_CLOSE;
-  static auto Console = spdlog::stderr_logger_st("polli");
-  DEBUG(Console->debug("PolyJIT shut down."));
+  lwMarkerStop("polyjit.main");
+  lwMarkerClose();
 }
 
 static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
 
+  if (char *LogLevel = std::getenv("POLLI_LOG_LEVEL")) {
+    opt::LogLevel = (polli::LogType)std::atoi(LogLevel);
+  }
+
   if (char *OLvl = std::getenv("POLLI_OPT_LEVEL"))
-    opt::OptLevel = *OLvl;
+    opt::OptLevel = std::atoi(OLvl);
 
   opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
 }
@@ -100,16 +108,15 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
+    set_options_from_environment();
+    setupLogging();
 
-    static auto Console = spdlog::stderr_logger_st("polli");
-    Console->debug("loading polyjit");
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
-    LIKWID_MARKER_INIT;
-    LIKWID_MARKER_START("main-thread");
+    lwMarkerInit();
+    lwMarkerStart("polyjit.main");
 
     atexit(do_shutdown);
-    set_options_from_environment();
 
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
@@ -153,10 +160,8 @@ static ExecutionEngine *getEngine(Module *M) {
     M->setTargetTriple(Triple::normalize(opt::TargetTriple));
 
   std::unique_ptr<Module> Owner(M);
-
   EngineBuilder builder(std::move(Owner));
-  auto MemMan =
-      std::unique_ptr<PolyJITMemoryManager>(new PolyJITMemoryManager());
+  auto MemManager = std::unique_ptr<llvm::SectionMemoryManager>();
 
   CodeGenOpt::Level OLvl;
   switch (opt::OptLevel) {
@@ -184,7 +189,7 @@ static ExecutionEngine *getEngine(Module *M) {
   builder.setCodeModel(opt::CModel);
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
-  builder.setMCJITMemoryManager(std::move(MemMan));
+  builder.setMCJITMemoryManager(std::move(MemManager));
   builder.setOptLevel(OLvl);
 
   llvm::TargetOptions Options;
@@ -215,18 +220,14 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
-  static auto Console = spdlog::stderr_logger_st("polli");
-  if (!likwid_thread_initialized) {
-    LIKWID_MARKER_THREADINIT;
-    likwid_thread_initialized = true;
-  }
+  lwMarkerThreadInit();
 
   static ManagedModules Mods;
 
   Module *NewM = NewF.getParent();
 
   // Fetch or Create a new ExecutionEngine for this Module.
-  LIKWID_MARKER_START("CodeGenJIT");
+  lwMarkerStart("polyjit.codegen");
   ExecutionEngine *EE = nullptr;
   if (!Mods.count(NewM)) {
     EE = getEngine(NewM);
@@ -234,24 +235,23 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
     Mods[NewM] = EE;
   } else
     EE = Mods[NewM];
-  LIKWID_MARKER_STOP("CodeGenJIT");
+  lwMarkerStop("polyjit.codegen");
 
   if (EE) {
-    LIKWID_MARKER_START(NewF.getName().str().c_str());
-    DEBUG(Console->debug("execution of {:>s} begins (#{:d} params)",
-                  NewF.getName().str(), paramc));
+    Console->warn("execution of {:>s} begins (#{:d} params)",
+                  NewF.getName().str(), paramc);
     void *FPtr = EE->getPointerToFunction(&NewF);
     void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
     PF(paramc, params);
-    DEBUG(Console->debug("execution of {:>s} completed", NewF.getName().str()));
-    LIKWID_MARKER_STOP(NewF.getName().str().c_str());
+    Console->warn("execution of {:>s} completed", NewF.getName().str());
   } else {
     Console->error("no execution engine found.");
   }
 }
 
+static StaticInitializer InitializeEverything;
+
 extern "C" {
-StaticInitializer InitializeEverything;
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -262,16 +262,16 @@ StaticInitializer InitializeEverything;
  * @param params arugments of the function we want to call.
  */
 int pjit_main(const char *fName, unsigned paramc, char **params) {
-  static auto Console = spdlog::stderr_logger_st("polli");
-
-  LIKWID_MARKER_START("GetOrParsePrototype");
+  Console->warn() << "pjit_main() called.";
+  lwMarkerStart("poyjit.prototype.get");
   Module &M = getModule(fName);
   Function *F = getFunction(M);
   if (!F) {
     Console->error("Could not find a function in: {}", M.getModuleIdentifier());
     return 0;
   }
-  LIKWID_MARKER_STOP("GetOrParsePrototype");
+  Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F);
+  lwMarkerStop("poyjit.prototype.get");
 
   auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
     std::stringstream res;
@@ -290,28 +290,27 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
     return res.str();
   };
 
-  LIKWID_MARKER_START("JitSelectParams");
+  lwMarkerStart("polyjit.params.select");
 
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
+  Console->warn("\t ParamVector contains {} elements", ParamV.size());
 
   ParamVector<Param> Params(std::move(ParamV));
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
 
-  LIKWID_MARKER_STOP("JitSelectParams");
+  lwMarkerStop("polyjit.params.select");
 
-  // Stats &S = VarFun->stats();
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
+    Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(), (uint64_t)NewF);
     std::string paramlist = DebugFn(*F, paramc, params);
-    DEBUG(
-        Console->debug("running with params: #{:d} ({:s})", paramc, paramlist));
     runSpecializedFunction(*NewF, paramc, params);
   } else
     llvm_unreachable("FIXME: call the old prototype.");
 
-  // S.ExecCount++;
+  Console->warn("pjit_main complete");
   return 0;
 }
 }

@@ -43,7 +43,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
   if (opt::LogLevel > polli::Debug)
     return;
 
-  auto Console = spdlog::stderr_logger_st("polli");
+  auto Console = spdlog::stderr_logger_st("polli/verify");
 
   std::string buffer;
   llvm::raw_string_ostream s(buffer);
@@ -52,7 +52,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
     if (!verifyFunction(*F, &s))
       s << " OK";
   } else if (F && F->isDeclaration()) {
-    F->getType()->print(s << " OK (declare) : ");
+    F->getType()->print(s << " OK \n\t\t(declare) : ");
   } else {
     s << " OK (F is nullptr)";
   }
@@ -63,8 +63,8 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
                                    const Function *TgtF) {
 
-  verifyFn(Prefix + "(sourcef) ", SrcF);
-  verifyFn(Prefix + "(targetf) ", TgtF);
+  verifyFn(Prefix + "Verify Source ", SrcF);
+  verifyFn(Prefix + "Verify Target ", TgtF);
 }
 
 template <class OnCreate, class SourceAfterClone, class TargetAfterClone>
@@ -117,14 +117,14 @@ public:
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
 
-    polli::verifyFunctions("before transform: ", From, To);
+    polli::verifyFunctions("\t>> ", From, To);
 
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
-    polli::verifyFunctions("after transform: ", From, To);
+    polli::verifyFunctions("\t<< ", From, To);
 
     // Store function mapping for the linker.
     VMap[From] = To;
