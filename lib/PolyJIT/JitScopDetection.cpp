@@ -65,17 +65,6 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
 }
 
-static void printParameters(ParamList &L) {
-  std::string ParamStr = "";
-  llvm::raw_string_ostream OS(ParamStr);
-  for (const SCEV *S : L) {
-    OS << "[";
-    S->print(OS);
-    OS << "]";
-  }
-  Console->info("required @ run time: {:>30}", OS.str());
-}
-
 // Remove all direct and indirect children of region R from the region set Regs,
 // but do not recurse further if the first child has been found.
 //
