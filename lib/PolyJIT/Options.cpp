@@ -65,6 +65,7 @@ bool GenerateSoftFloatCalls = false;
 bool EnableJITExceptionHandling = false;
 bool EmitJitDebugInfo = false;
 bool EmitJitDebugInfoToDisk = false;
+bool EmitEnv = false;
 
 /**
  * @brief Check, if we have likwid support at run-time.
@@ -74,8 +75,11 @@ bool EmitJitDebugInfoToDisk = false;
 bool haveLikwid() {
   auto Console = spdlog::stderr_logger_st("polli/options");
   char *LIKWID_MODE = std::getenv("LIKWID_MODE");
-  for (char **current = environ; *current; current++) {
-    Console->warn(*current);
+
+  if (EmitEnv) {
+    for (char **current = environ; *current; current++) {
+      Console->warn(*current);
+    }
   }
 
   return LIKWID_MODE;
@@ -85,6 +89,12 @@ bool haveLikwid() {
 
 using namespace polli;
 using namespace polli::opt;
+
+static cl::opt<bool, true> EmitEnvX("polli-emit-env",
+                                    cl::desc("Emit environment."),
+                                    cl::location(EmitEnv), cl::init(false),
+                                    cl::cat(PolliCategory));
+
 static cl::opt<bool, true>
     InstrumentRegionsX("instrument", cl::desc("Enable instrumenting of SCoPs"),
                        cl::location(InstrumentRegions), cl::init(false),
