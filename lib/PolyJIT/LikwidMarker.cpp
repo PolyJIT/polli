@@ -77,38 +77,39 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
     return false;
 
   // Find the OpenMP sub function
-  Function *SubFn;
+  SmallVector<Function *, 4> SubFunctions;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (BasicBlock::iterator I = BB.begin(), IE = BB.end(); I != IE; ++I) {
         if (CallInst *Call = dyn_cast<CallInst>(&*I)) {
           if (Call->getCalledFunction() == OmpStartFn) {
-            SubFn = &F;
+            SubFunctions.push_back(&F);
           }
         }
       }
     }
   }
 
-  if (!SubFn) {
+  if (SubFunctions.size() == 0) {
     Console->warn("No OpenMP SubFunction found.");
     return false;
-  } else {
-    Console->warn("OpenMP subfn found: {}", SubFn->getName().str());
   }
 
-  BasicBlock &Entry = SubFn->getEntryBlock();
-  IRBuilder<> Builder(Ctx);
+  for (auto SubFn : SubFunctions) {
+    Console->warn("OpenMP subfn found: {}", SubFn->getName().str());
+    BasicBlock &Entry = SubFn->getEntryBlock();
+    IRBuilder<> Builder(Ctx);
 
-  Builder.SetInsertPoint(Entry.getFirstInsertionPt());
-  Builder.Insert(CallInst::Create(ThreadInit));
-  Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(SubFn->getName()));
+    Builder.SetInsertPoint(Entry.getFirstInsertionPt());
+    Builder.Insert(CallInst::Create(ThreadInit));
+    Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(SubFn->getName()));
 
-  for (BasicBlock &BB : *SubFn) {
-    for (BasicBlock::iterator J = BB.begin(), JE = BB.end(); J != JE; ++J) {
-      if (isa<ReturnInst>(&*J)) {
-        Builder.SetInsertPoint(J);
-        Builder.CreateCall(Stop, Builder.CreateGlobalStringPtr(SubFn->getName()));
+    for (BasicBlock &BB : *SubFn) {
+      for (BasicBlock::iterator J = BB.begin(), JE = BB.end(); J != JE; ++J) {
+        if (isa<ReturnInst>(&*J)) {
+          Builder.SetInsertPoint(J);
+          Builder.CreateCall(Stop, Builder.CreateGlobalStringPtr(SubFn->getName()));
+        }
       }
     }
   }
@@ -121,3 +122,4 @@ ModulePass *createLikwidMarkerPass() { return new LikwidMarker(); }
 static RegisterPass<LikwidMarker>
     X("polli-likwid", "PolyJIT - Mark parallel regions with likwid calls.",
       false, false);
+
