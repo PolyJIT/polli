@@ -40,10 +40,10 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
 Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
   LIKWID_MARKER_START("polyjit.variant.get");
   if (Variants.count(K)) {
-    Console->warn("Cache hit for {}", K.getShortName().str());
+    DEBUG(Console->warn("Cache hit for {}", K.getShortName().str()));
     return Variants[K];
   } else {
-    Console->warn("New Variant required.");
+    DEBUG(Console->warn("New Variant required."));
   }
 
   Function *Variant = createVariant(K);
@@ -242,7 +242,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
       (M->getModuleIdentifier() + "." + SourceF.getName()).str() +
       K.getShortName().str() + ".ll");
 
-  Console->warn("Create Variant for: {}", K.getShortName().str());
+  DEBUG(Console->warn("Create Variant for: {}", K.getShortName().str()));
   // Perform parameter value substitution.
   if (!opt::DisableRecompile) {
     FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>

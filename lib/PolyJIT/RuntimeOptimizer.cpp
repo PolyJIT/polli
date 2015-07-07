@@ -84,7 +84,7 @@ Function &OptimizeForRuntime(Function &F) {
     DEBUG(Console->warn("\t LikwidMarker support NOT active."));
   }
 
-  StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
+  DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
   opt::GenerateOutput = false;
 
   return F;

@@ -61,7 +61,6 @@ void LikwidMarker::print(llvm::raw_ostream &OS, const llvm::Module *) const {}
 bool LikwidMarker::runOnModule(llvm::Module &M) {
   auto Console = spdlog::stderr_logger_st("polli/likwid");
 
-  Console->warn("Working on {}", M.getModuleIdentifier());
   LLVMContext &Ctx = getGlobalContext();
   Function *OmpStartFn = M.getFunction("GOMP_loop_runtime_next");
   Function *ThreadInit = static_cast<Function *>(M.getOrInsertFunction(
