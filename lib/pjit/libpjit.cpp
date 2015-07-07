@@ -233,8 +233,9 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
     EE = getEngine(NewM);
     EE->finalizeObject();
     Mods[NewM] = EE;
-  } else
+  } else {
     EE = Mods[NewM];
+  }
   lwMarkerStop("polyjit.codegen");
 
   if (!EE) {
