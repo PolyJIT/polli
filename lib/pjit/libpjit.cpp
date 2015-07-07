@@ -222,6 +222,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   lwMarkerThreadInit();
 
   static ManagedModules Mods;
+  static std::unordered_map<llvm::Function *, void *> FunctionCache;
 
   Module *NewM = NewF.getParent();
 
@@ -236,16 +237,20 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
     EE = Mods[NewM];
   lwMarkerStop("polyjit.codegen");
 
-  if (EE) {
-    DEBUG(Console->warn("execution of {:>s} begins (#{:d} params)",
-                        NewF.getName().str(), paramc));
-    void *FPtr = EE->getPointerToFunction(&NewF);
-    void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
-    PF(paramc, params);
-    DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
-  } else {
+  if (!EE) {
     Console->error("no execution engine found.");
+    return;
   }
+
+  DEBUG(Console->warn("execution of {:>s} begins (#{:d} params)",
+                      NewF.getName().str(), paramc));
+  if (!FunctionCache.count(&NewF))
+    FunctionCache.insert(
+        std::make_pair(&NewF, EE->getPointerToFunction(&NewF)));
+  void *FPtr = FunctionCache[&NewF];
+  void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
+  PF(paramc, params);
+  DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
 }
 
 static StaticInitializer InitializeEverything;
