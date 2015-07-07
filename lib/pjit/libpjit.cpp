@@ -278,25 +278,7 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
       Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F));
   lwMarkerStop("poyjit.prototype.get");
 
-  auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
-    std::stringstream res;
-
-    int i = 0;
-    for (Argument &Arg : F.args()) {
-      if (i > 0)
-        res << ", ";
-      if (Arg.getType()->isPointerTy()) {
-        res << ((uint64_t **)params)[i++];
-      } else {
-        res << ((uint32_t **)params)[i++][0];
-      }
-    }
-
-    return res.str();
-  };
-
   lwMarkerStart("polyjit.params.select");
-
   std::vector<Param> ParamV;
   getRuntimeParameters(F, paramc, params, ParamV);
   DEBUG(Console->warn("\t ParamVector contains {} elements", ParamV.size()));
@@ -305,16 +287,13 @@ int pjit_main(const char *fName, unsigned paramc, char **params) {
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
-
   lwMarkerStop("polyjit.params.select");
 
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
     DEBUG(Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(),
                         (uint64_t)NewF));
-    std::string paramlist = DebugFn(*F, paramc, params);
     runSpecializedFunction(*NewF, paramc, params);
-  } else
-    llvm_unreachable("FIXME: call the old prototype.");
+  }
 
   DEBUG(Console->warn("pjit_main complete"));
   return 0;
