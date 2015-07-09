@@ -5,14 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <string>
-#include <vector>
 #include <map>
-#include <pthread.h>
-#include <memory>
 #include <fstream>
 #include <iostream>
+#include <memory>
+#include <pthread.h>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include <sys/stat.h>
 
@@ -32,7 +32,7 @@ Options *getOptions() {
  * @brief Storage container for all PAPI region events.
  */
 Run<PPEvent> PapiEvents;
-}
+} // namespace pprof
 
 extern "C" {
 void papi_region_enter_scop(uint64_t id, const char *dbg) {

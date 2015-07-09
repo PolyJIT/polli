@@ -1,24 +1,34 @@
+//===-- libpjit.cpp - PolyJIT Just in Time Compiler -----------------------===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// This tool implements a just-in-time compiler for LLVM, allowing direct
+// execution of LLVM bitcode in an efficient manner.
+//
+//===----------------------------------------------------------------------===//
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Function.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/IR/Function.h"
 
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "pprof/Tracing.h"
 #include "polli/Options.h"
-#if 0
-#include "polli/PolyJIT.h"
-#endif
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
 #include "polly/RegisterPasses.h"
-#include "llvm/LinkAllPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
+#include "llvm/LinkAllPasses.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -35,7 +45,6 @@ using namespace polli;
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 
-static auto Console = spdlog::stderr_logger_st("polli");
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 
@@ -54,6 +63,7 @@ static inline void lwMarkerThreadInit() { LIKWID_MARKER_THREADINIT; }
 static Module &getModule(const char *prototype) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
+  static auto Console = spdlog::stderr_logger_st("polli");
 
   if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
@@ -142,6 +152,8 @@ public:
     InitializeNativeTargetAsmParser();
   }
 };
+
+static StaticInitializer InitializeEverything;
 } // end of anonymous namespace
 
 /**
@@ -219,6 +231,7 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
+  static auto Console = spdlog::stderr_logger_st("polli");
   lwMarkerThreadInit();
 
   static ManagedModules Mods;
@@ -254,7 +267,6 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
 }
 
-static StaticInitializer InitializeEverything;
 
 extern "C" {
 /**

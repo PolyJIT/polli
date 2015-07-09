@@ -13,14 +13,14 @@
 #include "polli/Utils.h"
 #include "polli/Options.h"
 
-#include <string>                      // for string
-#include <utility>                     // for pair
 #include "llvm/ADT/SmallVector.h"      // for SmallVector
 #include "llvm/ADT/Twine.h"            // for Twine
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Module.h"            // for Module
 #include "llvm/IR/Verifier.h"          // for createVerifierPass
 #include "llvm/IR/IRPrintingPasses.h"
+#include <string>                      // for string
+#include <utility>                     // for pair
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Pass.h"                   // for FunctionPass
 #include "llvm/Support/CommandLine.h"    // for initializer, desc, init, etc

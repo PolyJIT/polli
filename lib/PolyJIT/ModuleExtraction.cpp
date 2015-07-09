@@ -4,7 +4,6 @@
 
 #define DEBUG_TYPE "polli-extract"
 
-#include "llvm/Pass.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -13,15 +12,18 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Dominators.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/Metadata.h"
+#include "llvm/Pass.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+
+#include "spdlog/spdlog.h"
 
 using namespace llvm;
 using namespace spdlog::details;
@@ -399,10 +401,12 @@ struct RemoveGlobalsPolicy {
  */
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
+  static auto Console = spdlog::stderr_logger_st(DEBUG_TYPE);
+
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
 
-  outs() << fmt::format("Source to Prototype -> {:s}\n", F.getName().str());
+  DEBUG(Console->debug("Source to Prototype -> {:s}\n", F.getName().str()));
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
   InstrList Converted = apply<InstrList>(F, constantExprToInstruction);
@@ -645,4 +649,4 @@ void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
-} // end of polli namespace
+} // namespace polli // namespace polli // namespace polli // end of polli namespace

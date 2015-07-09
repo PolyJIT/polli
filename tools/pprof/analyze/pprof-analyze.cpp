@@ -4,18 +4,18 @@
 
 #include "llvm/Support/CommandLine.h"
 
+#include <map>
 #include <string>
 #include <vector>
-#include <map>
 
 #include <fstream>
-#include <iostream>
 #include <algorithm>
+#include <iostream>
 #include <numeric>
 
-#include <stdexcept>
-#include <memory>
 #include <assert.h>
+#include <memory>
+#include <stdexcept>
 
 #define FMT_HEADER_ONLY
 #include <cppformat/format.h>
@@ -261,7 +261,7 @@ static int main(const Options Opts) {
   PrintStats(std::cout, M, Regions);
   return 0;
 }
-}
+} // namespace file
 
 namespace pgsql {
 static int main(const Options Opts) {
@@ -288,8 +288,8 @@ static int main(const Options Opts) {
 
   return 0;
 }
-}
-}
+} // namespace pgsql
+} // namespace pprof
 
 int main(int argc, const char **argv) {
   using namespace pprof;

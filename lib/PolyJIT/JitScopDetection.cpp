@@ -21,10 +21,12 @@
 #include "llvm/Analysis/RegionPass.h"      // for RGPassManager
 #include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
-#include "llvm/InitializePasses.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/Analysis/Passes.h"
+#include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
 #include "llvm/IR/LegacyPassManager.h" // for FunctionPassManager
+#include "llvm/InitializePasses.h"
 #include "llvm/PassAnalysisSupport.h"  // for AnalysisUsage, etc
 #include "llvm/PassSupport.h"          // for INITIALIZE_PASS_DEPENDENCY, etc
 #include "llvm/Support/CommandLine.h"  // for desc, opt
@@ -44,10 +46,10 @@
 
 namespace llvm {
 class Function;
-}
+} // namespace llvm
 namespace llvm {
 class Module;
-}
+} // namespace llvm
 
 using namespace llvm;
 using namespace llvm::legacy;
@@ -57,7 +59,6 @@ using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 
-static auto Console = spdlog::stderr_logger_st("polli/jitsd");
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
@@ -83,6 +84,8 @@ static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
 }
 
 bool JitScopDetection::runOnFunction(Function &F) {
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+
   if (!Enabled)
     return false;
 
@@ -92,11 +95,13 @@ bool JitScopDetection::runOnFunction(Function &F) {
   if (F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
+  Console->error("Running on: {}", F.getName().str());
+
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
   M = F.getParent();
 
-  DEBUG(Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str()));
+  Console->warn("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
@@ -104,7 +109,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
     if (!R)
       continue;
-    DEBUG(Console->info("==== Next Region: {:>60s}", R->getNameStr()));
+    Console->warn("==== Next Region: {:>60s}", R->getNameStr());
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -141,7 +146,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
        * We need to do two steps:
        *
        * 1) Eliminate all children from the set of jitable Scops. */
-      eraseAllChildren(JitableScops, *R);
+      unsigned deleted = eraseAllChildren(JitableScops, *R);
+      Console->error("Deleted {} children.", deleted);
 
       /* 2) Search for one of our parents (up to the function entry) in the
        *    list of jitable Scops. If we find one in there, do not enter

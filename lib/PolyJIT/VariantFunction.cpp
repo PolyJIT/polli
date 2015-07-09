@@ -1,9 +1,9 @@
 #define DEBUG_TYPE "polyjit"
 #include "polli/VariantFunction.h"
 #include "polli/Utils.h"
+#include "spdlog/spdlog.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "spdlog/spdlog.h"
 
 using namespace llvm;
 using namespace spdlog::details;
@@ -50,4 +50,4 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
   out << "]";
   return out;
 }
-}
+} // namespace polli

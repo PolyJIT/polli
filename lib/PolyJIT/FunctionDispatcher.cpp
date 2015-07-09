@@ -16,8 +16,7 @@
 #include <map>
 
 namespace {
-auto Console = spdlog::stderr_logger_st("polli/dispatch");
-}
+} // namespace
 
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
@@ -38,12 +37,14 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
 }
 
 Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
+  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
+
   LIKWID_MARKER_START("polyjit.variant.get");
   if (Variants.count(K)) {
-    DEBUG(Console->warn("Cache hit for {}", K.getShortName().str()));
+    DEBUG(Console->error("Cache hit for {}", K.getShortName().str()));
     return Variants[K];
   } else {
-    DEBUG(Console->warn("New Variant required."));
+    DEBUG(Console->error("New Variant required."));
   }
 
   Function *Variant = createVariant(K);
@@ -227,6 +228,7 @@ public:
  * @return a copy of the base function, with the values of K substituted.
  */
 Function *VariantFunction::createVariant(const FunctionKey &K) {
+  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */

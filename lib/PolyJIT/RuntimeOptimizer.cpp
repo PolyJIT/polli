@@ -15,13 +15,13 @@
 #define DEBUG_TYPE "polyjit"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
-#include "polli/Options.h"
 #include "polli/LikwidMarker.h"
+#include "polli/Options.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 
 #include "llvm/Pass.h"
@@ -37,13 +37,9 @@
 #include "spdlog/spdlog.h"
 #include <unistd.h>
 
-namespace {
-auto Console = spdlog::stderr_logger_st("polli/optimizer");
-}
-
 namespace llvm {
 class Function;
-}
+} // namespace llvm
 
 using namespace llvm;
 using namespace llvm::legacy;
@@ -89,4 +85,4 @@ Function &OptimizeForRuntime(Function &F) {
 
   return F;
 }
-}
+} // namespace polli

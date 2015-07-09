@@ -46,7 +46,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
   if (opt::LogLevel > polli::Debug)
     return;
 
-  auto Console = spdlog::stderr_logger_st("polli/verify");
+  static auto Console = spdlog::stderr_logger_st("polli/verify");
 
   std::string buffer;
   llvm::raw_string_ostream s(buffer);

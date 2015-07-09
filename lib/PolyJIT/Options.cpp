@@ -73,7 +73,7 @@ bool EmitEnv = false;
  * @return bool
  */
 bool haveLikwid() {
-  auto Console = spdlog::stderr_logger_st("polli/options");
+  static auto Console = spdlog::stderr_logger_st("polli/options");
   char *LIKWID_MODE = std::getenv("LIKWID_MODE");
 
   if (EmitEnv) {
@@ -84,8 +84,8 @@ bool haveLikwid() {
 
   return LIKWID_MODE;
 }
-}
-}
+} // namespace opt
+} // namespace polli
 
 using namespace polli;
 using namespace polli::opt;
