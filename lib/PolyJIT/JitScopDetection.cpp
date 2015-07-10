@@ -59,6 +59,23 @@ using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 
+class DiagnosticJitScopFound : public DiagnosticInfo {
+private:
+  static int PluginDiagnosticKind;
+
+  Function &F;
+  std::string FileName;
+  unsigned EntryLine, ExitLine;
+
+public:
+  DiagnosticJitScopFound(Function &F, std::string FileName, unsigned EntryLine, unsigned ExitLine) : DiagnosticInfo(PluginDiagnosticKind, DS_Note), F(F),
+  FileName(FileName), EntryLine(EntryLine), ExitLine(ExitLine) {}
+
+  void print(DiagnosticPrinter &DP) const override;
+  static bool classof(const DiagnosticInfo *DI) {
+    return DI->getKind() == PluginDiagnosticKind;
+  }
+};
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
@@ -82,6 +99,46 @@ static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
     }
   }
   return Count;
+}
+
+static void getDebugLocations(const Region *R, DebugLoc &Begin, DebugLoc &End) {
+  for (const BasicBlock *BB : R->blocks())
+    for (const Instruction &Inst : *BB) {
+      DebugLoc DL = Inst.getDebugLoc();
+      if (!DL)
+        continue;
+
+      Begin = Begin ? std::min(Begin, DL) : DL;
+      End = End ? std::max(End, DL) : DL;
+    }
+}
+
+static void emitClassicalSCoPs(const Function &F, const ScopSet &Scops) {
+  LLVMContext &Ctx = F.getContext();
+
+  DebugLoc Begin, End;
+
+  for (const Region *R : Scops) {
+    getDebugLocations(R, Begin, End);
+
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, Begin,
+                          "A classic SCoP begins here.");
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, End, "A classic SCoP ends here.");
+  }
+}
+
+static void emitJitSCoPs(const Function &F, const ScopSet &Scops) {
+  LLVMContext &Ctx = F.getContext();
+
+  DebugLoc Begin, End;
+
+  for (const Region *R : Scops) {
+    getDebugLocations(R, Begin, End);
+
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, Begin,
+                          "A JIT SCoP begins here.");
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, End, "A JIT SCoP ends here.");
+  }
 }
 
 static bool isValidRec(const Region *CurR, const Region *R) {
@@ -206,6 +263,10 @@ bool JitScopDetection::runOnFunction(Function &F) {
   ClassicScops.insert(SD->begin(), SD->end());
   AccumulatedScops.insert(SD->begin(), SD->end());
   AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
+
+  emitClassicalSCoPs(F, ClassicScops);
+  emitJitSCoPs(F, JitableScops);
+
   return false;
 }
 
