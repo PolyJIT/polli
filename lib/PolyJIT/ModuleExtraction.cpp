@@ -16,12 +16,14 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Pass.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Transforms/IPO.h"
 
 #include "spdlog/spdlog.h"
 
@@ -611,8 +613,11 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
-
     Function *ProtoF = extractPrototypeM(VMap, *F, *PrototypeM);
+
+    llvm::legacy::PassManager MPM;
+    MPM.add(llvm::createStripSymbolsPass(true));
+    MPM.run(*PrototypeM);
 
     // Make sure that we do not destroy the function before we're done
     // using the IRBuilder, otherwise this will end poorly.
