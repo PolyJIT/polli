@@ -267,6 +267,31 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
 }
 
+static inline Function *getPrototype(const char *function) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  lwMarkerStart("poyjit.prototype.get");
+  Module &M = getModule(function);
+  Function *F = getFunction(M);
+  if (!F) {
+    Console->error("Could not find a function in: {}", M.getModuleIdentifier());
+    llvm_unreachable("Could not find a function in the prototype module");
+    return 0;
+  }
+  lwMarkerStop("poyjit.prototype.get");
+  return F;
+}
+
+static inline ParamVector<Param> getParameterInput(Function *F, unsigned paramc,
+                                                   char **params) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  lwMarkerStart("polyjit.params.select");
+  std::vector<Param> ParamV;
+  getRuntimeParameters(F, paramc, params, ParamV);
+
+  ParamVector<Param> Params(std::move(ParamV));
+  lwMarkerStop("polyjit.params.select");
+  return Params;
+}
 
 extern "C" {
 /**
@@ -278,37 +303,17 @@ extern "C" {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-int pjit_main(const char *fName, unsigned paramc, char **params) {
-  DEBUG(Console->warn() << "pjit_main() called.");
-  lwMarkerStart("poyjit.prototype.get");
-  Module &M = getModule(fName);
-  Function *F = getFunction(M);
-  if (!F) {
-    Console->error("Could not find a function in: {}", M.getModuleIdentifier());
-    return 0;
-  }
-  DEBUG(
-      Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F));
-  lwMarkerStop("poyjit.prototype.get");
+void pjit_main(const char *fName, unsigned paramc, char **params) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  Function *F = getPrototype(fName);
+  ParamVector<Param> Params = getParameterInput(F, paramc, params);
 
-  lwMarkerStart("polyjit.params.select");
-  std::vector<Param> ParamV;
-  getRuntimeParameters(F, paramc, params, ParamV);
-  DEBUG(Console->warn("\t ParamVector contains {} elements", ParamV.size()));
-
-  ParamVector<Param> Params(std::move(ParamV));
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
-  lwMarkerStop("polyjit.params.select");
 
   if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
-    DEBUG(Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(),
-                        (uint64_t)NewF));
     runSpecializedFunction(*NewF, paramc, params);
   }
-
-  DEBUG(Console->warn("pjit_main complete"));
-  return 0;
 }
 }
