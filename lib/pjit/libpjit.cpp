@@ -44,7 +44,6 @@ using namespace polli;
 
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
-
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 
@@ -263,6 +262,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
         std::make_pair(&NewF, EE->getPointerToFunction(&NewF)));
   void *FPtr = FunctionCache[&NewF];
   void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
+
   PF(paramc, params);
   DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
 }
@@ -312,8 +312,7 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
 
-  if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
-    runSpecializedFunction(*NewF, paramc, params);
-  }
+  Function *NewF = VarFun->getOrCreateVariant(Params);
+  runSpecializedFunction(*NewF, paramc, params);
 }
 }
