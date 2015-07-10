@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "polli/LikwidMarker.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -19,7 +20,6 @@
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
-
 #include "spdlog/spdlog.h"
 
 
@@ -76,13 +76,13 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
     return false;
 
   // Find the OpenMP sub function
-  SmallVector<Function *, 4> SubFunctions;
+  SetVector<Function *> SubFunctions;
   for (Function &F : M) {
     for (BasicBlock &BB : F) {
       for (BasicBlock::iterator I = BB.begin(), IE = BB.end(); I != IE; ++I) {
         if (CallInst *Call = dyn_cast<CallInst>(&*I)) {
           if (Call->getCalledFunction() == OmpStartFn) {
-            SubFunctions.push_back(&F);
+            SubFunctions.insert(&F);
           }
         }
       }
