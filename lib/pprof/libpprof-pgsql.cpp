@@ -3,9 +3,9 @@
 #include <pqxx/pqxx>
 
 #include <ctime>
+#include <set>
 #include <stdlib.h>
 #include <string>
-#include <set>
 
 #define FMT_HEADER_ONLY
 #include <cppformat/format.h>
@@ -272,5 +272,5 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   w.commit();
 };
 
-} // end of sql namespace
-} // end of pprof namespace
+} // namespace pgsql // namespace pgsql // namespace pgsql // end of sql namespace
+} // namespace pprof // namespace pprof // namespace pprof // end of pprof namespace

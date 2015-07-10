@@ -6,8 +6,8 @@
 #include <memory>
 
 #include <assert.h>
-#include <string>
 #include <stdlib.h>
+#include <string>
 
 #define FMT_HEADER_ONLY
 #include <cppformat/format.h>
@@ -78,7 +78,7 @@ getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
   assert("BUG: No matching Exit to this Entry");
   return Cur;
 }
-}
+} // namespace pprof
 
 std::ostream &operator<<(std::ostream &os, const PPEvent &event) {
   return os << event.id() << " " << event.timestamp() << " " << event.event()

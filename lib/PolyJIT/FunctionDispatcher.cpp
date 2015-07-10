@@ -16,8 +16,7 @@
 #include <map>
 
 namespace {
-auto Console = spdlog::stderr_logger_st("polli/dispatch");
-}
+} // namespace
 
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
@@ -35,22 +34,6 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
     }
     i++;
   }
-}
-
-Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
-  LIKWID_MARKER_START("polyjit.variant.get");
-  if (Variants.count(K)) {
-    Console->warn("Cache hit for {}", K.getShortName().str());
-    return Variants[K];
-  } else {
-    Console->warn("New Variant required.");
-  }
-
-  Function *Variant = createVariant(K);
-  Variants[K] = Variant;
-
-  LIKWID_MARKER_STOP("polyjit.variant.get");
-  return Variant;
 }
 
 /**
@@ -227,6 +210,7 @@ public:
  * @return a copy of the base function, with the values of K substituted.
  */
 Function *VariantFunction::createVariant(const FunctionKey &K) {
+  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
@@ -242,7 +226,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
       (M->getModuleIdentifier() + "." + SourceF.getName()).str() +
       K.getShortName().str() + ".ll");
 
-  Console->warn("Create Variant for: {}", K.getShortName().str());
+  DEBUG(Console->warn("Create Variant for: {}", K.getShortName().str()));
   // Perform parameter value substitution.
   if (!opt::DisableRecompile) {
     FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>

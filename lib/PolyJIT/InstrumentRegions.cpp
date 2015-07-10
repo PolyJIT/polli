@@ -43,22 +43,21 @@
 #include "llvm/PassAnalysisSupport.h"   // for Pass::getAnalysis, etc
 #include "llvm/PassSupport.h"           // for INITIALIZE_PASS_BEGIN, etc
 #include "llvm/Transforms/Utils/BasicBlockUtils.h" // for SplitEdge
-#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
-#include "llvm/Support/Casting.h"       // for isa
-#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
 #include "papi.h"                       // for PAPI_VER_CURRENT
 #include "polli/InstrumentRegions.h"    // for PapiCScopProfiling, etc
 #include "polli/JitScopDetection.h"  // for JitScopDetection, etc
 #include "polly/ScopDetection.h"        // for ScopDetection, etc
+#include "llvm/Support/Casting.h"       // for isa
+#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
+#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
+#include "spdlog/spdlog.h"
+
 namespace llvm { class LLVMContext; }  // lines 49-49
 namespace llvm { class Value; }  // lines 50-50
 
 using namespace llvm;
 using namespace polli;
 using namespace polly;
-
-#include "spdlog/spdlog.h"
-auto Console = spdlog::stderr_logger_st("polli");
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 STATISTIC(InstrumentedJITScops, "Number of instrumented JIT SCoPs");
@@ -237,6 +236,8 @@ static void InsertProfilingInitCall(Function *MainFn) {
  * @return  true, if we changed something in the module.
  */
 bool PapiCScopProfilingInit::runOnModule(Module &M) {
+  static auto Console = spdlog::stderr_logger_st("polli");
+
   Function *Main = M.getFunction("main");
   if (Main == 0) {
     Console->warn("no main function found in module.");

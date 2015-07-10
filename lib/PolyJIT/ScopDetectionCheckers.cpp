@@ -13,10 +13,10 @@
 
 #include "polli/ScopDetectionCheckers.h"
 
-#include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/ScalarEvolution.h"
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/Support/SCEVValidator.h"
+#include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/ScalarEvolution.h"
 
 STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
 STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
@@ -95,4 +95,4 @@ bool isValid(AliasingChecker &Chk, RejectReason &Reason) {
 
   return false;
 }
-}
+} // namespace polli

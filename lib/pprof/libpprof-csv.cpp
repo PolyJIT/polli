@@ -69,5 +69,5 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   out.flush();
   out.close();
 }
-}
-}
+} // namespace csv
+} // namespace pprof

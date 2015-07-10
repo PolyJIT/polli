@@ -10,27 +10,26 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include <map>                             // for _Rb_tree_const_iterator, etc
-#include <memory>                          // for unique_ptr
-#include <set>                             // for set
-#include <string>                          // for string
-#include <utility>                         // for make_pair, pair
-#include <vector>                          // for vector<>::iterator, vector
+#include "polli/JitScopDetection.h"    // for ParamList, etc
+
 #include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
 #include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
-#include "llvm/Analysis/RegionPass.h"      // for RGPassManager
+#include "llvm/Analysis/RegionIterator.h"
 #include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/DataLayout.h"
-#include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
-#include "llvm/InitializePasses.h"
+#include "llvm/IR/DiagnosticInfo.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/Analysis/Passes.h"
+#include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
 #include "llvm/IR/LegacyPassManager.h" // for FunctionPassManager
+#include "llvm/InitializePasses.h"
 #include "llvm/PassAnalysisSupport.h"  // for AnalysisUsage, etc
 #include "llvm/PassSupport.h"          // for INITIALIZE_PASS_DEPENDENCY, etc
 #include "llvm/Support/CommandLine.h"  // for desc, opt
 #include "llvm/Support/Debug.h"        // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h"  // for raw_ostream
-#include "polli/JitScopDetection.h"    // for ParamList, etc
 #include "polly/ScopDetection.h"       // for ScopDetection, etc
 #include "polly/ScopDetectionDiagnostic.h" // for ReportNonAffBranch, etc
 #include "polly/Support/SCEVValidator.h"   // for getParamsInNonAffineExpr, etc
@@ -42,12 +41,13 @@
 
 #include "spdlog/spdlog.h"
 
-namespace llvm {
-class Function;
-}
-namespace llvm {
-class Module;
-}
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+#include <typeinfo>
 
 using namespace llvm;
 using namespace llvm::legacy;
@@ -57,23 +57,31 @@ using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 
-static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+class DiagnosticJitScopFound : public DiagnosticInfo {
+private:
+  static int PluginDiagnosticKind;
+
+  Function &F;
+  std::string FileName;
+  unsigned EntryLine, ExitLine;
+
+public:
+  DiagnosticJitScopFound(Function &F, std::string FileName, unsigned EntryLine,
+                         unsigned ExitLine)
+      : DiagnosticInfo(PluginDiagnosticKind, DS_Note), F(F), FileName(FileName),
+        EntryLine(EntryLine), ExitLine(ExitLine) {}
+
+  void print(DiagnosticPrinter &DP) const override;
+  static bool classof(const DiagnosticInfo *DI) {
+    return DI->getKind() == PluginDiagnosticKind;
+  }
+};
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolution>();
+  AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
-}
-
-static void printParameters(ParamList &L) {
-  std::string ParamStr = "";
-  llvm::raw_string_ostream OS(ParamStr);
-  for (const SCEV *S : L) {
-    OS << "[";
-    S->print(OS);
-    OS << "]";
-  }
-  Console->info("required @ run time: {:>30}", OS.str());
 }
 
 // Remove all direct and indirect children of region R from the region set Regs,
@@ -93,7 +101,84 @@ static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   return Count;
 }
 
+static void getDebugLocations(const Region *R, DebugLoc &Begin, DebugLoc &End) {
+  for (const BasicBlock *BB : R->blocks())
+    for (const Instruction &Inst : *BB) {
+      DebugLoc DL = Inst.getDebugLoc();
+      if (!DL)
+        continue;
+
+      Begin = Begin ? std::min(Begin, DL) : DL;
+      End = End ? std::max(End, DL) : DL;
+    }
+}
+
+static void emitClassicalSCoPs(const Function &F, const ScopSet &Scops) {
+  LLVMContext &Ctx = F.getContext();
+
+  DebugLoc Begin, End;
+
+  for (const Region *R : Scops) {
+    getDebugLocations(R, Begin, End);
+
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, Begin,
+                          "A classic SCoP begins here.");
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, End, "A classic SCoP ends here.");
+  }
+}
+
+static void emitJitSCoPs(const Function &F, const ScopSet &Scops) {
+  LLVMContext &Ctx = F.getContext();
+
+  DebugLoc Begin, End;
+
+  for (const Region *R : Scops) {
+    getDebugLocations(R, Begin, End);
+
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, Begin,
+                          "A JIT SCoP begins here.");
+    emitOptimizationRemark(Ctx, DEBUG_TYPE, F, End, "A JIT SCoP ends here.");
+  }
+}
+
+static bool sharesBlocks(const Region *CurR, const Region *R) {
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+  for (auto I = CurR->element_begin(), E = CurR->element_end(); I != E; ++I)
+    if (!I->isSubRegion() && CurR->contains(I->getNodeAs<BasicBlock>())) {
+      DEBUG(Console->debug("Region: {} shares blocks with {}",
+                           CurR->getNameStr(), R->getNameStr()));
+      return true;
+    }
+
+  return false;
+}
+
+bool operator<(const Region &LHS, const Region &RHS) {
+  assert(sharesBlocks(&LHS, &RHS) &&
+         "LHS & RHS don't share any blocks, reject.");
+
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+
+  SmallVector<const BasicBlock*, 4> LeftBlocks;
+  SmallVector<const BasicBlock*, 4> RightBlocks;
+
+  for (auto I = LHS.element_begin(), E = LHS.element_end(); I != E; ++I) {
+    if (!I->isSubRegion())
+      LeftBlocks.push_back(I->getNodeAs<BasicBlock>());
+  }
+
+  for (auto I = RHS.element_begin(), E = RHS.element_end(); I != E; ++I) {
+    if (!I->isSubRegion())
+      RightBlocks.push_back(I->getNodeAs<BasicBlock>());
+  }
+
+  DEBUG(Console->error("{} < {}", LeftBlocks.size(), RightBlocks.size()));
+  return LeftBlocks.size() < RightBlocks.size();
+}
+
 bool JitScopDetection::runOnFunction(Function &F) {
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+
   if (!Enabled)
     return false;
 
@@ -105,9 +190,11 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
+  RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  Console->info("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
+  DEBUG(Console->trace("== Detect JIT SCoPs in function: {:>30}",
+                       F.getName().str()));
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
@@ -115,9 +202,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
     if (!R)
       continue;
-    Console->info("==== Next Region: {:>60s}", R->getNameStr());
-    R->dump();
-
+    DEBUG(Console->trace("==== Next Region: {:>60s}", R->getNameStr()));
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -149,29 +234,50 @@ bool JitScopDetection::runOnFunction(Function &F) {
       Tmp = LoopBoundChk.params();
       L.insert(L.end(), Tmp.begin(), Tmp.end());
 
-      /* The SCoP can be fixed at run time. However, we want need to make
-       * sure to fetch the largest parent region that is fixable.
-       * We need to do two steps:
-       *
-       * 1) Eliminate all children from the set of jitable Scops. */
-      eraseAllChildren(JitableScops, *R);
+      // Clean up all children of the new region.
+      unsigned deleted = eraseAllChildren(JitableScops, *R);
+      JitScopsFound -= deleted;
+      DEBUG(Console->debug("Deleted {} children.", deleted));
 
-      /* 2) Search for one of our parents (up to the function entry) in the
-       *    list of jitable Scops. If we find one in there, do not enter
-       *    the set of jitable Scops. */
-      const Region *Parent = R->getParent();
-      while (Parent && !JitableScops.count(Parent))
-        Parent = Parent->getParent();
+      JitableScops.insert(R);
+      ++JitScopsFound;
+    }
+  }
 
-      // We found one of our parent regions in the set of jitable Scops.
-      if (!Parent) {
-        Console->info("     Accepting SCoP: {}", R->getNameStr());
-        AccumulatedScops.insert(R);
-        JitableScops.insert(R);
-        ++JitScopsFound;
+  ScopSet Rejected;
+  for (ScopSet::const_iterator LHS = JitableScops.begin(),
+                               LE = JitableScops.end();
+       LHS != LE; ++LHS) {
+    for (ScopSet::const_iterator RHS = LHS, RE = JitableScops.end(); RHS != RE;
+         ++RHS) {
+      const Region *L = *LHS;
+      const Region *R = *RHS;
+      if (L == R)
+        continue;
+
+      if (sharesBlocks(L, R)) {
+        if (*LHS < *RHS) {
+          Rejected.insert(L);
+          DEBUG(Console->trace("Rejecting: ", L->getNameStr()));
+        }
+        else {
+          Rejected.insert(R);
+          DEBUG(Console->trace("Rejecting: ", R->getNameStr()));
+        }
       }
     }
   }
+
+  for (const Region *R : Rejected)
+    JitableScops.remove(R);
+
+  ScopSet ClassicScops;
+  ClassicScops.insert(SD->begin(), SD->end());
+  AccumulatedScops.insert(SD->begin(), SD->end());
+  AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
+
+  emitClassicalSCoPs(F, ClassicScops);
+  emitJitSCoPs(F, JitableScops);
 
   return false;
 }
@@ -215,8 +321,6 @@ void JitScopDetection::releaseMemory() {
   JitableScops.clear();
   AccumulatedScops.clear();
   RequiredParams.clear();
-
-  // Do not clear the ignored functions.
 }
 
 char JitScopDetection::ID = 0;

@@ -1,24 +1,34 @@
+//===-- libpjit.cpp - PolyJIT Just in Time Compiler -----------------------===//
+//
+//                     The LLVM Compiler Infrastructure
+//
+// This file is distributed under the University of Illinois Open Source
+// License. See LICENSE.TXT for details.
+//
+//===----------------------------------------------------------------------===//
+//
+// This tool implements a just-in-time compiler for LLVM, allowing direct
+// execution of LLVM bitcode in an efficient manner.
+//
+//===----------------------------------------------------------------------===//
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Function.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/IR/Function.h"
 
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 
 #include "pprof/Tracing.h"
 #include "polli/Options.h"
-#if 0
-#include "polli/PolyJIT.h"
-#endif
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
 #include "polly/RegisterPasses.h"
-#include "llvm/LinkAllPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
+#include "llvm/LinkAllPasses.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -34,8 +44,6 @@ using namespace polli;
 
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
-
-static auto Console = spdlog::stderr_logger_st("polli");
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 
@@ -54,6 +62,7 @@ static inline void lwMarkerThreadInit() { LIKWID_MARKER_THREADINIT; }
 static Module &getModule(const char *prototype) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
+  static auto Console = spdlog::stderr_logger_st("polli");
 
   if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
@@ -142,8 +151,9 @@ public:
     InitializeNativeTargetAsmParser();
   }
 };
-} // end of anonymous namespace
 
+static StaticInitializer InitializeEverything;
+} // end of anonymous namespace
 
 /**
 * @brief Get a new Execution engine for the given module.
@@ -220,9 +230,11 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
+  static auto Console = spdlog::stderr_logger_st("polli");
   lwMarkerThreadInit();
 
   static ManagedModules Mods;
+  static std::unordered_map<llvm::Function *, void *> FunctionCache;
 
   Module *NewM = NewF.getParent();
 
@@ -233,23 +245,53 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
     EE = getEngine(NewM);
     EE->finalizeObject();
     Mods[NewM] = EE;
-  } else
+  } else {
     EE = Mods[NewM];
+  }
   lwMarkerStop("polyjit.codegen");
 
-  if (EE) {
-    Console->warn("execution of {:>s} begins (#{:d} params)",
-                  NewF.getName().str(), paramc);
-    void *FPtr = EE->getPointerToFunction(&NewF);
-    void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
-    PF(paramc, params);
-    Console->warn("execution of {:>s} completed", NewF.getName().str());
-  } else {
+  if (!EE) {
     Console->error("no execution engine found.");
+    return;
   }
+
+  DEBUG(Console->warn("execution of {:>s} begins (#{:d} params)",
+                      NewF.getName().str(), paramc));
+  if (!FunctionCache.count(&NewF))
+    FunctionCache.insert(
+        std::make_pair(&NewF, EE->getPointerToFunction(&NewF)));
+  void *FPtr = FunctionCache[&NewF];
+  void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
+
+  PF(paramc, params);
+  DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
 }
 
-static StaticInitializer InitializeEverything;
+static inline Function *getPrototype(const char *function) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  lwMarkerStart("poyjit.prototype.get");
+  Module &M = getModule(function);
+  Function *F = getFunction(M);
+  if (!F) {
+    Console->error("Could not find a function in: {}", M.getModuleIdentifier());
+    llvm_unreachable("Could not find a function in the prototype module");
+    return 0;
+  }
+  lwMarkerStop("poyjit.prototype.get");
+  return F;
+}
+
+static inline ParamVector<Param> getParameterInput(Function *F, unsigned paramc,
+                                                   char **params) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  lwMarkerStart("polyjit.params.select");
+  std::vector<Param> ParamV;
+  getRuntimeParameters(F, paramc, params, ParamV);
+
+  ParamVector<Param> Params(std::move(ParamV));
+  lwMarkerStop("polyjit.params.select");
+  return Params;
+}
 
 extern "C" {
 /**
@@ -261,56 +303,16 @@ extern "C" {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-int pjit_main(const char *fName, unsigned paramc, char **params) {
-  Console->warn() << "pjit_main() called.";
-  lwMarkerStart("poyjit.prototype.get");
-  Module &M = getModule(fName);
-  Function *F = getFunction(M);
-  if (!F) {
-    Console->error("Could not find a function in: {}", M.getModuleIdentifier());
-    return 0;
-  }
-  Console->warn("\t Prototype: {} @ {}", F->getName().str(), (uint64_t)F);
-  lwMarkerStop("poyjit.prototype.get");
+void pjit_main(const char *fName, unsigned paramc, char **params) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  Function *F = getPrototype(fName);
+  ParamVector<Param> Params = getParameterInput(F, paramc, params);
 
-  auto DebugFn = [](Function &F, int argc, void *params) -> std::string {
-    std::stringstream res;
-
-    int i = 0;
-    for (Argument &Arg : F.args()) {
-      if (i > 0)
-        res << ", ";
-      if (Arg.getType()->isPointerTy()) {
-        res << ((uint64_t **)params)[i++];
-      } else {
-        res << ((uint32_t **)params)[i++][0];
-      }
-    }
-
-    return res.str();
-  };
-
-  lwMarkerStart("polyjit.params.select");
-
-  std::vector<Param> ParamV;
-  getRuntimeParameters(F, paramc, params, ParamV);
-  Console->warn("\t ParamVector contains {} elements", ParamV.size());
-
-  ParamVector<Param> Params(std::move(ParamV));
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
 
-  lwMarkerStop("polyjit.params.select");
-
-  if (Function *NewF = VarFun->getOrCreateVariant(Params)) {
-    Console->warn("\t Variant Generated: {} @ {}", NewF->getName().str(), (uint64_t)NewF);
-    std::string paramlist = DebugFn(*F, paramc, params);
-    runSpecializedFunction(*NewF, paramc, params);
-  } else
-    llvm_unreachable("FIXME: call the old prototype.");
-
-  Console->warn("pjit_main complete");
-  return 0;
+  Function *NewF = VarFun->getOrCreateVariant(Params);
+  runSpecializedFunction(*NewF, paramc, params);
 }
 }

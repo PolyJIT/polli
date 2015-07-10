@@ -28,11 +28,7 @@
 
 namespace llvm {
 class Function;
-}
-
-namespace {
-auto Console = spdlog::stderr_logger_st("polli");
-}
+} // namespace llvm
 
 using namespace llvm;
 using namespace polli;
@@ -45,6 +41,7 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
+  static auto Console = spdlog::stderr_logger_st("polli");
   JSD = &getAnalysis<JitScopDetection>();
   DTP = &getAnalysis<DominatorTreeWrapperPass>();
 
@@ -62,7 +59,7 @@ bool ScopMapper::runOnFunction(Function &F) {
     if (Extractor.isEligible()) {
       MappableRegions.insert(R);
     } else {
-      outs() << R->getNameStr() << " not eligible\n";
+      Console->error("{} not eligible", R->getNameStr());
     }
   }
 

@@ -15,13 +15,13 @@
 #define DEBUG_TYPE "polyjit"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
-#include "polli/Options.h"
 #include "polli/LikwidMarker.h"
+#include "polli/Options.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 
 #include "llvm/Pass.h"
@@ -37,13 +37,9 @@
 #include "spdlog/spdlog.h"
 #include <unistd.h>
 
-namespace {
-auto Console = spdlog::stderr_logger_st("polli/optimizer");
-}
-
 namespace llvm {
 class Function;
-}
+} // namespace llvm
 
 using namespace llvm;
 using namespace llvm::legacy;
@@ -55,38 +51,45 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   polly::registerPollyPasses(PM);
 }
 
-Function &OptimizeForRuntime(Function &F) {
-  Module *M = F.getParent();
+static PassManagerBuilder getBuilder() {
   PassManagerBuilder Builder;
+
+  Builder.VerifyInput = false;
+  Builder.VerifyOutput = false;
+  Builder.OptLevel = 3;
+  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                             registerPolly);
+
+  return Builder;
+}
+
+Function &OptimizeForRuntime(Function &F) {
+  static auto Console = spdlog::stderr_logger_st("polli/optimizer");
+  static PassManagerBuilder Builder = getBuilder();
+  Module *M = F.getParent();
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;
 
   FunctionPassManager PM = FunctionPassManager(M);
 
-  Builder.VerifyInput = false;
-  Builder.VerifyOutput = false;
-  Builder.OptLevel = 3;
-  Builder.DisableTailCalls = true;
-  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                             registerPolly);
   Builder.populateFunctionPassManager(PM);
   PM.doInitialization();
   PM.run(F);
   PM.doFinalization();
 
   if (opt::haveLikwid()) {
-    Console->warn("\t LikwidMarker support active.");
+    DEBUG(Console->warn("\t LikwidMarker support active."));
     PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createLikwidMarkerPass());
     MPM.run(*M);
   } else {
-    Console->warn("\t LikwidMarker support NOT active.");
+    DEBUG(Console->warn("\t LikwidMarker support NOT active."));
   }
 
-  StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll");
+  DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
   opt::GenerateOutput = false;
 
   return F;
 }
-}
+} // namespace polli

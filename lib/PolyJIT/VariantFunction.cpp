@@ -1,9 +1,12 @@
 #define DEBUG_TYPE "polyjit"
+#include "likwid.h"
+
 #include "polli/VariantFunction.h"
 #include "polli/Utils.h"
+#include "spdlog/spdlog.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "spdlog/spdlog.h"
+
 
 using namespace llvm;
 using namespace spdlog::details;
@@ -50,4 +53,23 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
   out << "]";
   return out;
 }
+
+Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
+  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
+
+  LIKWID_MARKER_START("polyjit.variant.get");
+  if (Variants.count(K)) {
+    DEBUG(Console->debug("Cache hit for {}", K.getShortName().str()));
+    return Variants[K];
+  } else {
+    DEBUG(Console->debug("New Variant {}", K.getShortName().str()));
+  }
+
+  Function *Variant = createVariant(K);
+  Variants[K] = Variant;
+
+  LIKWID_MARKER_STOP("polyjit.variant.get");
+  return Variant;
 }
+
+} // namespace polli

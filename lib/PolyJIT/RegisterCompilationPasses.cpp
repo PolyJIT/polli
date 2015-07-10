@@ -18,8 +18,8 @@
 #include "polly/Canonicalization.h"
 #include "polly/RegisterPasses.h"
 
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Support/CommandLine.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -39,10 +39,6 @@ using namespace spdlog::details;
 #include <stdio.h>
 #include <stdlib.h>
 
-namespace {
-auto Console = spdlog::stderr_logger_st("polli");
-}
-
 namespace polli {
 
 void initializePolliPasses(PassRegistry &Registry) {
@@ -51,6 +47,7 @@ void initializePolliPasses(PassRegistry &Registry) {
 }
 
 static void printConfig() {
+  auto Console = spdlog::stderr_logger_st("polli");
   Console->info("PolyJIT - Config:");
   Console->info(" polyjit.jitable: {}", opt::EnableJitable);
   Console->info(" polyjit.recompile: {}", !opt::DisableRecompile);
@@ -108,7 +105,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
     polly::PollyUseRuntimeAliasChecks = false;
 
   setupLogging();
-  printConfig();
+  DEBUG(printConfig());
 
   registerPollyPasses(PM);
 
@@ -131,4 +128,4 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 static llvm::RegisterStandardPasses
     RegisterPolyJIT(llvm::PassManagerBuilder::EP_EarlyAsPossible,
                     registerPolyJIT);
-}
+} // namespace polli
