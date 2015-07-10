@@ -152,22 +152,6 @@ static bool sharesBlocks(const Region *CurR, const Region *R) {
   return false;
 }
 
-static bool isValidRec(const Region *CurR, const Region *R) {
-  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
-
-  bool isValid = false;
-  for (auto &Child : *CurR) {
-    const Region *Sub = Child->getNodeAs<Region>();
-    isValid = (Sub == R);
-    if (isValid)
-      break;
-    else
-      return isValidRec(Sub, R);
-  }
-  Console->error("IsValid: {} = {}", R->getNameStr(), isValid);
-  return isValid;
-}
-
 bool operator<(const Region &LHS, const Region &RHS) {
   assert(sharesBlocks(&LHS, &RHS) &&
          "LHS & RHS don't share any blocks, reject.");
@@ -189,23 +173,6 @@ bool operator<(const Region &LHS, const Region &RHS) {
 
   Console->error("{} < {}", LeftBlocks.size(), RightBlocks.size());
   return LeftBlocks.size() < RightBlocks.size();
-}
-
-bool JitScopDetection::isInvalidRegion(const Function &F,
-                                       const Region *R) const {
-  const RegionInfo &RInfo = RI->getRegionInfo();
-  const Region *TopLevel = RInfo.getTopLevelRegion();
-
-  // This would either be the TopLevel, or a dangling region pointer.
-  // We want neither.
-  const Region *Parent = R->getParent();
-  if (Parent == nullptr)
-    return true;
-
-  while (Parent && !JitableScops.count(Parent))
-    Parent = Parent->getParent();
-
-  return !isValidRec(TopLevel, R);
 }
 
 bool JitScopDetection::runOnFunction(Function &F) {
@@ -304,7 +271,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
     JitableScops.remove(R);
 
   ScopSet ClassicScops;
-
   ClassicScops.insert(SD->begin(), SD->end());
   AccumulatedScops.insert(SD->begin(), SD->end());
   AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
