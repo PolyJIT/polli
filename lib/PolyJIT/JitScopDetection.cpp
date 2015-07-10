@@ -10,16 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include <map>                             // for _Rb_tree_const_iterator, etc
-#include <memory>                          // for unique_ptr
-#include <set>                             // for set
-#include <string>                          // for string
-#include <utility>                         // for make_pair, pair
-#include <vector>                          // for vector<>::iterator, vector
+#include "polli/JitScopDetection.h"    // for ParamList, etc
 #include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
 #include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
-#include "llvm/Analysis/RegionPass.h"      // for RGPassManager
 #include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
@@ -32,7 +28,6 @@
 #include "llvm/Support/CommandLine.h"  // for desc, opt
 #include "llvm/Support/Debug.h"        // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h"  // for raw_ostream
-#include "polli/JitScopDetection.h"    // for ParamList, etc
 #include "polly/ScopDetection.h"       // for ScopDetection, etc
 #include "polly/ScopDetectionDiagnostic.h" // for ReportNonAffBranch, etc
 #include "polly/Support/SCEVValidator.h"   // for getParamsInNonAffineExpr, etc
@@ -44,12 +39,13 @@
 
 #include "spdlog/spdlog.h"
 
-namespace llvm {
-class Function;
-} // namespace llvm
-namespace llvm {
-class Module;
-} // namespace llvm
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+#include <typeinfo>
 
 using namespace llvm;
 using namespace llvm::legacy;
