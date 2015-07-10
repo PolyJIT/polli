@@ -63,6 +63,7 @@ STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolution>();
+  AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
 
@@ -83,6 +84,39 @@ static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
   return Count;
 }
 
+static bool isValidRec(const Region *CurR, const Region *R) {
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+
+  bool isValid = false;
+  for (auto &Child : *CurR) {
+    const Region *Sub = Child->getNodeAs<Region>();
+    isValid = (Sub == R);
+    if (isValid)
+      break;
+    else
+      return isValidRec(Sub, R);
+  }
+  Console->error("IsValid: {} = {}", R->getNameStr(), isValid);
+  return isValid;
+}
+
+bool JitScopDetection::isInvalidRegion(const Function &F,
+                                       const Region *R) const {
+  const RegionInfo &RInfo = RI->getRegionInfo();
+  const Region *TopLevel = RInfo.getTopLevelRegion();
+
+  // This would either be the TopLevel, or a dangling region pointer.
+  // We want neither.
+  const Region *Parent = R->getParent();
+  if (Parent == nullptr)
+    return true;
+
+  while (Parent && !JitableScops.count(Parent))
+    Parent = Parent->getParent();
+
+  return !isValidRec(TopLevel, R);
+}
+
 bool JitScopDetection::runOnFunction(Function &F) {
   static auto Console = spdlog::stderr_logger_st("polli/jitsd");
 
@@ -99,6 +133,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
+  RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
   Console->warn("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
@@ -155,17 +190,22 @@ bool JitScopDetection::runOnFunction(Function &F) {
       const Region *Parent = R->getParent();
       while (Parent && !JitableScops.count(Parent))
         Parent = Parent->getParent();
+      if (isInvalidRegion(F, R)) {
+        continue;
+      }
 
       // We found one of our parent regions in the set of jitable Scops.
-      if (!Parent) {
-        DEBUG(Console->info("     Accepting SCoP: {}", R->getNameStr()));
-        AccumulatedScops.insert(R);
-        JitableScops.insert(R);
-        ++JitScopsFound;
       }
+      JitableScops.insert(R);
+      ++JitScopsFound;
     }
   }
 
+  ScopSet ClassicScops;
+
+  ClassicScops.insert(SD->begin(), SD->end());
+  AccumulatedScops.insert(SD->begin(), SD->end());
+  AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
   return false;
 }
 

@@ -61,6 +61,7 @@ public:
   }
 
   void enable(bool doEnable) { Enabled = doEnable; }
+  bool isInvalidRegion(const Function &F, const Region *R) const;
 
   /// @name FunctionPass interface
   //@{
