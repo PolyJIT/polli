@@ -13,6 +13,7 @@
 #include "polli/JitScopDetection.h"    // for ParamList, etc
 #include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
 #include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
+#include "llvm/Analysis/RegionIterator.h"
 #include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Function.h"
@@ -139,6 +140,18 @@ static void emitJitSCoPs(const Function &F, const ScopSet &Scops) {
   }
 }
 
+static bool sharesBlocks(const Region *CurR, const Region *R) {
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+  for (auto I = CurR->element_begin(), E = CurR->element_end(); I != E; ++I)
+    if (!I->isSubRegion() && CurR->contains(I->getNodeAs<BasicBlock>())) {
+      Console->error("Region: {} shares blocks with {}", CurR->getNameStr(),
+                     R->getNameStr());
+      return true;
+    }
+
+  return false;
+}
+
 static bool isValidRec(const Region *CurR, const Region *R) {
   static auto Console = spdlog::stderr_logger_st("polli/jitsd");
 
@@ -153,6 +166,29 @@ static bool isValidRec(const Region *CurR, const Region *R) {
   }
   Console->error("IsValid: {} = {}", R->getNameStr(), isValid);
   return isValid;
+}
+
+bool operator<(const Region &LHS, const Region &RHS) {
+  assert(sharesBlocks(&LHS, &RHS) &&
+         "LHS & RHS don't share any blocks, reject.");
+
+  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
+
+  SmallVector<const BasicBlock*, 4> LeftBlocks;
+  SmallVector<const BasicBlock*, 4> RightBlocks;
+
+  for (auto I = LHS.element_begin(), E = LHS.element_end(); I != E; ++I) {
+    if (!I->isSubRegion())
+      LeftBlocks.push_back(I->getNodeAs<BasicBlock>());
+  }
+
+  for (auto I = RHS.element_begin(), E = RHS.element_end(); I != E; ++I) {
+    if (!I->isSubRegion())
+      RightBlocks.push_back(I->getNodeAs<BasicBlock>());
+  }
+
+  Console->error("{} < {}", LeftBlocks.size(), RightBlocks.size());
+  return LeftBlocks.size() < RightBlocks.size();
 }
 
 bool JitScopDetection::isInvalidRegion(const Function &F,
