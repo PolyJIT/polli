@@ -607,7 +607,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Module *M = F->getParent();
     StringRef ModuleName = F->getParent()->getModuleIdentifier();
     StringRef FromName = F->getName();
-    ModulePtrT PrototypeM = copyModule(VMap, *M);
+    Module *PrototypeM = copyModule(VMap, *M);
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
