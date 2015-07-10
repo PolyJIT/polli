@@ -306,8 +306,6 @@ void JitScopDetection::releaseMemory() {
   JitableScops.clear();
   AccumulatedScops.clear();
   RequiredParams.clear();
-
-  // Do not clear the ignored functions.
 }
 
 char JitScopDetection::ID = 0;
