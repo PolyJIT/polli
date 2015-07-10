@@ -73,12 +73,12 @@ bool EmitEnv = false;
  * @return bool
  */
 bool haveLikwid() {
-  static auto Console = spdlog::stderr_logger_st("polli/options");
   char *LIKWID_MODE = std::getenv("LIKWID_MODE");
 
   if (EmitEnv) {
     for (char **current = environ; *current; current++) {
-      Console->warn(*current);
+      auto Console = spdlog::stderr_logger_st("polli/options");
+      Console->info(*current);
     }
   }
 

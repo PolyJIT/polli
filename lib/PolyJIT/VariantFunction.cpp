@@ -59,10 +59,10 @@ Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
 
   LIKWID_MARKER_START("polyjit.variant.get");
   if (Variants.count(K)) {
-    DEBUG(Console->error("Cache hit for {}", K.getShortName().str()));
+    DEBUG(Console->debug("Cache hit for {}", K.getShortName().str()));
     return Variants[K];
   } else {
-    Console->error("New Variant {}", K.getShortName().str());
+    DEBUG(Console->debug("New Variant {}", K.getShortName().str()));
   }
 
   Function *Variant = createVariant(K);

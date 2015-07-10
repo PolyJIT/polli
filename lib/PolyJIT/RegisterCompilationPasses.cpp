@@ -105,7 +105,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
     polly::PollyUseRuntimeAliasChecks = false;
 
   setupLogging();
-  printConfig();
+  DEBUG(printConfig());
 
   registerPollyPasses(PM);
 

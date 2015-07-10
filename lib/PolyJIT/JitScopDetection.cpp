@@ -145,8 +145,8 @@ static bool sharesBlocks(const Region *CurR, const Region *R) {
   static auto Console = spdlog::stderr_logger_st("polli/jitsd");
   for (auto I = CurR->element_begin(), E = CurR->element_end(); I != E; ++I)
     if (!I->isSubRegion() && CurR->contains(I->getNodeAs<BasicBlock>())) {
-      Console->error("Region: {} shares blocks with {}", CurR->getNameStr(),
-                     R->getNameStr());
+      DEBUG(Console->debug("Region: {} shares blocks with {}",
+                           CurR->getNameStr(), R->getNameStr()));
       return true;
     }
 
@@ -172,7 +172,7 @@ bool operator<(const Region &LHS, const Region &RHS) {
       RightBlocks.push_back(I->getNodeAs<BasicBlock>());
   }
 
-  Console->error("{} < {}", LeftBlocks.size(), RightBlocks.size());
+  DEBUG(Console->error("{} < {}", LeftBlocks.size(), RightBlocks.size()));
   return LeftBlocks.size() < RightBlocks.size();
 }
 
@@ -188,14 +188,13 @@ bool JitScopDetection::runOnFunction(Function &F) {
   if (F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
-  Console->error("Running on: {}", F.getName().str());
-
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolution>();
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  Console->warn("== Detect JIT SCoPs in function: {:>30}", F.getName().str());
+  DEBUG(Console->trace("== Detect JIT SCoPs in function: {:>30}",
+                       F.getName().str()));
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
@@ -203,7 +202,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
     if (!R)
       continue;
-    Console->warn("==== Next Region: {:>60s}", R->getNameStr());
+    DEBUG(Console->trace("==== Next Region: {:>60s}", R->getNameStr()));
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -237,7 +236,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       // Clean up all children of the new region.
       unsigned deleted = eraseAllChildren(JitableScops, *R);
-      Console->error("Deleted {} children.", deleted);
+      JitScopsFound -= deleted;
+      DEBUG(Console->debug("Deleted {} children.", deleted));
 
       JitableScops.insert(R);
       ++JitScopsFound;
@@ -258,11 +258,11 @@ bool JitScopDetection::runOnFunction(Function &F) {
       if (sharesBlocks(L, R)) {
         if (*LHS < *RHS) {
           Rejected.insert(L);
-          Console->error("Rejecting: ", L->getNameStr());
+          DEBUG(Console->trace("Rejecting: ", L->getNameStr()));
         }
         else {
           Rejected.insert(R);
-          Console->error("Rejecting: ", R->getNameStr());
+          DEBUG(Console->trace("Rejecting: ", R->getNameStr()));
         }
       }
     }
