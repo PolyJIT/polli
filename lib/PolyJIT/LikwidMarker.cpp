@@ -10,6 +10,8 @@
 // Place likwidMarker* calls in parallel regions.
 //
 //===----------------------------------------------------------------------===//
+#define DEBUG_TYPE "polyjit"
+
 #include "polli/LikwidMarker.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/IR/IRBuilder.h"
@@ -17,6 +19,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Instruction.h"
 #include "llvm/IR/Type.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Pass.h"
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
