@@ -244,9 +244,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
       /* 2) Search for one of our parents (up to the function entry) in the
        *    list of jitable Scops. If we find one in there, do not enter
        *    the set of jitable Scops. */
-      const Region *Parent = R->getParent();
-      while (Parent && !JitableScops.count(Parent))
-        Parent = Parent->getParent();
       if (isInvalidRegion(F, R)) {
         continue;
       }
