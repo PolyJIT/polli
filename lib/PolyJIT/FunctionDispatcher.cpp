@@ -36,24 +36,6 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
   }
 }
 
-Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
-  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
-
-  LIKWID_MARKER_START("polyjit.variant.get");
-  if (Variants.count(K)) {
-    DEBUG(Console->error("Cache hit for {}", K.getShortName().str()));
-    return Variants[K];
-  } else {
-    DEBUG(Console->error("New Variant required."));
-  }
-
-  Function *Variant = createVariant(K);
-  Variants[K] = Variant;
-
-  LIKWID_MARKER_STOP("polyjit.variant.get");
-  return Variant;
-}
-
 /**
  * @brief  Convert srcF signature into a 'main' function format,
  * i.e. f(int argc, char** argv). This way the parameters can be passed by
