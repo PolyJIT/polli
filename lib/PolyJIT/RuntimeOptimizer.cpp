@@ -51,20 +51,27 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   polly::registerPollyPasses(PM);
 }
 
-Function &OptimizeForRuntime(Function &F) {
-  Module *M = F.getParent();
+static PassManagerBuilder getBuilder() {
   PassManagerBuilder Builder;
+
+  Builder.VerifyInput = false;
+  Builder.VerifyOutput = false;
+  Builder.OptLevel = 3;
+  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                             registerPolly);
+
+  return Builder;
+}
+
+Function &OptimizeForRuntime(Function &F) {
+  static auto Console = spdlog::stderr_logger_st("polli/optimizer");
+  static PassManagerBuilder Builder = getBuilder();
+  Module *M = F.getParent();
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;
 
   FunctionPassManager PM = FunctionPassManager(M);
 
-  Builder.VerifyInput = false;
-  Builder.VerifyOutput = false;
-  Builder.OptLevel = 3;
-  Builder.DisableTailCalls = true;
-  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                             registerPolly);
   Builder.populateFunctionPassManager(PM);
   PM.doInitialization();
   PM.run(F);
