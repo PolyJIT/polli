@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/JitScopDetection.h"    // for ParamList, etc
+
 #include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
 #include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
 #include "llvm/Analysis/RegionIterator.h"
