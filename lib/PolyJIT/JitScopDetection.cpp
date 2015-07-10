@@ -267,27 +267,41 @@ bool JitScopDetection::runOnFunction(Function &F) {
       Tmp = LoopBoundChk.params();
       L.insert(L.end(), Tmp.begin(), Tmp.end());
 
-      /* The SCoP can be fixed at run time. However, we want need to make
-       * sure to fetch the largest parent region that is fixable.
-       * We need to do two steps:
-       *
-       * 1) Eliminate all children from the set of jitable Scops. */
+      // Clean up all children of the new region.
       unsigned deleted = eraseAllChildren(JitableScops, *R);
       Console->error("Deleted {} children.", deleted);
 
-      /* 2) Search for one of our parents (up to the function entry) in the
-       *    list of jitable Scops. If we find one in there, do not enter
-       *    the set of jitable Scops. */
-      if (isInvalidRegion(F, R)) {
-        continue;
-      }
-
-      // We found one of our parent regions in the set of jitable Scops.
-      }
       JitableScops.insert(R);
       ++JitScopsFound;
     }
   }
+
+  ScopSet Rejected;
+  for (ScopSet::const_iterator LHS = JitableScops.begin(),
+                               LE = JitableScops.end();
+       LHS != LE; ++LHS) {
+    for (ScopSet::const_iterator RHS = LHS, RE = JitableScops.end(); RHS != RE;
+         ++RHS) {
+      const Region *L = *LHS;
+      const Region *R = *RHS;
+      if (L == R)
+        continue;
+
+      if (sharesBlocks(L, R)) {
+        if (*LHS < *RHS) {
+          Rejected.insert(L);
+          Console->error("Rejecting: ", L->getNameStr());
+        }
+        else {
+          Rejected.insert(R);
+          Console->error("Rejecting: ", R->getNameStr());
+        }
+      }
+    }
+  }
+
+  for (const Region *R : Rejected)
+    JitableScops.remove(R);
 
   ScopSet ClassicScops;
 
