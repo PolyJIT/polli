@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
 }
 
 // STATIC: 1 regions require runtime support:
-// STATIC:   0 region %1 => %11 requires 1 params
-// STATIC:     0 - %n
-// STATIC:     1 reasons can be fixed at run time:
-// STATIC:       0 - Non affine access function: (4 * (sext i32 {0,+,%n}<%1> to i64))<nsw>
+// STATIC:   0 region for.body => for.end requires 1 params
+// STATIC:       0 - (4 * (sext i32 %n to i64))
+// STATIC:       1 reasons can be fixed at run time:
+// STATIC:             0 - Non affine access function: {0,+,(4 * (sext i32 %n to i64))}<%for.body>
 
 // CHECK: A: 1 1 1 1 1 0 0 0 0 0
 // CHECK: A: 3 1 3 1 5 0 3 0 7 0
