@@ -200,7 +200,8 @@ static ExecutionEngine *getEngine(Module *M) {
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
   builder.setMCJITMemoryManager(std::move(MemManager));
-  builder.setOptLevel(OLvl);
+  //builder.setOptLevel(OLvl);
+  builder.setOptLevel(CodeGenOpt::None);
 
   llvm::TargetOptions Options;
   if (opt::FloatABIForCalls != FloatABI::Default)
