@@ -22,13 +22,18 @@ if (NOT DEFINED LLVM_MAIN_SRC_DIR)
   add_definitions( ${POLLY_DEFINITIONS} )
 endif()
 
+
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # Add path for polli custom modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
-include(polli_macros)
+set(CMAKE_MODULE_PATH
+  ${CMAKE_MODULE_PATH}
+  "${POLLI_SOURCE_DIR}/cmake"
+  )
+
+include("polli_macros")
 
 if (NOT DEFINED PAPI_FOUND)
   find_package(Papi REQUIRED)
@@ -75,7 +80,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -pthread -fno-rtti -std=c++11")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -pthread -fno-rtti")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )

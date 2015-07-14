@@ -28,7 +28,6 @@
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/PassSupport.h"
-
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
 #include "polly/RegisterPasses.h"
@@ -49,6 +48,20 @@ namespace polli {
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
   polly::registerPollyPasses(PM);
+}
+
+static PassManagerBuilder getDebugBuilder() {
+  PassManagerBuilder Builder;
+
+  Builder.VerifyInput = true;
+  Builder.VerifyOutput = true;
+  Builder.OptLevel = 0;
+  Builder.DisableUnrollLoops = true;
+  Builder.DisableTailCalls = true;
+  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                             registerPolly);
+
+  return Builder;
 }
 
 static PassManagerBuilder getBuilder() {

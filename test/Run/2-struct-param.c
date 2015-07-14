@@ -3,12 +3,14 @@
 #include <stdio.h>
 
 typedef struct {
+  int  bar;
   int A[10];
 } SA;
 
 SA sA;
 
 typedef struct {
+  int foo;
   int B[10];
 } SB;
 
@@ -27,6 +29,8 @@ void print() {
     printf("%d ", sA.A[i]);
   }
 
+  printf("\n");
+
   printf("B: ");
   for (int i = 0; i < 10; i++) {
     printf("%d ", sB.B[i]);
@@ -44,11 +48,11 @@ int main(int argc, char **argv) {
 
 // STATIC: 1 regions require runtime support:
 // STATIC:   0 region for.body => for.end requires 2 params
-// STATIC:       0 - (4 * (sext i32 %n to i64))
-// STATIC:       0 - (4 * (sext i32 %n to i64))
-// STATIC:       2 reasons can be fixed at run time:
-// STATIC:             0 - Non affine access function: {0,+,(4 * (sext i32 %n to i64))}<%for.body>
-// STATIC:                   1 - Non affine access function: {0,+,(4 * (sext i32 %n to i64))}<%for.body>
+// STATIC:     0 - (4 * (sext i32 %n to i64))
+// STATIC:     0 - (4 * (sext i32 %n to i64))
+// STATIC:     2 reasons can be fixed at run time:
+// STATIC:       0 - Non affine access function: {4,+,(4 * (sext i32 %n to i64))}<%for.body>
+// STATIC:       1 - Non affine access function: {4,+,(4 * (sext i32 %n to i64))}<%for.body>
 
 // CHECK: A: 1 1 1 1 1 0 0 0 0 0
 // CHECK: B: 1 1 1 1 1 0 0 0 0 0

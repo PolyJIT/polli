@@ -16,12 +16,9 @@ macro(add_polli_library name)
     string( REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
     list( GET split_path -1 dir)
     file( GLOB_RECURSE headers
-      ../../include/polli${dir}/*.h)
-    file( GLOB_RECURSE headers ../include/polli/*.h)
+      ../../include/polly${dir}/*.h)
+    set(srcs ${srcs} ${headers})
   endif(MSVC_IDE OR XCODE)
-
-  file( GLOB_RECURSE headers ../include/polli/*.h)
-  set(srcs ${srcs} ${headers})
   if (MODULE)
     set(libkind MODULE)
   elseif (SHARED_LIBRARY)
@@ -39,13 +36,15 @@ macro(add_polli_library name)
     endforeach(lib)
   endif( LLVM_USED_LIBS )
 
+  if(POLLI_LINK_LIBS)
+    foreach(lib ${POLLI_LINK_LIBS})
+      target_link_libraries(${name} ${lib})
+    endforeach(lib)
+  endif(POLLI_LINK_LIBS)
+
   if( LLVM_LINK_COMPONENTS )
     llvm_config(${name} ${LLVM_LINK_COMPONENTS})
   endif( LLVM_LINK_COMPONENTS )
-  if( llvm_system_libs )
-    target_link_libraries(${name} ${llvm_system_libs})
-  endif( llvm_system_libs )
-
   if(MSVC)
     get_target_property(cflag ${name} COMPILE_FLAGS)
     if(NOT cflag)
@@ -55,8 +54,10 @@ macro(add_polli_library name)
     set_target_properties(${name} PROPERTIES COMPILE_FLAGS ${cflag})
   endif(MSVC)
   install(TARGETS ${name}
+    EXPORT LLVMExports
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
+  set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${name})
 endmacro(add_polli_library)
 
 macro(add_polli_loadable_module name)

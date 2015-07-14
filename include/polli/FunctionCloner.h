@@ -60,7 +60,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
     s << " OK (F is nullptr)";
   }
 
-  Console->debug(s.str());
+  DEBUG(Console->debug(s.str()));
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
@@ -120,14 +120,14 @@ public:
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
 
-    DEBUG(polli::verifyFunctions("\t>> ", From, To));
+    polli::verifyFunctions("\t>> ", From, To);
 
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
-    DEBUG(polli::verifyFunctions("\t<< ", From, To));
+    polli::verifyFunctions("\t<< ", From, To);
 
     // Store function mapping for the linker.
     VMap[From] = To;

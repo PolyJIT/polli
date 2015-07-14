@@ -137,8 +137,9 @@ public:
     Function::arg_iterator result = F->arg_begin(), end = F->arg_end();
 
     // 'Cheap' find
-    while (result != end && result->getName() != ArgName)
+    while (result != end && result->getName() != ArgName) {
       ++result;
+    }
 
     return result;
   }
@@ -179,20 +180,21 @@ public:
     Builder.SetInsertPoint(EntryBB);
     Builder.CreateBr(ClonedEntryBB);
 
-    for (unsigned i = 0; i < SpecValues.size(); ++i) {
+    unsigned i = 0;
+    for (Argument &Arg : From->args()) {
       ParamT P = SpecValues[i];
-      Function::arg_iterator Arg = getArgument(From, P.Name);
+      
+      if (isa<IntegerType>(Arg.getType()) &&
+          Arg.getType() == P.Val->getType()) {
+        // Get a constant value for P.
+        if (Constant *Replacement = P.Val) {
+          Value *NewArg = VMap[&Arg];
 
-      // Could not find the argument, should not happen.
-      if (Arg == To->arg_end())
-        continue;
-
-      // Get a constant value for P.
-      if (Constant *Replacement = P.Val) {
-        Value *NewArg = VMap[Arg];
-
-        if (!isa<Constant>(NewArg))
-          NewArg->replaceAllUsesWith(Replacement);
+          if (!isa<Constant>(NewArg)) {
+            NewArg->replaceAllUsesWith(Replacement);
+          }
+        }
+        i++;
       }
     }
   }
