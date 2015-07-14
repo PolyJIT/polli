@@ -74,12 +74,12 @@ add_polli_loadable_module(LLVMPolyJIT
 
 
 if (BUILD_SHARED_LIBS)
-  target_link_libraries(pjit
+  target_link_libraries(pjit PRIVATE
     Polly
     likwid
     pthread
   )
-  target_link_libraries(LLVMPolyJIT
+  target_link_libraries(LLVMPolyJIT PRIVATE
     Polly
     likwid
     pthread
