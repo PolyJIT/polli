@@ -43,9 +43,6 @@ using namespace spdlog::details;
 namespace polli {
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
-  if (opt::LogLevel > polli::Debug)
-    return;
-
   static auto Console = spdlog::stderr_logger_st("polli/verify");
 
   std::string buffer;
@@ -60,7 +57,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
     s << " OK (F is nullptr)";
   }
 
-  DEBUG(Console->debug(s.str()));
+  Console->error(s.str());
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
@@ -120,14 +117,14 @@ public:
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
 
-    polli::verifyFunctions("\t>> ", From, To);
+    DEBUG(polli::verifyFunctions("\t>> ", From, To));
 
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
 
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
-    polli::verifyFunctions("\t<< ", From, To);
+    DEBUG(polli::verifyFunctions("\t<< ", From, To));
 
     // Store function mapping for the linker.
     VMap[From] = To;
