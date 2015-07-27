@@ -240,7 +240,7 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
     Specializer.setParameters(K);
     Specializer.setSource(&SourceF);
 
-    return &(OptimizeForRuntime(*Specializer.start()));
+    return &(OptimizeForRuntime(*Specializer.start(true)));
   } else {
     FunctionCloner<MainCreator, IgnoreSource, ConnectTarget> Specializer(VMap,
                                                                          NewM);
