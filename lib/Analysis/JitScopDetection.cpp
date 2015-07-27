@@ -276,8 +276,10 @@ bool JitScopDetection::runOnFunction(Function &F) {
   AccumulatedScops.insert(SD->begin(), SD->end());
   AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
 
-  emitClassicalSCoPs(F, ClassicScops);
-  emitJitSCoPs(F, JitableScops);
+  if (opt::AnalyzeIR) {
+    emitClassicalSCoPs(F, ClassicScops);
+    emitJitSCoPs(F, JitableScops);
+  }
 
   return false;
 }
