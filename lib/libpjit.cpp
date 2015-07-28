@@ -229,7 +229,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   LIKWID_MARKER_THREADINIT;
 
   static ManagedModules Mods;
-  static std::unordered_map<llvm::Function *, void *> FunctionCache;
+  static std::unordered_map<llvm::Function *, uint64_t> FunctionCache;
 
   Module *NewM = NewF.getParent();
 
@@ -254,8 +254,8 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                       NewF.getName().str(), paramc));
   if (!FunctionCache.count(&NewF))
     FunctionCache.insert(
-        std::make_pair(&NewF, EE->getPointerToFunction(&NewF)));
-  void *FPtr = FunctionCache[&NewF];
+        std::make_pair(&NewF, EE->getFunctionAddress(NewF.getName().str())));
+  uint64_t FPtr = FunctionCache[&NewF];
   void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
 
   PF(paramc, params);
