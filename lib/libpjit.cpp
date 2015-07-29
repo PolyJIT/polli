@@ -65,6 +65,7 @@ static Module &getModule(const char *prototype) {
     SMDiagnostic Err;
 
     if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
+      DEBUG(Mod->dump());
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
     } else {
       Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
