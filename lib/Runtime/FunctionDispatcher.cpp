@@ -15,9 +15,6 @@
 #include "spdlog/spdlog.h"
 #include <map>
 
-namespace {
-} // namespace
-
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
   int i = 0;
@@ -128,10 +125,10 @@ struct MainCreator {
 //
 template <class ParamT> class SpecializeEndpoint {
 private:
-  ParamVector<ParamT> SpecValues;
+  RunValueList SpecValues;
 
 public:
-  void setParameters(ParamVector<ParamT> const &Values) { SpecValues = Values; }
+  void setParameters(RunValueList const &Values) { SpecValues = Values; }
 
   Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
     Function::arg_iterator result = F->arg_begin(), end = F->arg_end();
@@ -142,19 +139,6 @@ public:
     }
 
     return result;
-  }
-
-  /**
-   * @brief TODO: Add comments here.
-   *
-   * @param AllValues
-   * @param TgtF
-   *
-   * @return
-   */
-  ParamVector<ParamT> getSpecValues(ParamVector<ParamT> &AllValues,
-                                    Function *TgtF) {
-    return SpecVals(AllValues.size());
   }
 
   /**
@@ -183,23 +167,21 @@ public:
     unsigned i = 0;
     for (Argument &Arg : From->args()) {
       ParamT P = SpecValues[i];
-      
-      if (isa<IntegerType>(Arg.getType()) &&
-          Arg.getType() == P.Val->getType()) {
+
+      if (IntegerType *IntTy = dyn_cast<IntegerType>(Arg.getType())) {
         // Get a constant value for P.
-        if (Constant *Replacement = P.Val) {
+        if (Constant *Replacement = ConstantInt::get(IntTy, P.value)) {
           Value *NewArg = VMap[&Arg];
 
           if (!isa<Constant>(NewArg)) {
             NewArg->replaceAllUsesWith(Replacement);
           }
         }
-        i++;
       }
+      i++;
     }
   }
 };
-
 
 /**
  * @brief Create a new variant of this function using the function key K.
@@ -211,8 +193,10 @@ public:
  *
  * @return a copy of the base function, with the values of K substituted.
  */
-Function *VariantFunction::createVariant(const FunctionKey &K) {
-  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
+Function *VariantFunction::createVariant(const RunValueList &K) {
+  using namespace spdlog::details;
+
+  static auto Console = spdlog::stderr_logger_mt("polli");
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
@@ -224,15 +208,16 @@ Function *VariantFunction::createVariant(const FunctionKey &K) {
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
   NewM->setMaterializer(M->getMaterializer());
-  NewM->setModuleIdentifier(
-      (M->getModuleIdentifier() + "." + SourceF.getName()).str() +
-      K.getShortName().str() + ".ll");
+  NewM->setModuleIdentifier(fmt::format("{}.{}-{:d}.ll",
+                                        M->getModuleIdentifier(),
+                                        SourceF.getName().str(), K.hash()));
 
-  DEBUG(Console->warn("Create Variant for: {}", K.getShortName().str()));
+  DEBUG(Console->warn("Create Variant for: {} Hash: {:d}", K.str(), K.hash()));
   // Perform parameter value substitution.
   if (!opt::DisableRecompile) {
-    FunctionCloner<MainCreator, IgnoreSource, SpecializeEndpoint<Param>>
-        Specializer(VMap, NewM);
+    FunctionCloner<MainCreator, IgnoreSource,
+                   SpecializeEndpoint<RunValue<uint64_t>>> Specializer(VMap,
+                                                                       NewM);
 
     /* Perform a parameter specialization by taking the unchanged base function
      * and substitute all known parameter values.

@@ -9,8 +9,6 @@
 #ifndef POLLI_FUNCTION_DISPATCHER_H
 #define POLLI_FUNCTION_DISPATCHER_H
 
-#define DEBUG_TYPE "polyjit"
-
 #include "polli/FunctionCloner.h"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"

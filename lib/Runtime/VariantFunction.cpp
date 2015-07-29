@@ -16,15 +16,26 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
   return OS << P.Val->getUniqueInteger();
 }
 
+llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                              const RunValueList &Params) {
+  out << "[";
+
+  for(auto &Val : Params) {
+    out << Val.value;
+    out << " ";
+  }
+  out << "]";
+  return out;
+}
+
 void VariantFunction::printVariants(raw_ostream &OS) {
-    for (VariantsT::iterator I = Variants.begin(), IE = Variants.end(); I != IE;
-         ++I) {
-      const FunctionKey K = I->first;
-      Function *VarFun = I->second;
-      Module *M = VarFun->getParent();
-      OS.indent(4) << K << M->getModuleIdentifier() << "\n";
-    }
-    OS << "\n";
+  for (auto &I : Variants) {
+    const size_t hash = I.first;
+    Function *VarFun = I.second;
+    Module *M = VarFun->getParent();
+    OS.indent(4) << hash << ": " << M->getModuleIdentifier() << "\n";
+  }
+  OS << "\n";
 }
 
 void VariantFunction::printHeader(llvm::raw_ostream &OS) {
@@ -54,19 +65,20 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
   return out;
 }
 
-Function *VariantFunction::getOrCreateVariant(const FunctionKey &K) {
-  static auto Console = spdlog::stderr_logger_mt("polli/dispatch");
+Function *VariantFunction::getOrCreateVariant(const RunValueList &K) {
+  static auto Console = spdlog::stderr_logger_mt("polli");
 
   LIKWID_MARKER_START("polyjit.variant.get");
-  if (Variants.count(K)) {
-    DEBUG(Console->debug("Cache hit for {}", K.getShortName().str()));
-    return Variants[K];
+  size_t hash = K.hash();
+  if (Variants.count(hash)) {
+    DEBUG(Console->warn("Cache hit for {}", K.str()));
+    return Variants[hash];
   } else {
-    DEBUG(Console->debug("New Variant {}", K.getShortName().str()));
+    DEBUG(Console->warn("New Variant {}", K.str()));
   }
 
   Function *Variant = createVariant(K);
-  Variants[K] = Variant;
+  Variants[hash] = Variant;
 
   LIKWID_MARKER_STOP("polyjit.variant.get");
   return Variant;

@@ -6,7 +6,9 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include <map>
+#include "polli/RuntimeValues.h"
+
+#include <unordered_map>
 #include <vector>
 #include <memory>
 
@@ -150,6 +152,8 @@ struct Stats {
 
 class VariantFunction {
 private:
+  using VariantsT = std::unordered_map<size_t, llvm::Function *>;
+
   // @brief Track various stats about this function;
   Stats S;
 
@@ -164,17 +168,16 @@ private:
   //
   // We index the variants with the key we form from our specialzed param
   // vector.
-  std::map<const FunctionKey, llvm::Function *> Variants;
+  VariantsT Variants;
 
   // @brief Create a new function variant with they values included in the
   // key replaced.
-  llvm::Function *createVariant(const FunctionKey &K);
+  llvm::Function *createVariant(const RunValueList &K);
 
 protected:
   llvm::Function &getBaseFunction() const { return BaseF; }
   llvm::Function &getSourceFunction() const { return SourceF; }
 
-  typedef std::map<const FunctionKey, llvm::Function *> VariantsT;
   VariantsT getVariants() const {
     return Variants;
   }
@@ -222,7 +225,7 @@ public:
    *
    * @return
    */
-  llvm::Function *getOrCreateVariant(const FunctionKey &K);
+  llvm::Function *getOrCreateVariant(const RunValueList &K);
 
   ~VariantFunction() { Variants.clear(); }
   /**  @} */
@@ -230,14 +233,15 @@ private:
   void printVariants(llvm::raw_ostream &OS);
 
 };
-typedef std::shared_ptr<VariantFunction> VariantFunctionTy;
 
-typedef std::map<llvm::Function *, std::shared_ptr<VariantFunction>>
-    VariantFunctionMapTy;
+using VariantFunctionTy = std::shared_ptr<VariantFunction>;
+using VariantFunctionMapTy =
+    std::unordered_map<llvm::Function *, std::shared_ptr<VariantFunction>>;
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P);
-
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                               const ParamVector<Param> &Params);
+llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
+                              const RunValueList &Params);
 }
 #endif // POLLI_VARIANTFUNCTION_H
