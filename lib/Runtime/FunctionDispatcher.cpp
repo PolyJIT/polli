@@ -196,7 +196,7 @@ public:
 Function *VariantFunction::createVariant(const RunValueList &K) {
   using namespace spdlog::details;
 
-  static auto Console = spdlog::stderr_logger_st("polli");
+  static auto Console = spdlog::stderr_logger_mt("polli");
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */

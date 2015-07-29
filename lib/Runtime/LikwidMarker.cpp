@@ -63,7 +63,7 @@ void LikwidMarker::releaseMemory() {}
 void LikwidMarker::print(llvm::raw_ostream &OS, const llvm::Module *) const {}
 
 bool LikwidMarker::runOnModule(llvm::Module &M) {
-  auto Console = spdlog::stderr_logger_st("polli/likwid");
+  auto Console = spdlog::stderr_logger_mt("polli/likwid");
 
   LLVMContext &Ctx = getGlobalContext();
   Function *OmpStartFn = M.getFunction("GOMP_loop_runtime_next");

@@ -77,7 +77,7 @@ bool haveLikwid() {
 
   if (EmitEnv) {
     for (char **current = environ; *current; current++) {
-      auto Console = spdlog::stderr_logger_st("polli/options");
+      auto Console = spdlog::stderr_logger_mt("polli/options");
       Console->info(*current);
     }
   }

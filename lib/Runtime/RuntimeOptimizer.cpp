@@ -77,7 +77,7 @@ static PassManagerBuilder getBuilder() {
 }
 
 Function &OptimizeForRuntime(Function &F) {
-  static auto Console = spdlog::stderr_logger_st("polli/optimizer");
+  static auto Console = spdlog::stderr_logger_mt("polli/optimizer");
   static PassManagerBuilder Builder = getBuilder();
   Module *M = F.getParent();
   opt::GenerateOutput = true;

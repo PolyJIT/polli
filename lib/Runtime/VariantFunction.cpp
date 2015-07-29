@@ -66,7 +66,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
 }
 
 Function *VariantFunction::getOrCreateVariant(const RunValueList &K) {
-  static auto Console = spdlog::stderr_logger_st("polli");
+  static auto Console = spdlog::stderr_logger_mt("polli");
 
   LIKWID_MARKER_START("polyjit.variant.get");
   size_t hash = K.hash();

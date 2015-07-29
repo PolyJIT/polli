@@ -236,7 +236,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
  * @return  true, if we changed something in the module.
  */
 bool PapiCScopProfilingInit::runOnModule(Module &M) {
-  static auto Console = spdlog::stderr_logger_st("polli");
+  static auto Console = spdlog::stderr_logger_mt("polli");
 
   Function *Main = M.getFunction("main");
   if (Main == 0) {
