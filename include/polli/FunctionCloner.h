@@ -51,13 +51,15 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
   if (F && !F->isDeclaration()) {
     if (!verifyFunction(*F, &s))
       s << " OK";
+    else
+      s << " FAILED";
   } else if (F && F->isDeclaration()) {
     F->getType()->print(s << " OK \n\t\t(declare) : ");
   } else {
     s << " OK (F is nullptr)";
   }
 
-  Console->error(s.str());
+  Console->info(s.str());
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
