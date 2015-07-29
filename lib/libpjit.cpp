@@ -26,6 +26,7 @@
 #include "polli/Options.h"
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
+#include "polli/RuntimeValues.h"
 #include "polly/RegisterPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/LinkAllPasses.h"
@@ -276,16 +277,38 @@ static inline Function *getPrototype(const char *function) {
   return F;
 }
 
-static inline ParamVector<Param> getParameterInput(Function *F, unsigned paramc,
-                                                   char **params) {
-  static auto Console = spdlog::stderr_logger_mt("polli");
-  LIKWID_MARKER_START("polyjit.params.select");
-  std::vector<Param> ParamV;
-  getRuntimeParameters(F, paramc, params, ParamV);
+static void printArgs(const Function &F, size_t argc, char **params) {
+  static auto Console = spdlog::stderr_logger_st("polli");
 
-  ParamVector<Param> Params(std::move(ParamV));
+  std::string buf;
+  llvm::raw_string_ostream s(buf);
+  F.getType()->print(s);
+  Console->warn(s.str());
+  for (size_t i = 0; i < argc; i++) {
+    Console->warn("[{}] -> {:d} - {}", i, (*(uint64_t *)params[i]),
+                  (void *)(params[i]));
+  }
+}
+
+static void printRunValues(const RunValueList & Values) {
+  static auto Console = spdlog::stderr_logger_st("polli");
+
+  for (auto &RV : Values) {
+    Console->warn("{} matched against {}", RV.value, (void *)RV.Arg);
+  }
+}
+
+static RunValueList runValues(Function *F, unsigned paramc, void *params) {
+  LIKWID_MARKER_START("polyjit.params.select");
+  int i = 0;
+  RunValueList RunValues;
+
+  for (const Argument &Arg : F->args()) {
+    RunValues.add({ (*((uint64_t **)params)[i]), &Arg });
+    i++;
+  }
   LIKWID_MARKER_STOP("polyjit.params.select");
-  return Params;
+  return RunValues;
 }
 
 extern "C" {
@@ -301,13 +324,15 @@ extern "C" {
 void pjit_main(const char *fName, unsigned paramc, char **params) {
   static auto Console = spdlog::stderr_logger_mt("polli");
   Function *F = getPrototype(fName);
-  ParamVector<Param> Params = getParameterInput(F, paramc, params);
+  RunValueList values = runValues(F, paramc, params);
 
   // Assume that we have used a specializer that converts all functions into
   // 'main' compatible format.
   VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
 
-  Function *NewF = VarFun->getOrCreateVariant(Params);
+  Function *NewF = VarFun->getOrCreateVariant(values);
+  DEBUG(printArgs(*F, paramc, params));
+  DEBUG(printRunValues(values));
   runSpecializedFunction(*NewF, paramc, params);
 }
 }
