@@ -15,9 +15,6 @@
 #include "spdlog/spdlog.h"
 #include <map>
 
-namespace {
-} // namespace
-
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
   int i = 0;
