@@ -2,6 +2,7 @@
 #define PPRINT_H
 #include <inttypes.h>
 #include <papi.h>
+#include <pthread.h>
 
 #include <assert.h>
 #include <memory>
@@ -10,18 +11,22 @@
 
 extern "C" {
 /**
- * @brief Mark the entry of a SCoP
- *
- * @param id
- * @param dbg
- */
+  * @brief Mark the entry of a SCoP.
+  *
+  * The Entry gets assigned to the matching event-chain in memory.
+  *
+  * @param id A unique ID identifying the SCoP.
+  * @param dbg An optional name for the SCoP.
+  * @return void
+  */
 void papi_region_enter_scop(uint64_t id, const char *dbg);
 
 /**
  * @brief Mark the exit of a SCoP
  *
- * @param id
- * @param dbg
+ * @param id An unique ID that identifies the SCoP.
+ * @param dbg An optional name for the SCoP.
+ * @return void
  */
 void papi_region_exit_scop(uint64_t id, const char *dbg);
 
@@ -146,10 +151,11 @@ struct Event {
   uint64_t Start;
   uint64_t Duration;
   std::string Name;
+  pthread_t TID;
 
   Event(uint32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
         uint64_t D = 0, std::string N = "")
-      : ID(ID), Type(T), Start(S), Duration(D), Name(N) {}
+      : ID(ID), Type(T), Start(S), Duration(D), Name(N), TID(pthread_self()) {}
 };
 
 /**

@@ -150,30 +150,51 @@ static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
   return SRun;
 }
 
-void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
-  using namespace fmt;
-  DBConnection DB;
-  DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::work w(*DB.c);
-
-  std::string SEARCH_PROJECT_SQL =
-      "SELECT name FROM project WHERE name = '{}';";
-  pqxx::result project_exists =
-      w.exec(format(SEARCH_PROJECT_SQL, opts.project));
-  if (project_exists.affected_rows() == 0) {
-    // Insert project
-    w.exec(format("INSERT INTO project (name, description, src_url, domain, "
-                  "group_name) VALUES ('{}', '{}', '{}', '{}', '{}');",
-                  opts.project, opts.project, opts.src_uri, opts.domain,
-                  opts.group));
+static pqxx::result submit(const std::string &Query,
+                           pqxx::work &w) throw(pqxx::syntax_error) {
+  pqxx::result res;
+  try {
+    res = w.exec(Query);
+  } catch (pqxx::syntax_error e) {
+    std::cerr << e.what();
+    std::cerr << "\n";
+    std::cerr << e.query();
+    throw e;
   }
-  std::string NEW_RUN_SQL =
+  return res;
+}
+
+void StoreRun(const pthread_t tid, Run<PPEvent> &Events,
+              const pprof::Options &opts) {
+  static std::string SEARCH_PROJECT_SQL =
+      "SELECT name FROM project WHERE name = '{}';";
+
+  static std::string NEW_PROJECT_SQL =
+      "INSERT INTO project (name, description, src_url, domain, group_name) "
+      "VALUES ('{}', '{}', '{}', '{}', '{}');";
+
+  static std::string NEW_RUN_SQL =
       "INSERT INTO run (finished, command, "
       "project_name, experiment_name, run_group, experiment_group) "
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
-  pqxx::result r = w.exec(format(NEW_RUN_SQL, now(), opts.command, opts.project,
-                                 opts.experiment, Opts.uuid, Opts.exp_uuid));
+  static std::string NEW_RUN_RESULT_SQL = "INSERT INTO pprof_events (id, type, "
+                                          "start, duration, name, tid, run_id) "
+                                          "VALUES";
+
+  using namespace fmt;
+  DBConnection DB;
+  DbOptions Opts = getDBOptionsFromEnv();
+  pqxx::work w(*DB.c);
+  pqxx::result project_exists =
+      submit(format(SEARCH_PROJECT_SQL, opts.project), w);
+
+  if (project_exists.affected_rows() == 0)
+    submit(format(NEW_PROJECT_SQL, opts.project, opts.project, opts.src_uri,
+                  opts.domain, opts.group), w);
+
+  pqxx::result r = submit(format(NEW_RUN_SQL, now(), opts.command, opts.project,
+                                 opts.experiment, Opts.uuid, Opts.exp_uuid), w);
 
   long run_id;
   r[0]["id"].to(run_id);
@@ -185,17 +206,17 @@ void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts) {
   for (i = 0; i < SimpleEvents.size(); i += n) {
     std::stringstream vals;
     for (size_t j = i; j < std::min(SimpleEvents.size(), (size_t)(n + i)); j++) {
-      const pprof::Event &Ev = SimpleEvents[j];
+      pprof::Event &Ev = SimpleEvents[j];
+      Ev.TID = tid;
+
       if (j != i)
         vals << ",";
-      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d})", Ev.ID, Ev.Type, Ev.Start,
-                     Ev.Duration, Ev.Name, run_id);
+      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})", Ev.ID, Ev.Type, Ev.Start,
+                     Ev.Duration, Ev.Name, Ev.TID, run_id);
     }
     vals << ";";
 
-    std::string NEW_RUN_RESULT_SQL =
-        "INSERT INTO pprof_events (id, type, start, duration, name, run_id) VALUES";
-    w.exec(NEW_RUN_RESULT_SQL + vals.str());
+    submit(NEW_RUN_RESULT_SQL + vals.str(), w);
     vals.clear();
     vals.flush();
   }
