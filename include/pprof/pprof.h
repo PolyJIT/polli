@@ -34,15 +34,17 @@ void papi_region_exit_scop(uint64_t id, const char *dbg);
  * @brief Mark the entry of a Region
  *
  * @param id
+ * @param dbg A name for the region.
  */
-void papi_region_enter(uint64_t id);
+void papi_region_enter(uint64_t id, const char *dbg);
 
 /**
  * @brief Mark the exit of a Region
  *
  * @param id
+ * @param dbg A name for the region.
  */
-void papi_region_exit(uint64_t id);
+void papi_region_exit(uint64_t id, const char *dbg);
 
 /**
  * @brief Setup the atexit handler

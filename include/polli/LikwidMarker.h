@@ -13,4 +13,5 @@
 
 namespace polli {
 llvm::ModulePass *createLikwidMarkerPass();
+llvm::ModulePass *createTraceMarkerPass();
 }

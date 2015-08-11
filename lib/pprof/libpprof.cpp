@@ -87,9 +87,9 @@ void papi_region_exit_scop(uint64_t id, const char *dbg) {
  * @param id An unique ID that identifies the Region.
  * @return void
  */
-void papi_region_enter(uint64_t id) {
+void papi_region_enter(uint64_t id, const char *dbg) {
   do_papi_thread_init_once();
-  PPEvent Ev(id, RegionEnter);
+  PPEvent Ev(id, RegionEnter, dbg);
   Ev.snapshot();
   PapiLocalEvents->push_back(Ev);
 }
@@ -100,8 +100,8 @@ void papi_region_enter(uint64_t id) {
  * @param id An unique ID that identifies the Region.
  * @return void
  */
-void papi_region_exit(uint64_t id) {
-  PPEvent Ev(id, RegionExit);
+void papi_region_exit(uint64_t id, const char *dbg) {
+  PPEvent Ev(id, RegionExit, dbg);
   Ev.snapshot();
   PapiLocalEvents->push_back(Ev);
 }
