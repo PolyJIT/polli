@@ -18,7 +18,6 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/PolyJIT.h"
-#include "pprof/Tracing.h"
 #include "polli/Options.h"
 
 #include "llvm/ADT/Triple.h"
