@@ -68,6 +68,15 @@ bool EmitJitDebugInfoToDisk = false;
 bool EmitEnv = false;
 
 /**
+ * @brief Check, if we should perform PAPI based runtime instrumentation.
+ *
+ * @return True, if we should enable PAPI base runtime instrumentation.
+ */
+bool havePapi() {
+  return std::getenv("POLLI_ENABLE_PAPI") != nullptr;
+}
+
+/**
  * @brief Check, if we have likwid support at run-time.
  *
  * @return bool
