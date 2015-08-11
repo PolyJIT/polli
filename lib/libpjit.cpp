@@ -11,6 +11,8 @@
 // execution of LLVM bitcode in an efficient manner.
 //
 //===----------------------------------------------------------------------===//
+#include <likwid.h>
+
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
@@ -34,7 +36,6 @@
 #include "llvm/Support/PrettyStackTrace.h"
 
 #include "spdlog/spdlog.h"
-#include <likwid.h>
 
 #include <stdlib.h>
 #include <vector>
@@ -93,8 +94,13 @@ static Function *getFunction(Module &M) {
 }
 
 static inline void do_shutdown() {
-  LIKWID_MARKER_STOP("polyjit.main");
-  LIKWID_MARKER_CLOSE;
+  POLLI_TRACING_REGION_STOP(0, "polyjit.main");
+  POLLI_TRACING_FINALIZE;
+
+  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
+    POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
+    POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
+  }
 }
 
 static inline void set_options_from_environment() {
@@ -118,8 +124,8 @@ public:
 
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
-    LIKWID_MARKER_INIT;
-    LIKWID_MARKER_START("polyjit.main");
+    POLLI_TRACING_INIT;
+    POLLI_TRACING_REGION_START(0, "polyjit.main");
 
     atexit(do_shutdown);
 
@@ -228,15 +234,13 @@ static ExecutionEngine *getEngine(Module *M) {
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
   static auto Console = spdlog::stderr_logger_st("polli");
-  LIKWID_MARKER_THREADINIT;
-
   static ManagedModules Mods;
   static std::unordered_map<llvm::Function *, uint64_t> FunctionCache;
 
   Module *NewM = NewF.getParent();
 
   // Fetch or Create a new ExecutionEngine for this Module.
-  LIKWID_MARKER_START("polyjit.codegen");
+  POLLI_TRACING_REGION_START(1, "polyjit.codegen");
   ExecutionEngine *EE = nullptr;
   if (!Mods.count(NewM)) {
     EE = getEngine(NewM);
@@ -245,7 +249,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   } else {
     EE = Mods[NewM];
   }
-  LIKWID_MARKER_STOP("polyjit.codegen");
+  POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
 
   if (!EE) {
     Console->error("no execution engine found.");
@@ -266,7 +270,7 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
 
 static inline Function *getPrototype(const char *function) {
   static auto Console = spdlog::stderr_logger_mt("polli");
-  LIKWID_MARKER_START("poyjit.prototype.get");
+  POLLI_TRACING_REGION_START(2, "polyjit.prototype.get");
   Module &M = getModule(function);
   Function *F = getFunction(M);
   if (!F) {
@@ -274,7 +278,7 @@ static inline Function *getPrototype(const char *function) {
     llvm_unreachable("Could not find a function in the prototype module");
     return 0;
   }
-  LIKWID_MARKER_STOP("poyjit.prototype.get");
+  POLLI_TRACING_REGION_STOP(2, "polyjit.prototype.get");
   return F;
 }
 
@@ -300,7 +304,7 @@ static void printRunValues(const RunValueList & Values) {
 }
 
 static RunValueList runValues(Function *F, unsigned paramc, void *params) {
-  LIKWID_MARKER_START("polyjit.params.select");
+  POLLI_TRACING_REGION_START(3, "polyjit.params.select");
   int i = 0;
   RunValueList RunValues;
 
@@ -308,7 +312,7 @@ static RunValueList runValues(Function *F, unsigned paramc, void *params) {
     RunValues.add({ (*((uint64_t **)params)[i]), &Arg });
     i++;
   }
-  LIKWID_MARKER_STOP("polyjit.params.select");
+  POLLI_TRACING_REGION_STOP(3, "polyjit.params.select");
   return RunValues;
 }
 

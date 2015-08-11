@@ -90,6 +90,14 @@ Function &OptimizeForRuntime(Function &F) {
   PM.run(F);
   PM.doFinalization();
 
+  if (opt::havePapi()) {
+    DEBUG(Console->warn("\t Generic trace support active."));
+    PassManager MPM;
+    Builder.populateModulePassManager(MPM);
+    MPM.add(polli::createTraceMarkerPass());
+    MPM.run(*M);
+  }
+
   if (opt::haveLikwid()) {
     DEBUG(Console->warn("\t LikwidMarker support active."));
     PassManager MPM;
