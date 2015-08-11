@@ -5,7 +5,6 @@ set(POLLI_SOURCES
   libpprof.cpp
   libpprof-pgsql.cpp
   libpprof-file.cpp
-  libpprof-csv.cpp
 )
 
 add_polli_library(pprof

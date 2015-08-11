@@ -303,11 +303,4 @@ int main(int argc, const char **argv) {
   if (Opts.use_file) {
     return file::main(Opts);
   }
-
-  if (Opts.use_csv) {
-    std::cout << "Using CSV file backend\n";
-    std::cout << "Not implemented!\n";
-    exit(1);
-  }
-
 }

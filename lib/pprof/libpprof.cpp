@@ -19,7 +19,6 @@
 
 #include "pprof/pgsql.h"
 #include "pprof/file.h"
-#include "pprof/csv.h"
 
 using namespace pprof;
 
@@ -131,8 +130,6 @@ void papi_atexit_handler(void) {
   }
   if (opts.use_file)
     file::StoreRun(PapiEvents, opts);
-  if (opts.use_csv)
-    csv::StoreRun(PapiEvents, opts);
 
   PapiLocalEvents->clear();
   PAPI_shutdown();
