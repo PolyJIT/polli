@@ -224,29 +224,6 @@ void StoreRun(const pthread_t tid, Run<PPEvent> &Events,
   w.commit();
 }
 
-Run<PPEvent> ReadRun(uint32_t run_id,
-                     std::map<uint32_t, PPStringRegion> &Regions) {
-  using namespace fmt;
-
-  DbOptions Opts = getDBOptionsFromEnv();
-  Run<PPEvent> Events(run_id);
-  Events.clear();
-
-  pqxx::read_transaction txn(*DB.c);
-  pqxx::result r = txn.prepared("select_run")(run_id).exec();
-
-  Events.ID = run_id;
-  for (size_t i = 0; i < r.size(); i++) {
-    uint16_t ev_id = r[i][0].as<uint16_t>();
-    uint32_t ev_ty = r[i][1].as<uint32_t>();
-    uint64_t ev_ts = r[i][2].as<uint64_t>();
-
-    Events.push_back(PPEvent(ev_id, (PPEventType)ev_ty, ev_ts));
-  }
-
-  return Events;
-}
-
 Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   using namespace fmt;
 
