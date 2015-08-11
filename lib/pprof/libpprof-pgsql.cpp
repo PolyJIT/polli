@@ -74,7 +74,7 @@ public:
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
       std::string SELECT_SIMPLE_RUN =
-          "SELECT id,type,start,duration,name FROM pprof_events WHERE run_id=$1 ORDER BY "
+          "SELECT id,type,start,duration,name,tid FROM pprof_events WHERE run_id=$1 ORDER BY "
           "start;";
       std::string SELECT_RUN_IDs =
           "SELECT id FROM run WHERE run_group = $1;";
@@ -265,8 +265,10 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
     uint64_t ev_start = r[i][2].as<uint64_t>();
     uint64_t ev_duration = r[i][3].as<uint64_t>();
     std::string ev_name = r[i][4].as<std::string>();
+    uint64_t ev_tid = r[i][5].as<uint64_t>();
 
-    Events.push_back(Event(ev_id, (PPEventType)ev_ty, ev_start, ev_duration, ev_name));
+    Events.push_back(Event(ev_id, (PPEventType)ev_ty, ev_start, ev_duration,
+                           ev_name, ev_tid));
   }
 
   return Events;

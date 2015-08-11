@@ -154,8 +154,8 @@ struct Event {
   pthread_t TID;
 
   Event(uint32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
-        uint64_t D = 0, std::string N = "")
-      : ID(ID), Type(T), Start(S), Duration(D), Name(N), TID(pthread_self()) {}
+        uint64_t D = 0, std::string N = "", uint64_t TID = pthread_self())
+      : ID(ID), Type(T), Start(S), Duration(D), Name(N), TID(TID) {}
 };
 
 /**
