@@ -122,6 +122,12 @@ void papi_atexit_handler(void) {
     return;
 
   PapiLocalEvents->push_back(PPEvent(0, RegionExit, "STOP"));
+  uint64_t bytes = 0;
+  for (auto elem : PapiThreadedEvents) {
+    bytes += elem.second.size() * sizeof(PPEvent);
+  }
+  fprintf(stderr, "libpprof: I required %ld MB storage.\n",
+          bytes / (1024 * 1024));
 
   if (opts.use_db) {
     for (auto elem : PapiThreadedEvents) {
