@@ -167,11 +167,3 @@ void papi_region_setup() {
   PapiLocalEvents->push_back(PPEvent(0, RegionEnter, "START"));
 }
 }
-
-class StaticInitializer {
-public:
-  StaticInitializer() {
-    papi_region_setup();
-  }
-};
-static StaticInitializer InitializeLib;
