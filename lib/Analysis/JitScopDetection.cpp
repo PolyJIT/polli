@@ -84,23 +84,6 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
 }
 
-// Remove all direct and indirect children of region R from the region set Regs,
-// but do not recurse further if the first child has been found.
-//
-// Return the number of regions erased from Regs.
-static unsigned eraseAllChildren(ScopSet &Regs, const Region &R) {
-  unsigned Count = 0;
-  for (auto &SubRegion : R) {
-    if (Regs.count(SubRegion.get())) {
-      ++Count;
-      Regs.remove(SubRegion.get());
-    } else {
-      Count += eraseAllChildren(Regs, *SubRegion);
-    }
-  }
-  return Count;
-}
-
 static void getDebugLocations(const Region *R, DebugLoc &Begin, DebugLoc &End) {
   for (const BasicBlock *BB : R->blocks())
     for (const Instruction &Inst : *BB) {
@@ -153,27 +136,33 @@ static bool sharesBlocks(const Region *CurR, const Region *R) {
   return false;
 }
 
+struct less_than_region_ptr {
+  inline bool operator()(const Region *LHS, const Region *RHS) {
+    return LHS->getNameStr() < RHS->getNameStr();
+  }
+};
+
 bool operator<(const Region &LHS, const Region &RHS) {
   assert(sharesBlocks(&LHS, &RHS) &&
          "LHS & RHS don't share any blocks, reject.");
 
   static auto Console = spdlog::stderr_logger_st("polli/jitsd");
 
-  SmallVector<const BasicBlock*, 4> LeftBlocks;
-  SmallVector<const BasicBlock*, 4> RightBlocks;
+  unsigned LeftCnt = 0;
+  unsigned RightCnt = 0;
 
   for (auto I = LHS.element_begin(), E = LHS.element_end(); I != E; ++I) {
     if (!I->isSubRegion())
-      LeftBlocks.push_back(I->getNodeAs<BasicBlock>());
+      LeftCnt++;
   }
 
   for (auto I = RHS.element_begin(), E = RHS.element_end(); I != E; ++I) {
     if (!I->isSubRegion())
-      RightBlocks.push_back(I->getNodeAs<BasicBlock>());
+      RightCnt++;
   }
 
-  DEBUG(Console->error("{} < {}", LeftBlocks.size(), RightBlocks.size()));
-  return LeftBlocks.size() < RightBlocks.size();
+  DEBUG(Console->error("{} < {}", LeftCnt, RightCnt));
+  return LeftCnt < RightCnt;
 }
 
 bool JitScopDetection::runOnFunction(Function &F) {
@@ -234,42 +223,46 @@ bool JitScopDetection::runOnFunction(Function &F) {
       Tmp = LoopBoundChk.params();
       L.insert(L.end(), Tmp.begin(), Tmp.end());
 
-      // Clean up all children of the new region.
-      unsigned deleted = eraseAllChildren(JitableScops, *R);
-      JitScopsFound -= deleted;
-      DEBUG(Console->debug("Deleted {} children.", deleted));
-
       JitableScops.insert(R);
       ++JitScopsFound;
     }
   }
 
+  // Yikes :O%. Make our post-analysis filtering predictable.
+  std::vector<Region *> SortedJitScops;
+  for (auto &R : JitableScops) {
+    SortedJitScops.push_back(const_cast<Region *>(R));
+  }
+  std::stable_sort(SortedJitScops.begin(), SortedJitScops.end(),
+                   less_than_region_ptr());
+
   ScopSet Rejected;
-  for (ScopSet::const_iterator LHS = JitableScops.begin(),
-                               LE = JitableScops.end();
-       LHS != LE; ++LHS) {
-    for (ScopSet::const_iterator RHS = LHS, RE = JitableScops.end(); RHS != RE;
-         ++RHS) {
-      const Region *L = *LHS;
-      const Region *R = *RHS;
-      if (L == R)
+  for (Region *LHS : SortedJitScops) {
+    if (Rejected.count(LHS))
+      continue;
+
+    for (Region *RHS : SortedJitScops) {
+      if (LHS == RHS || Rejected.count(RHS))
         continue;
 
-      if (sharesBlocks(L, R)) {
+      if (sharesBlocks(LHS, RHS)) {
         if (*LHS < *RHS) {
-          Rejected.insert(L);
-          DEBUG(Console->trace("Rejecting: ", L->getNameStr()));
+          Rejected.insert(LHS);
+          DEBUG(Console->trace("Rejecting: ", LHS->getNameStr()));
+          break;
         }
         else {
-          Rejected.insert(R);
-          DEBUG(Console->trace("Rejecting: ", R->getNameStr()));
+          Rejected.insert(RHS);
+          DEBUG(Console->trace("Rejecting: ", RHS->getNameStr()));
         }
       }
     }
   }
 
-  for (const Region *R : Rejected)
+  for (const Region *R : Rejected) {
+    JitScopsFound -= 1;
     JitableScops.remove(R);
+  }
 
   ScopSet ClassicScops;
   ClassicScops.insert(SD->begin(), SD->end());

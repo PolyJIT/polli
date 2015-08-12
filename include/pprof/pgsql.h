@@ -2,6 +2,7 @@
 #define PPROF_PGSQL_H
 
 #include "pprof/pprof.h"
+#include <pthread.h>
 #include <vector>
 #include <map>
 #include <set>
@@ -15,11 +16,10 @@ using Metrics = std::map<std::string, double>;
 
 UuidSet ReadAvailableRunGroups();
 IdVector ReadAvailableRunIDs(std::string run_group);
-Run<PPEvent> ReadRun(uint32_t run_id,
-                     std::map<uint32_t, PPStringRegion> &Regions);
 Run<pprof::Event> ReadSimpleRun(uint32_t run_id);
 
-void StoreRun(Run<PPEvent> &Events, const pprof::Options &opts);
+void StoreRun(const pthread_t tid, Run<PPEvent> &Events,
+              const pprof::Options &opts);
 void StoreRunMetrics(long run_id, const Metrics &M);
 }
 }

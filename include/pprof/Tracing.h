@@ -1,165 +1,123 @@
 #ifndef PPROF_TRACING_H
 #define PPROF_TRACING_H
+
 #include "pprof/pprof.h"
 #include "pprof/Config.h"
+#include "polli/Options.h"
 
-// Enable/Disable tracing
-#ifdef ENABLE_TRACING
-#define LIKWID_PERFMON
-#endif
-
-#include <inttypes.h>
-#include <papi.h>
-
-#include <sstream>
-#include <iostream>
+#include "spdlog/spdlog.h"
 #include <memory>
 
-#include <assert.h>
+#ifdef POLLI_ENABLE_TRACING
+#define LIKWID_PERFMON
+
 #include <likwid.h>
+#define POLLI_TRACING_INIT polliTracingInit()
+#define POLLI_TRACING_FINALIZE polliTracingFinalize()
+#define POLLI_TRACING_REGION_START(ID, NAME) polliTracingRegionStart(ID, NAME)
+#define POLLI_TRACING_REGION_STOP(ID, NAME) polliTracingRegionStop(ID, NAME)
+#define POLLI_TRACING_SCOP_START(ID, NAME) polliTracingScopStart(ID, NAME)
+#define POLLI_TRACING_SCOP_STOP(ID, NAME) polliTracingScopStop(ID, NAME)
+namespace polli {
+static std::shared_ptr<spdlog::logger> logger() {
+  static auto Console = spdlog::stderr_logger_st("polli/tracer");
+  return Console;
+}
 
-/**
- * @brief Setup papi for trace monitoring.
- */
-void pprof_setup_papi();
+struct Tracer {
+  virtual void init() const {}
+  virtual void finalize() const {}
+  virtual void regionStart(uint64_t Id, const char *Name) const {}
+  virtual void regionStop(uint64_t Id, const char *Name) const {}
+  virtual void scopStart(uint64_t Id, const char *Name) const {}
+  virtual void scopStop(uint64_t Id, const char *Name) const {}
+  virtual ~Tracer() = default;
+};
 
-/**
- * @brief PAPI Event to add to the tracking.
- *
- * @param PapiEventNum
- */
-void pprof_trace_add_event(int PapiEventNum);
-void pprof_trace_add_event(std::string &&Name);
-
-/**
- * @brief Mark the entry for a specified trace.
- *
- * @param TraceName
- */
-void pprof_trace_entry(const std::string &&TraceName);
-
-/**
- * @brief Mark the exit for a specified trace.
- *
- * @param TraceName
- */
-void pprof_trace_exit(const std::string &&TraceName);
-
-/**
- * @brief Start the configured event set
- */
-void pprof_trace_start();
-
-/**
- * @brief Stop the configured event set
- *
- * Adding events is only allowed when the current set is not running.
- *
- */
-void pprof_trace_stop();
-
-/**
- * @brief Store arbitrary PAPI event data at defined trace points.
- */
-template <typename IdTy>
-class PPEventInfo {
-protected:
-  /**
-   * @brief Unique(!) Identification of this event.
-   */
-  IdTy ID;
-
-  /**
-   * @brief Type of this pprof event.
-   */
-  PPEventType EvTy;
-
-  /**
-   * @brief Size of the payload.
-   */
-  size_t Size;
-
-  /**
-   * @brief Payload managed by this PPEventInfo
-   */
-  long long int *Payload;
-
-  /**
-   * @brief Timestamp of this payload data.
-   */
-  uint64_t Timestamp;
-
-  /**
-   * @brief Handle of the event set registered in papi.
-   */
-  int EventSetHandle;
-
-public:
-  /**
-   * @brief
-   *
-   * @param id
-   * @param evTy
-   * @param EventSetHandle
-   * @param EventSetSize
-   */
-  explicit PPEventInfo(IdTy id, PPEventType evTy, int EventSetHandle,
-                       int EventSetSize)
-      : ID(id), EvTy(evTy), Size(EventSetSize), EventSetHandle(EventSetHandle) {
-    Payload = new long long int[Size];
+struct LikwidTracer : public Tracer {
+  void init() const override {
+    likwid_markerInit();
+    likwid_markerThreadInit();
   }
-
-  /**
-   * @brief
-   *
-   * @param idx
-   *
-   * @return
-   */
-  long long int get(size_t idx) const;
-
-  /**
-   * @brief
-   *
-   * @return
-   */
-  PPEventType type() const;
-
-  /**
-   * @brief
-   *
-   * @return
-   */
-  IdTy id() const;
-
-  /**
-   * @brief
-   *
-   * @param
-   *
-   * @return
-   */
-  size_t size() const;
-
-  /**
-   * @brief
-   *
-   * @return
-   */
-  uint64_t timestamp() const;
-
-  /**
-   * @brief
-   */
-  void snapshot();
-
-  /**
-   * @brief
-   */
-  ~PPEventInfo() {
-    delete[] Payload;
+  void finalize() const override { likwid_markerClose(); }
+  void regionStart(uint64_t Id, const char *Name) const override {
+    likwid_markerStartRegion(Name);
+  }
+  void regionStop(uint64_t Id, const char *Name) const override {
+    likwid_markerStopRegion(Name);
+  }
+  void scopStart(uint64_t Id, const char *Name) const override {
+    likwid_markerStartRegion(Name);
+  }
+  void scopStop(uint64_t Id, const char *Name) const override {
+    likwid_markerStopRegion(Name);
   }
 };
 
+struct PapiTracer : public Tracer {
+  void init() const override { papi_region_setup(); }
+  void finalize() const override {}
+  void regionStart(uint64_t Id, const char *Name) const override {
+    papi_region_enter(Id, Name);
+  }
+  void regionStop(uint64_t Id, const char *Name) const override {
+    papi_region_exit(Id, Name);
+  }
+  void scopStart(uint64_t Id, const char *Name) const override {
+    papi_region_enter_scop(Id, Name);
+  }
+  void scopStop(uint64_t Id, const char *Name) const override {
+    papi_region_exit_scop(Id, Name);
+  }
+};
 
+static std::unique_ptr<Tracer> createTracer() {
+  if (opt::havePapi())
+    return std::unique_ptr<Tracer>(new PapiTracer());
+  else if (opt::haveLikwid())
+    return std::unique_ptr<Tracer>(new LikwidTracer());
+
+  return std::unique_ptr<Tracer>(new Tracer());
+}
+
+static std::unique_ptr<Tracer> ActiveTracer = createTracer();
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+void polliTracingInit() {
+  polli::ActiveTracer->init();
+}
+
+void polliTracingFinalize() {
+  polli::ActiveTracer->finalize();
+}
+
+void polliTracingRegionStart(uint64_t Id, const char *Name) {
+  polli::ActiveTracer->regionStart(Id, Name);
+}
+
+void polliTracingRegionStop(uint64_t Id, const char *Name) {
+  polli::ActiveTracer->regionStop(Id, Name);
+}
+
+void polliTracingScopStart(uint64_t Id, const char *Name) {
+  polli::ActiveTracer->scopStart(Id, Name);
+}
+
+void polliTracingScopStop(uint64_t Id, const char *Name) {
+  polli::ActiveTracer->scopStop(Id, Name);
+}
+#ifdef __cplusplus
+#else
+#define POLLI_TRACING_INIT
+#define POLLI_TRACING_FINALIZE
+#define POLLI_TRACING_REGION_START(ID, NAME)
+#define POLLI_TRACING_REGION_STOP(ID, NAME)
+#define POLLI_TRACING_SCOP_START(ID, NAME)
+#define POLLI_TRACING_SCOP_STOP(ID, NAME)
+#endif
+}
+#endif
 #endif //PPROF_TRACING_H

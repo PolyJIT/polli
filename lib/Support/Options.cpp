@@ -68,13 +68,20 @@ bool EmitJitDebugInfoToDisk = false;
 bool EmitEnv = false;
 
 /**
+ * @brief Check, if we should perform PAPI based runtime instrumentation.
+ *
+ * @return True, if we should enable PAPI base runtime instrumentation.
+ */
+bool havePapi() {
+  return std::getenv("POLLI_ENABLE_PAPI") != nullptr;
+}
+
+/**
  * @brief Check, if we have likwid support at run-time.
  *
  * @return bool
  */
 bool haveLikwid() {
-  char *LIKWID_MODE = std::getenv("LIKWID_MODE");
-
   if (EmitEnv) {
     for (char **current = environ; *current; current++) {
       auto Console = spdlog::stderr_logger_mt("polli/options");
@@ -82,7 +89,7 @@ bool haveLikwid() {
     }
   }
 
-  return LIKWID_MODE;
+  return std::getenv("LIKWID_MODE") != nullptr;
 }
 } // namespace opt
 } // namespace polli

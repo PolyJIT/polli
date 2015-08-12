@@ -105,6 +105,13 @@ extern bool Enabled;
  * @return bool
  */
 bool haveLikwid();
+
+/**
+ * @brief Check, if we should perform PAPI based runtime instrumentation.
+ *
+ * @return True, if we should enable PAPI base runtime instrumentation.
+ */
+bool havePapi();
 }
 }
 #endif

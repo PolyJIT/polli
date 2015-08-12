@@ -73,7 +73,9 @@ endif ()
 add_library(pqxx SHARED IMPORTED)
 set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
 
-option(ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
+option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
+option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
+option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)

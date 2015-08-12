@@ -13,6 +13,8 @@
 #ifndef PPROF_CONFIG_H
 #define PPROF_CONFIG_H
 
-#cmakedefine ENABLE_TRACING
+#cmakedefine POLLI_ENABLE_TRACING
+#cmakedefine POLLI_ENABLE_LIKWID
+#cmakedefine POLLI_ENABLE_PAPI
 
 #endif

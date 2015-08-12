@@ -48,11 +48,11 @@ public:
   const_iterator begin() const { return RequiredParams.begin(); }
   const_iterator end() const { return RequiredParams.end(); }
 
-  int count(const Region *R) { return AccumulatedScops.count(R); }
+  int count(const Region *R) const { return AccumulatedScops.count(R); }
   unsigned size() { return AccumulatedScops.size(); }
 
   /* JIT Scops */
-  int countJS(const Region *R) { return JitableScops.count(R); }
+  int countJS(const Region *R) const { return JitableScops.count(R); }
   unsigned sizeJS() { return JitableScops.size(); }
 
   iterator_range<ScopSet::iterator> jitScops() {
