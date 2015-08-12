@@ -49,6 +49,11 @@ using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 
+static std::shared_ptr<spdlog::logger> log() {
+  static auto Console = spdlog::stderr_logger_st("polli/libpjit");
+  return Console;
+}
+
 /**
  * @brief Read the LLVM-IR module from the given prototype string.
  *
@@ -58,7 +63,6 @@ static FunctionDispatcher Disp;
 static Module &getModule(const char *prototype) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
-  static auto Console = spdlog::stderr_logger_st("polli");
 
   if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
@@ -69,10 +73,10 @@ static Module &getModule(const char *prototype) {
       DEBUG(Mod->dump());
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
     } else {
-      Console->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
+      log()->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
                      Err.getLineNo(), Err.getColumnNo(),
                      Err.getMessage().str());
-      Console->error("{:s}", prototype);
+      log()->error("{:s}", prototype);
     }
   }
 
@@ -94,13 +98,14 @@ static Function *getFunction(Module &M) {
 }
 
 static inline void do_shutdown() {
-  POLLI_TRACING_REGION_STOP(0, "polyjit.main");
-  POLLI_TRACING_FINALIZE;
-
+  // This forces the linker to keep the symbols around, if tracing is
+  // enabled.
   if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
     POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
     POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
   }
+  POLLI_TRACING_REGION_STOP(0, "polyjit.main");
+  POLLI_TRACING_FINALIZE;
 }
 
 static inline void set_options_from_environment() {
@@ -233,7 +238,6 @@ static ExecutionEngine *getEngine(Module *M) {
 */
 static void runSpecializedFunction(llvm::Function &NewF, int paramc,
                                    char **params) {
-  static auto Console = spdlog::stderr_logger_st("polli");
   static ManagedModules Mods;
   static std::unordered_map<llvm::Function *, uint64_t> FunctionCache;
 
@@ -252,11 +256,11 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
 
   if (!EE) {
-    Console->error("no execution engine found.");
+    log()->error("no execution engine found.");
     return;
   }
 
-  DEBUG(Console->warn("execution of {:>s} begins (#{:d} params)",
+  DEBUG(log()->warn("execution of {:>s} begins (#{:d} params)",
                       NewF.getName().str(), paramc));
   if (!FunctionCache.count(&NewF))
     FunctionCache.insert(
@@ -265,16 +269,15 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
 
   PF(paramc, params);
-  DEBUG(Console->warn("execution of {:>s} completed", NewF.getName().str()));
+  DEBUG(log()->warn("execution of {:>s} completed", NewF.getName().str()));
 }
 
 static inline Function *getPrototype(const char *function) {
-  static auto Console = spdlog::stderr_logger_mt("polli");
   POLLI_TRACING_REGION_START(2, "polyjit.prototype.get");
   Module &M = getModule(function);
   Function *F = getFunction(M);
   if (!F) {
-    Console->error("Could not find a function in: {}", M.getModuleIdentifier());
+    log()->error("Could not find a function in: {}", M.getModuleIdentifier());
     llvm_unreachable("Could not find a function in the prototype module");
     return 0;
   }
@@ -283,23 +286,19 @@ static inline Function *getPrototype(const char *function) {
 }
 
 static void printArgs(const Function &F, size_t argc, char **params) {
-  static auto Console = spdlog::stderr_logger_st("polli");
-
   std::string buf;
   llvm::raw_string_ostream s(buf);
   F.getType()->print(s);
-  Console->warn(s.str());
+  log()->warn(s.str());
   for (size_t i = 0; i < argc; i++) {
-    Console->warn("[{}] -> {:d} - {}", i, (*(uint64_t *)params[i]),
+    log()->warn("[{}] -> {:d} - {}", i, (*(uint64_t *)params[i]),
                   (void *)(params[i]));
   }
 }
 
 static void printRunValues(const RunValueList & Values) {
-  static auto Console = spdlog::stderr_logger_st("polli");
-
   for (auto &RV : Values) {
-    Console->warn("{} matched against {}", RV.value, (void *)RV.Arg);
+    log()->warn("{} matched against {}", RV.value, (void *)RV.Arg);
   }
 }
 
@@ -327,7 +326,6 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
-  static auto Console = spdlog::stderr_logger_mt("polli");
   Function *F = getPrototype(fName);
   RunValueList values = runValues(F, paramc, params);
 
