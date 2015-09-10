@@ -107,6 +107,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   setupLogging();
   DEBUG(printConfig());
 
+  polly::registerCanonicalicationPasses(PM);
   registerPollyPasses(PM);
 
   // Schedule us inbetween detection and polly's codegen.

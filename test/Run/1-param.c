@@ -1,4 +1,4 @@
-// RUN: %clang -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polly-detect-keep-going %s -o %t -lpjit
+// RUN: %clang -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polly-detect-unprofitable -mllvm -polli -mllvm -jitable -mllvm -polly-detect-keep-going %s -o %t -lpjit
 // RUN: %t 2>&1 | FileCheck %s
 #include <stdio.h>
 

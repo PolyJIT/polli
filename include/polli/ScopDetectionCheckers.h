@@ -99,6 +99,7 @@ public:
 };
 
 class AliasingChecker {};
+class ProfitableChecker {};
 
 template <typename T> bool isValid(T &Ext, polly::RejectReason &R) {
   return false;
@@ -108,5 +109,6 @@ bool isValid(NonAffineAccessChecker &Chk, polly::RejectReason &Reason);
 bool isValid(NonAffineBranchChecker &Chk, polly::RejectReason &Reason);
 bool isValid(NonAffineLoopBoundChecker &Chk, polly::RejectReason &Reason);
 bool isValid(AliasingChecker &Chk, polly::RejectReason &Reason);
+bool isValid(ProfitableChecker &Chk, polly::RejectReason &Reason);
 }
 #endif // POLLI_SCOP_DETECTION_CHECKERS_H

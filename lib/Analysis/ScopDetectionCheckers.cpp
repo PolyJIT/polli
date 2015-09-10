@@ -22,6 +22,7 @@ STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
 STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
 STATISTIC(JitNonAffineAccess, "Number of fixable non affine accesses");
 STATISTIC(AliasingIgnored, "Number of ignored aliasings");
+STATISTIC(UnprofitableIgnored, "Number of ignored uprofitable reports");
 
 using namespace llvm;
 using namespace polly;
@@ -93,6 +94,14 @@ bool isValid(AliasingChecker &Chk, RejectReason &Reason) {
     return true;
   }
 
+  return false;
+}
+
+bool isValid(ProfitableChecker &Chk, RejectReason &Reason) {
+  if (isa<ReportUnprofitable>(&Reason)) {
+    ++UnprofitableIgnored;
+    return true;
+  }
   return false;
 }
 } // namespace polli
