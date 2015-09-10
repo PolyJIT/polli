@@ -79,7 +79,7 @@ public:
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
-  AU.addRequired<ScalarEvolution>();
+  AU.addRequired<ScalarEvolutionWrapperPass>();
   AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
@@ -178,7 +178,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
     return false;
 
   SD = &getAnalysis<ScopDetection>();
-  SE = &getAnalysis<ScalarEvolution>();
+  SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 

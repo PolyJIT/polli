@@ -13,7 +13,6 @@ set(LLVM_LINK_COMPONENTS
   Interpreter
   InstCombine
   Instrumentation
-  IPA
   IPO
   Linker
   MC

@@ -85,7 +85,7 @@ public:
   }
 
   void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
-    for (Instruction &I : inst_range(SrcF)) {
+    for (Instruction &I : instructions(SrcF)) {
       if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
         CallSite CS = CallSite(&I);
         if (Function *CalledF = CS.getCalledFunction()) {

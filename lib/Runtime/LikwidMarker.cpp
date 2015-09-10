@@ -116,7 +116,7 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
       if (F.isDeclaration())
         continue;
 
-      for (auto &I : inst_range(F)) {
+      for (auto &I : instructions(F)) {
         if (CallInst *Call = dyn_cast<CallInst>(&I)) {
           if (Call->getCalledFunction() == OmpStartFn) {
             SubFunctions.insert(&F);
@@ -139,7 +139,7 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
       Builder.SetInsertPoint(Entry.getFirstInsertionPt());
       Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(F.getName()));
 
-      for (auto &I : inst_range(F)) {
+      for (auto &I : instructions(F)) {
         if (isa<ReturnInst>(&I)) {
           Builder.SetInsertPoint(&I);
           Builder.CreateCall(Stop, Builder.CreateGlobalStringPtr(F.getName()));
@@ -157,7 +157,7 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
     Builder.Insert(CallInst::Create(ThreadInit));
     Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(SubFn->getName()));
 
-    for (auto &I : inst_range(*SubFn)) {
+    for (auto &I : instructions(*SubFn)) {
       if (isa<ReturnInst>(&I)) {
         Builder.SetInsertPoint(&I);
         Builder.CreateCall(Stop,
@@ -199,7 +199,7 @@ bool TraceMarker::runOnModule(llvm::Module &M) {
       if (F.isDeclaration())
         continue;
 
-      for (auto &I : inst_range(F)) {
+      for (auto &I : instructions(F)) {
         if (CallInst *Call = dyn_cast<CallInst>(&I)) {
           if (Call->getCalledFunction() == OmpStartFn) {
             SubFunctions.insert(&F);
@@ -226,7 +226,7 @@ bool TraceMarker::runOnModule(llvm::Module &M) {
       Builder.CreateCall(Start,
                          {ID, Builder.CreateGlobalStringPtr(F.getName())});
 
-      for (auto &I : inst_range(F)) {
+      for (auto &I : instructions(F)) {
         if (isa<ReturnInst>(&I)) {
           Builder.SetInsertPoint(&I);
           Builder.CreateCall(Stop,
@@ -248,7 +248,7 @@ bool TraceMarker::runOnModule(llvm::Module &M) {
     Builder.CreateCall(Start,
                        {ID, Builder.CreateGlobalStringPtr(SubFn->getName())});
 
-    for (auto &I : inst_range(*SubFn)) {
+    for (auto &I : instructions(*SubFn)) {
       if (isa<ReturnInst>(&I)) {
         Builder.SetInsertPoint(&I);
         Builder.CreateCall(
