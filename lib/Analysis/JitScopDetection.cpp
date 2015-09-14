@@ -198,7 +198,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
     NonAffineBranchChecker NonAffBranchChk(R, SE);
     NonAffineLoopBoundChecker LoopBoundChk(R, SE);
     AliasingChecker AliasChk;
-    ProfitableChecker ProfitableChk;
+    //ProfitableChecker ProfitableChk;
 
     ParamList Params;
     bool RegionIsValid = Log.size() > 0;
@@ -209,7 +209,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
       IsFixable |= isValid(NonAffBranchChk, *Reason);
       IsFixable |= isValid(LoopBoundChk, *Reason);
       IsFixable |= isValid(AliasChk, *Reason);
-      IsFixable |= isValid(ProfitableChk, *Reason);
+      //IsFixable |= isValid(ProfitableChk, *Reason);
 
       RegionIsValid &= IsFixable;
     }
