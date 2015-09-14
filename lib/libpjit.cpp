@@ -142,7 +142,6 @@ public:
     initializeVectorization(Registry);
     initializeIPO(Registry);
     initializeAnalysis(Registry);
-    initializeIPA(Registry);
     initializeTransformUtils(Registry);
     initializeInstCombine(Registry);
     initializeInstrumentation(Registry);

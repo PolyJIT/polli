@@ -79,7 +79,7 @@ public:
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopDetection>();
-  AU.addRequired<ScalarEvolution>();
+  AU.addRequired<ScalarEvolutionWrapperPass>();
   AU.addRequired<RegionInfoPass>();
   AU.setPreservesAll();
 }
@@ -178,7 +178,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
     return false;
 
   SD = &getAnalysis<ScopDetection>();
-  SE = &getAnalysis<ScalarEvolution>();
+  SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
@@ -198,6 +198,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
     NonAffineBranchChecker NonAffBranchChk(R, SE);
     NonAffineLoopBoundChecker LoopBoundChk(R, SE);
     AliasingChecker AliasChk;
+    //ProfitableChecker ProfitableChk;
 
     ParamList Params;
     bool RegionIsValid = Log.size() > 0;
@@ -208,6 +209,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
       IsFixable |= isValid(NonAffBranchChk, *Reason);
       IsFixable |= isValid(LoopBoundChk, *Reason);
       IsFixable |= isValid(AliasChk, *Reason);
+      //IsFixable |= isValid(ProfitableChk, *Reason);
 
       RegionIsValid &= IsFixable;
     }
@@ -255,7 +257,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
           Rejected.insert(RHS);
           DEBUG(Console->trace("Rejecting: ", RHS->getNameStr()));
         }
-      }
+    }
     }
   }
 
