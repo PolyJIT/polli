@@ -21,6 +21,11 @@
 STATISTIC(JitNonAffineLoopBound, "Number of fixable non affine loop bounds");
 STATISTIC(JitNonAffineCondition, "Number of fixable non affine conditions");
 STATISTIC(JitNonAffineAccess, "Number of fixable non affine accesses");
+
+STATISTIC(NonAffineAccess, "Rejected JIT SCoP - Non-Affine access.");
+STATISTIC(NonAffineLoopBound, "Rejected JIT SCoP - Non-Affine loop bound.");
+STATISTIC(NonAffineBranch, "Rejected JIT SCoP - Non-Affine branch.");
+
 STATISTIC(AliasingIgnored, "Number of ignored aliasings");
 STATISTIC(UnprofitableIgnored, "Number of ignored uprofitable reports");
 
@@ -38,8 +43,10 @@ bool isValid(NonAffineAccessChecker &Chk, RejectReason &Reason) {
     const Region *R = Chk.region();
     ScalarEvolution *SE = Chk.se();
 
-    if (!isNonAffineExpr(R, NonAff->get(), *SE))
+    if (!isNonAffineExpr(R, NonAff->get(), *SE)) {
+      ++NonAffineAccess;
       return false;
+    }
 
     Chk.append(getParamsInNonAffineExpr(R, NonAff->get(), *SE));
     ++JitNonAffineAccess;
@@ -54,14 +61,18 @@ bool isValid(NonAffineBranchChecker &Chk, RejectReason &Reason) {
     const Region *R = Chk.region();
     ScalarEvolution *SE = Chk.se();
     // Check LHS & Add parameters
-    if (!isNonAffineExpr(R, NonAff->lhs(), *SE))
+    if (!isNonAffineExpr(R, NonAff->lhs(), *SE)) {
+      ++NonAffineBranch;
       return false;
+    }
 
     Chk.append(getParamsInNonAffineExpr(R, NonAff->lhs(), *SE));
 
     // Check RHS & Add parameters
-    if (!isNonAffineExpr(R, NonAff->rhs(), *SE))
+    if (!isNonAffineExpr(R, NonAff->rhs(), *SE)) {
+      ++NonAffineBranch;
       return false;
+    }
     ParamList RHSParams;
 
     Chk.append(getParamsInNonAffineExpr(R, NonAff->rhs(), *SE));
@@ -82,6 +93,8 @@ bool isValid(NonAffineLoopBoundChecker &Chk, RejectReason &Reason) {
     if (isValid) {
       Chk.append(getParamsInNonAffineExpr(R, NonAff->loopCount(), *SE));
       ++JitNonAffineLoopBound;
+    } else {
+      ++NonAffineLoopBound;
     }
     return isValid;
   }
