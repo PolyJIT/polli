@@ -93,13 +93,17 @@ public:
     c.reset(nullptr);
   }
 };
-static DBConnection DB;
+
+static DBConnection& getDatabase() {
+  static DBConnection DB;
+  return DB;
+}
 
 UuidSet ReadAvailableRunGroups() {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::read_transaction txn(*DB.c);
+  pqxx::read_transaction txn(*getDatabase().c);
   pqxx::result r = txn.prepared("select_run_groups")(Opts.exp_uuid).exec();
 
   UuidSet RunGroups;
@@ -114,7 +118,7 @@ IdVector ReadAvailableRunIDs(std::string run_group) {
   using namespace fmt;
 
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::read_transaction txn(*DB.c);
+  pqxx::read_transaction txn(*getDatabase().c);
   pqxx::result r = txn.prepared("select_run_ids")(run_group).exec();
 
   IdVector RunIDs(r.size());
@@ -183,9 +187,8 @@ void StoreRun(const pthread_t tid, Run<PPEvent> &Events,
                                           "VALUES";
 
   using namespace fmt;
-  DBConnection DB;
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::work w(*DB.c);
+  pqxx::work w(*getDatabase().c);
   pqxx::result project_exists =
       submit(format(SEARCH_PROJECT_SQL, opts.project), w);
 
@@ -231,7 +234,7 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   Run<Event> Events(run_id);
   Events.clear();
 
-  pqxx::read_transaction txn(*DB.c);
+  pqxx::read_transaction txn(*getDatabase().c);
   pqxx::result r = txn.prepared("select_simple_run")(run_id).exec();
 
   Events.ID = run_id;
@@ -259,7 +262,7 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   static std::string NewMetric =
       "INSERT INTO metrics (name, value, run_id) VALUES ('{}', {}, {});";
 
-  pqxx::work w(*DB.c);
+  pqxx::work w(*getDatabase().c);
 
   pqxx::result r =
       w.exec(format("SELECT name FROM metrics WHERE run_id = {}", run_id));
