@@ -77,7 +77,6 @@ static PassManagerBuilder getBuilder() {
 }
 
 Function &OptimizeForRuntime(Function &F) {
-  static auto Console = spdlog::stderr_logger_mt("polli/optimizer");
   static PassManagerBuilder Builder = getBuilder();
   Module *M = F.getParent();
   opt::GenerateOutput = true;
@@ -91,7 +90,6 @@ Function &OptimizeForRuntime(Function &F) {
   PM.doFinalization();
 
   if (opt::havePapi()) {
-    DEBUG(Console->warn("\t Generic trace support active."));
     PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createTraceMarkerPass());
@@ -99,16 +97,15 @@ Function &OptimizeForRuntime(Function &F) {
   }
 
   if (opt::haveLikwid()) {
-    DEBUG(Console->warn("\t LikwidMarker support active."));
     PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createLikwidMarkerPass());
     MPM.run(*M);
-  } else {
-    DEBUG(Console->warn("\t LikwidMarker support NOT active."));
   }
 
-  DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
+  DEBUG(
+  StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll")
+  );
   opt::GenerateOutput = false;
 
   return F;

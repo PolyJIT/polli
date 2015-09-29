@@ -196,7 +196,6 @@ public:
 Function *VariantFunction::createVariant(const RunValueList &K) {
   using namespace spdlog::details;
 
-  static auto Console = spdlog::stderr_logger_mt("polli");
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
@@ -212,7 +211,10 @@ Function *VariantFunction::createVariant(const RunValueList &K) {
                                         M->getModuleIdentifier(),
                                         SourceF.getName().str(), K.hash()));
 
-  DEBUG(Console->warn("Create Variant for: {} Hash: {:d}", K.str(), K.hash()));
+  DEBUG(
+  static auto Console = spdlog::stderr_logger_mt("polli");
+  Console->warn("Create Variant for: {} Hash: {:d}", K.str(), K.hash())
+  );
   // Perform parameter value substitution.
   if (!opt::DisableRecompile) {
     FunctionCloner<MainCreator, IgnoreSource,
