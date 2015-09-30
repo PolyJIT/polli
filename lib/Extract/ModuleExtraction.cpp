@@ -441,7 +441,7 @@ struct InstrumentEndpoint {
   void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
   /**
-   * @brief Apply the JIT inderection to the target Function.
+   * @brief Apply the JIT indirection to the target Function.
    *
    * 1. Create a JIT callback function signature, in the form of:
    *    void pjit_main(char *Prototype, int argc, char *argv)

@@ -39,11 +39,14 @@ Run<PPEvent> PapiEvents;
 } // namespace pprof
 
 static __thread bool papi_thread_init = false;
+static bool papi_init = false;
 static inline void do_papi_thread_init_once() {
   if (!papi_thread_init) {
+    if (!papi_init)
+      papi_region_setup();
     int ret = PAPI_thread_init(pthread_self);
     if (ret != PAPI_OK) {
-      fprintf(stderr, "PAPI_library_init() failed\n");
+      fprintf(stderr, "PAPI_thread_init() failed\n");
       exit(ret);
     }
     PapiLocalEvents = &PapiThreadedEvents[pthread_self()];
@@ -153,7 +156,9 @@ void papi_region_setup() {
   if (init != PAPI_VER_CURRENT && init > 0)
     fprintf(stderr, "ERROR(PPROF): PAPI_library_init: Version mismatch\n");
 
+  papi_init = true;
   do_papi_thread_init_once();
+  papi_init = false;
 
   init = PAPI_is_initialized();
   if (init != PAPI_LOW_LEVEL_INITED)
@@ -165,5 +170,6 @@ void papi_region_setup() {
             err);
   //PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
   PapiLocalEvents->push_back(PPEvent(0, RegionEnter, "START"));
+  papi_init = true;
 }
 }
