@@ -13,6 +13,7 @@
 #include "polli/JitScopDetection.h"    // for ParamList, etc
 
 #include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
 #include "llvm/Analysis/RegionIterator.h"
 #include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
@@ -78,6 +79,7 @@ public:
 };
 
 void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<LoopInfoWrapperPass>();
   AU.addRequired<ScopDetection>();
   AU.addRequired<ScalarEvolutionWrapperPass>();
   AU.addRequired<RegionInfoPass>();
@@ -177,6 +179,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
   if (F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
+  LoopInfo *LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
   SD = &getAnalysis<ScopDetection>();
   SE = &getAnalysis<ScalarEvolutionWrapperPass>().getSE();
   RI = &getAnalysis<RegionInfoPass>();
@@ -188,6 +191,11 @@ bool JitScopDetection::runOnFunction(Function &F) {
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
     const Region *R = (*Rej).first;
+    Loop *L = LI->getLoopFor(R->getEntry());
+    L = L ? R->outermostLoopInRegion(L) : nullptr;
+    L = L ? L->getParentLoop() : nullptr;
+    if (!L)
+      continue;
 
     if (!R)
       continue;
