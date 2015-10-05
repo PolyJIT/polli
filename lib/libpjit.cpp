@@ -78,6 +78,7 @@ static Module &getModule(const char *prototype) {
                      Err.getMessage().str());
       log()->error("{:s}", prototype);
     }
+    assert(ModuleIndex[prototype] && "Parsing the prototype module failed!");
   }
 
   return *ModuleIndex[prototype];
