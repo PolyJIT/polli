@@ -191,9 +191,13 @@ bool JitScopDetection::runOnFunction(Function &F) {
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
     const Region *R = (*Rej).first;
-    Loop *L = LI->getLoopFor(R->getEntry());
-    L = L ? R->outermostLoopInRegion(L) : nullptr;
-    L = L ? L->getParentLoop() : nullptr;
+
+    Loop *L = nullptr;
+    for (auto BB : R->blocks()) {
+      L = LI->getLoopFor(BB);
+      if (L)
+        break;
+    }
     if (!L)
       continue;
 
