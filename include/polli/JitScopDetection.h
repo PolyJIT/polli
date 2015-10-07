@@ -60,6 +60,11 @@ public:
                                              JitableScops.end());
   }
 
+  iterator_range<ScopSet::iterator> allScops() {
+    return iterator_range<ScopSet::iterator>(AccumulatedScops.begin(),
+                                             AccumulatedScops.end());
+  }
+
   void enable(bool doEnable) { Enabled = doEnable; }
   bool isInvalidRegion(const Function &F, const Region *R) const;
 
