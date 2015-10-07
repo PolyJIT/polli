@@ -29,8 +29,11 @@ PolyJIT relies on the work of the following projects:
 * [libpqxx](http://pqxx.org/development/libpqxx/)
 
 ## Installation
+
+It is easiest to use the ```pprof build``` command included with
+simbuerg/pprof-study. More details follow.
+
 ```
-TODO
 ```
 
 ## LLVMPolyJIT components
