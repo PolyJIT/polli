@@ -191,6 +191,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
     const Region *R = (*Rej).first;
+    if (!R)
+      continue;
 
     Loop *L = nullptr;
     for (auto BB : R->blocks()) {
@@ -201,8 +203,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
     if (!L)
       continue;
 
-    if (!R)
-      continue;
     DEBUG(Console->trace("==== Next Region: {:>60s}", R->getNameStr()));
     RejectLog Log = (*Rej).second;
 
