@@ -247,6 +247,11 @@ bool JitScopDetection::runOnFunction(Function &F) {
   for (auto &R : JitableScops) {
     SortedJitScops.push_back(const_cast<Region *>(R));
   }
+
+  // Add the classic SCoPs from Polly too (filtering and stuff).
+  for (auto &R : *SD) {
+    SortedJitScops.push_back(const_cast<Region *>(R));
+  }
   std::stable_sort(SortedJitScops.begin(), SortedJitScops.end(),
                    less_than_region_ptr());
 
@@ -280,7 +285,6 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
   ScopSet ClassicScops;
   ClassicScops.insert(SD->begin(), SD->end());
-  AccumulatedScops.insert(SD->begin(), SD->end());
   AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
 
   if (opt::AnalyzeIR) {
