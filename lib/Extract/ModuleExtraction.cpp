@@ -474,7 +474,7 @@ struct InstrumentEndpoint {
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
     To->deleteBody();
-    To->setLinkage(From->getLinkage());
+    To->setLinkage(GlobalValue::WeakAnyLinkage);
 
     BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", To);
     IRBuilder<> Builder(BB);
@@ -591,7 +591,8 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-        ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
+        //ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
+        ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
         Functions.insert(ExtractedF);
