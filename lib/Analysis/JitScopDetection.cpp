@@ -39,6 +39,7 @@
 #include "polly/Canonicalization.h"
 #include "polli/ScopDetectionCheckers.h"
 #include "polli/Utils.h"
+#include "polli/Options.h"
 
 #include "spdlog/spdlog.h"
 
@@ -278,13 +279,17 @@ bool JitScopDetection::runOnFunction(Function &F) {
     }
   }
 
-  for (const Region *R : Rejected) {
-    JitScopsFound -= 1;
-    JitableScops.remove(R);
-  }
-
   ScopSet ClassicScops;
   ClassicScops.insert(SD->begin(), SD->end());
+  for (const Region *R : Rejected) {
+    JitScopsFound -= 1;
+    if (JitableScops.count(R))
+      JitableScops.remove(R);
+    if (ClassicScops.count(R))
+      ClassicScops.remove(R);
+  }
+
+  AccumulatedScops.insert(ClassicScops.begin(), ClassicScops.end());
   AccumulatedScops.insert(JitableScops.begin(), JitableScops.end());
 
   if (opt::AnalyzeIR) {
@@ -303,7 +308,7 @@ void JitScopDetection::print(raw_ostream &OS, const Module *) const {
   unsigned i = 0;
 
   OS << fmt::format("{:d} regions require runtime support:\n", count);
-  for (const Region *R : JitableScops) {
+  for (const Region *R : AccumulatedScops) {
     const ParamList &L = RequiredParams.at(R);
     OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
                                 R->getNameStr(), L.size());
