@@ -28,9 +28,11 @@ llvm::cl::OptionCategory
 
 namespace polli {
 
-void setupLogging() {
+bool setupLogging() {
   spdlog::set_async_mode(1048576);
-  spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
+  spdlog::set_level(spdlog::level::trace);
+  //spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
+  return true;
 }
 
 namespace opt {

@@ -126,7 +126,6 @@ class StaticInitializer {
 public:
   StaticInitializer() {
     set_options_from_environment();
-    setupLogging();
 
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
