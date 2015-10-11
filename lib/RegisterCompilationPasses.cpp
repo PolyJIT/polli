@@ -104,7 +104,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (polly::PollyUseRuntimeAliasChecks && opt::EnableJitable)
     polly::PollyUseRuntimeAliasChecks = false;
 
-  setupLogging();
   DEBUG(printConfig());
 
   polly::registerCanonicalicationPasses(PM);

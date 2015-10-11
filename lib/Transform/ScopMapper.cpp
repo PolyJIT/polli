@@ -53,7 +53,7 @@ bool ScopMapper::runOnFunction(Function &F) {
     return false;
 
   /* Extract each SCoP in this function into a new one. */
-  for (const Region *R : JSD->jitScops()) {
+  for (const Region *R : JSD->allScops()) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
 
     if (Extractor.isEligible()) {
