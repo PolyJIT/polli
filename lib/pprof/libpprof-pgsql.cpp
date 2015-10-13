@@ -76,6 +76,8 @@ public:
       std::string SELECT_SIMPLE_RUN =
           "SELECT id,type,start,duration,name,tid FROM pprof_events WHERE run_id=$1 ORDER BY "
           "start;";
+      std::string DELETE_SIMPLE_RUN =
+          "DELETE FROM pprof_events WHERE run_id=$1";
       std::string SELECT_RUN_IDs =
           "SELECT id FROM run WHERE run_group = $1;";
       std::string SELECT_RUN_GROUPS =
@@ -83,6 +85,7 @@ public:
 
       c->prepare("select_run", SELECT_RUN);
       c->prepare("select_simple_run", SELECT_SIMPLE_RUN);
+      c->prepare("delete_simple_run", DELETE_SIMPLE_RUN);
       c->prepare("select_run_ids", SELECT_RUN_IDs);
       c->prepare("select_run_groups", SELECT_RUN_GROUPS);
     }
@@ -234,13 +237,13 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   Run<Event> Events(run_id);
   Events.clear();
 
-  pqxx::read_transaction txn(*getDatabase().c);
+  pqxx::work txn(*getDatabase().c);
   pqxx::result r = txn.prepared("select_simple_run")(run_id).exec();
 
   Events.ID = run_id;
   for (size_t i = 0; i < r.size(); i++) {
     //id, start, duration, name
-    uint32_t ev_id = r[i][0].as<uint16_t>();
+    uint64_t ev_id = r[i][0].as<uint64_t>();
     uint16_t ev_ty = r[i][1].as<uint16_t>();
     uint64_t ev_start = r[i][2].as<uint64_t>();
     uint64_t ev_duration = r[i][3].as<uint64_t>();
@@ -251,6 +254,8 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
                            ev_name, ev_tid));
   }
 
+  r = txn.prepared("delete_simple_run")(run_id).exec();
+  txn.commit();
   return Events;
 }
 
