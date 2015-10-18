@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 void test(int n, int *A) {
+  #pragma nounroll
   for (int i = 0; i < 5; i++) {
     A[i*n] = A[i] + n;
   }
@@ -26,7 +27,7 @@ int main(int argc, char **argv) {
 }
 
 // STATIC: 1 regions require runtime support:
-// STATIC:   0 region for.body => for.end requires 1 params
+// STATIC:   0 region for.body => for.cond.cleanup requires 1 params
 // STATIC:       0 - (4 * (sext i32 %n to i64))
 // STATIC:       1 reasons can be fixed at run time:
 // STATIC:             0 - Non affine access function: {0,+,(4 * (sext i32 %n to i64))}<nsw><%for.body>

@@ -129,8 +129,8 @@ void papi_atexit_handler(void) {
   for (auto elem : PapiThreadedEvents) {
     bytes += elem.second.size() * sizeof(PPEvent);
   }
-  fprintf(stderr, "libpprof: I required %ld MB storage.\n",
-          bytes / (1024 * 1024));
+  fprintf(stderr, "libpprof: I required %f MB storage.\n",
+          bytes / (double)(1024 * 1024));
 
   if (opts.use_db) {
     for (auto elem : PapiThreadedEvents) {

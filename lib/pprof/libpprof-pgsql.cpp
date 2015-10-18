@@ -162,7 +162,8 @@ static pqxx::result submit(const std::string &Query,
   pqxx::result res;
   try {
     res = w.exec(Query);
-  } catch (pqxx::syntax_error e) {
+  } catch (pqxx::data_exception e) {
+    std::cerr << "pgsql: Encountered the following error:\n";
     std::cerr << e.what();
     std::cerr << "\n";
     std::cerr << e.query();
