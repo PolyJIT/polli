@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polly-detect-keep-going -o /dev/null -x c++ %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
+// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polly-detect-unprofitable -mllvm -polly-detect-keep-going -o /dev/null -x c++ %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
 
 // Check that we can handle a single global variable during compilation.
 
@@ -8,6 +8,7 @@ typedef struct {
 static TestA StructA;
 
 void test(int n) {
+  #pragma nounroll
   for (int i = 0; i < 1024; i++) {
     StructA.A[i*n] = StructA.A[i] + n;
   }
@@ -32,8 +33,8 @@ int main(int argc, char **argv) {
 // CHECK-NEXT:   %7 = bitcast i64* %5 to i8*
 // CHECK-NEXT:   store i8* %7, i8** %6
 // CHECK-NEXT:   %8 = getelementptr [3 x i8*], [3 x i8*]* %params, i32 0, i32 2
-// CHECK-NEXT:   store i8* bitcast (%struct.TestA* @_ZL7StructA to i8*), i8** %8
+// CHECK-NEXT:   store i8* bitcast ([10240 x i32]* @_ZL7StructA.0 to i8*), i8** %8
 // CHECK-NEXT:   %9 = bitcast [3 x i8*]* %params to i8*
-// CHECK-NEXT:   call void @pjit_main(i8* getelementptr inbounds ([1435 x i8], [1435 x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 3, i8* %9)
+// CHECK-NEXT:   call void @pjit_main(i8* getelementptr inbounds ([1476 x i8], [1476 x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 3, i8* %9)
 // CHECK-NEXT:   ret void
 // CHECK-NEXT: }

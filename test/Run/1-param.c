@@ -5,6 +5,7 @@
 static int A[10];
 
 void test(int n) {
+  #pragma nounroll
   for (int i = 0; i < 5; i++) {
     A[i*n] = A[i] + n;
   }

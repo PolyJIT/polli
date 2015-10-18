@@ -17,6 +17,7 @@ typedef struct {
 SB sB;
 
 void test(int n) {
+  #pragma nounroll
   for (int i = 0; i < 5; i++) {
     sA.A[i*n] = sA.A[i] + n;
     sB.B[i*n] = sB.B[i] + n;
@@ -47,7 +48,7 @@ int main(int argc, char **argv) {
 }
 
 // STATIC: 1 regions require runtime support:
-// STATIC:   0 region for.body => for.end requires 2 params
+// STATIC:   0 region for.body => for.cond.cleanup requires 2 params
 // STATIC:     0 - (4 * (sext i32 %n to i64))
 // STATIC:     0 - (4 * (sext i32 %n to i64))
 // STATIC:     2 reasons can be fixed at run time:
