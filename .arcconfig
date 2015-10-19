@@ -1,0 +1,9 @@
+{
+  "project_id" : "polli",
+  "conduit_uri" : "https://phabricator.lairosiel.de",
+  "history.immutable" : true,
+  "load" : [
+    "utils/arcanist/LitTestEngine"
+  ],
+  "unit.engine" : "LitTestEngine"
+}
