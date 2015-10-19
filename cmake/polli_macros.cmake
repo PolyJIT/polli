@@ -38,7 +38,7 @@ macro(add_polli_library name)
 
   if(POLLI_LINK_LIBS)
     foreach(lib ${POLLI_LINK_LIBS})
-      target_link_libraries(${name} ${lib})
+      target_link_libraries(${name} LINK_PRIVATE ${lib})
     endforeach(lib)
   endif(POLLI_LINK_LIBS)
 
