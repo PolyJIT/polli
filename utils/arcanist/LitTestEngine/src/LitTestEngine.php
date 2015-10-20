@@ -23,8 +23,7 @@ final class LitTestEngine extends ArcanistUnitTestEngine {
             ArcanistUnitTestResult::RESULT_FAIL => 'red',
             ArcanistUnitTestResult::RESULT_SKIP => 'yellow',
             ArcanistUnitTestResult::RESULT_BROKEN => 'red',
-            ArcanistUnitTestResult::RESULT_UNSOUND => 'yellow',
-            ArcanistUnitTestResult::RESULT_POSTPONED => 'yellow'
+            ArcanistUnitTestResult::RESULT_UNSOUND => 'yellow'
         );
 
         $s = "\t[\033[0;30m";
