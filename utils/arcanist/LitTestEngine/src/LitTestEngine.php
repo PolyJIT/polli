@@ -64,7 +64,7 @@ final class LitTestEngine extends ArcanistUnitTestEngine {
           $s .=  " $c/$numTests]";
         else
             $s .= " $c]";
-        return phutil_console_format($s);
+        return phutil_console_format($s."\n");
     }
 
     public function run() {
@@ -151,7 +151,7 @@ final class LitTestEngine extends ArcanistUnitTestEngine {
         }
         print "\n";
 
-        $timeThreshold = 0.050;
+        $timeThreshold = 0.05;
         $interestingTests = array();
         foreach ($results as $result) {
           if ($result->getResult() != "pass")
