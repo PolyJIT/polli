@@ -40,7 +40,7 @@ char ModuleExtractor::ID = 0;
 using ModulePtrT = Module *;
 
 static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
-  ModulePtrT NewM = new Module(M.getModuleIdentifier(), M.getContext());
+  auto  NewM = new Module(M.getModuleIdentifier(), M.getContext());
   NewM->setDataLayout(M.getDataLayout());
   NewM->setTargetTriple(M.getTargetTriple());
   NewM->setMaterializer(M.getMaterializer());

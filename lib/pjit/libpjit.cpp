@@ -278,7 +278,7 @@ static inline Function *getPrototype(const char *function) {
   if (!F) {
     log()->error("Could not find a function in: {}", M.getModuleIdentifier());
     llvm_unreachable("Could not find a function in the prototype module");
-    return 0;
+    return nullptr;
   }
   POLLI_TRACING_REGION_STOP(2, "polyjit.prototype.get");
   return F;

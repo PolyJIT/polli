@@ -70,7 +70,7 @@ private:
 public:
   DiagnosticJitScopFound(Function &F, std::string FileName, unsigned EntryLine,
                          unsigned ExitLine)
-      : DiagnosticInfo(PluginDiagnosticKind, DS_Note), F(F), FileName(FileName),
+      : DiagnosticInfo(PluginDiagnosticKind, DS_Note), F(F), FileName(std::move(FileName)),
         EntryLine(EntryLine), ExitLine(ExitLine) {}
 
   void print(DiagnosticPrinter &DP) const override;

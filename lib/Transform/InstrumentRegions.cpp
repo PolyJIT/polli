@@ -187,7 +187,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
   Constant *PapiSetup =
       M.getOrInsertFunction("papi_region_setup", Type::getVoidTy(Context),
-                            IntegerType::getInt32Ty(Context), ArgVTy, (Type *)0);
+                            IntegerType::getInt32Ty(Context), ArgVTy, (Type *)nullptr);
 
   std::vector<Value *> Args(2);
   Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
@@ -239,7 +239,7 @@ bool PapiCScopProfilingInit::runOnModule(Module &M) {
   static auto Console = spdlog::stderr_logger_mt("polli");
 
   Function *Main = M.getFunction("main");
-  if (Main == 0) {
+  if (Main == nullptr) {
     Console->warn("no main function found in module.");
     return false; // No main, no instrumentation!
   }
@@ -266,9 +266,8 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
   NSD = getAnalysisIfAvailable<JitScopDetection>();
   RI = &getAnalysis<RegionInfoPass>();
 
-  for (ScopDetection::iterator It = SD->begin(), SE = SD->end(); It != SE;
-       ++It) {
-    if (processRegion(*It))
+  for (const auto & elem : *SD) {
+    if (processRegion(elem))
       ++InstrumentedRegions;
   }
 

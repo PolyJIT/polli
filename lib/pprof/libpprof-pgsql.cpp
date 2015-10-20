@@ -110,8 +110,8 @@ UuidSet ReadAvailableRunGroups() {
   pqxx::result r = txn.prepared("select_run_groups")(Opts.exp_uuid).exec();
 
   UuidSet RunGroups;
-  for (size_t i = 0; i < r.size(); i++) {
-    RunGroups.insert(r[i][0].as<std::string>());
+  for (auto & elem : r) {
+    RunGroups.insert(elem[0].as<std::string>());
   }
 
   return RunGroups;
@@ -242,14 +242,14 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   pqxx::result r = txn.prepared("select_simple_run")(run_id).exec();
 
   Events.ID = run_id;
-  for (size_t i = 0; i < r.size(); i++) {
+  for (auto & elem : r) {
     //id, start, duration, name
-    uint64_t ev_id = r[i][0].as<uint64_t>();
-    uint16_t ev_ty = r[i][1].as<uint16_t>();
-    uint64_t ev_start = r[i][2].as<uint64_t>();
-    uint64_t ev_duration = r[i][3].as<uint64_t>();
-    std::string ev_name = r[i][4].as<std::string>();
-    uint64_t ev_tid = r[i][5].as<uint64_t>();
+    uint64_t ev_id = elem[0].as<uint64_t>();
+    uint16_t ev_ty = elem[1].as<uint16_t>();
+    uint64_t ev_start = elem[2].as<uint64_t>();
+    uint64_t ev_duration = elem[3].as<uint64_t>();
+    std::string ev_name = elem[4].as<std::string>();
+    uint64_t ev_tid = elem[5].as<uint64_t>();
 
     Events.push_back(Event(ev_id, (PPEventType)ev_ty, ev_start, ev_duration,
                            ev_name, ev_tid));
