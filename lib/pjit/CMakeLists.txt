@@ -32,6 +32,17 @@ set(POLLI_LINK_LIBS
 
 set(LLVM_NO_RTTI 1)
 
+set(POLLI_RUNTIME
+  ../Runtime/FunctionDispatcher.cpp
+  ../Runtime/LikwidMarker.cpp
+  ../Runtime/RuntimeOptimizer.cpp
+  ../Runtime/VariantFunction.cpp
+)
+set(POLLI_SUPPORT
+  ../Support/Options.cpp
+  ../Support/Utils.cpp
+)
+
 add_polli_library(pjit
   ${POLLI_RUNTIME}
   ${POLLI_SUPPORT}
