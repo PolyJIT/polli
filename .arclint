@@ -1,5 +1,18 @@
 {
   "linters": {
+    "cppcheck": {
+      "include": "(include/polli/.+\\.h$|include/pprof/.+\\.h$|lib/.+\\.cpp$)",
+      "type": "cppcheck"
+    },
+    "cpplint": {
+      "include": "(include/polli/.+\\.h$|include/pprof/.+\\.h$|lib/.+\\.cpp$)",
+      "type": "cpplint",
+      "severity": {
+        "runtime/int":            "advice",
+        "whitespace/comments":    "advice",
+        "whitespace/blank_line":  "advice"
+      }
+    },
     "chmod": {
       "type": "chmod"
     },
