@@ -110,7 +110,7 @@ UuidSet ReadAvailableRunGroups() {
   pqxx::result r = txn.prepared("select_run_groups")(Opts.exp_uuid).exec();
 
   UuidSet RunGroups;
-  for (auto & elem : r) {
+  for (auto elem : r) {
     RunGroups.insert(elem[0].as<std::string>());
   }
 
