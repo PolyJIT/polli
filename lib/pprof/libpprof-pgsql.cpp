@@ -242,7 +242,7 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   pqxx::result r = txn.prepared("select_simple_run")(run_id).exec();
 
   Events.ID = run_id;
-  for (auto & elem : r) {
+  for (auto elem : r) {
     //id, start, duration, name
     uint64_t ev_id = elem[0].as<uint64_t>();
     uint16_t ev_ty = elem[1].as<uint16_t>();
