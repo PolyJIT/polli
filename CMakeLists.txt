@@ -79,10 +79,10 @@ option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fexceptions -pthread -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fno-rtti")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
