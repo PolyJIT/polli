@@ -35,7 +35,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
-#include "spdlog/spdlog.h"
+#define FMT_HEADER_ONLY
+#include "cppformat/format.h"
 
 #include <stdlib.h>
 #include <vector>
@@ -48,11 +49,6 @@ namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
-
-static std::shared_ptr<spdlog::logger> log() {
-  static auto Console = spdlog::stderr_logger_st("polli/libpjit");
-  return Console;
-}
 
 /**
  * @brief Read the LLVM-IR module from the given prototype string.
@@ -73,10 +69,10 @@ static Module &getModule(const char *prototype) {
       DEBUG(Mod->dump());
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
     } else {
-      log()->error("{:s}:{:d}:{:d} {:s}", Err.getFilename().str(),
-                     Err.getLineNo(), Err.getColumnNo(),
-                     Err.getMessage().str());
-      log()->error("{:s}", prototype);
+      errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
+                            Err.getLineNo(), Err.getColumnNo(),
+                            Err.getMessage().str());
+      errs() << fmt::format("{:s}\n", prototype);
     }
     assert(ModuleIndex[prototype] && "Parsing the prototype module failed!");
   }
@@ -255,12 +251,12 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
 
   if (!EE) {
-    log()->error("no execution engine found.");
+    errs() << "no execution engine found.\n";
     return;
   }
 
-  DEBUG(log()->warn("execution of {:>s} begins (#{:d} params)",
-                      NewF.getName().str(), paramc));
+  DEBUG(dbgs() << fmt::format("execution of {:>s} begins (#{:d} params)",
+                              NewF.getName().str(), paramc));
   if (!FunctionCache.count(&NewF))
     FunctionCache.insert(
         std::make_pair(&NewF, EE->getFunctionAddress(NewF.getName().str())));
@@ -268,7 +264,8 @@ static void runSpecializedFunction(llvm::Function &NewF, int paramc,
   void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
 
   PF(paramc, params);
-  DEBUG(log()->warn("execution of {:>s} completed", NewF.getName().str()));
+  DEBUG(dbgs() << fmt::format("execution of {:>s} completed",
+                              NewF.getName().str()));
 }
 
 static inline Function *getPrototype(const char *function) {
@@ -276,7 +273,8 @@ static inline Function *getPrototype(const char *function) {
   Module &M = getModule(function);
   Function *F = getFunction(M);
   if (!F) {
-    log()->error("Could not find a function in: {}", M.getModuleIdentifier());
+    errs() << fmt::format("Could not find a function in: {}\n",
+                          M.getModuleIdentifier());
     llvm_unreachable("Could not find a function in the prototype module");
     return nullptr;
   }
@@ -288,16 +286,16 @@ static void printArgs(const Function &F, size_t argc, char **params) {
   std::string buf;
   llvm::raw_string_ostream s(buf);
   F.getType()->print(s);
-  log()->warn(s.str());
+  dbgs() << s.str() << "\n";
   for (size_t i = 0; i < argc; i++) {
-    log()->warn("[{}] -> {:d} - {}", i, (*(uint64_t *)params[i]),
-                  (void *)(params[i]));
+    dbgs() << fmt::format("[{}] -> {:d} - {}\n", i, (*(uint64_t *)params[i]),
+                          (void *)(params[i]));
   }
 }
 
 static void printRunValues(const RunValueList & Values) {
   for (auto &RV : Values) {
-    log()->warn("{} matched against {}", RV.value, (void *)RV.Arg);
+    dbgs() << fmt::format("{} matched against {}\n", RV.value, (void *)RV.Arg);
   }
 }
 

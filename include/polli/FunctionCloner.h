@@ -34,17 +34,14 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "spdlog/spdlog.h"
+#define FMT_HEADER_ONLY
+#include "cppformat/format.h"
 
 using namespace llvm;
-using namespace spdlog;
-using namespace spdlog::details;
 
 namespace polli {
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
-  static auto Console = spdlog::stderr_logger_st("polli/verify");
-
   std::string buffer;
   llvm::raw_string_ostream s(buffer);
   s << Prefix;
@@ -59,7 +56,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
     s << " OK (F is nullptr)";
   }
 
-  Console->info(s.str());
+  outs() << fmt::format(s.str());
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,

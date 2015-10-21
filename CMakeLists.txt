@@ -92,18 +92,9 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/external/
   ${CMAKE_CURRENT_BINARY_DIR}/external/
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/spdlog/include
-  ${CMAKE_CURRENT_BINARY_DIR}/external/spdlog/include
 )
 
 install(DIRECTORY include/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY external/spdlog/include/
   DESTINATION include
   FILES_MATCHING
   PATTERN "*.h"
@@ -122,13 +113,6 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/
   FILES_MATCHING
   PATTERN "*.h"
   PATTERN "CMakeFiles" EXCLUDE
-  PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY ${POLLI_BINARY_DIR}/external/spdlog/include/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
   PATTERN ".svn" EXCLUDE
   )
 

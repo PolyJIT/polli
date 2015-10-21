@@ -33,7 +33,6 @@
 #include "polly/RegisterPasses.h"
 #include "polly/Options.h"
 
-#include "spdlog/spdlog.h"
 #include <unistd.h>
 
 namespace llvm {

@@ -41,7 +41,8 @@
 #include "polli/Utils.h"
 #include "polli/Options.h"
 
-#include "spdlog/spdlog.h"
+#define FMT_HEADER_ONLY
+#include "cppformat/format.h"
 
 #include <map>
 #include <memory>
@@ -55,7 +56,6 @@ using namespace llvm;
 using namespace llvm::legacy;
 using namespace polly;
 using namespace polli;
-using namespace spdlog::details;
 
 STATISTIC(JitScopsFound, "Number of jitable SCoPs");
 
@@ -128,11 +128,10 @@ static void emitJitSCoPs(const Function &F, const ScopSet &Scops) {
 }
 
 static bool sharesBlocks(const Region *CurR, const Region *R) {
-  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
   for (auto I = CurR->element_begin(), E = CurR->element_end(); I != E; ++I)
     if (!I->isSubRegion() && CurR->contains(I->getNodeAs<BasicBlock>())) {
-      DEBUG(Console->debug("Region: {} shares blocks with {}",
-                           CurR->getNameStr(), R->getNameStr()));
+      DEBUG(dbgs() << fmt::format("Region: {} shares blocks with {}",
+                                  CurR->getNameStr(), R->getNameStr()));
       return true;
     }
 
@@ -149,8 +148,6 @@ bool operator<(const Region &LHS, const Region &RHS) {
   assert(sharesBlocks(&LHS, &RHS) &&
          "LHS & RHS don't share any blocks, reject.");
 
-  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
-
   unsigned LeftCnt = 0;
   unsigned RightCnt = 0;
 
@@ -164,13 +161,11 @@ bool operator<(const Region &LHS, const Region &RHS) {
       RightCnt++;
   }
 
-  DEBUG(Console->error("{} < {}", LeftCnt, RightCnt));
+  DEBUG(dbgs() << fmt::format("{} < {}", LeftCnt, RightCnt));
   return LeftCnt < RightCnt;
 }
 
 bool JitScopDetection::runOnFunction(Function &F) {
-  static auto Console = spdlog::stderr_logger_st("polli/jitsd");
-
   if (!Enabled)
     return false;
 
@@ -186,8 +181,8 @@ bool JitScopDetection::runOnFunction(Function &F) {
   RI = &getAnalysis<RegionInfoPass>();
   M = F.getParent();
 
-  DEBUG(Console->trace("== Detect JIT SCoPs in function: {:>30}",
-                       F.getName().str()));
+  DEBUG(dbgs() << fmt::format("== Detect JIT SCoPs in function: {:>30}",
+                              F.getName().str()));
   for (ScopDetection::const_reject_iterator Rej = SD->reject_begin(),
                                             RejE = SD->reject_end();
        Rej != RejE; ++Rej) {
@@ -204,7 +199,7 @@ bool JitScopDetection::runOnFunction(Function &F) {
     if (!L)
       continue;
 
-    DEBUG(Console->trace("==== Next Region: {:>60s}", R->getNameStr()));
+    DEBUG(dbgs() << fmt::format("==== Next Region: {:>60s}", R->getNameStr()));
     RejectLog Log = (*Rej).second;
 
     NonAffineAccessChecker NonAffAccessChk(R, SE);
@@ -268,12 +263,12 @@ bool JitScopDetection::runOnFunction(Function &F) {
       if (sharesBlocks(LHS, RHS)) {
         if (*LHS < *RHS) {
           Rejected.insert(LHS);
-          DEBUG(Console->trace("Rejecting: ", LHS->getNameStr()));
+          DEBUG(dbgs() << fmt::format("Rejecting: ", LHS->getNameStr()));
           break;
         }
         else {
           Rejected.insert(RHS);
-          DEBUG(Console->trace("Rejecting: ", RHS->getNameStr()));
+          DEBUG(dbgs() << fmt::format("Rejecting: ", RHS->getNameStr()));
         }
     }
     }

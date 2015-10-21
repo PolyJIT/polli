@@ -24,7 +24,9 @@
 #include "polly/ScopDetectionDiagnostic.h"       // for getDebugLocation
 
 #include "polli/Utils.h"
-#include "spdlog/spdlog.h"
+
+#define FMT_HEADER_ONLY
+#include "cppformat/format.h"
 
 namespace llvm {
 class Function;
@@ -41,7 +43,6 @@ void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
-  static auto Console = spdlog::stderr_logger_st("polli");
   JSD = &getAnalysis<JitScopDetection>();
   DTP = &getAnalysis<DominatorTreeWrapperPass>();
 
@@ -59,7 +60,7 @@ bool ScopMapper::runOnFunction(Function &F) {
     if (Extractor.isEligible()) {
       MappableRegions.insert(R);
     } else {
-      Console->error("{} not eligible", R->getNameStr());
+      errs() << fmt::format("{} not eligible", R->getNameStr());
     }
   }
 

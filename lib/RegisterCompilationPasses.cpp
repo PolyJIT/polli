@@ -29,11 +29,11 @@
 #include "polli/ScopMapper.h"
 #include "polli/ModuleExtractor.h"
 
-#include "spdlog/spdlog.h"
+#define FMT_HEADER_ONLY
+#include "cppformat/format.h"
 
 using namespace llvm;
 using namespace polli;
-using namespace spdlog::details;
 
 #include <iostream>
 #include <stdio.h>
@@ -47,14 +47,14 @@ void initializePolliPasses(PassRegistry &Registry) {
 }
 
 static void printConfig() {
-  auto Console = spdlog::stderr_logger_st("polli");
-  Console->info("PolyJIT - Config:");
-  Console->info(" polyjit.jitable: {}", opt::EnableJitable);
-  Console->info(" polyjit.recompile: {}", !opt::DisableRecompile);
-  Console->info(" polyjit.execute: {}", !opt::DisableExecution);
-  Console->info(" polyjit.instrument: {}", opt::InstrumentRegions);
-  Console->info(" polly.delinearize: {}", polly::PollyDelinearize);
-  Console->info(" polly.aliaschecks: {}", polly::PollyUseRuntimeAliasChecks);
+  errs() << fmt::format("PolyJIT - Config:");
+  errs() << fmt::format(" polyjit.jitable: {}", opt::EnableJitable);
+  errs() << fmt::format(" polyjit.recompile: {}", !opt::DisableRecompile);
+  errs() << fmt::format(" polyjit.execute: {}", !opt::DisableExecution);
+  errs() << fmt::format(" polyjit.instrument: {}", opt::InstrumentRegions);
+  errs() << fmt::format(" polly.delinearize: {}", polly::PollyDelinearize);
+  errs() << fmt::format(" polly.aliaschecks: {}",
+                        polly::PollyUseRuntimeAliasChecks);
 }
 
 /**
@@ -104,7 +104,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (polly::PollyUseRuntimeAliasChecks && opt::EnableJitable)
     polly::PollyUseRuntimeAliasChecks = false;
 
-  DEBUG(printConfig());
+  printConfig();
 
   polly::registerCanonicalicationPasses(PM);
   registerPollyPasses(PM);
@@ -114,8 +114,10 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (opt::AnalyzeIR)
     PM.add(new FunctionPassPrinter<JitScopDetection>(outs()));
 
-  if (opt::InstrumentRegions)
+  if (opt::InstrumentRegions) {
     PM.add(new PapiCScopProfiling());
+    return;
+  }
 
   if (!opt::DisableRecompile) {
     PM.add(new ScopMapper());

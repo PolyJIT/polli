@@ -50,7 +50,6 @@
 #include "llvm/Support/Casting.h"       // for isa
 #include "llvm/Support/Debug.h"         // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
-#include "spdlog/spdlog.h"
 
 namespace llvm { class LLVMContext; }  // lines 49-49
 namespace llvm { class Value; }  // lines 50-50
@@ -236,11 +235,9 @@ static void InsertProfilingInitCall(Function *MainFn) {
  * @return  true, if we changed something in the module.
  */
 bool PapiCScopProfilingInit::runOnModule(Module &M) {
-  static auto Console = spdlog::stderr_logger_mt("polli");
-
   Function *Main = M.getFunction("main");
   if (Main == nullptr) {
-    Console->warn("no main function found in module.");
+    dbgs() << "no main function found in module.\n";
     return false; // No main, no instrumentation!
   }
 

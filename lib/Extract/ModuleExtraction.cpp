@@ -2,8 +2,6 @@
 #include "polli/ModuleExtractor.h"
 #include "polli/ScopMapper.h"
 
-#define DEBUG_TYPE "polli-extract"
-
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -25,10 +23,7 @@
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/IPO.h"
 
-#include "spdlog/spdlog.h"
-
 using namespace llvm;
-using namespace spdlog::details;
 
 STATISTIC(Instrumented, "Number of instrumented functions");
 STATISTIC(MappedGlobals, "Number of global to argument redirections");
@@ -403,12 +398,11 @@ struct RemoveGlobalsPolicy {
  */
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
-  static auto Console = spdlog::stderr_logger_st(DEBUG_TYPE);
-
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
 
-  DEBUG(Console->debug("Source to Prototype -> {:s}\n", F.getName().str()));
+  DEBUG(dbgs() << fmt::format("Source to Prototype -> {:s}\n",
+                              F.getName().str()));
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
   InstrList Converted = apply<InstrList>(F, constantExprToInstruction);
