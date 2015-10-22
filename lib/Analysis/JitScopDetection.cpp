@@ -5,35 +5,44 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 - Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "polli/JitScopDetection.h"    // for ParamList, etc
+#include "polli/JitScopDetection.h"
 
-#include "llvm/ADT/Statistic.h"            // for STATISTIC, Statistic
+#include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/Analysis/RegionInfo.h"      // for Region, RegionInfo
+#include "llvm/Analysis/Passes.h"
+#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/RegionIterator.h"
-#include "llvm/Analysis/ScalarEvolution.h" // for SCEV, ScalarEvolution
+#include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Function.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
-#include "llvm/Analysis/Passes.h"
-#include "llvm/IR/Dominators.h" // for DominatorTreeWrapperPass
-#include "llvm/IR/LegacyPassManager.h" // for FunctionPassManager
+#include "llvm/IR/Dominators.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "polly/ScopDetection.h"
+#include "polly/ScopDetectionDiagnostic.h"
+#include "polly/Support/SCEVValidator.h"
 #include "llvm/InitializePasses.h"
-#include "llvm/PassAnalysisSupport.h"  // for AnalysisUsage, etc
-#include "llvm/PassSupport.h"          // for INITIALIZE_PASS_DEPENDENCY, etc
-#include "llvm/Support/CommandLine.h"  // for desc, opt
-#include "llvm/Support/Debug.h"        // for dbgs, DEBUG
-#include "llvm/Support/raw_ostream.h"  // for raw_ostream
-#include "polly/ScopDetection.h"       // for ScopDetection, etc
-#include "polly/ScopDetectionDiagnostic.h" // for ReportNonAffBranch, etc
-#include "polly/Support/SCEVValidator.h"   // for getParamsInNonAffineExpr, etc
+#include "llvm/PassAnalysisSupport.h"
+#include "llvm/PassSupport.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "polly/LinkAllPasses.h"
 #include "polly/Canonicalization.h"
@@ -43,14 +52,6 @@
 
 #define FMT_HEADER_ONLY
 #include "cppformat/format.h"
-
-#include <map>
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-#include <typeinfo>
 
 using namespace llvm;
 using namespace llvm::legacy;
