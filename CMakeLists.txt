@@ -35,43 +35,35 @@ set(CMAKE_MODULE_PATH
 
 include("polli_macros")
 
-if (NOT DEFINED PAPI_FOUND)
-  find_package(Papi REQUIRED)
-  include_directories(BEFORE ${PAPI_INCLUDE_DIR})
-  link_directories(${PAPI_LIBRARY})
-endif ()
+find_package(Papi REQUIRED)
+find_package(Pthread REQUIRED)
+find_package(Likwid REQUIRED)
+find_package(Pqxx REQUIRED)
 
-add_library(papi SHARED IMPORTED)
-set_target_properties(papi
-  PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+add_library(papi UNKNOWN IMPORTED)
+add_library(pthread UNKNOWN IMPORTED)
+add_library(likwid UNKNOWN IMPORTED)
+add_library(pqxx UNKNOWN IMPORTED)
 
-if (NOT DEFINED PTHREAD_FOUND)
-  find_package(Pthread REQUIRED)
-  include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
-  link_directories(${PTHREAD_LIBRARY})
-endif ()
-
-add_library(pthread SHARED IMPORTED)
-set_target_properties(pthread
-  PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
-
-if (NOT DEFINED LIKWID_FOUND)
-  find_package(Likwid REQUIRED)
-  include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
-  link_directories(${LIKWID_LIBRARY})
-endif ()
-
-add_library(likwid SHARED IMPORTED)
+set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
 set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
-
-if (NOT DEFINED PQXX_FOUND)
-  find_package(Pqxx REQUIRED)
-  include_directories(BEFORE ${PQXX_INCLUDE_DIR})
-  link_directories(${PQXX_LIBRARY})
-endif ()
-
-add_library(pqxx SHARED IMPORTED)
 set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
+
+include_directories(BEFORE ${PAPI_INCLUDE_DIR})
+include_directories(BEFORE ${PQXX_INCLUDE_DIR})
+include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
+include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
+
+get_filename_component(PAPI_LIBDIR ${PAPI_LIBRARY} DIRECTORY)
+get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
+get_filename_component(LIKWID_LIBDIR ${LIKWID_LIBRARY} DIRECTORY)
+get_filename_component(PTHREAD_LIBDIR ${PTHREAD_LIBRARY} DIRECTORY)
+
+link_directories(${PAPI_LIBDIR})
+link_directories(${PQXX_LIBDIR})
+link_directories(${LIKWID_LIBDIR})
+link_directories(${PTHREAD_LIBDIR})
 
 option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
 option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)

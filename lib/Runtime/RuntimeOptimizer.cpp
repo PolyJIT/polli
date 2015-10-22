@@ -49,6 +49,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   polly::registerPollyPasses(PM);
 }
 
+#ifdef DEBUG
 static PassManagerBuilder getDebugBuilder() {
   PassManagerBuilder Builder;
 
@@ -62,6 +63,7 @@ static PassManagerBuilder getDebugBuilder() {
 
   return Builder;
 }
+#endif
 
 static PassManagerBuilder getBuilder() {
   PassManagerBuilder Builder;
@@ -76,7 +78,11 @@ static PassManagerBuilder getBuilder() {
 }
 
 Function &OptimizeForRuntime(Function &F) {
+#ifdef NDEBUG
   static PassManagerBuilder Builder = getBuilder();
+#else
+  static PassManagerBuilder Builder = getDebugBuilder();
+#endif
   Module *M = F.getParent();
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;

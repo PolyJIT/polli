@@ -28,41 +28,16 @@ set(LLVM_LINK_COMPONENTS
 
 set(POLLI_LINK_LIBS
   Polly
+  PolyJIT_Runtime
+  PolyJIT_Support
+  likwid
+  pthread
+  pfm
+  papi
+  pprof
 )
 
-set(LLVM_NO_RTTI 1)
-
-set(POLLI_RUNTIME
-  ../Runtime/FunctionDispatcher.cpp
-  ../Runtime/LikwidMarker.cpp
-  ../Runtime/RuntimeOptimizer.cpp
-  ../Runtime/VariantFunction.cpp
-)
-set(POLLI_SUPPORT
-  ../Support/Options.cpp
-  ../Support/Utils.cpp
-)
-
-add_polli_library(pjit
-  ${POLLI_RUNTIME}
-  ${POLLI_SUPPORT}
+set(SHARED_LIBRARY On)
+add_polli_library(pjit SHARED
   libpjit.cpp
 )
-
-if (BUILD_SHARED_LIBS)
-  target_link_libraries(pjit LINK_PRIVATE
-    pprof
-    likwid
-    pthread
-  )
-endif()
-target_link_libraries(pjit PUBLIC
-  pprof
-  likwid
-  pthread)
-
-
-if (TARGET intrinsics_gen)
-  # Check if we are building as part of an LLVM build
-  add_dependencies(pjit intrinsics_gen)
-endif()
