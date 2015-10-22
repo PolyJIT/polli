@@ -56,6 +56,11 @@ if (BUILD_SHARED_LIBS)
     pthread
   )
 endif()
+target_link_libraries(pjit
+  pprof
+  likwid
+  pthread)
+
 
 if (TARGET intrinsics_gen)
   # Check if we are building as part of an LLVM build
