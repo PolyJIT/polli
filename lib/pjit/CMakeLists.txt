@@ -56,7 +56,7 @@ if (BUILD_SHARED_LIBS)
     pthread
   )
 endif()
-target_link_libraries(pjit
+target_link_libraries(pjit PUBLIC
   pprof
   likwid
   pthread)
