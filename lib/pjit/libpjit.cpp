@@ -11,6 +11,10 @@
 // execution of LLVM bitcode in an efficient manner.
 //
 //===----------------------------------------------------------------------===//
+#include <stdlib.h>
+#include <cstdlib>
+#include <vector>
+
 #include <likwid.h>
 
 #include "llvm/IR/Module.h"
@@ -38,10 +42,6 @@
 
 #define FMT_HEADER_ONLY
 #include "cppformat/format.h"
-
-#include <stdlib.h>
-#include <vector>
-#include <cstdlib>
 
 using namespace llvm;
 using namespace polli;
@@ -108,14 +108,6 @@ static inline void do_shutdown() {
 
 static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
-
-  if (char *LogLevel = std::getenv("POLLI_LOG_LEVEL")) {
-    opt::LogLevel = (polli::LogType)std::atoi(LogLevel);
-  }
-
-  if (char *OLvl = std::getenv("POLLI_OPT_LEVEL"))
-    opt::OptLevel = std::atoi(OLvl);
-
   opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
 }
 
