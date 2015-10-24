@@ -631,14 +631,15 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstF->addFnAttr(Attribute::OptimizeNone);
     InstF->addFnAttr(Attribute::NoInline);
 
-    // Remove all uses and unlink the old function from the call graph.
-    F->replaceAllUsesWith(InstF);
-    CallGraphNode CGN(F);
-    CG.removeFunctionFromModule(&CGN);
-
     InstrumentedFunctions.insert(InstF);
     VMap.clear();
     Instrumented++;
+
+    // Remove all uses and unlink the old function from the call graph.
+    F->addFnAttr("polyjit.old");
+    F->replaceAllUsesWith(InstF);
+//    CallGraphNode CGN(F);
+//    CG.removeFunctionFromModule(&CGN);
   }
 
   return Changed;
