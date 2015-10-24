@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // Policy based function cloning.
@@ -73,7 +75,7 @@ class FunctionCloner : public OnCreate,
 public:
   explicit FunctionCloner(
       ValueToValueMapTy &map, Module *m = NULL)
-      : VMap(map), ToM(m), From(nullptr), To(nullptr) {}
+      : ToM(m), From(nullptr), To(nullptr) {}
 
   void setTarget(Function *F) { To = F; }
   FunctionCloner &setSource(Function *F) {
@@ -102,6 +104,7 @@ public:
    * If target module does not exist, create the target
    * function in the source module. */
   Function *start(bool RemapCalls = false) {
+    ValueToValueMapTy VMap;
     if (!ToM)
       ToM = From->getParent();
 
@@ -131,7 +134,6 @@ public:
   }
 
 private:
-  ValueToValueMapTy &VMap;
   Module *ToM;
   Function *From;
   Function *To;

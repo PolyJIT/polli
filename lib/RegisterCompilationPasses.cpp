@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // Register the compilation sequence required for the PolyJIT runtime support.
@@ -47,13 +49,13 @@ void initializePolliPasses(PassRegistry &Registry) {
 }
 
 static void printConfig() {
-  errs() << fmt::format("PolyJIT - Config:");
-  errs() << fmt::format(" polyjit.jitable: {}", opt::EnableJitable);
-  errs() << fmt::format(" polyjit.recompile: {}", !opt::DisableRecompile);
-  errs() << fmt::format(" polyjit.execute: {}", !opt::DisableExecution);
-  errs() << fmt::format(" polyjit.instrument: {}", opt::InstrumentRegions);
-  errs() << fmt::format(" polly.delinearize: {}", polly::PollyDelinearize);
-  errs() << fmt::format(" polly.aliaschecks: {}",
+  errs() << fmt::format("PolyJIT - Config:\n");
+  errs() << fmt::format(" polyjit.jitable: {}\n", opt::EnableJitable);
+  errs() << fmt::format(" polyjit.recompile: {}\n", !opt::DisableRecompile);
+  errs() << fmt::format(" polyjit.execute: {}\n", !opt::DisableExecution);
+  errs() << fmt::format(" polyjit.instrument: {}\n", opt::InstrumentRegions);
+  errs() << fmt::format(" polly.delinearize: {}\n", polly::PollyDelinearize);
+  errs() << fmt::format(" polly.aliaschecks: {}\n",
                         polly::PollyUseRuntimeAliasChecks);
 }
 
@@ -104,7 +106,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (polly::PollyUseRuntimeAliasChecks && opt::EnableJitable)
     polly::PollyUseRuntimeAliasChecks = false;
 
-  printConfig();
+  DEBUG(printConfig());
 
   polly::registerCanonicalicationPasses(PM);
   registerPollyPasses(PM);
@@ -130,4 +132,4 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 static llvm::RegisterStandardPasses
     RegisterPolyJIT(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
                     registerPolyJIT);
-} // namespace polli
+}  // namespace polli

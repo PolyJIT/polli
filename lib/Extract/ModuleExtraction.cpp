@@ -4,6 +4,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/Attributes.h"
@@ -12,12 +13,12 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/Pass.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
@@ -32,10 +33,10 @@ STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
 namespace polli {
 char ModuleExtractor::ID = 0;
 
-using ModulePtrT = Module *;
+using ModulePtrT = std::unique_ptr<Module>;
 
 static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
-  auto  NewM = new Module(M.getModuleIdentifier(), M.getContext());
+  auto NewM = ModulePtrT(new Module(M.getModuleIdentifier(), M.getContext()));
   NewM->setDataLayout(M.getDataLayout());
   NewM->setTargetTriple(M.getTargetTriple());
   NewM->setMaterializer(M.getMaterializer());
@@ -46,6 +47,7 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
 
 void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopMapper>();
+  AU.addRequired<CallGraphWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
@@ -604,7 +606,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Module *M = F->getParent();
     StringRef ModuleName = F->getParent()->getModuleIdentifier();
     StringRef FromName = F->getName();
-    Module *PrototypeM = copyModule(VMap, *M);
+    ModulePtrT PrototypeM = copyModule(VMap, *M);
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
@@ -628,11 +630,11 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstF->addFnAttr(Attribute::OptimizeNone);
     InstF->addFnAttr(Attribute::NoInline);
 
-    F->replaceAllUsesWith(InstF);
-
     InstrumentedFunctions.insert(InstF);
     VMap.clear();
     Instrumented++;
+
+    F->replaceAllUsesWith(InstF);
   }
 
   return Changed;
@@ -649,4 +651,4 @@ void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
-} // namespace polli // namespace polli // namespace polli // end of polli namespace
+}  // namespace polli

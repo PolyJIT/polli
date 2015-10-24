@@ -6,7 +6,7 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-//
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
 //
 //===----------------------------------------------------------------------===//
 #ifndef POLLI_MODULE_EXTRACTOR_H
@@ -38,5 +38,5 @@ private:
   // DO NOT IMPLEMENT
   const ModuleExtractor &operator=(const ModuleExtractor &);
 };
-} // end of namespace polli
+}  // end of namespace polli
 #endif // POLLI_MODULE_EXTRACTOR_H

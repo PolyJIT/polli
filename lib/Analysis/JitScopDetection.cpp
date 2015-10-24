@@ -305,6 +305,8 @@ void JitScopDetection::print(raw_ostream &OS, const Module *) const {
 
   OS << fmt::format("{:d} regions require runtime support:\n", count);
   for (const Region *R : AccumulatedScops) {
+    if (!R || (R && !RequiredParams.count(R)))
+      continue;
     const ParamList &L = RequiredParams.at(R);
     OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
                                 R->getNameStr(), L.size());
