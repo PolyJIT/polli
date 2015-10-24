@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // Register the compilation sequence required for the PolyJIT runtime support.
@@ -122,7 +124,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (!opt::DisableRecompile) {
     PM.add(new ScopMapper());
     PM.add(new ModuleExtractor());
-    //PM.add(createFunctionCleanupPass());
     if (opt::AnalyzeIR)
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }
@@ -131,4 +132,4 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 static llvm::RegisterStandardPasses
     RegisterPolyJIT(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
                     registerPolyJIT);
-} // namespace polli
+}  // namespace polli

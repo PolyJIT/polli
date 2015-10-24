@@ -15,10 +15,10 @@
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Pass.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
@@ -580,7 +580,6 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   ScopMapper &SM = getAnalysis<ScopMapper>();
-  CallGraph &CG = getAnalysis<CallGraphWrapperPass>().getCallGraph();
 
   // Extract all regions marked for extraction into an own function and mark it
   // as 'polyjit-jit-candidate'.
@@ -635,11 +634,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     VMap.clear();
     Instrumented++;
 
-    // Remove all uses and unlink the old function from the call graph.
-    F->addFnAttr("polyjit.old");
     F->replaceAllUsesWith(InstF);
-//    CallGraphNode CGN(F);
-//    CG.removeFunctionFromModule(&CGN);
   }
 
   return Changed;
@@ -654,43 +649,6 @@ void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
   }
 }
 
-class FunctionCleanupPass : public ModulePass {
-public:
-  static char ID;
-  explicit FunctionCleanupPass() : llvm::ModulePass(ID) {}
-
-  virtual bool runOnModule(Module &M) override {
-    bool Modified = false;
-
-    for(Function &F : M.functions()) {
-      if (F.isDeclaration())
-        continue;
-
-      if (F.hasFnAttribute("polyjit.old")) {
-        F.eraseFromParent();
-        F.deleteBody();
-        F.dropAllReferences();
-        Modified = true;
-      }
-    }
-    return Modified;
-  }
-private:
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  FunctionCleanupPass(const FunctionCleanupPass &);
-  // DO NOT IMPLEMENT
-  const FunctionCleanupPass &operator=(const FunctionCleanupPass &);
-};
-
-char FunctionCleanupPass::ID = 0;
-Pass *createFunctionCleanupPass() {
-  return new FunctionCleanupPass();
-}
-
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
-
-static RegisterPass<FunctionCleanupPass>
-    Y("polli-cleanup-prototypes", "PolyJIT - Cleanup extracted prototypes");
-} // namespace polli
+}  // namespace polli

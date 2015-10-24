@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // Policy based function cloning.
