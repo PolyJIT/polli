@@ -128,6 +128,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 }
 
 static llvm::RegisterStandardPasses
-    RegisterPolyJIT(llvm::PassManagerBuilder::EP_VectorizerStart,
+    RegisterPolyJIT(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
                     registerPolyJIT);
 } // namespace polli
