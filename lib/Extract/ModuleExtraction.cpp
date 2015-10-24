@@ -4,6 +4,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/Attributes.h"
@@ -46,6 +47,7 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
 
 void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopMapper>();
+  AU.addRequired<CallGraphWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
@@ -578,6 +580,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   ScopMapper &SM = getAnalysis<ScopMapper>();
+  CallGraph &CG = getAnalysis<CallGraphWrapperPass>().getCallGraph();
 
   // Extract all regions marked for extraction into an own function and mark it
   // as 'polyjit-jit-candidate'.
@@ -628,7 +631,10 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstF->addFnAttr(Attribute::OptimizeNone);
     InstF->addFnAttr(Attribute::NoInline);
 
+    // Remove all uses and unlink the old function from the call graph.
     F->replaceAllUsesWith(InstF);
+    CallGraphNode CGN(F);
+    CG.removeFunctionFromModule(&CGN);
 
     InstrumentedFunctions.insert(InstF);
     VMap.clear();
