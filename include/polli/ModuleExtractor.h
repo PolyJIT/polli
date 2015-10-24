@@ -18,6 +18,8 @@
 #include "llvm/Pass.h"
 
 namespace polli {
+Pass *createFunctionCleanupPass();
+
 class ModuleExtractor : public llvm::FunctionPass {
 public:
   static char ID;

@@ -122,6 +122,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (!opt::DisableRecompile) {
     PM.add(new ScopMapper());
     PM.add(new ModuleExtractor());
+    //PM.add(createFunctionCleanupPass());
     if (opt::AnalyzeIR)
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }

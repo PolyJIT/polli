@@ -13,9 +13,9 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/Pass.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Pass.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
@@ -654,6 +654,43 @@ void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
   }
 }
 
+class FunctionCleanupPass : public ModulePass {
+public:
+  static char ID;
+  explicit FunctionCleanupPass() : llvm::ModulePass(ID) {}
+
+  virtual bool runOnModule(Module &M) override {
+    bool Modified = false;
+
+    for(Function &F : M.functions()) {
+      if (F.isDeclaration())
+        continue;
+
+      if (F.hasFnAttribute("polyjit.old")) {
+        F.eraseFromParent();
+        F.deleteBody();
+        F.dropAllReferences();
+        Modified = true;
+      }
+    }
+    return Modified;
+  }
+private:
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  FunctionCleanupPass(const FunctionCleanupPass &);
+  // DO NOT IMPLEMENT
+  const FunctionCleanupPass &operator=(const FunctionCleanupPass &);
+};
+
+char FunctionCleanupPass::ID = 0;
+Pass *createFunctionCleanupPass() {
+  return new FunctionCleanupPass();
+}
+
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
-} // namespace polli // namespace polli // namespace polli // end of polli namespace
+
+static RegisterPass<FunctionCleanupPass>
+    Y("polli-cleanup-prototypes", "PolyJIT - Cleanup extracted prototypes");
+} // namespace polli
