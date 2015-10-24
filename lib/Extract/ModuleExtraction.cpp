@@ -32,10 +32,10 @@ STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
 namespace polli {
 char ModuleExtractor::ID = 0;
 
-using ModulePtrT = Module *;
+using ModulePtrT = std::unique_ptr<Module>;
 
 static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
-  auto  NewM = new Module(M.getModuleIdentifier(), M.getContext());
+  auto NewM = ModulePtrT(new Module(M.getModuleIdentifier(), M.getContext()));
   NewM->setDataLayout(M.getDataLayout());
   NewM->setTargetTriple(M.getTargetTriple());
   NewM->setMaterializer(M.getMaterializer());
@@ -604,7 +604,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Module *M = F->getParent();
     StringRef ModuleName = F->getParent()->getModuleIdentifier();
     StringRef FromName = F->getName();
-    Module *PrototypeM = copyModule(VMap, *M);
+    ModulePtrT PrototypeM = copyModule(VMap, *M);
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
