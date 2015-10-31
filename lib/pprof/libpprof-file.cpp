@@ -139,5 +139,5 @@ bool ReadRun(Run<PPEvent> &Events,
   return gotValidRun;
 }
 
-} // namespace file // namespace file // namespace file // end of file namespace
-} // namespace pprof // namespace pprof // namespace pprof // end of pprof namespace
+} // namespace file
+} // namespace pprof

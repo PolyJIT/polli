@@ -280,5 +280,5 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   w.commit();
 };
 
-} // namespace pgsql // namespace pgsql // namespace pgsql // end of sql namespace
-} // namespace pprof // namespace pprof // namespace pprof // end of pprof namespace
+} // namespace pgsql
+} // namespace pprof
