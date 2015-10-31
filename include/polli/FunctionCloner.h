@@ -36,7 +36,6 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 using namespace llvm;

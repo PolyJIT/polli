@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string>
 
-#define FMT_HEADER_ONLY
 #include <cppformat/format.h>
 
 #include <fstream>

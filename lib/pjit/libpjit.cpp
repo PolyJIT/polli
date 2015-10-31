@@ -40,7 +40,6 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 using namespace llvm;

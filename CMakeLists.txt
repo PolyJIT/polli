@@ -115,6 +115,7 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/external/
   PATTERN ".svn" EXCLUDE
   )
 
+add_definitions( -DFMT_HEADER_ONLY )
 add_definitions( -D_GNU_SOURCE )
 
 add_subdirectory(include)

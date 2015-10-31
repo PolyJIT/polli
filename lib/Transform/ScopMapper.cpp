@@ -24,8 +24,6 @@
 #include "polly/ScopDetectionDiagnostic.h"       // for getDebugLocation
 
 #include "polli/Utils.h"
-
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 namespace llvm {

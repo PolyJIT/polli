@@ -12,7 +12,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/Casting.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 #include <map>
 

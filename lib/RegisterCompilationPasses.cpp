@@ -31,7 +31,6 @@
 #include "polli/ScopMapper.h"
 #include "polli/ModuleExtractor.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 using namespace llvm;
