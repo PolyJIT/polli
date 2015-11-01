@@ -25,6 +25,7 @@
 #include "llvm/Transforms/IPO.h"
 
 using namespace llvm;
+#define DEBUG_TYPE "polyjit"
 
 STATISTIC(Instrumented, "Number of instrumented functions");
 STATISTIC(MappedGlobals, "Number of global to argument redirections");

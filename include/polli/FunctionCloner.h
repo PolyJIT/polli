@@ -210,4 +210,5 @@ typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
 typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
     MovingFunctionCloner;
 }
+#undef DEBUG_TYPE
 #endif // POLLI_FUNCTION_CLONER_H

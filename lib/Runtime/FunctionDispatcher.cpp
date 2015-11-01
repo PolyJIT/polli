@@ -15,6 +15,8 @@
 #include "cppformat/format.h"
 #include <map>
 
+#define DEBUG_TYPE "polyjit"
+
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
   int i = 0;

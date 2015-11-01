@@ -42,6 +42,8 @@
 
 #include "cppformat/format.h"
 
+#define DEBUG_TYPE "polyjit"
+
 using namespace llvm;
 using namespace polli;
 
