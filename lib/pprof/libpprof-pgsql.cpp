@@ -11,16 +11,6 @@
 using namespace pqxx;
 
 namespace pprof {
-struct DbOptions {
-  std::string host;
-  int port;
-  std::string user;
-  std::string pass;
-  std::string name;
-  std::string uuid;
-  std::string exp_uuid;
-};
-
 DbOptions getDBOptionsFromEnv() {
   DbOptions Opts;
 
@@ -29,14 +19,16 @@ DbOptions getDBOptionsFromEnv() {
   const char *pass = std::getenv("PPROF_DB_PASS");
   const char *name = std::getenv("PPROF_DB_NAME");
   const char *port = std::getenv("PPROF_DB_PORT");
+  const char *run_id = std::getenv("PPROF_DB_RUN_ID");
   const char *uuid = std::getenv("PPROF_DB_RUN_GROUP");
   const char *exp_uuid = std::getenv("PPROF_EXPERIMENT_ID");
 
   Opts.host = host ? host : "localhost";
-  Opts.port = port ? stoi(port) : 49153;
+  Opts.port = port ? stoi(port) : 32768;
   Opts.name = name ? name : "pprof";
   Opts.user = user ? user : "pprof";
   Opts.pass = pass ? pass : "pprof";
+  Opts.run_id = run_id ? stoi(run_id) : 0;
   Opts.uuid = uuid ? uuid : "00000000-0000-0000-0000-000000000000";
   Opts.exp_uuid = exp_uuid ? exp_uuid : "00000000-0000-0000-0000-000000000000";
 
