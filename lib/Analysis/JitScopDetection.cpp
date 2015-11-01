@@ -50,7 +50,6 @@
 #include "polli/Utils.h"
 #include "polli/Options.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 using namespace llvm;

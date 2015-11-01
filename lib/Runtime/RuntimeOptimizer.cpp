@@ -63,8 +63,7 @@ static PassManagerBuilder getDebugBuilder() {
 
   return Builder;
 }
-#endif
-
+#else
 static PassManagerBuilder getBuilder() {
   PassManagerBuilder Builder;
 
@@ -76,6 +75,7 @@ static PassManagerBuilder getBuilder() {
 
   return Builder;
 }
+#endif
 
 Function &OptimizeForRuntime(Function &F) {
 #ifdef NDEBUG

@@ -6,7 +6,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 using namespace llvm;

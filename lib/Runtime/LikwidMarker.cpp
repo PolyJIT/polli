@@ -26,7 +26,6 @@
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
 
-#define FMT_HEADER_ONLY
 #include "cppformat/format.h"
 
 namespace polli {
