@@ -87,9 +87,9 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<T>();
-    //FIXME: We preserve everything, but LLVM will kill all passes that are
+    // FIXME: We preserve everything, but LLVM will kill all passes that are
     //       needed by the module extractor in our compilation pipeline.
-    //AU.setPreservesAll();
+    // AU.setPreservesAll();
   }
 };
 
@@ -133,4 +133,4 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 static llvm::RegisterStandardPasses
     RegisterPolyJIT(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
                     registerPolyJIT);
-}  // namespace polli
+} // namespace polli

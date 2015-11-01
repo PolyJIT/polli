@@ -52,9 +52,7 @@ void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
-void ModuleExtractor::releaseMemory() {
-  InstrumentedFunctions.clear();
-}
+void ModuleExtractor::releaseMemory() { InstrumentedFunctions.clear(); }
 
 /**
  * @brief Convert a module to a string.
@@ -588,7 +586,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-        //ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
+        // ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
@@ -652,4 +650,4 @@ void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
-}  // namespace polli
+} // namespace polli
