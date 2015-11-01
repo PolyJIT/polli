@@ -1,5 +1,6 @@
 #include "polli/FunctionCloner.h"
 #include "polli/ModuleExtractor.h"
+#include "polli/Schema.h"
 #include "polli/ScopMapper.h"
 
 #include "llvm/ADT/SetVector.h"
@@ -551,6 +552,19 @@ private:
   Value *PrototypeF;
 };
 
+static inline void collectRegressionTest(const std::string Name,
+                                         const std::string &ModStr) {
+  if (!opt::CollectRegressionTests) {
+    return;
+  }
+  using namespace db;
+
+  auto T = std::shared_ptr<Tuple>(new RegressionTest(Name, ModStr));
+  db::Session S;
+  S.add(T);
+  S.commit();
+}
+
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
 
@@ -619,8 +633,13 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     // using the IRBuilder, otherwise this will end poorly.
     assert(F->begin() && "Body of function got destroyed too early!");
     IRBuilder<> Builder(F->begin());
-    Value *Prototype = Builder.CreateGlobalStringPtr(
-        moduleToString(*PrototypeM), FromName + ".prototype");
+    const std::string ModStr = moduleToString(*PrototypeM);
+    Value *Prototype = Builder.CreateGlobalStringPtr(ModStr);
+
+    // Persist the resulting prototype for later reuse.
+    // A separate tool should then try to generate a LLVM-lit test that
+    // tries to detect that again.
+    collectRegressionTest(FromName, ModStr);
 
     InstrumentingFunctionCloner InstCloner(VMap, M);
     InstCloner.setSource(ProtoF).setPrototype(Prototype);
