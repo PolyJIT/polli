@@ -634,7 +634,8 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     assert(F->begin() && "Body of function got destroyed too early!");
     IRBuilder<> Builder(F->begin());
     const std::string ModStr = moduleToString(*PrototypeM);
-    Value *Prototype = Builder.CreateGlobalStringPtr(ModStr);
+    Value *Prototype =
+        Builder.CreateGlobalStringPtr(ModStr, FromName + ".prototype");
 
     // Persist the resulting prototype for later reuse.
     // A separate tool should then try to generate a LLVM-lit test that
