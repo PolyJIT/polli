@@ -40,6 +40,7 @@ bool AnalyseOnly;
 std::string ReportFilename;
 bool GenerateOutput;
 bool Enabled;
+bool CollectRegressionTests = false;
 
 bool DisableCoreFiles = true;
 char OptLevel = ' ';
@@ -139,3 +140,9 @@ static cl::opt<bool, true>
     PolliEnabledX("polli", cl::desc("Enable the polli JIT compiler"),
                   cl::ZeroOrMore, cl::location(polli::opt::Enabled),
                   cl::init(false), cl::cat(PolliCategory));
+
+static cl::opt<bool, true> PolliCollectX(
+    "polli-collect-modules",
+    cl::desc("Collect Modules in the database for regression testing."),
+    cl::ZeroOrMore, cl::location(polli::opt::CollectRegressionTests),
+    cl::init(false), cl::cat(PolliCategory));

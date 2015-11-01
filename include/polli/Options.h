@@ -36,6 +36,7 @@ extern bool DisableRecompile;
 extern bool DisableExecution;
 extern bool AnalyzeIR;
 extern char OptLevel;
+extern bool CollectRegressionTests;
 
 extern std::string TargetTriple;
 extern std::string MArch;

@@ -56,6 +56,8 @@ static void printConfig() {
   errs() << fmt::format(" polly.delinearize: {}\n", polly::PollyDelinearize);
   errs() << fmt::format(" polly.aliaschecks: {}\n",
                         polly::PollyUseRuntimeAliasChecks);
+  errs() << fmt::format(" polyjit.collect-regression: {}\n",
+                        opt::CollectRegressionTests);
 }
 
 /**
