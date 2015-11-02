@@ -24,7 +24,7 @@ DbOptions getDBOptionsFromEnv() {
   const char *exp_uuid = std::getenv("PPROF_EXPERIMENT_ID");
 
   Opts.host = host ? host : "localhost";
-  Opts.port = port ? stoi(port) : 32768;
+  Opts.port = port ? stoi(port) : 5432;
   Opts.name = name ? name : "pprof";
   Opts.user = user ? user : "pprof";
   Opts.pass = pass ? pass : "pprof";
