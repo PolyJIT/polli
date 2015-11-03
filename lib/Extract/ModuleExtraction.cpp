@@ -14,7 +14,9 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
@@ -565,6 +567,22 @@ static inline void collectRegressionTest(const std::string Name,
   S.commit();
 }
 
+static void clearFunctionLocalMetadata(Function *F) {
+  if (!F)
+    return;
+
+  SmallVector<Instruction *, 4> DeleteInsts;
+  for (auto &I : instructions(F)) {
+    if (DbgInfoIntrinsic *DI = dyn_cast_or_null<DbgInfoIntrinsic>(&I)) {
+      DeleteInsts.push_back(DI);
+    }
+  }
+
+  for (auto *I : DeleteInsts) {
+      I->removeFromParent();
+  }
+}
+
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
 
@@ -604,6 +622,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
+
         Functions.insert(ExtractedF);
         Changed |= true;
       }
@@ -628,6 +647,8 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     llvm::legacy::PassManager MPM;
     MPM.add(llvm::createStripSymbolsPass(true));
     MPM.run(*PrototypeM);
+
+    clearFunctionLocalMetadata(F);
 
     // Make sure that we do not destroy the function before we're done
     // using the IRBuilder, otherwise this will end poorly.
