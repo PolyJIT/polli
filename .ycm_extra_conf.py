@@ -2,7 +2,7 @@ import os
 
 
 def DirectoryOfThisScript():
-    return os.path.dirname(os.path.abspath(__file__))
+    return os.path.dirname(os.path.abspath('__file__'))
 
 
 def root():
@@ -46,7 +46,7 @@ flags = [
     "-I", polly_inc("lib/External/isl/include"),
     "-I", polly_inc("lib/JSON/include"),
     "-I", llvm_inc("include"),
-    "-I", root("build/include"),
+    "-I", root() + "build/include",
     "-I", "/usr/include"
 ]
 
