@@ -28,6 +28,7 @@ def llvm_inc(sub):
 flags = [
     "-std=c++14",
     "-DENABLE_GTEST",
+    "-DFMT_HEADER_ONLY",
     "-D_DEBUG",
     "-D_GNU_SOURCE",
     "-D__STDC_CONSTANT_MACROS",
