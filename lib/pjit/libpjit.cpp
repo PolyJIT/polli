@@ -92,8 +92,8 @@ static Module &getModule(const char *prototype) {
  * @return llvm::Function* The first function in the given module.
  */
 static Function *getFunction(Module &M) {
-  Disp.setPrototypeMapping(M.begin(), M.begin());
-  return M.begin();
+  Disp.setPrototypeMapping(&*M.begin(), &*M.begin());
+  return &*M.begin();
 }
 
 static inline void do_shutdown() {

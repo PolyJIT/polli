@@ -127,13 +127,18 @@ static void setPointerOperand(Instruction &I, Value &V) {
     NewV = Builder.CreateLoad(&V);
   } else if (StoreInst *S = dyn_cast<StoreInst>(&I)) {
     NewV = Builder.CreateStore(S->getValueOperand(), &V);
+  } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+    SmallVector<Value *, 4> Indices;
+    for (GetElementPtrInst::const_op_iterator I = GEP->idx_begin(),
+                                              E = GEP->idx_end();
+         I != E; ++I) {
+      Value *V = (*I).get();
+      Indices.push_back(V);
+    }
+    NewV = Builder.CreateGEP(&V, Indices);
   } else {
     return;
   }
-  // else if (GetElementPtrInst *G = dyn_cast<GetElementPtrInst>(&I)) {
-  //  NewV = Builder.CreateGEP
-  //  G->setOperand(0, &V);
-  //}
 
   I.replaceAllUsesWith(NewV);
 }
@@ -154,6 +159,16 @@ static inline size_t getGlobalCount(Function *F) {
   return n;
 }
 
+#ifdef DEBUG
+static void dumpUsers(Value &V) {
+  for (const auto &U : V.users()) {
+    U->print(outs().indent(2));
+    outs() << "\n";
+  }
+  llvm::outs() << "====\n";
+}
+#endif
+
 using InstrList = SmallVector<Instruction *, 4>;
 /**
  * @brief Convert a ConstantExpr pointer operand to an Instruction Value.
@@ -172,6 +187,10 @@ static inline void constantExprToInstruction(Instruction &I,
     if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
       Instruction *Inst = C->getAsInstruction();
       Inst->insertBefore(&I);
+
+      DEBUG(llvm::outs() << "I: " << I << "\nInst: " << *Inst << "\n";
+            llvm::outs() << "Users:\n";
+            dumpUsers(*C));
       setPointerOperand(I, *Inst);
       Converted.push_back(&I);
     }
@@ -268,7 +287,7 @@ struct AddGlobalsPolicy {
     Function::arg_iterator NewArg = To->arg_begin();
     for (Argument &Arg : From->args()) {
       NewArg->setName(Arg.getName());
-      VMap[&Arg] = NewArg++;
+      VMap[&Arg] = &*(NewArg++);
     }
 
     GlobalList ReqGlobals = getGVsUsedInFunction(*From);
@@ -284,7 +303,7 @@ struct AddGlobalsPolicy {
        * different invocations of the FunctionCloner.
        */
       NewArg->setName(GV->getName());
-      VMap[GV] = NewArg++;
+      VMap[GV] = &*(NewArg++);
       MappedGlobals++;
     }
   }
@@ -361,7 +380,7 @@ struct RemoveGlobalsPolicy {
           UnmappedGlobals++;
         }
       } else {
-        VMap[&FromArg] = ToArg++;
+        VMap[&FromArg] = &*(ToArg++);
       }
   }
 
@@ -652,8 +671,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 
     // Make sure that we do not destroy the function before we're done
     // using the IRBuilder, otherwise this will end poorly.
-    assert(F->begin() && "Body of function got destroyed too early!");
-    IRBuilder<> Builder(F->begin());
+    IRBuilder<> Builder(&*(F->begin()));
     const std::string ModStr = moduleToString(*PrototypeM);
     Value *Prototype =
         Builder.CreateGlobalStringPtr(ModStr, FromName + ".prototype");

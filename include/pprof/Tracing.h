@@ -104,6 +104,8 @@ void polliTracingScopStop(uint64_t Id, const char *Name) {
   polli::ActiveTracer->scopStop(Id, Name);
 }
 #ifdef __cplusplus
+}
+#endif
 #else
 #define POLLI_TRACING_INIT
 #define POLLI_TRACING_FINALIZE
@@ -111,7 +113,5 @@ void polliTracingScopStop(uint64_t Id, const char *Name) {
 #define POLLI_TRACING_REGION_STOP(ID, NAME)
 #define POLLI_TRACING_SCOP_START(ID, NAME)
 #define POLLI_TRACING_SCOP_STOP(ID, NAME)
-#endif
-}
 #endif
 #endif //PPROF_TRACING_H
