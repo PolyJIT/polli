@@ -149,7 +149,7 @@ struct CopyCreator {
                                       AE = SrcF->arg_end();
          Arg != AE; ++Arg) {
       NewArg->setName(Arg->getName());
-      VMap[Arg] = NewArg++;
+      VMap[&*Arg] = &*(NewArg++);
     }
   }
 

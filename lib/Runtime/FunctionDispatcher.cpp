@@ -57,8 +57,8 @@ struct MainCreator {
                                    Function *TgtF) {
     // 2nd argument is our array, 1st is argc
     Function::arg_iterator TgtArg = TgtF->arg_begin();
-    Argument *ArgC = TgtArg;
-    Value *ArgV = ++TgtArg;
+    Argument *ArgC = &*TgtArg;
+    Value *ArgV = &*++TgtArg;
 
     ArgC->setName("argc");
     ArgV->setName("argv");

@@ -134,7 +134,7 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
         continue;
 
       BasicBlock &Entry = F.getEntryBlock();
-      Builder.SetInsertPoint(Entry.getFirstInsertionPt());
+      Builder.SetInsertPoint(&*(Entry.getFirstInsertionPt()));
       Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(F.getName()));
 
       for (auto &I : instructions(F)) {
@@ -152,7 +152,7 @@ bool LikwidMarker::runOnModule(llvm::Module &M) {
     BasicBlock &Entry = SubFn->getEntryBlock();
     IRBuilder<> Builder(Ctx);
 
-    Builder.SetInsertPoint(Entry.getFirstInsertionPt());
+    Builder.SetInsertPoint(&*(Entry.getFirstInsertionPt()));
     Builder.Insert(CallInst::Create(ThreadInit));
     Builder.CreateCall(Start, Builder.CreateGlobalStringPtr(SubFn->getName()));
 
@@ -219,7 +219,7 @@ bool TraceMarker::runOnModule(llvm::Module &M) {
                                          reinterpret_cast<uint64_t>(&F), false);
 
       BasicBlock &Entry = F.getEntryBlock();
-      Builder.SetInsertPoint(Entry.getFirstInsertionPt());
+      Builder.SetInsertPoint(&*(Entry.getFirstInsertionPt()));
       Builder.CreateCall(Start,
                          {ID, Builder.CreateGlobalStringPtr(F.getName())});
 
@@ -242,7 +242,7 @@ bool TraceMarker::runOnModule(llvm::Module &M) {
     ConstantInt *ID = ConstantInt::get(
         Type::getInt64Ty(Ctx), reinterpret_cast<uint64_t>(&SubFn), false);
 
-    Builder.SetInsertPoint(Entry.getFirstInsertionPt());
+    Builder.SetInsertPoint(&*(Entry.getFirstInsertionPt()));
     Builder.CreateCall(Start,
                        {ID, Builder.CreateGlobalStringPtr(SubFn->getName())});
 

@@ -162,7 +162,7 @@ static void PapiCreateInit(Function *F) {
   Constant *PapiLibInitFn = M->getOrInsertFunction(
       "PAPI_library_init", Builder.getInt32Ty(), Builder.getInt32Ty(), NULL);
 
-  Instruction *Insert = F->getEntryBlock().getFirstInsertionPt();
+  Instruction *Insert = &*(F->getEntryBlock().getFirstInsertionPt());
   Builder.SetInsertPoint(Insert);
   Builder.CreateCall(PapiLibInitFn, Builder.getInt32(PAPI_VER_CURRENT),
                      "papi.lib.init");
@@ -178,7 +178,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   Module &M = *MainFn->getParent();
 
   // Skip over any allocas in the entry block.
-  BasicBlock *Entry = MainFn->begin();
+  BasicBlock *Entry = &*(MainFn->begin());
   BasicBlock::iterator InsertPos = Entry->begin();
   while (isa<AllocaInst>(InsertPos))
     ++InsertPos;
@@ -192,7 +192,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
   Args[1] = Constant::getNullValue(ArgVTy);
 
-  CallInst *InitCall = CallInst::Create(PapiSetup, Args, "", InsertPos);
+  CallInst *InitCall = CallInst::Create(PapiSetup, Args, "", &*InsertPos);
 
   // If argc or argv are not available in main, just pass null values in.
   Function::arg_iterator AI;
@@ -203,11 +203,11 @@ static void InsertProfilingInitCall(Function *MainFn) {
     ++AI;
     if (AI->getType() != ArgVTy) {
       Instruction::CastOps opcode =
-          CastInst::getCastOpcode(AI, false, ArgVTy, false);
+          CastInst::getCastOpcode(&*AI, false, ArgVTy, false);
       InitCall->setArgOperand(
-          1, CastInst::Create(opcode, AI, ArgVTy, "argv.cast", InitCall));
+          1, CastInst::Create(opcode, &*AI, ArgVTy, "argv.cast", InitCall));
     } else {
-      InitCall->setArgOperand(1, AI);
+      InitCall->setArgOperand(1, &*AI);
     }
   /* FALL THROUGH */
   case 1:
@@ -216,12 +216,12 @@ static void InsertProfilingInitCall(Function *MainFn) {
     // init call instead.
     if (!AI->getType()->isIntegerTy(32)) {
       Instruction::CastOps opcode =
-          CastInst::getCastOpcode(AI, true, Type::getInt32Ty(Context), true);
+          CastInst::getCastOpcode(&*AI, true, Type::getInt32Ty(Context), true);
       InitCall->setArgOperand(
-          0, CastInst::Create(opcode, AI, Type::getInt32Ty(Context),
+          0, CastInst::Create(opcode, &*AI, Type::getInt32Ty(Context),
                               "argc.cast", InitCall));
     } else
-      InitCall->setArgOperand(0, AI);
+      InitCall->setArgOperand(0, &*AI);
   case 0:
     break;
   }
@@ -366,7 +366,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
                                           std::string exitName) {
   BasicBlock::iterator InsertPos;
   for (auto &BB : EntryBBs) {
-    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
+    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
     // Adjust insertion point for landing pads / allocas
     if (BB->isLandingPad())
       ++InsertPos;
@@ -378,18 +378,18 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
     while (isa<CallInst>(InsertPos))
       ++InsertPos;
 
-    PapiRegionEnterSCoP(InsertPos, M, EvID, entryName);
+    PapiRegionEnterSCoP(&*InsertPos, M, EvID, entryName);
   }
 
   for (auto &BB : ExitBBs) {
-    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
+    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
     // Adjust insertion point for landing pads / allocas
     if (BB->isLandingPad())
       ++InsertPos;
     while (isa<AllocaInst>(InsertPos))
       ++InsertPos;
 
-    PapiRegionExitSCoP(InsertPos, M, EvID, exitName);
+    PapiRegionExitSCoP(&*InsertPos, M, EvID, exitName);
   }
 
   ++EvID;
