@@ -82,10 +82,10 @@ static Module &getModule(const char *prototype) {
       DEBUG(Mod->dump());
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
     } else {
-      errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
-                            Err.getLineNo(), Err.getColumnNo(),
-                            Err.getMessage().str());
-      errs() << fmt::format("{:s}\n", prototype);
+      errs() << format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
+                       Err.getLineNo(), Err.getColumnNo(),
+                       Err.getMessage().str());
+      errs() << format("{:s}\n", prototype);
     }
     assert(ModuleIndex[prototype] && "Parsing the prototype module failed!");
   }
@@ -207,7 +207,6 @@ static ExecutionEngine *getEngine(Module *M) {
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
   builder.setMCJITMemoryManager(std::move(MemManager));
-  //builder.setOptLevel(OLvl);
   builder.setOptLevel(CodeGenOpt::None);
 
   llvm::TargetOptions Options;
