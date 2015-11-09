@@ -126,6 +126,8 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
+    using polly::initializePollyPasses;
+
     set_options_from_environment();
 
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
@@ -236,16 +238,19 @@ static inline Function *getPrototype(const char *function) {
   return F;
 }
 
+#ifdef DEBUG
 static void printArgs(const Function &F, size_t argc, char **params) {
   std::string buf;
   llvm::raw_string_ostream s(buf);
   F.getType()->print(s);
   dbgs() << s.str() << "\n";
   for (size_t i = 0; i < argc; i++) {
-    dbgs() << fmt::format("[{}] -> {:d} - {}\n", i, (*(uint64_t *)params[i]),
-                          (void *)(params[i]));
+    dbgs() << fmt::format("[{}] -> {:d} - {}\n", i,
+                          *reinterpret_cast<uint64_t *>(params[i]),
+                          reinterpret_cast<void *>(params[i]));
   }
 }
+#endif
 
 static void printRunValues(const RunValueList & Values) {
   for (auto &RV : Values) {
