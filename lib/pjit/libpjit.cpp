@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2014 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // This tool implements a just-in-time compiler for LLVM, allowing direct
