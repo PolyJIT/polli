@@ -13,11 +13,20 @@
 // execution of LLVM bitcode in an efficient manner.
 //
 //===----------------------------------------------------------------------===//
+#include <likwid.h>
+
 #include <stdlib.h>
+#include <pthread.h>
 #include <cstdlib>
 #include <vector>
-
-#include <likwid.h>
+#include <future>
+#include <thread>
+#include <condition_variable>
+#include <memory>
+#include <string>
+#include <deque>
+#include <mutex>
+#include <unordered_map>
 
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -214,56 +223,6 @@ static ExecutionEngine *getEngine(Module *M) {
   return EE;
 }
 
-/**
-* @brief Run a specialized version of a function.
-*
-* The specialized version needs to be in 'main' form, i.e., its signature
-* has to be:
-*  void fn_name(int argc, char *argv);
-*
-* The FunctionCloner's MainCreator policy takes care of that. All the real
-* parameters are passed via argv.
-*
-* @param NewF the specialized function in main form.
-* @param ArgValues the parameter _values_ for the formal parameters.
-*/
-static void runSpecializedFunction(llvm::Function &NewF, int paramc,
-                                   char **params) {
-  static ManagedModules Mods;
-  static std::unordered_map<llvm::Function *, uint64_t> FunctionCache;
-
-  Module *NewM = NewF.getParent();
-
-  // Fetch or Create a new ExecutionEngine for this Module.
-  POLLI_TRACING_REGION_START(1, "polyjit.codegen");
-  ExecutionEngine *EE = nullptr;
-  if (!Mods.count(NewM)) {
-    EE = getEngine(NewM);
-    EE->finalizeObject();
-    Mods[NewM] = EE;
-  } else {
-    EE = Mods[NewM];
-  }
-  POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
-
-  if (!EE) {
-    errs() << "no execution engine found.\n";
-    return;
-  }
-
-  DEBUG(dbgs() << fmt::format("execution of {:>s} begins (#{:d} params)",
-                              NewF.getName().str(), paramc));
-  if (!FunctionCache.count(&NewF))
-    FunctionCache.insert(
-        std::make_pair(&NewF, EE->getFunctionAddress(NewF.getName().str())));
-  uint64_t FPtr = FunctionCache[&NewF];
-  void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
-
-  PF(paramc, params);
-  DEBUG(dbgs() << fmt::format("execution of {:>s} completed",
-                              NewF.getName().str()));
-}
-
 static inline Function *getPrototype(const char *function) {
   POLLI_TRACING_REGION_START(2, "polyjit.prototype.get");
   Module &M = getModule(function);
@@ -308,6 +267,159 @@ static RunValueList runValues(Function *F, unsigned paramc, void *params) {
   return RunValues;
 }
 
+struct SpecializerRequest {
+  const char *IR;
+  unsigned ParamC;
+  char **Params;
+
+  SpecializerRequest(const char *IR, unsigned ParamC, char **Params)
+      : IR(IR), ParamC(ParamC), Params(Params) {}
+};
+
+struct CacheKey {
+  const char *IR;
+  size_t ValueHash;
+
+  CacheKey(const char *IR, size_t ValueHash)
+      : IR(IR), ValueHash(ValueHash) {}
+  CacheKey(const SpecializerRequest &Req, size_t ValueHash)
+      : IR(Req.IR), ValueHash(ValueHash) {}
+
+  bool operator==(const CacheKey &O) const {
+    return IR == O.IR && ValueHash == O.ValueHash;
+  }
+
+  bool operator<(const CacheKey &O) const {
+    return IR < O.IR || (IR == O.IR && ValueHash < O.ValueHash);
+  }
+};
+
+template<>
+struct std::hash<CacheKey> {
+  std::size_t operator()(const CacheKey &K) const {
+    return (size_t)K.IR ^ K.ValueHash;
+  }
+};
+
+template <typename T> class CodeGenQueue {
+private:
+  std::deque<T> Work;
+  mutable std::mutex M;
+
+public:
+  using value_type = T;
+  using reference = const T &;
+
+  reference front() const { return Work.front(); }
+  reference back() const { return Work.front(); }
+
+  void pop_front() {
+    std::unique_lock<std::mutex> L(M);
+    Work.pop_front();
+  }
+
+  void pop_back() {
+    std::unique_lock<std::mutex> L(M);
+    Work.pop_back();
+  }
+
+  bool empty() const {
+    std::unique_lock<std::mutex> L(M);
+    return Work.empty();
+  }
+
+  void push_back(const value_type &x) {
+    std::unique_lock<std::mutex> L(M);
+    Work.push_back(x);
+  }
+
+  void push_back(value_type &&x) {
+    std::unique_lock<std::mutex> L(M);
+    Work.push_back(x);
+  }
+};
+
+static std::unordered_map<CacheKey, uint64_t> FunctionCache;
+static std::unordered_map<const char *, llvm::Function *> IRFunctionCache;
+
+static CodeGenQueue<SpecializerRequest> Work;
+
+class PolyJIT {
+private:
+  std::thread Generator;
+
+  std::mutex GeneratorRequestMutex;
+  std::mutex CacheRequestMutex;
+  std::condition_variable GeneratorShouldStart;
+  std::condition_variable GeneratorShutDown;
+  bool ShuttingDown = false;
+  std::condition_variable CacheReady;
+
+public:
+  explicit PolyJIT()
+      : Generator([&]() {
+          pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
+          while (!ShuttingDown) {
+            std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
+            GeneratorShouldStart.wait(Lock);
+
+            POLLI_TRACING_REGION_START(1, "polyjit.codegen");
+            while (!Work.empty()) {
+              const SpecializerRequest &Request = Work.front();
+              Function *F = getPrototype(Request.IR);
+              RunValueList Values =
+                  runValues(F, Request.ParamC, Request.Params);
+              VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+              Function *NewF = VarFun->getOrCreateVariant(Values);
+              Module *NewM = NewF->getParent();
+              ExecutionEngine *EE = getEngine(NewM);
+
+              DEBUG(printArgs(*F, Request.ParamC, Request.Params));
+              DEBUG(printRunValues(Values));
+
+              assert(EE && "No execution engine could be constructed.");
+              EE->finalizeObject();
+
+              FunctionCache.insert(std::make_pair(
+                  CacheKey(Request, Values.hash()),
+                  EE->getFunctionAddress(NewF->getName().str())));
+              IRFunctionCache.insert(std::make_pair(Request.IR, F));
+              Work.pop_front();
+              CacheReady.notify_all();
+            }
+            Lock.unlock();
+            POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
+          }
+
+          GeneratorShutDown.notify_all();
+        }) {}
+
+  ~PolyJIT() {
+    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
+    ShuttingDown = true;
+
+    // Wake up the generator to allow it to shut down.
+    GeneratorShouldStart.notify_all();
+    GeneratorShutDown.wait(Lock);
+    Generator.join();
+  }
+
+  void startGenerator() {
+    GeneratorShouldStart.notify_all();
+  }
+
+  Function *waitForIRCache(std::function<bool()> && Pred,
+                           std::function<Function *()> && Getter) {
+      std::unique_lock<std::mutex> L(CacheRequestMutex);
+      CacheReady.wait(L, Pred);
+      Function *F = Getter();
+      L.unlock();
+      return F;
+  }
+};
+
+static PolyJIT JIT;
+
 extern "C" {
 /**
  * @brief Runtime callback for PolyJIT.
@@ -319,16 +431,26 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
-  Function *F = getPrototype(fName);
-  RunValueList values = runValues(F, paramc, params);
+  using fmt::format;
 
-  // Assume that we have used a specializer that converts all functions into
-  // 'main' compatible format.
-  VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+  // Check Cache, Register SpecializerRequest in the WorkQueue and notify
+  // the generator that there is something to do.
+  SpecializerRequest Request(fName, paramc, params);
+  Work.push_back(Request);
 
-  Function *NewF = VarFun->getOrCreateVariant(values);
-  DEBUG(printArgs(*F, paramc, params));
-  DEBUG(printRunValues(values));
-  runSpecializedFunction(*NewF, paramc, params);
+  JIT.startGenerator();
+  std::future<uint64_t> CacheRequest =
+      std::async([](const SpecializerRequest &Request) -> uint64_t {
+          using fmt::format;
+          Function *F = JIT.waitForIRCache(
+              [&]() { return IRFunctionCache.count(Request.IR); },
+              [&]() { return IRFunctionCache[Request.IR]; });
+          RunValueList Values = runValues(F, Request.ParamC, Request.Params);
+          CacheKey K(Request, Values.hash());
+          return FunctionCache[K];
+      }, Request);
+
+  void (*PF)(int, char **) = (void (*)(int, char **))CacheRequest.get();
+  PF(paramc, params);
 }
 }
