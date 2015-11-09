@@ -360,7 +360,7 @@ private:
   std::condition_variable CacheReady;
 
 public:
-  explicit PolyJIT()
+  PolyJIT()
       : Generator([&]() {
           pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
           while (!ShuttingDown) {
