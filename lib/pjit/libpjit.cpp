@@ -368,6 +368,7 @@ private:
 public:
   PolyJIT()
       : Generator([&]() {
+          using fmt::format;
           pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
           while (!ShuttingDown) {
             std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
