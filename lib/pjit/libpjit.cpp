@@ -70,6 +70,7 @@ static FunctionDispatcher Disp;
  * @return llvm::Module& The LLVM-IR module we just read.
  */
 static Module &getModule(const char *prototype) {
+  using fmt::format;
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
 
@@ -225,6 +226,8 @@ static ExecutionEngine *getEngine(Module *M) {
 }
 
 static inline Function *getPrototype(const char *function) {
+  using fmt::format;
+
   POLLI_TRACING_REGION_START(2, "polyjit.prototype.get");
   Module &M = getModule(function);
   Function *F = getFunction(M);
@@ -240,21 +243,24 @@ static inline Function *getPrototype(const char *function) {
 
 #ifdef DEBUG
 static void printArgs(const Function &F, size_t argc, char **params) {
+  using fmt::format;
+
   std::string buf;
   llvm::raw_string_ostream s(buf);
   F.getType()->print(s);
   dbgs() << s.str() << "\n";
   for (size_t i = 0; i < argc; i++) {
-    dbgs() << fmt::format("[{}] -> {:d} - {}\n", i,
-                          *reinterpret_cast<uint64_t *>(params[i]),
-                          reinterpret_cast<void *>(params[i]));
+    dbgs() << format("[{}] -> {:d} - {}\n", i,
+                     *reinterpret_cast<uint64_t *>(params[i]),
+                     reinterpret_cast<void *>(params[i]));
   }
 }
 #endif
 
 static void printRunValues(const RunValueList & Values) {
+  using fmt::format;
   for (auto &RV : Values) {
-    dbgs() << fmt::format("{} matched against {}\n", RV.value, (void *)RV.Arg);
+    dbgs() << format("{} matched against {}\n", RV.value, (void *)RV.Arg);
   }
 }
 
@@ -435,17 +441,12 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
-  using fmt::format;
-
-  // Check Cache, Register SpecializerRequest in the WorkQueue and notify
-  // the generator that there is something to do.
   SpecializerRequest Request(fName, paramc, params);
   Work.push_back(Request);
 
   JIT.startGenerator();
   std::future<uint64_t> CacheRequest =
       std::async([](const SpecializerRequest &Request) -> uint64_t {
-          using fmt::format;
           Function *F = JIT.waitForIRCache(
               [&]() { return IRFunctionCache.count(Request.IR); },
               [&]() { return IRFunctionCache[Request.IR]; });
