@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <cstdlib>
+#include <atomic>
 #include <vector>
 #include <future>
 #include <thread>
@@ -311,6 +312,44 @@ struct std::hash<CacheKey> {
   }
 };
 
+template <typename K, typename V> class IRCache {
+private:
+  std::unordered_map<K, V> Cache;
+  mutable std::mutex ReadMutex;
+  mutable std::mutex WriteMutex;
+
+  std::condition_variable NewElement;
+public:
+  using size_type = size_t;
+  using iterator = typename std::unordered_map<K, V>::iterator;
+  using value_type = std::pair<K, V>;
+  using iterator_pair = std::pair<iterator, bool>;
+
+  size_type count(const K &X) {
+    std::lock_guard<std::mutex> L(ReadMutex);
+    return Cache.count(X);
+  }
+
+  iterator_pair insert(const value_type &Value) {
+    std::unique_lock<std::mutex> WL(WriteMutex);
+    iterator_pair Ret = Cache.insert(Value);
+    WL.unlock();
+    NewElement.notify_all();
+    return Ret;
+  }
+
+  V &operator[](const K &X) {
+    std::unique_lock<std::mutex> CL(WriteMutex);
+    NewElement.wait(CL, [&] () { return Cache.count(X); });
+    return Cache[X];
+  }
+
+  V &operator[](K &&X) {
+    K &RX = X;
+    return this[RX];
+  }
+};
+
 template <typename T> class CodeGenQueue {
 private:
   std::deque<T> Work;
@@ -350,29 +389,28 @@ public:
 };
 
 static std::unordered_map<CacheKey, uint64_t> FunctionCache;
-static std::unordered_map<const char *, llvm::Function *> IRFunctionCache;
-
-static CodeGenQueue<SpecializerRequest> Work;
+static IRCache<const char *, llvm::Function *> IRFunctionCache;
 
 class PolyJIT {
 private:
-  std::thread Generator;
-
-  std::mutex GeneratorRequestMutex;
-  std::mutex CacheRequestMutex;
+  CodeGenQueue<SpecializerRequest> Work;
+  std::atomic_bool ShuttingDown;
+  std::atomic_bool ShouldStart;
   std::condition_variable GeneratorShouldStart;
   std::condition_variable GeneratorShutDown;
-  bool ShuttingDown = false;
-  std::condition_variable CacheReady;
+  std::mutex GeneratorRequestMutex;
+  std::thread Generator;
 
 public:
   PolyJIT()
-      : Generator([&]() {
+      : ShuttingDown(false), ShouldStart(false), Generator([&]() {
           using fmt::format;
+          std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
           pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
           while (!ShuttingDown) {
-            std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
-            GeneratorShouldStart.wait(Lock);
+            while(!ShouldStart) {
+              GeneratorShouldStart.wait(Lock);
+            }
 
             POLLI_TRACING_REGION_START(1, "polyjit.codegen");
             while (!Work.empty()) {
@@ -396,36 +434,28 @@ public:
                   EE->getFunctionAddress(NewF->getName().str())));
               IRFunctionCache.insert(std::make_pair(Request.IR, F));
               Work.pop_front();
-              CacheReady.notify_all();
             }
-            Lock.unlock();
             POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
-          }
 
-          GeneratorShutDown.notify_all();
+            ShouldStart = false;
+          }
         }) {}
 
   ~PolyJIT() {
-    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
     ShuttingDown = true;
+    ShouldStart = true;
 
     // Wake up the generator to allow it to shut down.
     GeneratorShouldStart.notify_all();
-    GeneratorShutDown.wait(Lock);
     Generator.join();
   }
 
-  void startGenerator() {
+  void addRequest(SpecializerRequest Request) {
+    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
+    Work.push_back(Request);
+    ShouldStart = true;
+    Lock.unlock();
     GeneratorShouldStart.notify_all();
-  }
-
-  Function *waitForIRCache(std::function<bool()> && Pred,
-                           std::function<Function *()> && Getter) {
-      std::unique_lock<std::mutex> L(CacheRequestMutex);
-      CacheReady.wait(L, Pred);
-      Function *F = Getter();
-      L.unlock();
-      return F;
   }
 };
 
@@ -443,20 +473,13 @@ extern "C" {
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
   SpecializerRequest Request(fName, paramc, params);
-  Work.push_back(Request);
 
-  std::future<uint64_t> CacheRequest =
-      std::async([](const SpecializerRequest &Request) -> uint64_t {
-          Function *F = JIT.waitForIRCache(
-              [&]() { return IRFunctionCache.count(Request.IR); },
-              [&]() { return IRFunctionCache[Request.IR]; });
-          RunValueList Values = runValues(F, Request.ParamC, Request.Params);
-          CacheKey K(Request, Values.hash());
-          return FunctionCache[K];
-      }, Request);
-  JIT.startGenerator();
+  JIT.addRequest(Request);
+  Function *F = IRFunctionCache[Request.IR];
+  RunValueList Values = runValues(F, Request.ParamC, Request.Params);
+  CacheKey K(Request, Values.hash());
 
-  void (*PF)(int, char **) = (void (*)(int, char **))CacheRequest.get();
+  void (*PF)(int, char **) = (void (*)(int, char **))FunctionCache[K];
   PF(paramc, params);
 }
 }
