@@ -445,7 +445,6 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   SpecializerRequest Request(fName, paramc, params);
   Work.push_back(Request);
 
-  JIT.startGenerator();
   std::future<uint64_t> CacheRequest =
       std::async([](const SpecializerRequest &Request) -> uint64_t {
           Function *F = JIT.waitForIRCache(
@@ -455,6 +454,7 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
           CacheKey K(Request, Values.hash());
           return FunctionCache[K];
       }, Request);
+  JIT.startGenerator();
 
   void (*PF)(int, char **) = (void (*)(int, char **))CacheRequest.get();
   PF(paramc, params);
