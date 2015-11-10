@@ -258,7 +258,7 @@ static void printArgs(const Function &F, size_t argc, char **params) {
 }
 #endif
 
-static void printRunValues(const RunValueList & Values) {
+static void printRunValues(const RunValueList &Values) {
   using fmt::format;
   for (auto &RV : Values) {
     dbgs() << format("{} matched against {}\n", RV.value, (void *)RV.Arg);
@@ -271,7 +271,7 @@ static RunValueList runValues(Function *F, unsigned paramc, void *params) {
   RunValueList RunValues;
 
   for (const Argument &Arg : F->args()) {
-    RunValues.add({ (*((uint64_t **)params)[i]), &Arg });
+    RunValues.add({(*((uint64_t **)params)[i]), &Arg});
     i++;
   }
   POLLI_TRACING_REGION_STOP(3, "polyjit.params.select");
@@ -291,8 +291,7 @@ struct CacheKey {
   const char *IR;
   size_t ValueHash;
 
-  CacheKey(const char *IR, size_t ValueHash)
-      : IR(IR), ValueHash(ValueHash) {}
+  CacheKey(const char *IR, size_t ValueHash) : IR(IR), ValueHash(ValueHash) {}
   CacheKey(const SpecializerRequest &Req, size_t ValueHash)
       : IR(Req.IR), ValueHash(ValueHash) {}
 
@@ -305,8 +304,7 @@ struct CacheKey {
   }
 };
 
-template<>
-struct std::hash<CacheKey> {
+template <> struct std::hash<CacheKey> {
   std::size_t operator()(const CacheKey &K) const {
     return (size_t)K.IR ^ K.ValueHash;
   }
@@ -319,6 +317,7 @@ private:
   mutable std::mutex WriteMutex;
 
   std::condition_variable NewElement;
+
 public:
   using size_type = size_t;
   using iterator = typename std::unordered_map<K, V>::iterator;
@@ -340,7 +339,7 @@ public:
 
   V &operator[](const K &X) {
     std::unique_lock<std::mutex> CL(WriteMutex);
-    NewElement.wait(CL, [&] () { return Cache.count(X); });
+    NewElement.wait(CL, [&]() { return Cache.count(X); });
     return Cache[X];
   }
 
@@ -408,7 +407,7 @@ public:
           std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
           pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
           while (!ShuttingDown) {
-            while(!ShouldStart) {
+            while (!ShouldStart) {
               GeneratorShouldStart.wait(Lock);
             }
 
