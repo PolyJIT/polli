@@ -30,7 +30,7 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "polli"
+#define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"

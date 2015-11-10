@@ -5,17 +5,29 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2014 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // This tool implements a just-in-time compiler for LLVM, allowing direct
 // execution of LLVM bitcode in an efficient manner.
 //
 //===----------------------------------------------------------------------===//
-#include <stdlib.h>
-#include <cstdlib>
-#include <vector>
-
 #include <likwid.h>
+
+#include <stdlib.h>
+#include <pthread.h>
+#include <cstdlib>
+#include <atomic>
+#include <vector>
+#include <future>
+#include <thread>
+#include <condition_variable>
+#include <memory>
+#include <string>
+#include <deque>
+#include <mutex>
+#include <unordered_map>
 
 #include "llvm/IR/Module.h"
 #include "llvm/ADT/DenseMap.h"
@@ -59,6 +71,7 @@ static FunctionDispatcher Disp;
  * @return llvm::Module& The LLVM-IR module we just read.
  */
 static Module &getModule(const char *prototype) {
+  using fmt::format;
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
 
@@ -71,10 +84,10 @@ static Module &getModule(const char *prototype) {
       DEBUG(Mod->dump());
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
     } else {
-      errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
-                            Err.getLineNo(), Err.getColumnNo(),
-                            Err.getMessage().str());
-      errs() << fmt::format("{:s}\n", prototype);
+      errs() << format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
+                       Err.getLineNo(), Err.getColumnNo(),
+                       Err.getMessage().str());
+      errs() << format("{:s}\n", prototype);
     }
     assert(ModuleIndex[prototype] && "Parsing the prototype module failed!");
   }
@@ -115,6 +128,8 @@ static inline void set_options_from_environment() {
 class StaticInitializer {
 public:
   StaticInitializer() {
+    using polly::initializePollyPasses;
+
     set_options_from_environment();
 
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
@@ -196,7 +211,6 @@ static ExecutionEngine *getEngine(Module *M) {
   builder.setErrorStr(&ErrorMsg);
   builder.setEngineKind(EngineKind::JIT);
   builder.setMCJITMemoryManager(std::move(MemManager));
-  //builder.setOptLevel(OLvl);
   builder.setOptLevel(CodeGenOpt::None);
 
   llvm::TargetOptions Options;
@@ -212,57 +226,9 @@ static ExecutionEngine *getEngine(Module *M) {
   return EE;
 }
 
-/**
-* @brief Run a specialized version of a function.
-*
-* The specialized version needs to be in 'main' form, i.e., its signature
-* has to be:
-*  void fn_name(int argc, char *argv);
-*
-* The FunctionCloner's MainCreator policy takes care of that. All the real
-* parameters are passed via argv.
-*
-* @param NewF the specialized function in main form.
-* @param ArgValues the parameter _values_ for the formal parameters.
-*/
-static void runSpecializedFunction(llvm::Function &NewF, int paramc,
-                                   char **params) {
-  static ManagedModules Mods;
-  static std::unordered_map<llvm::Function *, uint64_t> FunctionCache;
-
-  Module *NewM = NewF.getParent();
-
-  // Fetch or Create a new ExecutionEngine for this Module.
-  POLLI_TRACING_REGION_START(1, "polyjit.codegen");
-  ExecutionEngine *EE = nullptr;
-  if (!Mods.count(NewM)) {
-    EE = getEngine(NewM);
-    EE->finalizeObject();
-    Mods[NewM] = EE;
-  } else {
-    EE = Mods[NewM];
-  }
-  POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
-
-  if (!EE) {
-    errs() << "no execution engine found.\n";
-    return;
-  }
-
-  DEBUG(dbgs() << fmt::format("execution of {:>s} begins (#{:d} params)",
-                              NewF.getName().str(), paramc));
-  if (!FunctionCache.count(&NewF))
-    FunctionCache.insert(
-        std::make_pair(&NewF, EE->getFunctionAddress(NewF.getName().str())));
-  uint64_t FPtr = FunctionCache[&NewF];
-  void (*PF)(int, char **) = (void (*)(int, char **))FPtr;
-
-  PF(paramc, params);
-  DEBUG(dbgs() << fmt::format("execution of {:>s} completed",
-                              NewF.getName().str()));
-}
-
 static inline Function *getPrototype(const char *function) {
+  using fmt::format;
+
   POLLI_TRACING_REGION_START(2, "polyjit.prototype.get");
   Module &M = getModule(function);
   Function *F = getFunction(M);
@@ -276,20 +242,26 @@ static inline Function *getPrototype(const char *function) {
   return F;
 }
 
+#ifdef DEBUG
 static void printArgs(const Function &F, size_t argc, char **params) {
+  using fmt::format;
+
   std::string buf;
   llvm::raw_string_ostream s(buf);
   F.getType()->print(s);
   dbgs() << s.str() << "\n";
   for (size_t i = 0; i < argc; i++) {
-    dbgs() << fmt::format("[{}] -> {:d} - {}\n", i, (*(uint64_t *)params[i]),
-                          (void *)(params[i]));
+    dbgs() << format("[{}] -> {:d} - {}\n", i,
+                     *reinterpret_cast<uint64_t *>(params[i]),
+                     reinterpret_cast<void *>(params[i]));
   }
 }
+#endif
 
-static void printRunValues(const RunValueList & Values) {
+static void printRunValues(const RunValueList &Values) {
+  using fmt::format;
   for (auto &RV : Values) {
-    dbgs() << fmt::format("{} matched against {}\n", RV.value, (void *)RV.Arg);
+    dbgs() << format("{} matched against {}\n", RV.value, (void *)RV.Arg);
   }
 }
 
@@ -299,12 +271,194 @@ static RunValueList runValues(Function *F, unsigned paramc, void *params) {
   RunValueList RunValues;
 
   for (const Argument &Arg : F->args()) {
-    RunValues.add({ (*((uint64_t **)params)[i]), &Arg });
+    RunValues.add({(*((uint64_t **)params)[i]), &Arg});
     i++;
   }
   POLLI_TRACING_REGION_STOP(3, "polyjit.params.select");
   return RunValues;
 }
+
+struct SpecializerRequest {
+  const char *IR;
+  unsigned ParamC;
+  char **Params;
+
+  SpecializerRequest(const char *IR, unsigned ParamC, char **Params)
+      : IR(IR), ParamC(ParamC), Params(Params) {}
+};
+
+struct CacheKey {
+  const char *IR;
+  size_t ValueHash;
+
+  CacheKey(const char *IR, size_t ValueHash) : IR(IR), ValueHash(ValueHash) {}
+  CacheKey(const SpecializerRequest &Req, size_t ValueHash)
+      : IR(Req.IR), ValueHash(ValueHash) {}
+
+  bool operator==(const CacheKey &O) const {
+    return IR == O.IR && ValueHash == O.ValueHash;
+  }
+
+  bool operator<(const CacheKey &O) const {
+    return IR < O.IR || (IR == O.IR && ValueHash < O.ValueHash);
+  }
+};
+
+template <> struct std::hash<CacheKey> {
+  std::size_t operator()(const CacheKey &K) const {
+    return (size_t)K.IR ^ K.ValueHash;
+  }
+};
+
+template <typename K, typename V> class IRCache {
+private:
+  std::unordered_map<K, V> Cache;
+  mutable std::mutex ReadMutex;
+  mutable std::mutex WriteMutex;
+
+  std::condition_variable NewElement;
+
+public:
+  using size_type = size_t;
+  using iterator = typename std::unordered_map<K, V>::iterator;
+  using value_type = std::pair<K, V>;
+  using iterator_pair = std::pair<iterator, bool>;
+
+  size_type count(const K &X) {
+    std::lock_guard<std::mutex> L(ReadMutex);
+    return Cache.count(X);
+  }
+
+  iterator_pair insert(const value_type &Value) {
+    std::unique_lock<std::mutex> WL(WriteMutex);
+    iterator_pair Ret = Cache.insert(Value);
+    WL.unlock();
+    NewElement.notify_all();
+    return Ret;
+  }
+
+  V &operator[](const K &X) {
+    std::unique_lock<std::mutex> CL(WriteMutex);
+    NewElement.wait(CL, [&]() { return Cache.count(X); });
+    return Cache[X];
+  }
+
+  V &operator[](K &&X) {
+    K &RX = X;
+    return this[RX];
+  }
+};
+
+template <typename T> class CodeGenQueue {
+private:
+  std::deque<T> Work;
+  mutable std::mutex M;
+
+public:
+  using value_type = T;
+  using reference = const T &;
+
+  reference front() const { return Work.front(); }
+  reference back() const { return Work.front(); }
+
+  void pop_front() {
+    std::unique_lock<std::mutex> L(M);
+    Work.pop_front();
+  }
+
+  void pop_back() {
+    std::unique_lock<std::mutex> L(M);
+    Work.pop_back();
+  }
+
+  bool empty() const {
+    std::unique_lock<std::mutex> L(M);
+    return Work.empty();
+  }
+
+  void push_back(const value_type &x) {
+    std::unique_lock<std::mutex> L(M);
+    Work.push_back(x);
+  }
+
+  void push_back(value_type &&x) {
+    std::unique_lock<std::mutex> L(M);
+    Work.push_back(x);
+  }
+};
+
+static std::unordered_map<CacheKey, uint64_t> FunctionCache;
+static IRCache<const char *, llvm::Function *> IRFunctionCache;
+
+class PolyJIT {
+private:
+  CodeGenQueue<SpecializerRequest> Work;
+  std::atomic_bool ShuttingDown;
+  std::atomic_bool ShouldStart;
+  std::condition_variable GeneratorShouldStart;
+  std::condition_variable GeneratorShutDown;
+  std::mutex GeneratorRequestMutex;
+  std::thread Generator;
+
+public:
+  PolyJIT()
+      : ShuttingDown(false), ShouldStart(false), Generator([&]() {
+          using fmt::format;
+          std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
+          pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
+          while (!ShuttingDown) {
+            while (!ShouldStart) {
+              GeneratorShouldStart.wait(Lock);
+            }
+
+            POLLI_TRACING_REGION_START(1, "polyjit.codegen");
+            while (!Work.empty()) {
+              const SpecializerRequest &Request = Work.front();
+              Function *F = getPrototype(Request.IR);
+              RunValueList Values =
+                  runValues(F, Request.ParamC, Request.Params);
+              VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+              Function *NewF = VarFun->getOrCreateVariant(Values);
+              Module *NewM = NewF->getParent();
+              ExecutionEngine *EE = getEngine(NewM);
+
+              DEBUG(printArgs(*F, Request.ParamC, Request.Params));
+              DEBUG(printRunValues(Values));
+
+              assert(EE && "No execution engine could be constructed.");
+              EE->finalizeObject();
+
+              FunctionCache.insert(std::make_pair(
+                  CacheKey(Request, Values.hash()),
+                  EE->getFunctionAddress(NewF->getName().str())));
+              IRFunctionCache.insert(std::make_pair(Request.IR, F));
+              Work.pop_front();
+            }
+            POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
+
+            ShouldStart = false;
+          }
+        }) {}
+
+  ~PolyJIT() {
+    ShuttingDown = true;
+    ShouldStart = true;
+
+    // Wake up the generator to allow it to shut down.
+    GeneratorShouldStart.notify_all();
+    Generator.join();
+  }
+
+  void addRequest(SpecializerRequest Request) {
+    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
+    Work.push_back(Request);
+    ShouldStart = true;
+    Lock.unlock();
+    GeneratorShouldStart.notify_all();
+  }
+};
+
+static PolyJIT JIT;
 
 extern "C" {
 /**
@@ -317,16 +471,14 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
-  Function *F = getPrototype(fName);
-  RunValueList values = runValues(F, paramc, params);
+  SpecializerRequest Request(fName, paramc, params);
 
-  // Assume that we have used a specializer that converts all functions into
-  // 'main' compatible format.
-  VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+  JIT.addRequest(Request);
+  Function *F = IRFunctionCache[Request.IR];
+  RunValueList Values = runValues(F, Request.ParamC, Request.Params);
+  CacheKey K(Request, Values.hash());
 
-  Function *NewF = VarFun->getOrCreateVariant(values);
-  DEBUG(printArgs(*F, paramc, params));
-  DEBUG(printRunValues(values));
-  runSpecializedFunction(*NewF, paramc, params);
+  void (*PF)(int, char **) = (void (*)(int, char **))FunctionCache[K];
+  PF(paramc, params);
 }
 }
