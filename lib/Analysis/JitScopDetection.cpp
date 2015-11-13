@@ -88,18 +88,6 @@ void JitScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.setPreservesAll();
 }
 
-static void getDebugLocations(const Region *R, DebugLoc &Begin, DebugLoc &End) {
-  for (const BasicBlock *BB : R->blocks())
-    for (const Instruction &Inst : *BB) {
-      DebugLoc DL = Inst.getDebugLoc();
-      if (!DL)
-        continue;
-
-      Begin = Begin ? std::min(Begin, DL) : DL;
-      End = End ? std::max(End, DL) : DL;
-    }
-}
-
 static void emitClassicalSCoPs(const Function &F, const ScopSet &Scops) {
   LLVMContext &Ctx = F.getContext();
 
