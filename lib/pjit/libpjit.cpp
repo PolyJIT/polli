@@ -306,7 +306,8 @@ struct CacheKey {
 
 template <> struct std::hash<CacheKey> {
   std::size_t operator()(const CacheKey &K) const {
-    return (size_t)K.IR ^ K.ValueHash;
+    size_t h = (size_t)K.IR ^ K.ValueHash;
+    return h;
   }
 };
 
@@ -339,13 +340,14 @@ public:
 
   V &operator[](const K &X) {
     std::unique_lock<std::mutex> CL(WriteMutex);
-    NewElement.wait(CL, [&]() { return Cache.count(X); });
+    NewElement.wait(CL, [&]() { return Cache.find(X) != Cache.end(); });
     return Cache[X];
   }
 
   V &operator[](K &&X) {
-    K &RX = X;
-    return this[RX];
+    std::unique_lock<std::mutex> CL(WriteMutex);
+    NewElement.wait(CL, [&]() { return Cache.find(X) != Cache.end(); });
+    return Cache[X];
   }
 };
 
@@ -387,7 +389,8 @@ public:
   }
 };
 
-static std::unordered_map<CacheKey, uint64_t> FunctionCache;
+using FCache = std::unordered_map<CacheKey, uint64_t>;
+static FCache FunctionCache;
 static IRCache<const char *, llvm::Function *> IRFunctionCache;
 
 class PolyJIT {
@@ -417,21 +420,26 @@ public:
               Function *F = getPrototype(Request.IR);
               RunValueList Values =
                   runValues(F, Request.ParamC, Request.Params);
-              VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
-              Function *NewF = VarFun->getOrCreateVariant(Values);
-              Module *NewM = NewF->getParent();
-              ExecutionEngine *EE = getEngine(NewM);
 
-              DEBUG(printArgs(*F, Request.ParamC, Request.Params));
-              DEBUG(printRunValues(Values));
+              CacheKey K(Request, Values.hash());
+              if (!FunctionCache.count(K)) {
+                VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
+                Function *NewF = VarFun->getOrCreateVariant(Values);
+                Module *NewM = NewF->getParent();
+                ExecutionEngine *EE = getEngine(NewM);
 
-              assert(EE && "No execution engine could be constructed.");
-              EE->finalizeObject();
+                DEBUG(printArgs(*F, Request.ParamC, Request.Params));
+                DEBUG(printRunValues(Values));
 
-              FunctionCache.insert(std::make_pair(
-                  CacheKey(Request, Values.hash()),
-                  EE->getFunctionAddress(NewF->getName().str())));
-              IRFunctionCache.insert(std::make_pair(Request.IR, F));
+                assert(EE && "No execution engine could be constructed.");
+                EE->finalizeObject();
+
+                uint64_t FPtr = EE->getFunctionAddress(NewF->getName().str());
+                assert(FPtr && "Specializer returned nullptr.");
+                auto Entry = std::make_pair(K, FPtr);
+                FunctionCache.insert(Entry);
+                IRFunctionCache.insert(std::make_pair(Request.IR, F));
+              }
               Work.pop_front();
             }
             POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
@@ -459,7 +467,6 @@ public:
 };
 
 static PolyJIT JIT;
-
 extern "C" {
 /**
  * @brief Runtime callback for PolyJIT.
@@ -471,14 +478,18 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
+  void (*PF)(int, char **) = nullptr;
+
+  Function *F = nullptr;
   SpecializerRequest Request(fName, paramc, params);
 
   JIT.addRequest(Request);
-  Function *F = IRFunctionCache[Request.IR];
-  RunValueList Values = runValues(F, Request.ParamC, Request.Params);
+  F = IRFunctionCache[fName];
+  RunValueList Values = runValues(F, paramc, params);
   CacheKey K(Request, Values.hash());
 
-  void (*PF)(int, char **) = (void (*)(int, char **))FunctionCache[K];
+  PF = (void (*)(int, char **))FunctionCache[K];
+  assert(PF && "Could not find specialized function in cache!");
   PF(paramc, params);
 }
 }
