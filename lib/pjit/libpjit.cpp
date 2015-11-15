@@ -311,7 +311,7 @@ template <> struct std::hash<CacheKey> {
   }
 };
 
-template <typename K, typename V> class IRCache {
+template <typename K, typename V> class BlockingMap {
 private:
   std::unordered_map<K, V> Cache;
   mutable std::mutex ReadMutex;
@@ -389,9 +389,8 @@ public:
   }
 };
 
-using FCache = std::unordered_map<CacheKey, uint64_t>;
-static FCache FunctionCache;
-static IRCache<const char *, llvm::Function *> IRFunctionCache;
+static BlockingMap<const char *, llvm::Function *> IRFunctionCache;
+static BlockingMap<CacheKey, uint64_t> CompileCache;
 
 class PolyJIT {
 private:
@@ -418,11 +417,13 @@ public:
             while (!Work.empty()) {
               const SpecializerRequest &Request = Work.front();
               Function *F = getPrototype(Request.IR);
+              IRFunctionCache.insert(std::make_pair(Request.IR, F));
+
               RunValueList Values =
                   runValues(F, Request.ParamC, Request.Params);
 
               CacheKey K(Request, Values.hash());
-              if (!FunctionCache.count(K)) {
+              if (!CompileCache.count(K)) {
                 VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
                 Function *NewF = VarFun->getOrCreateVariant(Values);
                 Module *NewM = NewF->getParent();
@@ -437,8 +438,7 @@ public:
                 uint64_t FPtr = EE->getFunctionAddress(NewF->getName().str());
                 assert(FPtr && "Specializer returned nullptr.");
                 auto Entry = std::make_pair(K, FPtr);
-                FunctionCache.insert(Entry);
-                IRFunctionCache.insert(std::make_pair(Request.IR, F));
+                CompileCache.insert(Entry);
               }
               Work.pop_front();
             }
@@ -478,8 +478,7 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 void pjit_main(const char *fName, unsigned paramc, char **params) {
-  void (*PF)(int, char **) = nullptr;
-
+  void (*NewF)(int, char **) = nullptr;
   Function *F = nullptr;
   SpecializerRequest Request(fName, paramc, params);
 
@@ -488,8 +487,8 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   RunValueList Values = runValues(F, paramc, params);
   CacheKey K(Request, Values.hash());
 
-  PF = (void (*)(int, char **))FunctionCache[K];
-  assert(PF && "Could not find specialized function in cache!");
-  PF(paramc, params);
+  NewF = (void (*)(int, char **))CompileCache[K];
+  assert(NewF && "Could not find specialized function in cache!");
+  NewF(paramc, params);
 }
 }
