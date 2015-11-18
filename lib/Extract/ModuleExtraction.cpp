@@ -486,7 +486,7 @@ struct InstrumentEndpoint {
     LLVMContext &Ctx = M->getContext();
 
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        "pjit_main", Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
+        "pjit_main", Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt32Ty(Ctx), Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
@@ -565,8 +565,15 @@ struct InstrumentEndpoint {
     Args.push_back(ParamC);
     Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
 
-    Builder.CreateCall(PJITCB, Args);
+    BasicBlock *JitReady = BasicBlock::Create(Ctx, "polyjit.ready", To);
+    BasicBlock *JitNotReady = BasicBlock::Create(Ctx, "polyjit.not.ready", To);
+    CallInst *ReadyCheck = Builder.CreateCall(PJITCB, Args);
+
+    Builder.CreateCondBr(ReadyCheck, JitReady, JitNotReady);
+    Builder.SetInsertPoint(JitReady);
     Builder.CreateRetVoid();
+    Builder.SetInsertPoint(JitNotReady);
+    Builder.CreateUnreachable();
   }
 
 private:

@@ -477,7 +477,7 @@ extern "C" {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void pjit_main(const char *fName, unsigned paramc, char **params) {
+bool pjit_main(const char *fName, unsigned paramc, char **params) {
   void (*NewF)(int, char **) = nullptr;
   Function *F = nullptr;
   SpecializerRequest Request(fName, paramc, params);
@@ -490,5 +490,6 @@ void pjit_main(const char *fName, unsigned paramc, char **params) {
   NewF = (void (*)(int, char **))CompileCache[K];
   assert(NewF && "Could not find specialized function in cache!");
   NewF(paramc, params);
+  return true;
 }
 }
