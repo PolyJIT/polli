@@ -46,8 +46,7 @@ def get_system_includes():
 
 
 flags = [
-    "-std=c++14",
-    "-stdlib=libstdc++",
+    "-std=c++11",
     "-DENABLE_GTEST",
     "-DFMT_HEADER_ONLY",
     "-D_DEBUG",
@@ -73,9 +72,7 @@ flags = [
     "-fno-rtti",
     "-fno-exceptions",
     "-pthread"
-]
-flags = flags + get_system_includes()
-flags = flags + [
+] + get_system_includes() + [
     "-I", polli_inc("include"),
     "-I", polli_inc("external"),
     "-I", polly_inc("include"),
@@ -91,7 +88,7 @@ flags = flags + [
 
 
 compilation_database_folder = DirectoryOfThisScript()
-if os.path.exists( compilation_database_folder ):
+if os.path.exists(os.path.join(compilation_database_folder, "compile_commands.json")):
     database = ycm_core.CompilationDatabase( compilation_database_folder )
 else:
     database = None
@@ -121,8 +118,8 @@ def MakeRelativePathsInFlagsAbsolute(flags, working_directory):
                 new_flag = path_flag + os.path.join(working_directory, path)
                 break
 
-            if new_flag:
-                new_flags.append(new_flag)
+        if new_flag:
+            new_flags.append(new_flag)
     return new_flags
 
 def IsHeaderFile( filename ):
@@ -170,9 +167,7 @@ def FlagsForFile(filename):
     except ValueError:
       pass
   else:
-    relative_to = DirectoryOfThisScript()
-    final_flags = MakeRelativePathsInFlagsAbsolute( flags, relative_to )
-
+    final_flags = flags
 
   return {
       'flags': final_flags,
