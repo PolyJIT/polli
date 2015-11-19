@@ -458,6 +458,19 @@ struct InstrumentEndpoint {
   void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
   /**
+   * @brief Setter for a fallback function that will be called.
+   *
+   * The fallback function is the function that will be called when the JIT
+   * reports that it cannot fullfill a request in time.
+   *
+   * This automatically forces the client to execute the fallback in parallel
+   * to the JIT' request.
+   *
+   * @param F The function we use as fallback when the JIT is not ready.
+   */
+  void setFallback(Function *F) { FallbackF = F; }
+
+  /**
    * @brief Apply the JIT indirection to the target Function.
    *
    * 1. Create a JIT callback function signature, in the form of:
@@ -476,6 +489,7 @@ struct InstrumentEndpoint {
   void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
     assert(From && "No source function!");
     assert(To && "No target function!");
+    assert(FallbackF && "No fallback function!");
 
     if (To->isDeclaration())
       return;
@@ -567,17 +581,28 @@ struct InstrumentEndpoint {
 
     BasicBlock *JitReady = BasicBlock::Create(Ctx, "polyjit.ready", To);
     BasicBlock *JitNotReady = BasicBlock::Create(Ctx, "polyjit.not.ready", To);
+    BasicBlock *Exit = BasicBlock::Create(Ctx, "polyjit.exit", To);
     CallInst *ReadyCheck = Builder.CreateCall(PJITCB, Args);
 
     Builder.CreateCondBr(ReadyCheck, JitReady, JitNotReady);
     Builder.SetInsertPoint(JitReady);
-    Builder.CreateRetVoid();
+    Builder.CreateBr(Exit);
     Builder.SetInsertPoint(JitNotReady);
-    Builder.CreateUnreachable();
+
+    // Just hand the args from the function down to the source function.
+    SmallVector<Value *, 3> ToArgs;
+    for (auto &Arg: To->args()) {
+      ToArgs.push_back(&Arg);
+    }
+    Builder.CreateCall(FallbackF, ToArgs);
+    Builder.CreateBr(Exit);
+    Builder.SetInsertPoint(Exit);
+    Builder.CreateRetVoid();
   }
 
 private:
   Value *PrototypeF;
+  Function *FallbackF;
 };
 
 static inline void collectRegressionTest(const std::string Name,
@@ -689,7 +714,9 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     collectRegressionTest(FromName, ModStr);
 
     InstrumentingFunctionCloner InstCloner(VMap, M);
-    InstCloner.setSource(ProtoF).setPrototype(Prototype);
+    InstCloner.setSource(ProtoF);
+    InstCloner.setPrototype(Prototype);
+    InstCloner.setFallback(F);
 
     Function *InstF = InstCloner.start(/* RemapCalls */ true);
     InstF->addFnAttr(Attribute::OptimizeNone);
