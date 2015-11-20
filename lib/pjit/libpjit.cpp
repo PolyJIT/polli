@@ -339,14 +339,10 @@ public:
   }
 
   V &operator[](const K &X) {
-    std::unique_lock<std::mutex> CL(WriteMutex);
-    NewElement.wait(CL, [&]() { return Cache.find(X) != Cache.end(); });
     return Cache[X];
   }
 
   V &operator[](K &&X) {
-    std::unique_lock<std::mutex> CL(WriteMutex);
-    NewElement.wait(CL, [&]() { return Cache.find(X) != Cache.end(); });
     return Cache[X];
   }
 };
@@ -479,17 +475,24 @@ extern "C" {
  */
 bool pjit_main(const char *fName, unsigned paramc, char **params) {
   void (*NewF)(int, char **) = nullptr;
-  Function *F = nullptr;
+  bool JitReady = false;
   SpecializerRequest Request(fName, paramc, params);
 
   JIT.addRequest(Request);
-  F = IRFunctionCache[fName];
-  RunValueList Values = runValues(F, paramc, params);
-  CacheKey K(Request, Values.hash());
+  if (IRFunctionCache.count(fName)) {
+    Function *F = IRFunctionCache[fName];
+    RunValueList Values = runValues(F, paramc, params);
+    CacheKey K(Request, Values.hash());
 
-  NewF = (void (*)(int, char **))CompileCache[K];
-  assert(NewF && "Could not find specialized function in cache!");
-  NewF(paramc, params);
-  return true;
+    if (CompileCache.count(K)) {
+      uint64_t CacheResult = CompileCache[K];
+      NewF = (void (*)(int, char **))CacheResult;
+      assert(NewF && "Could not find specialized function in cache!");
+      NewF(paramc, params);
+      JitReady = true;
+    }
+  }
+
+  return JitReady;
 }
 }
