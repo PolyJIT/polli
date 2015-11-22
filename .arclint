@@ -23,6 +23,11 @@
     "spelling": {
       "exclude": "(configure|autoconf/.*)",
       "type": "spelling"
+    },
+    "clang-tidy": {
+      "type": "script-and-regex",
+      "script-and-regex.script": "clang-tidy -fix",
+      "script-and-regex.regex": "/^(?P<file>.+):(?P<line>[0-9]+):(?P<char>[0-9]+): (?P<severity>warning|error|advice):(?P<message>.+) \\[(?P<name>.+)\\]$/m"
     }
-  }
+}
 }
