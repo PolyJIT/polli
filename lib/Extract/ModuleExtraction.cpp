@@ -669,7 +669,6 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-        // ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
