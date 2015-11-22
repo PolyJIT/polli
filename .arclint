@@ -9,7 +9,8 @@
       "severity": {
         "runtime/int":            "advice",
         "whitespace/comments":    "advice",
-        "whitespace/blank_line":  "advice"
+        "whitespace/blank_line":  "advice",
+        "legal/copyright":        "disabled"
       }
     },
     "filename": {
