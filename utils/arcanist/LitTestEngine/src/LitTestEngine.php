@@ -90,7 +90,7 @@ final class LitTestEngine extends ArcanistUnitTestEngine {
         print "Using lit executable '$lit'\n";
 
         // We have to modify the format string, because llvm-lit does not like a '' argument
-        $cmd = '%s ' . ($this->getEnableAsyncTests() ? '' : '-j1 ') .'%s 2>&1';
+        $cmd = '%s %s 2>&1';
         $litFuture = new ExecFuture($cmd, $lit, $polliTestDir);
         $out = "";
         $results = array();
@@ -130,7 +130,7 @@ final class LitTestEngine extends ArcanistUnitTestEngine {
                 if ($res == ArcanistUnitTestResult::RESULT_FAIL)
                     print "\033[0A";
                 if ($res != ArcanistUnitTestResult::RESULT_SKIP && $res != ArcanistUnitTestResult::RESULT_PASS)
-                    print "\r\033[K\033[0A".$line.self::progress($results, $numTests);
+                    print "\033[K\033[0A".$line.self::progress($results, $numTests);
                 if ($res == ArcanistUnitTestResult::RESULT_UNSOUND)
                     continue;
                 $result = new ArcanistUnitTestResult();
