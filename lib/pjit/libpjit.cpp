@@ -283,8 +283,17 @@ struct SpecializerRequest {
   unsigned ParamC;
   char **Params;
 
-  SpecializerRequest(const char *IR, unsigned ParamC, char **Params)
-      : IR(IR), ParamC(ParamC), Params(Params) {}
+  SpecializerRequest(const char *IR, unsigned ParamC, char **params)
+      : IR(IR), ParamC(ParamC) {
+
+        size_t n = ParamC * sizeof(void *);
+        Params = (char **)std::malloc(n);
+        std::memcpy(Params, params, n);
+      }
+
+  ~SpecializerRequest() {
+    std::free(Params);
+  }
 };
 
 struct CacheKey {
@@ -292,8 +301,6 @@ struct CacheKey {
   size_t ValueHash;
 
   CacheKey(const char *IR, size_t ValueHash) : IR(IR), ValueHash(ValueHash) {}
-  CacheKey(const SpecializerRequest &Req, size_t ValueHash)
-      : IR(Req.IR), ValueHash(ValueHash) {}
 
   bool operator==(const CacheKey &O) const {
     return IR == O.IR && ValueHash == O.ValueHash;
@@ -389,16 +396,9 @@ static BlockingMap<const char *, llvm::Function *> IRFunctionCache;
 static BlockingMap<CacheKey, uint64_t> CompileCache;
 
 class PolyJIT {
-private:
-  CodeGenQueue<SpecializerRequest> Work;
-  std::atomic_bool ShuttingDown;
-  std::atomic_bool ShouldStart;
-  std::condition_variable GeneratorShouldStart;
-  std::condition_variable GeneratorShutDown;
-  std::mutex GeneratorRequestMutex;
-  std::thread Generator;
-
 public:
+  using SpecializerRequestPtr = std::shared_ptr<SpecializerRequest>;
+
   PolyJIT()
       : ShuttingDown(false), ShouldStart(false), Generator([&]() {
           using fmt::format;
@@ -411,14 +411,14 @@ public:
 
             POLLI_TRACING_REGION_START(1, "polyjit.codegen");
             while (!Work.empty()) {
-              const SpecializerRequest &Request = Work.front();
+              const SpecializerRequest &Request = *Work.front();
               Function *F = getPrototype(Request.IR);
               IRFunctionCache.insert(std::make_pair(Request.IR, F));
 
               RunValueList Values =
                   runValues(F, Request.ParamC, Request.Params);
 
-              CacheKey K(Request, Values.hash());
+              CacheKey K(Request.IR, Values.hash());
               if (!CompileCache.count(K)) {
                 VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
                 Function *NewF = VarFun->getOrCreateVariant(Values);
@@ -453,13 +453,22 @@ public:
     Generator.join();
   }
 
-  void addRequest(SpecializerRequest Request) {
+  void addRequest(SpecializerRequestPtr Request) {
     std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
     Work.push_back(Request);
     ShouldStart = true;
     Lock.unlock();
     GeneratorShouldStart.notify_all();
   }
+
+private:
+  CodeGenQueue<SpecializerRequestPtr> Work;
+  std::atomic_bool ShuttingDown;
+  std::atomic_bool ShouldStart;
+  std::condition_variable GeneratorShouldStart;
+  std::condition_variable GeneratorShutDown;
+  std::mutex GeneratorRequestMutex;
+  std::thread Generator;
 };
 
 static PolyJIT JIT;
@@ -476,13 +485,12 @@ extern "C" {
 bool pjit_main(const char *fName, unsigned paramc, char **params) {
   void (*NewF)(int, char **) = nullptr;
   bool JitReady = false;
-  SpecializerRequest Request(fName, paramc, params);
-
+  auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   JIT.addRequest(Request);
   if (IRFunctionCache.count(fName)) {
     Function *F = IRFunctionCache[fName];
     RunValueList Values = runValues(F, paramc, params);
-    CacheKey K(Request, Values.hash());
+    CacheKey K(Request->IR, Values.hash());
 
     if (CompileCache.count(K)) {
       uint64_t CacheResult = CompileCache[K];
