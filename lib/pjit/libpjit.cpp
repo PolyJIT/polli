@@ -390,6 +390,11 @@ public:
     std::unique_lock<std::mutex> L(M);
     Work.push_back(x);
   }
+
+  void clear() {
+    std::unique_lock<std::mutex> L(M);
+    Work.clear();
+  }
 };
 
 static BlockingMap<const char *, llvm::Function *> IRFunctionCache;
@@ -447,6 +452,7 @@ public:
   ~PolyJIT() {
     ShuttingDown = true;
     ShouldStart = true;
+    Work.clear();
 
     // Wake up the generator to allow it to shut down.
     GeneratorShouldStart.notify_all();
