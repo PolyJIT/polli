@@ -285,7 +285,6 @@ struct SpecializerRequest {
 
   SpecializerRequest(const char *IR, unsigned ParamC, char **params)
       : IR(IR), ParamC(ParamC) {
-
         size_t n = ParamC * sizeof(void *);
         Params = (char **)std::malloc(n);
         std::memcpy(Params, params, n);
