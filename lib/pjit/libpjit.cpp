@@ -455,11 +455,13 @@ public:
         }) {}
 
   ~PolyJIT() {
+    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
     ShuttingDown = true;
     ShouldStart = true;
     Work.clear();
 
     // Wake up the generator to allow it to shut down.
+    Lock.unlock();
     GeneratorShouldStart.notify_all();
     Generator.join();
   }
