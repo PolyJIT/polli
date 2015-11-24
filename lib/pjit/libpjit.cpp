@@ -344,6 +344,12 @@ public:
     return Ret;
   }
 
+  V &blocking_at(const K &X) {
+    std::unique_lock<std::mutex> WL(WriteMutex, std::defer_lock);
+    NewElement.wait(WL, [&]() { return Cache.find(X) != Cache.end(); });
+    return Cache[X];
+  }
+
   V &operator[](const K &X) {
     return Cache[X];
   }
@@ -488,16 +494,32 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 bool pjit_main(const char *fName, unsigned paramc, char **params) {
+  Function *F = nullptr;
   void (*NewF)(int, char **) = nullptr;
   bool JitReady = false;
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
+
   JIT.addRequest(Request);
-  if (IRFunctionCache.count(fName)) {
-    Function *F = IRFunctionCache[fName];
+  if (!IRFunctionCache.count(fName)) {
+    // We have never seen this prototype, so we block until the first
+    // version can be delivered.
+    F = IRFunctionCache.blocking_at(fName);
+    RunValueList Values = runValues(F, paramc, params);
+    CacheKey K(Request->IR, Values.hash());
+    uint64_t CacheResult = CompileCache.blocking_at(K);
+    NewF = (void (*)(int, char **))CacheResult;
+    assert(NewF && "Could not find specialized function in cache!");
+    NewF(paramc, params);
+    JitReady = true;
+  } else {
+    std::cerr << fmt::format("Seen the prototype.\n");
+    // We have seen this prototype, so we can do everything asynchronously.
+    F = IRFunctionCache[fName];
     RunValueList Values = runValues(F, paramc, params);
     CacheKey K(Request->IR, Values.hash());
 
     if (CompileCache.count(K)) {
+      std::cerr << fmt::format("Seen the specialized version.\n");
       uint64_t CacheResult = CompileCache[K];
       NewF = (void (*)(int, char **))CacheResult;
       assert(NewF && "Could not find specialized function in cache!");
