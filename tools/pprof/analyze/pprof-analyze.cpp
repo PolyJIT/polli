@@ -17,7 +17,6 @@
 #include <memory>
 #include <stdexcept>
 
-#define FMT_HEADER_ONLY
 #include <cppformat/format.h>
 
 using namespace llvm;

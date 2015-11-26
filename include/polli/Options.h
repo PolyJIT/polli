@@ -24,26 +24,7 @@ extern llvm::cl::OptionCategory PolliCategory;
 
 namespace polli {
 
-enum LogType {
-  Trace,
-  Debug,
-  Info,
-  Notice,
-  Warn,
-  Err,
-  Critical,
-  Alert,
-  Emerg,
-  Off
-};
-
 namespace opt {
-extern std::vector<std::string> LibPaths;
-extern std::vector<std::string> Libraries;
-
-extern std::string InputFile;
-extern std::vector<std::string> InputArgv;
-
 extern std::string EntryFunc;
 extern std::string FakeArgv0;
 
@@ -55,6 +36,7 @@ extern bool DisableRecompile;
 extern bool DisableExecution;
 extern bool AnalyzeIR;
 extern char OptLevel;
+extern bool CollectRegressionTests;
 
 extern std::string TargetTriple;
 extern std::string MArch;
@@ -77,13 +59,6 @@ extern std::string ReportFilename;
 
 extern bool DisablePreopt;
 extern bool GenerateOutput;
-
-/**
- * @brief What logs should be visible to the user.
- *
- * Default is 'warn'
- */
-extern polli::LogType LogLevel;
 
 /**
  * @brief Should PolyJIT be enabled?

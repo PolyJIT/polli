@@ -12,8 +12,10 @@
 #include "llvm/IR/Function.h"
 #include "llvm/Support/Casting.h"
 
-#include "spdlog/spdlog.h"
+#include "cppformat/format.h"
 #include <map>
+
+#define DEBUG_TYPE "polyjit"
 
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
@@ -55,8 +57,8 @@ struct MainCreator {
                                    Function *TgtF) {
     // 2nd argument is our array, 1st is argc
     Function::arg_iterator TgtArg = TgtF->arg_begin();
-    Argument *ArgC = TgtArg;
-    Value *ArgV = ++TgtArg;
+    Argument *ArgC = &*TgtArg;
+    Value *ArgV = &*++TgtArg;
 
     ArgC->setName("argc");
     ArgV->setName("argv");
@@ -194,8 +196,6 @@ public:
  * @return a copy of the base function, with the values of K substituted.
  */
 Function *VariantFunction::createVariant(const RunValueList &K) {
-  using namespace spdlog::details;
-
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
@@ -211,10 +211,8 @@ Function *VariantFunction::createVariant(const RunValueList &K) {
                                         M->getModuleIdentifier(),
                                         SourceF.getName().str(), K.hash()));
 
-  DEBUG(
-  static auto Console = spdlog::stderr_logger_mt("polli");
-  Console->warn("Create Variant for: {} Hash: {:d}", K.str(), K.hash())
-  );
+  DEBUG(dbgs() << fmt::format("Create Variant for: {} Hash: {:d}", K.str(),
+                              K.hash()));
   // Perform parameter value substitution.
   if (!opt::DisableRecompile) {
     FunctionCloner<MainCreator, IgnoreSource,

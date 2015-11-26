@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string>
 
-#define FMT_HEADER_ONLY
 #include <cppformat/format.h>
 
 namespace pprof {
@@ -89,7 +88,7 @@ getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
   }
 
   //FIXME: Record an error event, this should not happen.
-  assert("BUG: No matching Exit to this Entry");
+  static_assert("BUG: No matching Exit to this Entry", "");
   return Cur;
 }
 } // namespace pprof

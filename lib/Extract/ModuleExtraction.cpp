@@ -1,11 +1,11 @@
 #include "polli/FunctionCloner.h"
 #include "polli/ModuleExtractor.h"
+#include "polli/Schema.h"
 #include "polli/ScopMapper.h"
-
-#define DEBUG_TYPE "polli-extract"
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/Attributes.h"
@@ -14,21 +14,21 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/Pass.h"
+#include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/IPO.h"
 
-#include "spdlog/spdlog.h"
-
 using namespace llvm;
-using namespace spdlog::details;
+#define DEBUG_TYPE "polyjit"
 
 STATISTIC(Instrumented, "Number of instrumented functions");
 STATISTIC(MappedGlobals, "Number of global to argument redirections");
@@ -37,10 +37,10 @@ STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
 namespace polli {
 char ModuleExtractor::ID = 0;
 
-using ModulePtrT = Module *;
+using ModulePtrT = std::unique_ptr<Module>;
 
 static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
-  ModulePtrT NewM = new Module(M.getModuleIdentifier(), M.getContext());
+  auto NewM = ModulePtrT(new Module(M.getModuleIdentifier(), M.getContext()));
   NewM->setDataLayout(M.getDataLayout());
   NewM->setTargetTriple(M.getTargetTriple());
   NewM->setMaterializer(M.getMaterializer());
@@ -51,12 +51,11 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
 
 void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ScopMapper>();
+  AU.addRequired<CallGraphWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
 }
 
-void ModuleExtractor::releaseMemory() {
-  InstrumentedFunctions.clear();
-}
+void ModuleExtractor::releaseMemory() { InstrumentedFunctions.clear(); }
 
 /**
  * @brief Convert a module to a string.
@@ -128,13 +127,18 @@ static void setPointerOperand(Instruction &I, Value &V) {
     NewV = Builder.CreateLoad(&V);
   } else if (StoreInst *S = dyn_cast<StoreInst>(&I)) {
     NewV = Builder.CreateStore(S->getValueOperand(), &V);
+  } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(&I)) {
+    SmallVector<Value *, 4> Indices;
+    for (GetElementPtrInst::const_op_iterator I = GEP->idx_begin(),
+                                              E = GEP->idx_end();
+         I != E; ++I) {
+      Value *V = (*I).get();
+      Indices.push_back(V);
+    }
+    NewV = Builder.CreateGEP(&V, Indices);
   } else {
     return;
   }
-  // else if (GetElementPtrInst *G = dyn_cast<GetElementPtrInst>(&I)) {
-  //  NewV = Builder.CreateGEP
-  //  G->setOperand(0, &V);
-  //}
 
   I.replaceAllUsesWith(NewV);
 }
@@ -155,6 +159,16 @@ static inline size_t getGlobalCount(Function *F) {
   return n;
 }
 
+#ifdef DEBUG
+static void dumpUsers(Value &V) {
+  for (const auto &U : V.users()) {
+    U->print(outs().indent(2));
+    outs() << "\n";
+  }
+  llvm::outs() << "====\n";
+}
+#endif
+
 using InstrList = SmallVector<Instruction *, 4>;
 /**
  * @brief Convert a ConstantExpr pointer operand to an Instruction Value.
@@ -173,6 +187,10 @@ static inline void constantExprToInstruction(Instruction &I,
     if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
       Instruction *Inst = C->getAsInstruction();
       Inst->insertBefore(&I);
+
+      DEBUG(llvm::outs() << "I: " << I << "\nInst: " << *Inst << "\n";
+            llvm::outs() << "Users:\n";
+            dumpUsers(*C));
       setPointerOperand(I, *Inst);
       Converted.push_back(&I);
     }
@@ -269,7 +287,7 @@ struct AddGlobalsPolicy {
     Function::arg_iterator NewArg = To->arg_begin();
     for (Argument &Arg : From->args()) {
       NewArg->setName(Arg.getName());
-      VMap[&Arg] = NewArg++;
+      VMap[&Arg] = &*(NewArg++);
     }
 
     GlobalList ReqGlobals = getGVsUsedInFunction(*From);
@@ -285,7 +303,7 @@ struct AddGlobalsPolicy {
        * different invocations of the FunctionCloner.
        */
       NewArg->setName(GV->getName());
-      VMap[GV] = NewArg++;
+      VMap[GV] = &*(NewArg++);
       MappedGlobals++;
     }
   }
@@ -362,7 +380,7 @@ struct RemoveGlobalsPolicy {
           UnmappedGlobals++;
         }
       } else {
-        VMap[&FromArg] = ToArg++;
+        VMap[&FromArg] = &*(ToArg++);
       }
   }
 
@@ -403,12 +421,11 @@ struct RemoveGlobalsPolicy {
  */
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
-  static auto Console = spdlog::stderr_logger_st(DEBUG_TYPE);
-
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
 
-  DEBUG(Console->debug("Source to Prototype -> {:s}\n", F.getName().str()));
+  DEBUG(dbgs() << fmt::format("Source to Prototype -> {:s}\n",
+                              F.getName().str()));
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
   InstrList Converted = apply<InstrList>(F, constantExprToInstruction);
@@ -441,6 +458,19 @@ struct InstrumentEndpoint {
   void setPrototype(Value *Prototype) { PrototypeF = Prototype; }
 
   /**
+   * @brief Setter for a fallback function that will be called.
+   *
+   * The fallback function is the function that will be called when the JIT
+   * reports that it cannot fullfill a request in time.
+   *
+   * This automatically forces the client to execute the fallback in parallel
+   * to the JIT' request.
+   *
+   * @param F The function we use as fallback when the JIT is not ready.
+   */
+  void setFallback(Function *F) { FallbackF = F; }
+
+  /**
    * @brief Apply the JIT indirection to the target Function.
    *
    * 1. Create a JIT callback function signature, in the form of:
@@ -459,6 +489,7 @@ struct InstrumentEndpoint {
   void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
     assert(From && "No source function!");
     assert(To && "No target function!");
+    assert(FallbackF && "No fallback function!");
 
     if (To->isDeclaration())
       return;
@@ -469,7 +500,7 @@ struct InstrumentEndpoint {
     LLVMContext &Ctx = M->getContext();
 
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        "pjit_main", Type::getVoidTy(Ctx), Type::getInt8PtrTy(Ctx),
+        "pjit_main", Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt32Ty(Ctx), Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
@@ -548,13 +579,60 @@ struct InstrumentEndpoint {
     Args.push_back(ParamC);
     Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
 
-    Builder.CreateCall(PJITCB, Args);
+    BasicBlock *JitReady = BasicBlock::Create(Ctx, "polyjit.ready", To);
+    BasicBlock *JitNotReady = BasicBlock::Create(Ctx, "polyjit.not.ready", To);
+    BasicBlock *Exit = BasicBlock::Create(Ctx, "polyjit.exit", To);
+    CallInst *ReadyCheck = Builder.CreateCall(PJITCB, Args);
+
+    Builder.CreateCondBr(ReadyCheck, JitReady, JitNotReady);
+    Builder.SetInsertPoint(JitReady);
+    Builder.CreateBr(Exit);
+    Builder.SetInsertPoint(JitNotReady);
+
+    // Just hand the args from the function down to the source function.
+    SmallVector<Value *, 3> ToArgs;
+    for (auto &Arg: To->args()) {
+      ToArgs.push_back(&Arg);
+    }
+    Builder.CreateCall(FallbackF, ToArgs);
+    Builder.CreateBr(Exit);
+    Builder.SetInsertPoint(Exit);
     Builder.CreateRetVoid();
   }
 
 private:
   Value *PrototypeF;
+  Function *FallbackF;
 };
+
+static inline void collectRegressionTest(const std::string Name,
+                                         const std::string &ModStr) {
+  if (!opt::CollectRegressionTests) {
+    return;
+  }
+  using namespace db;
+
+  auto T = std::shared_ptr<Tuple>(new RegressionTest(Name, ModStr));
+  db::Session S;
+  S.add(T);
+  S.commit();
+}
+
+static void clearFunctionLocalMetadata(Function *F) {
+  if (!F)
+    return;
+
+  SmallVector<Instruction *, 4> DeleteInsts;
+  for (auto &I : instructions(F)) {
+    if (DbgInfoIntrinsic *DI = dyn_cast_or_null<DbgInfoIntrinsic>(&I)) {
+      DeleteInsts.push_back(DI);
+    }
+  }
+
+  for (auto *I : DeleteInsts) {
+      I->removeFromParent();
+  }
+}
 
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
@@ -591,10 +669,10 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
-        //ExtractedF->setLinkage(GlobalValue::ExternalLinkage);
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
+
         Functions.insert(ExtractedF);
         Changed |= true;
       }
@@ -610,7 +688,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Module *M = F->getParent();
     StringRef ModuleName = F->getParent()->getModuleIdentifier();
     StringRef FromName = F->getName();
-    Module *PrototypeM = copyModule(VMap, *M);
+    ModulePtrT PrototypeM = copyModule(VMap, *M);
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
@@ -620,25 +698,34 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     MPM.add(llvm::createStripSymbolsPass(true));
     MPM.run(*PrototypeM);
 
+    clearFunctionLocalMetadata(F);
+
     // Make sure that we do not destroy the function before we're done
     // using the IRBuilder, otherwise this will end poorly.
-    assert(F->begin() && "Body of function got destroyed too early!");
-    IRBuilder<> Builder(F->begin());
-    Value *Prototype = Builder.CreateGlobalStringPtr(
-        moduleToString(*PrototypeM), FromName + ".prototype");
+    IRBuilder<> Builder(&*(F->begin()));
+    const std::string ModStr = moduleToString(*PrototypeM);
+    Value *Prototype =
+        Builder.CreateGlobalStringPtr(ModStr, FromName + ".prototype");
+
+    // Persist the resulting prototype for later reuse.
+    // A separate tool should then try to generate a LLVM-lit test that
+    // tries to detect that again.
+    collectRegressionTest(FromName, ModStr);
 
     InstrumentingFunctionCloner InstCloner(VMap, M);
-    InstCloner.setSource(ProtoF).setPrototype(Prototype);
+    InstCloner.setSource(ProtoF);
+    InstCloner.setPrototype(Prototype);
+    InstCloner.setFallback(F);
 
     Function *InstF = InstCloner.start(/* RemapCalls */ true);
     InstF->addFnAttr(Attribute::OptimizeNone);
     InstF->addFnAttr(Attribute::NoInline);
 
-    F->replaceAllUsesWith(InstF);
-
     InstrumentedFunctions.insert(InstF);
     VMap.clear();
     Instrumented++;
+
+    F->replaceAllUsesWith(InstF);
   }
 
   return Changed;
@@ -655,4 +742,4 @@ void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
-} // namespace polli // namespace polli // namespace polli // end of polli namespace
+} // namespace polli

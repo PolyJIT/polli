@@ -35,43 +35,35 @@ set(CMAKE_MODULE_PATH
 
 include("polli_macros")
 
-if (NOT DEFINED PAPI_FOUND)
-  find_package(Papi REQUIRED)
-  include_directories(BEFORE ${PAPI_INCLUDE_DIR})
-  link_directories(${PAPI_LIBRARY})
-endif ()
+find_package(Papi REQUIRED)
+find_package(Pthread REQUIRED)
+find_package(Likwid REQUIRED)
+find_package(Pqxx REQUIRED)
 
-add_library(papi SHARED IMPORTED)
-set_target_properties(papi
-  PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+add_library(papi UNKNOWN IMPORTED)
+add_library(pthread UNKNOWN IMPORTED)
+add_library(likwid UNKNOWN IMPORTED)
+add_library(pqxx UNKNOWN IMPORTED)
 
-if (NOT DEFINED PTHREAD_FOUND)
-  find_package(Pthread REQUIRED)
-  include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
-  link_directories(${PTHREAD_LIBRARY})
-endif ()
-
-add_library(pthread SHARED IMPORTED)
-set_target_properties(pthread
-  PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
-
-if (NOT DEFINED LIKWID_FOUND)
-  find_package(Likwid REQUIRED)
-  include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
-  link_directories(${LIKWID_LIBRARY})
-endif ()
-
-add_library(likwid SHARED IMPORTED)
+set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
+set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
 set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
-
-if (NOT DEFINED PQXX_FOUND)
-  find_package(Pqxx REQUIRED)
-  include_directories(BEFORE ${PQXX_INCLUDE_DIR})
-  link_directories(${PQXX_LIBRARY})
-endif ()
-
-add_library(pqxx SHARED IMPORTED)
 set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
+
+include_directories(BEFORE ${PAPI_INCLUDE_DIR})
+include_directories(BEFORE ${PQXX_INCLUDE_DIR})
+include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
+include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
+
+get_filename_component(PAPI_LIBDIR ${PAPI_LIBRARY} DIRECTORY)
+get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
+get_filename_component(LIKWID_LIBDIR ${LIKWID_LIBRARY} DIRECTORY)
+get_filename_component(PTHREAD_LIBDIR ${PTHREAD_LIBRARY} DIRECTORY)
+
+link_directories(${PAPI_LIBDIR})
+link_directories(${PQXX_LIBDIR})
+link_directories(${LIKWID_LIBDIR})
+link_directories(${PTHREAD_LIBDIR})
 
 option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
 option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
@@ -79,10 +71,10 @@ option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
 
 # Add appropriate flags for GCC
 if (CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wwrite-strings")
 endif ()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fexceptions -pthread -fno-rtti")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fno-rtti")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
@@ -92,18 +84,9 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/external/
   ${CMAKE_CURRENT_BINARY_DIR}/external/
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/spdlog/include
-  ${CMAKE_CURRENT_BINARY_DIR}/external/spdlog/include
 )
 
 install(DIRECTORY include/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY external/spdlog/include/
   DESTINATION include
   FILES_MATCHING
   PATTERN "*.h"
@@ -125,13 +108,6 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/
   PATTERN ".svn" EXCLUDE
   )
 
-install(DIRECTORY ${POLLI_BINARY_DIR}/external/spdlog/include/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
-  )
-
 install(DIRECTORY ${POLLI_BINARY_DIR}/external/
   DESTINATION include
   FILES_MATCHING
@@ -139,6 +115,7 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/external/
   PATTERN ".svn" EXCLUDE
   )
 
+add_definitions( -DFMT_HEADER_ONLY )
 add_definitions( -D_GNU_SOURCE )
 
 add_subdirectory(include)

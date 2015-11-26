@@ -5,7 +5,6 @@
 #include "pprof/Config.h"
 #include "polli/Options.h"
 
-#include "spdlog/spdlog.h"
 #include <memory>
 
 #ifdef POLLI_ENABLE_TRACING
@@ -19,11 +18,6 @@
 #define POLLI_TRACING_SCOP_START(ID, NAME) polliTracingScopStart(ID, NAME)
 #define POLLI_TRACING_SCOP_STOP(ID, NAME) polliTracingScopStop(ID, NAME)
 namespace polli {
-static std::shared_ptr<spdlog::logger> logger() {
-  static auto Console = spdlog::stderr_logger_st("polli/tracer");
-  return Console;
-}
-
 struct Tracer {
   virtual void init() const {}
   virtual void finalize() const {}
@@ -110,6 +104,8 @@ void polliTracingScopStop(uint64_t Id, const char *Name) {
   polli::ActiveTracer->scopStop(Id, Name);
 }
 #ifdef __cplusplus
+}
+#endif
 #else
 #define POLLI_TRACING_INIT
 #define POLLI_TRACING_FINALIZE
@@ -117,7 +113,5 @@ void polliTracingScopStop(uint64_t Id, const char *Name) {
 #define POLLI_TRACING_REGION_STOP(ID, NAME)
 #define POLLI_TRACING_SCOP_START(ID, NAME)
 #define POLLI_TRACING_SCOP_STOP(ID, NAME)
-#endif
-}
 #endif
 #endif //PPROF_TRACING_H

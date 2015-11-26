@@ -50,7 +50,6 @@
 #include "llvm/Support/Casting.h"       // for isa
 #include "llvm/Support/Debug.h"         // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
-#include "spdlog/spdlog.h"
 
 namespace llvm { class LLVMContext; }  // lines 49-49
 namespace llvm { class Value; }  // lines 50-50
@@ -163,7 +162,7 @@ static void PapiCreateInit(Function *F) {
   Constant *PapiLibInitFn = M->getOrInsertFunction(
       "PAPI_library_init", Builder.getInt32Ty(), Builder.getInt32Ty(), NULL);
 
-  Instruction *Insert = F->getEntryBlock().getFirstInsertionPt();
+  Instruction *Insert = &*(F->getEntryBlock().getFirstInsertionPt());
   Builder.SetInsertPoint(Insert);
   Builder.CreateCall(PapiLibInitFn, Builder.getInt32(PAPI_VER_CURRENT),
                      "papi.lib.init");
@@ -179,7 +178,7 @@ static void InsertProfilingInitCall(Function *MainFn) {
   Module &M = *MainFn->getParent();
 
   // Skip over any allocas in the entry block.
-  BasicBlock *Entry = MainFn->begin();
+  BasicBlock *Entry = &*(MainFn->begin());
   BasicBlock::iterator InsertPos = Entry->begin();
   while (isa<AllocaInst>(InsertPos))
     ++InsertPos;
@@ -187,13 +186,13 @@ static void InsertProfilingInitCall(Function *MainFn) {
   Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
   Constant *PapiSetup =
       M.getOrInsertFunction("papi_region_setup", Type::getVoidTy(Context),
-                            IntegerType::getInt32Ty(Context), ArgVTy, (Type *)0);
+                            IntegerType::getInt32Ty(Context), ArgVTy, (Type *)nullptr);
 
   std::vector<Value *> Args(2);
   Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
   Args[1] = Constant::getNullValue(ArgVTy);
 
-  CallInst *InitCall = CallInst::Create(PapiSetup, Args, "", InsertPos);
+  CallInst *InitCall = CallInst::Create(PapiSetup, Args, "", &*InsertPos);
 
   // If argc or argv are not available in main, just pass null values in.
   Function::arg_iterator AI;
@@ -204,11 +203,11 @@ static void InsertProfilingInitCall(Function *MainFn) {
     ++AI;
     if (AI->getType() != ArgVTy) {
       Instruction::CastOps opcode =
-          CastInst::getCastOpcode(AI, false, ArgVTy, false);
+          CastInst::getCastOpcode(&*AI, false, ArgVTy, false);
       InitCall->setArgOperand(
-          1, CastInst::Create(opcode, AI, ArgVTy, "argv.cast", InitCall));
+          1, CastInst::Create(opcode, &*AI, ArgVTy, "argv.cast", InitCall));
     } else {
-      InitCall->setArgOperand(1, AI);
+      InitCall->setArgOperand(1, &*AI);
     }
   /* FALL THROUGH */
   case 1:
@@ -217,12 +216,12 @@ static void InsertProfilingInitCall(Function *MainFn) {
     // init call instead.
     if (!AI->getType()->isIntegerTy(32)) {
       Instruction::CastOps opcode =
-          CastInst::getCastOpcode(AI, true, Type::getInt32Ty(Context), true);
+          CastInst::getCastOpcode(&*AI, true, Type::getInt32Ty(Context), true);
       InitCall->setArgOperand(
-          0, CastInst::Create(opcode, AI, Type::getInt32Ty(Context),
+          0, CastInst::Create(opcode, &*AI, Type::getInt32Ty(Context),
                               "argc.cast", InitCall));
     } else
-      InitCall->setArgOperand(0, AI);
+      InitCall->setArgOperand(0, &*AI);
   case 0:
     break;
   }
@@ -236,11 +235,9 @@ static void InsertProfilingInitCall(Function *MainFn) {
  * @return  true, if we changed something in the module.
  */
 bool PapiCScopProfilingInit::runOnModule(Module &M) {
-  static auto Console = spdlog::stderr_logger_mt("polli");
-
   Function *Main = M.getFunction("main");
-  if (Main == 0) {
-    Console->warn("no main function found in module.");
+  if (Main == nullptr) {
+    dbgs() << "no main function found in module.\n";
     return false; // No main, no instrumentation!
   }
 
@@ -266,9 +263,8 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
   NSD = getAnalysisIfAvailable<JitScopDetection>();
   RI = &getAnalysis<RegionInfoPass>();
 
-  for (ScopDetection::iterator It = SD->begin(), SE = SD->end(); It != SE;
-       ++It) {
-    if (processRegion(*It))
+  for (const auto & elem : *SD) {
+    if (processRegion(elem))
       ++InstrumentedRegions;
   }
 
@@ -370,7 +366,7 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
                                           std::string exitName) {
   BasicBlock::iterator InsertPos;
   for (auto &BB : EntryBBs) {
-    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
+    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
     // Adjust insertion point for landing pads / allocas
     if (BB->isLandingPad())
       ++InsertPos;
@@ -382,18 +378,18 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
     while (isa<CallInst>(InsertPos))
       ++InsertPos;
 
-    PapiRegionEnterSCoP(InsertPos, M, EvID, entryName);
+    PapiRegionEnterSCoP(&*InsertPos, M, EvID, entryName);
   }
 
   for (auto &BB : ExitBBs) {
-    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime();
+    InsertPos = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
     // Adjust insertion point for landing pads / allocas
     if (BB->isLandingPad())
       ++InsertPos;
     while (isa<AllocaInst>(InsertPos))
       ++InsertPos;
 
-    PapiRegionExitSCoP(InsertPos, M, EvID, exitName);
+    PapiRegionExitSCoP(&*InsertPos, M, EvID, exitName);
   }
 
   ++EvID;

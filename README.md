@@ -25,7 +25,6 @@ PolyJIT relies on the work of the following projects:
 * [Likwid](https://code.google.com/p/likwid)
 * [PAPI](http://icl.cs.utk.edu/papi/)
 * [cppformat](https://github.com/cppformat/cppformat)
-* [spdlog](https://github.com/gabime/spdlog)
 * [libpqxx](http://pqxx.org/development/libpqxx/)
 
 ## Installation
