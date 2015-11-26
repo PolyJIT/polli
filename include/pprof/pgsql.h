@@ -8,8 +8,20 @@
 #include <set>
 
 namespace pprof {
-namespace pgsql {
+struct DbOptions {
+  std::string host;
+  int port;
+  std::string user;
+  std::string pass;
+  std::string name;
+  uint64_t run_id;
+  std::string uuid;
+  std::string exp_uuid;
+};
 
+DbOptions getDBOptionsFromEnv();
+
+namespace pgsql {
 using IdVector = std::vector<uint32_t>;
 using UuidSet = std::set<std::string>;
 using Metrics = std::map<std::string, double>;

@@ -3,13 +3,12 @@
 
 #include "polli/VariantFunction.h"
 #include "polli/Utils.h"
-#include "spdlog/spdlog.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "cppformat/format.h"
 
 using namespace llvm;
-using namespace spdlog::details;
 
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
@@ -70,15 +69,13 @@ Function *VariantFunction::getOrCreateVariant(const RunValueList &K) {
   size_t hash = K.hash();
   if (Variants.count(hash)) {
     DEBUG(
-    auto Console = spdlog::stderr_logger_mt("polli");
-    Console->warn("Cache hit for {}", K.str())
+    dbgs() << fmt::format("Cache hit for {}", K.str())
     );
 
     return Variants[hash];
   } else {
     DEBUG(
-    auto Console = spdlog::stderr_logger_mt("polli");
-    Console->warn("New Variant {}", K.str())
+    dbgs() << fmt::format("New Variant {}", K.str())
     );
   }
 

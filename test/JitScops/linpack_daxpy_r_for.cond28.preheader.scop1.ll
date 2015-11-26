@@ -1,4 +1,4 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polly-detect-unprofitable -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
 ;CHECK: 1 regions require runtime support:
 ;CHECK:   0 region for.cond28.preheader => for.end41.loopexit requires 0 params

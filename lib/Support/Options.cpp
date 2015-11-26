@@ -17,23 +17,17 @@
 #include <string>
 #include <vector>
 
-#include "spdlog/spdlog.h"
 #include <unistd.h>
 
+#define DEBUG_TYPE polyjit
+#include "llvm/Support/Debug.h"
+
 using namespace llvm;
-using namespace spdlog;
 
 llvm::cl::OptionCategory
     PolliCategory("Polli Options", "Configure the runtime options of polli");
 
 namespace polli {
-
-bool setupLogging() {
-  spdlog::set_async_mode(1048576);
-  spdlog::set_level(spdlog::level::trace);
-  //spdlog::set_level((spdlog::level::level_enum)opt::LogLevel);
-  return true;
-}
 
 namespace opt {
 bool InstrumentRegions;
@@ -45,15 +39,9 @@ bool AnalyzeIR = false;
 bool AnalyseOnly;
 std::string ReportFilename;
 bool GenerateOutput;
-polli::LogType LogLevel;
 bool Enabled;
+bool CollectRegressionTests = false;
 
-std::vector<std::string> LibPaths;
-std::vector<std::string> Libraries;
-std::string InputFile;
-std::vector<std::string> InputArgv;
-std::string EntryFunc;
-std::string FakeArgv0;
 bool DisableCoreFiles = true;
 char OptLevel = ' ';
 std::string TargetTriple = "";
@@ -86,8 +74,7 @@ bool havePapi() {
 bool haveLikwid() {
   if (EmitEnv) {
     for (char **current = environ; *current; current++) {
-      auto Console = spdlog::stderr_logger_mt("polli/options");
-      Console->info(*current);
+      dbgs() << *current << "\n";
     }
   }
 
@@ -138,58 +125,11 @@ static cl::opt<bool, true> GenerateOutputX(
     cl::desc("Store all IR files inside a unique subdirectory."),
     cl::location(GenerateOutput), cl::init(false), cl::cat(PolliCategory));
 
-static cl::opt<polli::LogType, true>
-    LogLevelX("polli-log-level", cl::desc("Log level for output messages"),
-              cl::values(clEnumVal(polli::Trace, "all messages"),
-                         clEnumVal(polli::Debug, "up to debug messages"),
-                         clEnumVal(polli::Info, "up to info messages"),
-                         clEnumVal(polli::Notice, "up to notice messages"),
-                         clEnumVal(polli::Warn, "up to warn messages"),
-                         clEnumVal(polli::Err, "up to error messages"),
-                         clEnumVal(polli::Critical, "up to critical messages"),
-                         clEnumVal(polli::Alert, "up to alert messages"),
-                         clEnumVal(polli::Emerg, "up to emergency messages"),
-                         clEnumVal(polli::Off, "silence"), clEnumValEnd),
-              cl::location(LogLevel), cl::init(polli::Warn),
-              cl::cat(PolliCategory));
-
 static cl::opt<std::string, true>
     ReportFilenameX("polli-report-file",
                     cl::desc("Name of the report file to generate."),
                     cl::location(ReportFilename), cl::init("polli.report"),
                     cl::cat(PolliCategory));
-
-static cl::list<std::string, std::vector<std::string>>
-    LibPathsX("L", cl::Prefix, cl::desc("Specify a library search path"),
-              cl::value_desc("directory"), cl::ZeroOrMore,
-              cl::location(LibPaths), cl::cat(PolliCategory));
-
-static cl::list<std::string, std::vector<std::string>>
-    LibrariesX("l", cl::Prefix, cl::desc("Specify libraries to link to"),
-               cl::value_desc("library prefix"), cl::ZeroOrMore,
-               cl::location(Libraries), cl::cat(PolliCategory));
-
-static cl::opt<std::string, true>
-    InputFileX(cl::desc("<input bitcode>"), cl::Positional,
-               cl::location(InputFile), cl::init("-"), cl::cat(PolliCategory));
-
-static cl::list<std::string, std::vector<std::string>>
-    InputArgvX(cl::ConsumeAfter, cl::desc("<program arguments>..."),
-               cl::location(InputArgv), cl::cat(PolliCategory));
-
-static cl::opt<std::string, true>
-    EntryFuncX("entry-function",
-               cl::desc("Specify the entry function (default = 'main') "
-                        "of the executable"),
-               cl::value_desc("function"), cl::location(EntryFunc),
-               cl::init("main"), cl::cat(PolliCategory));
-
-static cl::opt<std::string, true>
-    FakeArgv0X("fake-argv0",
-               cl::desc("Override the 'argv[0]' value passed into the executing"
-                        " program"),
-               cl::value_desc("executable"), cl::location(FakeArgv0),
-               cl::cat(PolliCategory));
 
 static cl::opt<bool, true>
     DisableCoreFilesX("disable-core-files", cl::Hidden,
@@ -200,3 +140,9 @@ static cl::opt<bool, true>
     PolliEnabledX("polli", cl::desc("Enable the polli JIT compiler"),
                   cl::ZeroOrMore, cl::location(polli::opt::Enabled),
                   cl::init(false), cl::cat(PolliCategory));
+
+static cl::opt<bool, true> PolliCollectX(
+    "polli-collect-modules",
+    cl::desc("Collect Modules in the database for regression testing."),
+    cl::ZeroOrMore, cl::location(polli::opt::CollectRegressionTests),
+    cl::init(false), cl::cat(PolliCategory));

@@ -1,4 +1,4 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polly-detect-unprofitable -polly-delinearize=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polly-process-unprofitable -polly-delinearize=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 regions require runtime support:
 ; CHECK:   0 region for.body => for.cond.for.end94.loopexit2_crit_edge.exitStub requires 6 params

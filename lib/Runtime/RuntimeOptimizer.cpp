@@ -33,7 +33,6 @@
 #include "polly/RegisterPasses.h"
 #include "polly/Options.h"
 
-#include "spdlog/spdlog.h"
 #include <unistd.h>
 
 namespace llvm {
@@ -50,6 +49,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   polly::registerPollyPasses(PM);
 }
 
+#ifdef DEBUG
 static PassManagerBuilder getDebugBuilder() {
   PassManagerBuilder Builder;
 
@@ -63,7 +63,7 @@ static PassManagerBuilder getDebugBuilder() {
 
   return Builder;
 }
-
+#else
 static PassManagerBuilder getBuilder() {
   PassManagerBuilder Builder;
 
@@ -75,9 +75,14 @@ static PassManagerBuilder getBuilder() {
 
   return Builder;
 }
+#endif
 
 Function &OptimizeForRuntime(Function &F) {
+#ifdef NDEBUG
   static PassManagerBuilder Builder = getBuilder();
+#else
+  static PassManagerBuilder Builder = getDebugBuilder();
+#endif
   Module *M = F.getParent();
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;

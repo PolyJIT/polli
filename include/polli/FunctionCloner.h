@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // Policy based function cloning.
@@ -28,23 +30,19 @@
 #include "llvm/IR/Verifier.h"
 #include "llvm/Support/raw_ostream.h"
 
-#define DEBUG_TYPE "polli"
+#define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "spdlog/spdlog.h"
+#include "cppformat/format.h"
 
 using namespace llvm;
-using namespace spdlog;
-using namespace spdlog::details;
 
 namespace polli {
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
-  static auto Console = spdlog::stderr_logger_st("polli/verify");
-
   std::string buffer;
   llvm::raw_string_ostream s(buffer);
   s << Prefix;
@@ -59,7 +57,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
     s << " OK (F is nullptr)";
   }
 
-  Console->info(s.str());
+  outs() << fmt::format(s.str());
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
@@ -76,7 +74,7 @@ class FunctionCloner : public OnCreate,
 public:
   explicit FunctionCloner(
       ValueToValueMapTy &map, Module *m = NULL)
-      : VMap(map), ToM(m), From(nullptr), To(nullptr) {}
+      : ToM(m), From(nullptr), To(nullptr) {}
 
   void setTarget(Function *F) { To = F; }
   FunctionCloner &setSource(Function *F) {
@@ -105,6 +103,7 @@ public:
    * If target module does not exist, create the target
    * function in the source module. */
   Function *start(bool RemapCalls = false) {
+    ValueToValueMapTy VMap;
     if (!ToM)
       ToM = From->getParent();
 
@@ -134,7 +133,6 @@ public:
   }
 
 private:
-  ValueToValueMapTy &VMap;
   Module *ToM;
   Function *From;
   Function *To;
@@ -151,7 +149,7 @@ struct CopyCreator {
                                       AE = SrcF->arg_end();
          Arg != AE; ++Arg) {
       NewArg->setName(Arg->getName());
-      VMap[Arg] = NewArg++;
+      VMap[&*Arg] = &*(NewArg++);
     }
   }
 
@@ -212,4 +210,5 @@ typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
 typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
     MovingFunctionCloner;
 }
+#undef DEBUG_TYPE
 #endif // POLLI_FUNCTION_CLONER_H

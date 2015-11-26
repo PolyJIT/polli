@@ -5,6 +5,8 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
+// Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
+//
 //===----------------------------------------------------------------------===//
 //
 // Register the compilation sequence required for the PolyJIT runtime support.
@@ -29,11 +31,10 @@
 #include "polli/ScopMapper.h"
 #include "polli/ModuleExtractor.h"
 
-#include "spdlog/spdlog.h"
+#include "cppformat/format.h"
 
 using namespace llvm;
 using namespace polli;
-using namespace spdlog::details;
 
 #include <iostream>
 #include <stdio.h>
@@ -47,14 +48,16 @@ void initializePolliPasses(PassRegistry &Registry) {
 }
 
 static void printConfig() {
-  auto Console = spdlog::stderr_logger_st("polli");
-  Console->info("PolyJIT - Config:");
-  Console->info(" polyjit.jitable: {}", opt::EnableJitable);
-  Console->info(" polyjit.recompile: {}", !opt::DisableRecompile);
-  Console->info(" polyjit.execute: {}", !opt::DisableExecution);
-  Console->info(" polyjit.instrument: {}", opt::InstrumentRegions);
-  Console->info(" polly.delinearize: {}", polly::PollyDelinearize);
-  Console->info(" polly.aliaschecks: {}", polly::PollyUseRuntimeAliasChecks);
+  errs() << fmt::format("PolyJIT - Config:\n");
+  errs() << fmt::format(" polyjit.jitable: {}\n", opt::EnableJitable);
+  errs() << fmt::format(" polyjit.recompile: {}\n", !opt::DisableRecompile);
+  errs() << fmt::format(" polyjit.execute: {}\n", !opt::DisableExecution);
+  errs() << fmt::format(" polyjit.instrument: {}\n", opt::InstrumentRegions);
+  errs() << fmt::format(" polly.delinearize: {}\n", polly::PollyDelinearize);
+  errs() << fmt::format(" polly.aliaschecks: {}\n",
+                        polly::PollyUseRuntimeAliasChecks);
+  errs() << fmt::format(" polyjit.collect-regression: {}\n",
+                        opt::CollectRegressionTests);
 }
 
 /**
@@ -84,9 +87,9 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<T>();
-    //FIXME: We preserve everything, but LLVM will kill all passes that are
+    // FIXME: We preserve everything, but LLVM will kill all passes that are
     //       needed by the module extractor in our compilation pipeline.
-    //AU.setPreservesAll();
+    // AU.setPreservesAll();
   }
 };
 
@@ -114,8 +117,10 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (opt::AnalyzeIR)
     PM.add(new FunctionPassPrinter<JitScopDetection>(outs()));
 
-  if (opt::InstrumentRegions)
+  if (opt::InstrumentRegions) {
     PM.add(new PapiCScopProfiling());
+    return;
+  }
 
   if (!opt::DisableRecompile) {
     PM.add(new ScopMapper());
