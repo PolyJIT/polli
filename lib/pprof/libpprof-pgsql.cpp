@@ -1,3 +1,5 @@
+#include <cppformat/format.h>
+
 #include "pprof/pgsql.h"
 #include "pprof/pprof.h"
 #include <pqxx/pqxx>
@@ -7,7 +9,6 @@
 #include <stdlib.h>
 #include <string>
 
-#include <cppformat/format.h>
 using namespace pqxx;
 
 namespace pprof {

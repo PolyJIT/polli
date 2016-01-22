@@ -1,6 +1,6 @@
+#include <cppformat/format.h>
 #include "polli/Schema.h"
 #include "llvm/Support/raw_ostream.h"
-#include <cppformat/format.h>
 
 namespace polli {
 namespace db {

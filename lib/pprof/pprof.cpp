@@ -1,3 +1,5 @@
+#include <cppformat/format.h>
+
 #include "pprof/pprof.h"
 
 #include <fstream>
@@ -8,8 +10,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string>
-
-#include <cppformat/format.h>
 
 namespace pprof {
 Options getPprofOptionsFromEnv() {

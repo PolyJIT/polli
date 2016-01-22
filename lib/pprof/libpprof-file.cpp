@@ -1,11 +1,11 @@
+#include <cppformat/format.h>
+
 #include "pprof/file.h"
 #include "pprof/pprof.h"
 
 #include <ctime>
 #include <stdlib.h>
 #include <string>
-
-#include <cppformat/format.h>
 
 #include <fstream>
 #include <iostream>
