@@ -18,6 +18,7 @@ set(POLLI_LINK_LIBS
   PolyJIT_Transform
   likwid
   pthread
+  pqxx
 )
 
 add_polli_loadable_module(LLVMPolyJIT
