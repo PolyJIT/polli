@@ -78,10 +78,10 @@ static PassManagerBuilder getBuilder() {
 #endif
 
 Function &OptimizeForRuntime(Function &F) {
-#ifdef NDEBUG
-  static PassManagerBuilder Builder = getBuilder();
-#else
+#ifdef DEBUG
   static PassManagerBuilder Builder = getDebugBuilder();
+#else
+  static PassManagerBuilder Builder = getBuilder();
 #endif
   Module *M = F.getParent();
   opt::GenerateOutput = true;
