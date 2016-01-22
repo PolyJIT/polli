@@ -155,13 +155,8 @@ bool operator<(const Region &LHS, const Region &RHS) {
 }
 
 bool JitScopDetection::runOnFunction(Function &F) {
-  if (!Enabled)
-    return false;
-
-  if (F.isDeclaration())
-    return false;
-
-  if (F.hasFnAttribute("polyjit-jit-candidate"))
+  if (!Enabled || F.isDeclaration() ||
+      F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
   LoopInfo *LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
