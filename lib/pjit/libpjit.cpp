@@ -320,9 +320,8 @@ template <> struct std::hash<CacheKey> {
 template <typename K, typename V> class BlockingMap {
 private:
   std::unordered_map<K, V> Cache;
-  mutable std::mutex ReadMutex;
-  mutable std::mutex WriteMutex;
 
+  mutable std::mutex WriteMutex;
   std::condition_variable NewElement;
 
 public:
@@ -332,7 +331,6 @@ public:
   using iterator_pair = std::pair<iterator, bool>;
 
   size_type count(const K &X) {
-    std::lock_guard<std::mutex> L(ReadMutex);
     return Cache.count(X);
   }
 
