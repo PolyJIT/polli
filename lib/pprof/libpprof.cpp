@@ -42,6 +42,13 @@ static inline Run<PPEvent> *papi_local_events(Run<PPEvent> *Evs = nullptr) {
   return PapiLocalEvents;
 }
 
+using TIDMapT = std::map<thread::id, uint64_t>;
+static uint64_t TID = 0;
+static inline TIDMapT& papi_get_tid_map() {
+  static std::map<thread::id, uint64_t> TIDMap;
+  return TIDMap;
+}
+
 /**
  * @brief Get a unique thread id of type uint64_t
  *
@@ -50,11 +57,10 @@ static inline Run<PPEvent> *papi_local_events(Run<PPEvent> *Evs = nullptr) {
  *
  * @return a unique thread_id of type uint64_t.
  */
-static std::map<thread::id, uint64_t> TIDMap;
-static uint64_t TID = 0;
 static uint64_t papi_get_thread_id() {
   thread::id sTID = std::this_thread::get_id();
-  std::cerr << sTID << " :: " << TID << "\n";
+  TIDMapT &TIDMap = papi_get_tid_map();
+
   if (!(TIDMap.find(sTID) == TIDMap.end()))
     return TIDMap.at(sTID);
 
@@ -74,7 +80,7 @@ static inline void do_papi_thread_init_once() {
   if (!papi_thread_init) {
     if (!papi_init)
       papi_region_setup();
-    int ret = PAPI_thread_init(pthread_self);
+    int ret = PAPI_thread_init(papi_get_thread_id);
 
     if (ret != PAPI_OK) {
       if (ret == PAPI_ENOINIT) {
@@ -172,7 +178,7 @@ void papi_atexit_handler(void) {
 
   if (opts.use_db) {
     for (auto elem : papi_threaded_events()) {
-      pgsql::StoreRun(TIDMap[elem.first], elem.second, opts);
+      pgsql::StoreRun(papi_get_tid_map()[elem.first], elem.second, opts);
     }
   }
   if (opts.use_file)
