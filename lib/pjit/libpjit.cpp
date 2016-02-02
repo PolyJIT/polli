@@ -134,9 +134,11 @@ public:
 
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
+    // Make sure to initialize tracing before planting the atexit handler.
     POLLI_TRACING_INIT;
     POLLI_TRACING_REGION_START(0, "polyjit.main");
 
+    // We want to register this after the tracing atexit handler.
     atexit(do_shutdown);
 
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
