@@ -219,6 +219,9 @@ bool JitScopDetection::runOnFunction(Function &F) {
 
       JitableScops.insert(R);
       ++JitScopsFound;
+    } else {
+      // We tried, but failed. Still... log this region in it's own Module
+      // and store it in the database.
     }
   }
 
