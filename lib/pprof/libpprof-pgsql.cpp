@@ -175,6 +175,7 @@ void StoreRun(const pthread_t tid, Run<PPEvent> &Events,
 
   static std::string NEW_RUN_SQL =
     "INSERT INTO run (\"end\", command, "
+    "INSERT INTO run (end, command, "
       "project_name, experiment_name, run_group, experiment_group) "
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
