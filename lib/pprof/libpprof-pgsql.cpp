@@ -237,7 +237,7 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   Events.ID = run_id;
   for (auto elem : r) {
     //id, start, duration, name
-    uint64_t ev_id = elem[0].as<uint64_t>();
+    int32_t ev_id = elem[0].as<int32_t>();
     uint16_t ev_ty = elem[1].as<uint16_t>();
     uint64_t ev_start = elem[2].as<uint64_t>();
     uint64_t ev_duration = elem[3].as<uint64_t>();

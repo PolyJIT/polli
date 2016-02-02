@@ -82,10 +82,10 @@ struct PPStringRegion {
 
 class PPEvent {
 public:
-  PPEvent(uint64_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
+  PPEvent(int32_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_nsec()), DebugStr(dbgStr) {
   }
-  explicit PPEvent(uint64_t ID, PPEventType Ty, long long int Timestamp,
+  explicit PPEvent(int32_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(Timestamp), DebugStr(dbgStr) {}
 
@@ -96,7 +96,7 @@ public:
     EventTy = (PPEventType)std::stoi(R.Exit);
   }
 
-  uint32_t id() const { return ID; }
+  int32_t id() const { return ID; }
   PPEventType event() const { return EventTy; }
   long long int timestamp() const { return Timestamp; }
   std::string userString() const { return DebugStr; }
@@ -106,7 +106,7 @@ public:
    */
   void snapshot() { Timestamp = PAPI_get_real_nsec(); }
 private:
-  uint32_t ID;
+  int32_t ID;
   PPEventType EventTy;
   long long int Timestamp;
   std::string DebugStr;
@@ -148,14 +148,14 @@ Options *getOptions();
 Options getPprofOptionsFromEnv();
 
 struct Event {
-  uint32_t ID;
+  int32_t ID;
   PPEventType Type;
   uint64_t Start;
   uint64_t Duration;
   std::string Name;
   pthread_t TID;
 
-  Event(uint32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
+  Event(int32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
         uint64_t D = 0, std::string N = "", uint64_t TID = pthread_self())
       : ID(ID), Type(T), Start(S), Duration(D), Name(N), TID(TID) {}
 };
