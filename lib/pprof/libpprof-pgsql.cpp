@@ -196,11 +196,10 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
   pqxx::result r = submit(format(NEW_RUN_SQL, now(), opts.command, opts.project,
                                  opts.experiment, Opts.uuid, Opts.exp_uuid), w);
 
-  long run_id;
+  uint64_t run_id = 0;
   r[0]["id"].to(run_id);
 
   Run<pprof::Event> SimpleEvents = GetSimplifiedRun(Events);
-
   int n = 500;
   size_t i;
   for (i = 0; i < SimpleEvents.size(); i += n) {
@@ -211,8 +210,8 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
 
       if (j != i)
         vals << ",";
-      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})", Ev.ID, Ev.Type, Ev.Start,
-                     Ev.Duration, Ev.Name, Ev.TID, run_id);
+      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})", Ev.ID,
+                     Ev.Type, Ev.Start, Ev.Duration, Ev.Name, Ev.TID, run_id);
     }
     vals << ";";
 
