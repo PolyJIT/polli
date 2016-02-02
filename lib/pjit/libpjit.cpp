@@ -340,7 +340,7 @@ public:
     std::unique_lock<std::mutex> WL(WriteMutex);
     iterator_pair Ret = Cache.insert(Value);
     WL.unlock();
-    NewElement.notify_all();
+    NewElement.notify_one();
     return Ret;
   }
 
