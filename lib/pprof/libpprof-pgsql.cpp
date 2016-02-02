@@ -8,6 +8,7 @@
 #include <set>
 #include <stdlib.h>
 #include <string>
+#include <thread>
 
 using namespace pqxx;
 
@@ -164,7 +165,7 @@ static pqxx::result submit(const std::string &Query,
   return res;
 }
 
-void StoreRun(const pthread_t tid, Run<PPEvent> &Events,
+void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
               const pprof::Options &opts) {
   static std::string SEARCH_PROJECT_SQL =
       "SELECT name FROM project WHERE name = '{}';";
