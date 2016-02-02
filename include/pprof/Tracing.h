@@ -8,6 +8,12 @@
 #include <memory>
 
 #ifdef POLLI_ENABLE_TRACING
+
+#define PJIT_REGION_MAIN -1
+#define PJIT_REGION_CODEGEN -2
+#define PJIT_REGION_GET_PROTOTYPE -3
+#define PJIT_REGION_SELECT_PARAMS -4
+
 #define LIKWID_PERFMON
 
 #include <likwid.h>

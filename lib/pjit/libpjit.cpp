@@ -116,7 +116,7 @@ static inline void do_shutdown() {
     POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
     POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
   }
-  POLLI_TRACING_REGION_STOP(0, "polyjit.main");
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
   POLLI_TRACING_FINALIZE;
 }
 
@@ -136,7 +136,7 @@ public:
 
     // Make sure to initialize tracing before planting the atexit handler.
     POLLI_TRACING_INIT;
-    POLLI_TRACING_REGION_START(0, "polyjit.main");
+    POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
 
     // We want to register this after the tracing atexit handler.
     atexit(do_shutdown);
@@ -231,7 +231,7 @@ static ExecutionEngine *getEngine(Module *M) {
 static inline Function *getPrototype(const char *function) {
   using fmt::format;
 
-  POLLI_TRACING_REGION_START(2, "polyjit.prototype.get");
+  POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   Module &M = getModule(function);
   Function *F = getFunction(M);
   if (!F) {
@@ -240,7 +240,7 @@ static inline Function *getPrototype(const char *function) {
     llvm_unreachable("Could not find a function in the prototype module");
     return nullptr;
   }
-  POLLI_TRACING_REGION_STOP(2, "polyjit.prototype.get");
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   return F;
 }
 
@@ -268,7 +268,8 @@ static void printRunValues(const RunValueList &Values) {
 }
 
 static RunValueList runValues(Function *F, unsigned paramc, void *params) {
-  POLLI_TRACING_REGION_START(3, "polyjit.params.select");
+  POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
+                             "polyjit.params.select");
   int i = 0;
   RunValueList RunValues;
 
@@ -276,7 +277,7 @@ static RunValueList runValues(Function *F, unsigned paramc, void *params) {
     RunValues.add({(*((uint64_t **)params)[i]), &Arg});
     i++;
   }
-  POLLI_TRACING_REGION_STOP(3, "polyjit.params.select");
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_SELECT_PARAMS, "polyjit.params.select");
   return RunValues;
 }
 
@@ -419,7 +420,7 @@ public:
               GeneratorShouldStart.wait(Lock);
             }
 
-            POLLI_TRACING_REGION_START(1, "polyjit.codegen");
+            POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
             while (!Work.empty()) {
               const SpecializerRequest &Request = *Work.front();
               Function *F = getPrototype(Request.IR);
@@ -448,7 +449,7 @@ public:
               }
               Work.pop_front();
             }
-            POLLI_TRACING_REGION_STOP(1, "polyjit.codegen");
+            POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
             ShouldStart = false;
           }
