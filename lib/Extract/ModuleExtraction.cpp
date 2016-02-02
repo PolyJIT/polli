@@ -282,7 +282,7 @@ struct AddGlobalsPolicy {
    * @param To Mapping target Function.
    * @return void
    */
-  static void MapArguments(ValueToValueMapTy &VMap, Function *From,
+  void MapArguments(ValueToValueMapTy &VMap, Function *From,
                            Function *To) {
     Function::arg_iterator NewArg = To->arg_begin();
     for (Argument &Arg : From->args()) {
@@ -320,7 +320,7 @@ struct AddGlobalsPolicy {
    * @param To Target function.
    * @return llvm::Function*
    */
-  static Function *Create(Function *From, Module *To) {
+  Function *Create(Function *From, Module *To) {
     GlobalList ReqGlobals = getGVsUsedInFunction(*From);
     ArgListT Args;
 
@@ -366,7 +366,7 @@ struct RemoveGlobalsPolicy {
    * @param To Mapping target Function.
    * @return void
    */
-  static void MapArguments(ValueToValueMapTy &VMap, Function *From,
+  void MapArguments(ValueToValueMapTy &VMap, Function *From,
                            Function *To) {
     size_t FromArgCnt = From->arg_size() - getGlobalCount(From);
     Module &ToM = *To->getParent();
@@ -391,7 +391,7 @@ struct RemoveGlobalsPolicy {
    * @param To Target function.
    * @return llvm::Function*
    */
-  static Function *Create(Function *From, Module *ToM) {
+  Function *Create(Function *From, Module *ToM) {
     ArgListT Args;
     size_t ArgCount = From->arg_size() - getGlobalCount(From);
 

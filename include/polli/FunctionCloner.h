@@ -142,7 +142,7 @@ private:
  * Cloning policies.
  */
 struct CopyCreator {
-  static void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
+  void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
                            Function *TgtF) {
     Function::arg_iterator NewArg = TgtF->arg_begin();
     for (Function::const_arg_iterator Arg = SrcF->arg_begin(),
@@ -153,7 +153,7 @@ struct CopyCreator {
     }
   }
 
-  static Function *Create(Function *SrcF, Module *TgtM) {
+  Function *Create(Function *SrcF, Module *TgtM) {
     return Function::Create(SrcF->getFunctionType(), SrcF->getLinkage(),
                             SrcF->getName(), TgtM);
   }
@@ -163,19 +163,19 @@ struct CopyCreator {
  * Endpoint policies for the function cloner host.
  */
 struct IgnoreSource {
-  static void Apply(Function *, Function *, ValueToValueMapTy &){
+  void Apply(Function *, Function *, ValueToValueMapTy &){
       /* Do nothing */
   };
 };
 
 struct IgnoreTarget {
-  static void Apply(Function *, Function *, ValueToValueMapTy &){
+  void Apply(Function *, Function *, ValueToValueMapTy &){
       /* Do nothing */
   };
 };
 
 struct ConnectTarget {
-  static void Apply(Function *From, Function *To, ValueToValueMapTy &VMap){
+  void Apply(Function *From, Function *To, ValueToValueMapTy &VMap){
     /* We have to connect the function entry block to the entry block of the
      * target function unconditionally. This way, CreationPolicies can
      * modifiy the function entry.
@@ -193,13 +193,13 @@ struct ConnectTarget {
 };
 
 struct DestroySource {
-  static void Apply(Function *SrcF, Function *, ValueToValueMapTy &VMap) {
+  void Apply(Function *SrcF, Function *, ValueToValueMapTy &VMap) {
     SrcF->deleteBody();
   }
 };
 
 struct DestroyTarget {
-  static void Apply(Function *, Function *TgtF, ValueToValueMapTy &VMap) {
+  void Apply(Function *, Function *TgtF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
   }
 };
