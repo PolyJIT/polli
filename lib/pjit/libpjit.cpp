@@ -512,14 +512,12 @@ bool pjit_main(const char *fName, unsigned paramc, char **params) {
     NewF(paramc, params);
     JitReady = true;
   } else {
-    std::cerr << fmt::format("Seen the prototype.\n");
     // We have seen this prototype, so we can do everything asynchronously.
     F = IRFunctionCache[fName];
     RunValueList Values = runValues(F, paramc, params);
     CacheKey K(Request->IR, Values.hash());
 
     if (CompileCache.count(K)) {
-      std::cerr << fmt::format("Seen the specialized version.\n");
       uint64_t CacheResult = CompileCache[K];
       NewF = (void (*)(int, char **))CacheResult;
       assert(NewF && "Could not find specialized function in cache!");
