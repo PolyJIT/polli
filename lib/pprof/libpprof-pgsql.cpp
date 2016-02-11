@@ -193,11 +193,16 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
     submit(format(NEW_PROJECT_SQL, opts.project, opts.project, opts.src_uri,
                   opts.domain, opts.group), w);
 
-  pqxx::result r = submit(format(NEW_RUN_SQL, now(), opts.command, opts.project,
-                                 opts.experiment, Opts.uuid, Opts.exp_uuid), w);
-
   uint64_t run_id = 0;
-  r[0]["id"].to(run_id);
+  if (!Opts.run_id) {
+    pqxx::result r =
+        submit(format(NEW_RUN_SQL, now(), opts.command, opts.project,
+                      opts.experiment, Opts.uuid, Opts.exp_uuid),
+               w);
+    r[0]["id"].to(run_id);
+  } else {
+    run_id = Opts.run_id;
+  }
 
   Run<pprof::Event> SimpleEvents = GetSimplifiedRun(Events);
   int n = 500;
