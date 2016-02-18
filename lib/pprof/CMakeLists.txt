@@ -4,6 +4,7 @@ set(POLLI_SOURCES
   libpprof.cpp
   libpprof-pgsql.cpp
   libpprof-file.cpp
+  perf.cpp
 )
 
 # for pqxx

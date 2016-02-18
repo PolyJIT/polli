@@ -182,6 +182,9 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
   static std::string NEW_RUN_RESULT_SQL = "INSERT INTO pprof_events (id, type, "
                                           "start, duration, name, tid, run_id) "
                                           "VALUES";
+  static std::string NEW_PERF_RUN_RESULT_SQL = "INSERT INTO pprof_perf_events (id, type, "
+                                               "start, duration, name, tid, run_id) "
+                                               "VALUES";
 
   using namespace fmt;
   DbOptions Opts = getDBOptionsFromEnv();
@@ -209,6 +212,8 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
   size_t i;
   for (i = 0; i < SimpleEvents.size(); i += n) {
     std::stringstream vals;
+    std::stringstream perf_vals;
+    bool perf_val = false;
     for (size_t j = i; j < std::min(SimpleEvents.size(), (size_t)(n + i)); j++) {
       pprof::Event &Ev = SimpleEvents[j];
       Ev.TID = tid;
@@ -217,10 +222,20 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
         vals << ",";
       vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})", Ev.ID,
                      Ev.Type, Ev.Start, Ev.Duration, Ev.Name, Ev.TID, run_id);
+      if (Ev.ID < -41) {
+        if (perf_val)
+          perf_vals << ",";
+        perf_vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})", Ev.ID,
+                       Ev.Type, Ev.Start, Ev.Duration, Ev.Name, Ev.TID, run_id);
+        perf_val = true;
+      }
     }
     vals << ";";
+    perf_vals << ";";
 
     submit(NEW_RUN_RESULT_SQL + vals.str(), w);
+    if (perf_val)
+      submit(NEW_PERF_RUN_RESULT_SQL + perf_vals.str(), w);
     vals.clear();
     vals.flush();
   }

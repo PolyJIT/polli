@@ -54,6 +54,8 @@
 
 #include "cppformat/format.h"
 
+#include "pprof/Perf.h"
+
 #define DEBUG_TYPE "polyjit"
 
 using namespace llvm;
@@ -117,6 +119,10 @@ static inline void do_shutdown() {
     POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
   }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
+
+  auto &Perf_Regions = getPerfRegions();
+  POLLI_TRACING_REGION_STOP(Perf_Regions["TOTAL"] ,"TOTAL");
+
   POLLI_TRACING_FINALIZE;
 }
 
@@ -137,6 +143,8 @@ public:
     // Make sure to initialize tracing before planting the atexit handler.
     POLLI_TRACING_INIT;
     POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
+    POLLI_TRACING_REGION_START(getNewPerfID("TOTAL") ,"TOTAL");
+    POLLI_TRACING_REGION_START(getNewPerfID("Init") ,"Init");
 
     // We want to register this after the tracing atexit handler.
     atexit(do_shutdown);
@@ -162,6 +170,9 @@ public:
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
+
+    auto &Perf_Regions = getPerfRegions();
+    POLLI_TRACING_REGION_STOP(Perf_Regions["Init"] ,"Init");
   }
 };
 
@@ -415,6 +426,8 @@ public:
           using fmt::format;
           std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
           pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
+
+          POLLI_TRACING_REGION_START(getNewPerfID("Foo") ,"Foo");
           while (!ShuttingDown) {
             while (!ShouldStart) {
               GeneratorShouldStart.wait(Lock);
@@ -453,6 +466,10 @@ public:
 
             ShouldStart = false;
           }
+
+          auto &Perf_Regions = getPerfRegions();
+          POLLI_TRACING_REGION_STOP(Perf_Regions["Foo"] ,"Foo");
+
         }) {}
 
   ~PolyJIT() {
