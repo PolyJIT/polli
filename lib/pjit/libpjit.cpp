@@ -151,6 +151,8 @@ public:
 
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
+    POLLI_TRACING_REGION_STOP(Perf_Regions["Init"] ,"Init");
+    POLLI_TRACING_REGION_START(getNewPerfID("Init_2") ,"Init_2");
     initializeCore(Registry);
     initializeScalarOpts(Registry);
     initializeObjCARCOpts(Registry);
@@ -172,7 +174,7 @@ public:
     InitializeNativeTargetAsmParser();
 
     auto &Perf_Regions = getPerfRegions();
-    POLLI_TRACING_REGION_STOP(Perf_Regions["Init"] ,"Init");
+    POLLI_TRACING_REGION_STOP(Perf_Regions["Init_2"] ,"Init_2");
   }
 };
 
