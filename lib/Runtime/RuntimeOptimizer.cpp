@@ -87,7 +87,7 @@ Function &OptimizeForRuntime(Function &F) {
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;
 
-  FunctionPassManager PM = FunctionPassManager(M);
+  legacy::FunctionPassManager PM = legacy::FunctionPassManager(M);
 
   Builder.populateFunctionPassManager(PM);
   PM.doInitialization();
@@ -95,14 +95,14 @@ Function &OptimizeForRuntime(Function &F) {
   PM.doFinalization();
 
   if (opt::havePapi()) {
-    PassManager MPM;
+    legacy::PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createTraceMarkerPass());
     MPM.run(*M);
   }
 
   if (opt::haveLikwid()) {
-    PassManager MPM;
+    legacy::PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createLikwidMarkerPass());
     MPM.run(*M);

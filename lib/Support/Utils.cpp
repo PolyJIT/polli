@@ -73,7 +73,7 @@ void StoreModule(Module &M, const Twine &Name) {
   // Somewhere we don't fetch all symbols during extraction.
   llvm::StripDebugInfo(M);
 
-  PassManager PM;
+  llvm::legacy::PassManager PM;
   PM.add(llvm::createVerifierPass());
   PM.add(createPrintModulePass(Out->os()));
   PM.run(M);
