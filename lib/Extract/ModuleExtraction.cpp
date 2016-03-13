@@ -594,6 +594,12 @@ struct InstrumentEndpoint {
     for (auto &Arg: To->args()) {
       ToArgs.push_back(&Arg);
     }
+
+    // We need to replace all uses of our fallback function with the new
+    // instrumented version _before_ we create the call to the fallback
+    // function, otherwise we would call ourselves until the jit is ready.
+    FallbackF->replaceAllUsesWith(To);
+
     Builder.CreateCall(FallbackF, ToArgs);
     Builder.CreateBr(Exit);
     Builder.SetInsertPoint(Exit);
@@ -724,8 +730,6 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstrumentedFunctions.insert(InstF);
     VMap.clear();
     Instrumented++;
-
-    F->replaceAllUsesWith(InstF);
   }
 
   return Changed;
