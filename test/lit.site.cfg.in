@@ -23,7 +23,7 @@ if (re.match(r'^x86_64*', '@TARGET_TRIPLE@') == None) :
 try:
     config.llvm_tools_dir = config.llvm_tools_dir % lit_config.params
     config.llvm_libs_dir = config.llvm_libs_dir % lit_config.params
-except KeyError,e:
+except KeyError as e:
     key, = e.args
     lit.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
 
