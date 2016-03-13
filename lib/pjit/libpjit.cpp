@@ -145,7 +145,6 @@ public:
     polly::initializePollyPasses(Registry);
     initializeCore(Registry);
     initializeScalarOpts(Registry);
-    initializeObjCARCOpts(Registry);
     initializeVectorization(Registry);
     initializeIPO(Registry);
     initializeAnalysis(Registry);
@@ -156,8 +155,6 @@ public:
     initializeCodeGenPreparePass(Registry);
     initializeAtomicExpandPass(Registry);
     initializeRewriteSymbolsPass(Registry);
-    initializeWinEHPreparePass(Registry);
-    initializeDwarfEHPreparePass(Registry);
 
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
