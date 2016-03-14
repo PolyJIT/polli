@@ -22,6 +22,7 @@
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Pass.h"
+#include "llvm/PassAnalysisSupport.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
@@ -66,12 +67,13 @@ void ModuleExtractor::releaseMemory() { InstrumentedFunctions.clear(); }
  */
 static std::string moduleToString(Module &M) {
   std::string ModStr;
-  llvm::raw_string_ostream os(ModStr);
+  raw_string_ostream os(ModStr);
+  AnalysisManager<Module> AM;
   ModulePassManager PM;
   PrintModulePass PrintModuleP(os);
 
   PM.addPass(PrintModuleP);
-  PM.run(M);
+  PM.run(M, AM);
 
   os.flush();
   return ModStr;
