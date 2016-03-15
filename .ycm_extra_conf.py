@@ -26,7 +26,11 @@ def llvm_inc(sub):
 
 
 def get_system_includes():
-    from plumbum.cmd import echo, clang
+    from plumbum.cmd import echo
+    from plumbum import local
+
+    # Follow YCM's version.
+    clang = local['clang-3.7']
     _, _, stderr  = (echo | clang['-v', '-E', '-x', 'c++', '-']).run()
     l = stderr.split('\n')
 
@@ -47,6 +51,7 @@ def get_system_includes():
 
 flags = [
     "-std=c++11",
+    "-x", "c++",
     "-DENABLE_GTEST",
     "-DFMT_HEADER_ONLY",
     "-D_DEBUG",
@@ -63,9 +68,7 @@ flags = [
     "-Wno-long-long",
     "-Wcovered-switch-default",
     "-Wnon-virtual-dtor",
-    "-fcolor-diagnostics",
-    "-ffunction-sections",
-    "-fdata-sections",
+    "-Wdelete-non-virtual-dtor",
     "-fno-omit-frame-pointer",
     "-fPIC",
     "-pedantic",
