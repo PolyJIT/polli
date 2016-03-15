@@ -46,6 +46,7 @@
 #include "polli/VariantFunction.h"
 #include "polli/FunctionDispatcher.h"
 #include "polli/RuntimeValues.h"
+#include "polli/CodeGen.h"
 #include "polly/RegisterPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/LinkAllPasses.h"
@@ -354,49 +355,6 @@ public:
 
   V &operator[](K &&X) {
     return Cache[X];
-  }
-};
-
-template <typename T> class CodeGenQueue {
-private:
-  std::deque<T> Work;
-  mutable std::mutex M;
-
-public:
-  using value_type = T;
-  using reference = const T &;
-
-  reference front() const { return Work.front(); }
-  reference back() const { return Work.front(); }
-
-  void pop_front() {
-    std::unique_lock<std::mutex> L(M);
-    Work.pop_front();
-  }
-
-  void pop_back() {
-    std::unique_lock<std::mutex> L(M);
-    Work.pop_back();
-  }
-
-  bool empty() const {
-    std::unique_lock<std::mutex> L(M);
-    return Work.empty();
-  }
-
-  void push_back(const value_type &x) {
-    std::unique_lock<std::mutex> L(M);
-    Work.push_back(x);
-  }
-
-  void push_back(value_type &&x) {
-    std::unique_lock<std::mutex> L(M);
-    Work.push_back(x);
-  }
-
-  void clear() {
-    std::unique_lock<std::mutex> L(M);
-    Work.clear();
   }
 };
 
