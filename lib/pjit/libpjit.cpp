@@ -47,6 +47,7 @@
 #include "polli/FunctionDispatcher.h"
 #include "polli/RuntimeValues.h"
 #include "polli/CodeGen.h"
+#include "polli/BlockingMap.h"
 #include "polly/RegisterPasses.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/LinkAllPasses.h"
@@ -315,46 +316,6 @@ template <> struct std::hash<CacheKey> {
   std::size_t operator()(const CacheKey &K) const {
     size_t h = (size_t)K.IR ^ K.ValueHash;
     return h;
-  }
-};
-
-template <typename K, typename V> class BlockingMap {
-private:
-  std::unordered_map<K, V> Cache;
-
-  mutable std::mutex WriteMutex;
-  std::condition_variable NewElement;
-
-public:
-  using size_type = size_t;
-  using iterator = typename std::unordered_map<K, V>::iterator;
-  using value_type = std::pair<K, V>;
-  using iterator_pair = std::pair<iterator, bool>;
-
-  size_type count(const K &X) {
-    return Cache.count(X);
-  }
-
-  iterator_pair insert(const value_type &Value) {
-    std::unique_lock<std::mutex> WL(WriteMutex);
-    iterator_pair Ret = Cache.insert(Value);
-    WL.unlock();
-    NewElement.notify_one();
-    return Ret;
-  }
-
-  V &blocking_at(const K &X) {
-    std::unique_lock<std::mutex> WL(WriteMutex, std::defer_lock);
-    NewElement.wait(WL, [&]() { return Cache.find(X) != Cache.end(); });
-    return Cache[X];
-  }
-
-  V &operator[](const K &X) {
-    return Cache[X];
-  }
-
-  V &operator[](K &&X) {
-    return Cache[X];
   }
 };
 

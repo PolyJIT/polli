@@ -40,5 +40,6 @@ set(POLLI_LINK_LIBS
 set(SHARED_LIBRARY On)
 add_polli_library(pjit SHARED
   libpjit.cpp
+  BlockingMap.cpp
   CodeGen.cpp
 )
