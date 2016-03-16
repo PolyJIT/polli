@@ -384,11 +384,12 @@ public:
   }
 
   void addRequest(SpecializerRequestPtr Request) {
-    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
-    Work.push_back(Request);
-    ShouldStart = true;
-    Lock.unlock();
-    GeneratorShouldStart.notify_all();
+    {
+      std::lock_guard<std::mutex> Lock(GeneratorRequestMutex);
+      Work.push_back(Request);
+      ShouldStart = true;
+    }
+    GeneratorShouldStart.notify_one();
   }
 
 private:

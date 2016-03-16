@@ -35,16 +35,20 @@ public:
   size_type count(const K &X) { return Cache.count(X); }
 
   iterator_pair insert(const value_type &Value) {
-    std::unique_lock<std::mutex> WL(WriteMutex);
-    iterator_pair Ret = Cache.insert(Value);
-    WL.unlock();
+    iterator_pair Ret;
+    {
+      std::lock_guard<std::mutex> WL(WriteMutex);
+      Ret = Cache.insert(Value);
+    }
     NewElement.notify_one();
     return Ret;
   }
 
   V &blocking_at(const K &X) {
-    std::unique_lock<std::mutex> WL(WriteMutex, std::defer_lock);
-    NewElement.wait(WL, [&]() { return Cache.find(X) != Cache.end(); });
+    {
+      std::unique_lock<std::mutex> WL(WriteMutex);
+      NewElement.wait(WL, [&]() { return Cache.count(X); });
+    }
     return Cache[X];
   }
 
