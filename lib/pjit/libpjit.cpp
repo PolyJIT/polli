@@ -63,6 +63,8 @@ using namespace polli;
 
 namespace {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
+using fmt::format;
+
 static StackTracePtr StackTrace;
 static FunctionDispatcher Disp;
 
@@ -73,7 +75,6 @@ static FunctionDispatcher Disp;
  * @return llvm::Module& The LLVM-IR module we just read.
  */
 static Module &getModule(const char *prototype) {
-  using fmt::format;
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
 
@@ -228,8 +229,6 @@ static ExecutionEngine *getEngine(Module *M) {
 }
 
 static inline Function *getPrototype(const char *function) {
-  using fmt::format;
-
   POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   Module &M = getModule(function);
   Function *F = getFunction(M);
@@ -245,8 +244,6 @@ static inline Function *getPrototype(const char *function) {
 
 #ifdef DEBUG
 static void printArgs(const Function &F, size_t argc, char **params) {
-  using fmt::format;
-
   std::string buf;
   llvm::raw_string_ostream s(buf);
   F.getType()->print(s);
@@ -260,7 +257,6 @@ static void printArgs(const Function &F, size_t argc, char **params) {
 #endif
 
 static void printRunValues(const RunValueList &Values) {
-  using fmt::format;
   for (auto &RV : Values) {
     dbgs() << format("{} matched against {}\n", RV.value, (void *)RV.Arg);
   }
@@ -328,7 +324,6 @@ public:
 
   PolyJIT()
       : ShuttingDown(false), ShouldStart(false), Generator([&]() {
-          using fmt::format;
           std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
           pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
           while (!ShuttingDown) {
@@ -427,6 +422,7 @@ bool pjit_main(const char *fName, unsigned paramc, char **params) {
     RunValueList Values = runValues(F, paramc, params);
     CacheKey K(Request->IR, Values.hash());
     uint64_t CacheResult = CompileCache.blocking_at(K);
+
     NewF = (void (*)(int, char **))CacheResult;
     assert(NewF && "Could not find specialized function in cache!");
     NewF(paramc, params);
