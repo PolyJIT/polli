@@ -28,9 +28,9 @@ using namespace polli;
 #define DEBUG_TYPE "polyjit"
 
 namespace polli {
-  bool PollyTrackFailures = false;
-  bool PollyProcessUnprofitable;
-  StringRef PollySkipFnAttr = "polly.skip.fn";
+bool PollyTrackFailures = false;
+bool PollyProcessUnprofitable;
+StringRef PollySkipFnAttr = "polly.skip.fn";
 }
 
 // This option is set to a very high value, as analyzing such loops increases
@@ -48,8 +48,8 @@ static cl::opt<bool, true> XPollyProcessUnprofitable(
     "polli-process-unprofitable",
     cl::desc(
         "Process scops that are unlikely to benefit from Polly optimizations."),
-    cl::location(polli::PollyProcessUnprofitable), cl::init(false), cl::ZeroOrMore,
-    cl::cat(PollyCategory));
+    cl::location(polli::PollyProcessUnprofitable), cl::init(false),
+    cl::ZeroOrMore, cl::cat(PollyCategory));
 
 static cl::opt<std::string> OnlyFunction(
     "polli-only-func",
@@ -82,8 +82,8 @@ static cl::opt<bool> AllowUnsigned("polli-allow-unsigned",
 static cl::opt<bool, true>
     TrackFailures("polli-detect-track-failures",
                   cl::desc("Track failure strings in detecting scop regions"),
-                  cl::location(polli::PollyTrackFailures), cl::Hidden, cl::ZeroOrMore,
-                  cl::init(true), cl::cat(PollyCategory));
+                  cl::location(polli::PollyTrackFailures), cl::Hidden,
+                  cl::ZeroOrMore, cl::init(true), cl::cat(PollyCategory));
 
 static cl::opt<bool> KeepGoing("polli-detect-keep-going",
                                cl::desc("Do not fail on the first error."),
@@ -149,12 +149,11 @@ void DiagnosticScopFound::print(DiagnosticPrinter &DP) const {
 //===----------------------------------------------------------------------===//
 // JITScopDetection.
 
-JITScopDetection::JITScopDetection() : FunctionPass(ID) {
-}
+JITScopDetection::JITScopDetection() : FunctionPass(ID) {}
 
 template <class RR, typename... Args>
 inline bool JITScopDetection::invalid(DetectionContext &Context, bool Assert,
-                                   Args &&... Arguments) const {
+                                      Args &&... Arguments) const {
 
   if (!Context.Verifying) {
     polly::RejectLog &Log = Context.Log;
@@ -205,8 +204,8 @@ std::string JITScopDetection::regionIsInvalidBecause(const Region *R) const {
   return RR->getMessage();
 }
 
-bool JITScopDetection::addOverApproximatedRegion(Region *AR,
-                                              DetectionContext &Context) const {
+bool JITScopDetection::addOverApproximatedRegion(
+    Region *AR, DetectionContext &Context) const {
 
   // If we already know about Ar we can exit.
   if (!Context.NonAffineSubRegionSet.insert(AR))
@@ -237,8 +236,8 @@ bool JITScopDetection::onlyValidRequiredInvariantLoads(
 }
 
 bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
-                             DetectionContext &Context,
-                             Value *BaseAddress) const {
+                                DetectionContext &Context,
+                                Value *BaseAddress) const {
 
   polly::InvariantLoadsSetTy AccessILS;
   if (!polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE, BaseAddress,
@@ -256,8 +255,8 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
 }
 
 bool JITScopDetection::isValidSwitch(BasicBlock &BB, SwitchInst *SI,
-                                  Value *Condition, bool IsLoopBranch,
-                                  DetectionContext &Context) const {
+                                     Value *Condition, bool IsLoopBranch,
+                                     DetectionContext &Context) const {
   Loop *L = LI->getLoopFor(&BB);
   const SCEV *ConditionSCEV = SE->getSCEVAtScope(Condition, L);
 
@@ -272,12 +271,12 @@ bool JITScopDetection::isValidSwitch(BasicBlock &BB, SwitchInst *SI,
     return false;
 
   return invalid<polly::ReportNonAffBranch>(Context, /*Assert=*/true, &BB,
-                                     ConditionSCEV, ConditionSCEV, SI);
+                                            ConditionSCEV, ConditionSCEV, SI);
 }
 
 bool JITScopDetection::isValidBranch(BasicBlock &BB, BranchInst *BI,
-                                  Value *Condition, bool IsLoopBranch,
-                                  DetectionContext &Context) const {
+                                     Value *Condition, bool IsLoopBranch,
+                                     DetectionContext &Context) const {
 
   if (BinaryOperator *BinOp = dyn_cast<BinaryOperator>(Condition)) {
     auto Opcode = BinOp->getOpcode();
@@ -304,12 +303,14 @@ bool JITScopDetection::isValidBranch(BasicBlock &BB, BranchInst *BI,
   // TODO: This is not sufficient and just hides bugs. However it does pretty
   //       well.
   if (ICmp->isUnsigned() && !AllowUnsigned)
-    return invalid<polly::ReportUnsignedCond>(Context, /*Assert=*/true, BI, &BB);
+    return invalid<polly::ReportUnsignedCond>(Context, /*Assert=*/true, BI,
+                                              &BB);
 
   // Are both operands of the ICmp affine?
   if (isa<UndefValue>(ICmp->getOperand(0)) ||
       isa<UndefValue>(ICmp->getOperand(1)))
-    return invalid<polly::ReportUndefOperand>(Context, /*Assert=*/true, &BB, ICmp);
+    return invalid<polly::ReportUndefOperand>(Context, /*Assert=*/true, &BB,
+                                              ICmp);
 
   // TODO: FIXME: IslExprBuilder is not capable of producing valid code
   //              for arbitrary pointer expressions at the moment. Until
@@ -331,13 +332,13 @@ bool JITScopDetection::isValidBranch(BasicBlock &BB, BranchInst *BI,
   if (IsLoopBranch)
     return false;
 
-  return invalid<polly::ReportNonAffBranch>(Context, /*Assert=*/true, &BB, LHS, RHS,
-                                     ICmp);
+  return invalid<polly::ReportNonAffBranch>(Context, /*Assert=*/true, &BB, LHS,
+                                            RHS, ICmp);
 }
 
 bool JITScopDetection::isValidCFG(BasicBlock &BB, bool IsLoopBranch,
-                               bool AllowUnreachable,
-                               DetectionContext &Context) const {
+                                  bool AllowUnreachable,
+                                  DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
   TerminatorInst *TI = BB.getTerminator();
@@ -352,7 +353,8 @@ bool JITScopDetection::isValidCFG(BasicBlock &BB, bool IsLoopBranch,
   Value *Condition = polly::getConditionFromTerminator(TI);
 
   if (!Condition)
-    return invalid<polly::ReportInvalidTerminator>(Context, /*Assert=*/true, &BB);
+    return invalid<polly::ReportInvalidTerminator>(Context, /*Assert=*/true,
+                                                   &BB);
 
   // UndefValue is not allowed as condition.
   if (isa<UndefValue>(Condition))
@@ -372,7 +374,7 @@ bool JITScopDetection::isValidCFG(BasicBlock &BB, bool IsLoopBranch,
 }
 
 bool JITScopDetection::isValidCallInst(CallInst &CI,
-                                    DetectionContext &Context) const {
+                                       DetectionContext &Context) const {
   if (CI.doesNotReturn())
     return false;
 
@@ -428,7 +430,7 @@ bool JITScopDetection::isValidCallInst(CallInst &CI,
 }
 
 bool JITScopDetection::isValidIntrinsicInst(IntrinsicInst &II,
-                                         DetectionContext &Context) const {
+                                            DetectionContext &Context) const {
   if (polly::isIgnoredIntrinsic(&II))
     return true;
 
@@ -584,9 +586,8 @@ private:
   std::vector<const SCEV *> *Terms;
 };
 
-SmallVector<const SCEV *, 4>
-JITScopDetection::getDelinearizationTerms(DetectionContext &Context,
-                                       const SCEVUnknown *BasePointer) const {
+SmallVector<const SCEV *, 4> JITScopDetection::getDelinearizationTerms(
+    DetectionContext &Context, const SCEVUnknown *BasePointer) const {
   SmallVector<const SCEV *, 4> Terms;
   for (const auto &Pair : Context.Accesses[BasePointer]) {
     std::vector<const SCEV *> MaxTerms;
@@ -635,8 +636,8 @@ JITScopDetection::getDelinearizationTerms(DetectionContext &Context,
 }
 
 bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
-                                  const SCEVUnknown *BP,
-                                  DetectionContext &Context) const {
+                                     const SCEVUnknown *BP,
+                                     DetectionContext &Context) const {
 
   if (!BP)
     return invalid<polly::ReportNoBasePtr>(Context, /*Assert=*/true, Inst);
@@ -652,7 +653,8 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
   // Check that the base address of the access is invariant in the current
   // region.
   if (!isInvariant(*BV, Context.CurRegion))
-    return invalid<polly::ReportVariantBasePtr>(Context, /*Assert=*/true, BV, Inst);
+    return invalid<polly::ReportVariantBasePtr>(Context, /*Assert=*/true, BV,
+                                                Inst);
 
   AF = SE->getMinusSCEV(AF, BP);
 
@@ -667,8 +669,8 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
 
   if (Context.ElementSize[BP]) {
     if (!AllowDifferentTypes && Context.ElementSize[BP] != Size)
-      return invalid<polly::ReportDifferentArrayElementSize>(Context, /*Assert=*/true,
-                                                      Inst, BV);
+      return invalid<polly::ReportDifferentArrayElementSize>(
+          Context, /*Assert=*/true, Inst, BV);
 
     Context.ElementSize[BP] = SE->getSMinExpr(Size, Context.ElementSize[BP]);
   } else {
@@ -686,18 +688,18 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
   bool IsAffine = !IsVariantInNonAffineLoop && isAffine(AF, Scope, Context, BV);
   // Do not try to delinearize memory intrinsics and force them to be affine.
   if (isa<MemIntrinsic>(Inst) && !IsAffine) {
-    return invalid<polly::ReportNonAffineAccess>(Context, /*Assert=*/true, AF, Inst,
-                                          BV);
+    return invalid<polly::ReportNonAffineAccess>(Context, /*Assert=*/true, AF,
+                                                 Inst, BV);
   } else if (!IsAffine) {
-    return invalid<polly::ReportNonAffineAccess>(Context, /*Assert=*/true, AF, Inst,
-                                          BV);
+    return invalid<polly::ReportNonAffineAccess>(Context, /*Assert=*/true, AF,
+                                                 Inst, BV);
   }
 
   return true;
 }
 
 bool JITScopDetection::isValidMemoryAccess(polly::MemAccInst Inst,
-                                        DetectionContext &Context) const {
+                                           DetectionContext &Context) const {
   Value *Ptr = Inst.getPointerOperand();
   Loop *L = LI->getLoopFor(Inst->getParent());
   const SCEV *AccessFunction = SE->getSCEVAtScope(Ptr, L);
@@ -709,7 +711,7 @@ bool JITScopDetection::isValidMemoryAccess(polly::MemAccInst Inst,
 }
 
 bool JITScopDetection::isValidInstruction(Instruction &Inst,
-                                       DetectionContext &Context) const {
+                                          DetectionContext &Context) const {
   for (auto &Op : Inst.operands()) {
     auto *OpInst = dyn_cast<Instruction>(&Op);
 
@@ -740,8 +742,8 @@ bool JITScopDetection::isValidInstruction(Instruction &Inst,
     Context.hasStores |= isa<StoreInst>(MemInst);
     Context.hasLoads |= isa<LoadInst>(MemInst);
     if (!MemInst.isSimple())
-      return invalid<polly::ReportNonSimpleMemoryAccess>(Context, /*Assert=*/true,
-                                                  &Inst);
+      return invalid<polly::ReportNonSimpleMemoryAccess>(
+          Context, /*Assert=*/true, &Inst);
 
     return isValidMemoryAccess(MemInst, Context);
   }
@@ -751,7 +753,7 @@ bool JITScopDetection::isValidInstruction(Instruction &Inst,
 }
 
 bool JITScopDetection::canUseISLTripCount(Loop *L,
-                                       DetectionContext &Context) const {
+                                          DetectionContext &Context) const {
   // Ensure the loop has valid exiting blocks as well as latches, otherwise we
   // need to overapproximate it as a boxed loop.
   SmallVector<BasicBlock *, 4> LoopControlBlocks;
@@ -778,7 +780,8 @@ bool JITScopDetection::isValidLoop(Loop *L, DetectionContext &Context) const {
     return true;
 
   const SCEV *LoopCount = SE->getBackedgeTakenCount(L);
-  return invalid<polly::ReportLoopBound>(Context, /*Assert=*/true, L, LoopCount);
+  return invalid<polly::ReportLoopBound>(Context, /*Assert=*/true, L,
+                                         LoopCount);
 }
 
 /// @brief Return the number of loops in @p L (incl. @p L) that have a trip
@@ -987,7 +990,7 @@ bool JITScopDetection::allBlocksValid(DetectionContext &Context) const {
 }
 
 bool JITScopDetection::hasSufficientCompute(DetectionContext &Context,
-                                         int NumLoops) const {
+                                            int NumLoops) const {
   int InstCount = 0;
 
   for (auto *BB : Context.CurRegion.blocks())
@@ -1008,7 +1011,8 @@ bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   // We can probably not do a lot on scops that only write or only read
   // data.
   if (!Context.hasStores || !Context.hasLoads)
-    return invalid<polly::ReportUnprofitable>(Context, /*Assert=*/true, &CurRegion);
+    return invalid<polly::ReportUnprofitable>(Context, /*Assert=*/true,
+                                              &CurRegion);
 
   int NumLoops = countBeneficialLoops(&CurRegion);
   int NumAffineLoops = NumLoops - Context.BoxedLoopsSet.size();
@@ -1027,7 +1031,8 @@ bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   if (NumAffineLoops == 1 && hasSufficientCompute(Context, NumLoops))
     return true;
 
-  return invalid<polly::ReportUnprofitable>(Context, /*Assert=*/true, &CurRegion);
+  return invalid<polly::ReportUnprofitable>(Context, /*Assert=*/true,
+                                            &CurRegion);
 }
 
 bool JITScopDetection::isValidRegion(DetectionContext &Context) const {
@@ -1052,7 +1057,8 @@ bool JITScopDetection::isValidRegion(DetectionContext &Context) const {
   // to insert alloca instruction there when translate scalar to array.
   if (CurRegion.getEntry() ==
       &(CurRegion.getEntry()->getParent()->getEntryBlock()))
-    return invalid<polly::ReportEntry>(Context, /*Assert=*/true, CurRegion.getEntry());
+    return invalid<polly::ReportEntry>(Context, /*Assert=*/true,
+                                       CurRegion.getEntry());
 
   if (!allBlocksValid(Context))
     return false;
@@ -1060,7 +1066,7 @@ bool JITScopDetection::isValidRegion(DetectionContext &Context) const {
   DebugLoc DbgLoc;
   if (!isReducibleRegion(CurRegion, DbgLoc))
     return invalid<polly::ReportIrreducibleRegion>(Context, /*Assert=*/true,
-                                            &CurRegion, DbgLoc);
+                                                   &CurRegion, DbgLoc);
 
   if (!isProfitableRegion(Context))
     return false;
@@ -1069,8 +1075,7 @@ bool JITScopDetection::isValidRegion(DetectionContext &Context) const {
   return true;
 }
 
-void JITScopDetection::markFunctionAsInvalid(Function *F) const {
-}
+void JITScopDetection::markFunctionAsInvalid(Function *F) const {}
 
 bool JITScopDetection::isValidFunction(llvm::Function &F) {
   return !F.hasFnAttribute(PollySkipFnAttr);
@@ -1096,7 +1101,7 @@ void JITScopDetection::emitMissedRemarksForValidRegions(const Function &F) {
 }
 
 void JITScopDetection::emitMissedRemarksForLeaves(const Function &F,
-                                               const Region *R) {
+                                                  const Region *R) {
   for (const std::unique_ptr<Region> &Child : *R) {
     bool IsValid = DetectionContextMap.count(Child.get());
     if (IsValid)
@@ -1216,7 +1221,7 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
 }
 
 bool JITScopDetection::isNonAffineSubRegion(const Region *SubR,
-                                         const Region *ScopR) const {
+                                            const Region *ScopR) const {
   const DetectionContext *DC = getDetectionContext(ScopR);
   assert(DC && "ScopR is no valid region!");
   return DC->NonAffineSubRegionSet.count(SubR);
@@ -1305,4 +1310,5 @@ INITIALIZE_PASS_DEPENDENCY(RegionInfoPass);
 INITIALIZE_PASS_DEPENDENCY(DominatorTreeWrapperPass);
 INITIALIZE_PASS_DEPENDENCY(ScalarEvolutionWrapperPass);
 INITIALIZE_PASS_END(JITScopDetection, "polli-detect-scops",
-                    "Polli - Detect jitable static control parts (jSCoPs)", false, false)
+                    "Polli - Detect jitable static control parts (jSCoPs)",
+                    false, false)
