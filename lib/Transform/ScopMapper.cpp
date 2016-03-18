@@ -11,37 +11,33 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "pjit-mapper"
-#include <set>                        // for _Rb_tree_const_iterator, etc
-#include <string>                     // for string
+#include "polli/ScopDetection.h"
+#include "polli/ScopMapper.h"
+#include "polli/Utils.h"
+#include "polly/ScopDetectionDiagnostic.h"
+
 #include "llvm/Analysis/RegionInfo.h" // for Region, RegionInfo
 #include "llvm/IR/Dominators.h"       // for DominatorTreeWrapperPass, etc
 #include "llvm/PassAnalysisSupport.h" // for AnalysisUsage, etc
 #include "llvm/Support/Debug.h"       // for dbgs, DEBUG
 #include "llvm/Support/raw_ostream.h" // for raw_ostream
 #include "llvm/Transforms/Utils/CodeExtractor.h" // for CodeExtractor
-#include "polli/JitScopDetection.h"              // for JitScopDetection, etc
-#include "polli/ScopMapper.h"                    // for ScopMapper, etc
-#include "polly/ScopDetectionDiagnostic.h"       // for getDebugLocation
 
-#include "polli/Utils.h"
 #include "cppformat/format.h"
-
-namespace llvm {
-class Function;
-} // namespace llvm
+#include <set>
+#include <string>
 
 using namespace llvm;
 using namespace polli;
-using namespace polly;
 
 void ScopMapper::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<JitScopDetection>();
+  AU.addRequired<polli::JITScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
   AU.setPreservesAll();
 }
 
 bool ScopMapper::runOnFunction(Function &F) {
-  JSD = &getAnalysis<JitScopDetection>();
+  JSD = &getAnalysis<polli::JITScopDetection>();
   DTP = &getAnalysis<DominatorTreeWrapperPass>();
 
   DominatorTree &DT = DTP->getDomTree();
@@ -52,7 +48,7 @@ bool ScopMapper::runOnFunction(Function &F) {
     return false;
 
   /* Extract each SCoP in this function into a new one. */
-  for (const Region *R : JSD->allScops()) {
+  for (auto &R : *JSD) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
 
     if (Extractor.isEligible()) {

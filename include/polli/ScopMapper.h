@@ -19,7 +19,7 @@
 #include "llvm/IR/Module.h"
 
 namespace polli {
-class JitScopDetection;
+class JITScopDetection;
 
 /// @brief Extract SCoPs from the host function into a separate function.
 ///
@@ -51,7 +51,7 @@ private:
   const ScopMapper &operator=(const ScopMapper &);
 
   RegionSet MappableRegions;
-  JitScopDetection *JSD;
+  polli::JITScopDetection *JSD;
   DominatorTreeWrapperPass *DTP;
 };
 }

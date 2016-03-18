@@ -14,7 +14,7 @@
 
 #include "polly/Support/SCEVValidator.h"
 
-#include "polly/ScopDetection.h"
+#include "polli/ScopDetection.h"
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Analysis/ScalarEvolution.h"
@@ -82,7 +82,7 @@ private:
   // DO NOT IMPLEMENT
   const JitScopDetection &operator=(const JitScopDetection &);
 
-  ScopDetection *SD;
+  JITScopDetection *SD;
   ScalarEvolution *SE;
   DominatorTree *DT;
   RegionInfoPass *RI;
