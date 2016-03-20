@@ -37,9 +37,17 @@ set(POLLI_LINK_LIBS
   pprof
 )
 
-set(SHARED_LIBRARY On)
-add_polli_library(pjit SHARED
+add_polli_library(pjit STATIC
   libpjit.cpp
   BlockingMap.cpp
   CodeGen.cpp
 )
+
+add_polli_library(pjit_shared SHARED
+  libpjit.cpp
+  BlockingMap.cpp
+  CodeGen.cpp
+)
+set_target_properties(pjit_shared PROPERTIES OUTPUT_NAME pjit)
+
+
