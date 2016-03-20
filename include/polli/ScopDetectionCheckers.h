@@ -38,22 +38,27 @@ public:
     return *this;
   }
 
-  friend bool isValid(ScopDetectionExtension &E, polly::RejectReason &R) {
-    return E.Ext->isValid_(R);
+  friend bool isValid(ScopDetectionExtension &E, llvm::Loop *Scope,
+                      polly::RejectReason &R, polly::InvariantLoadsSetTy *ILS) {
+    return E.Ext->isValid_(Scope, R, ILS);
   }
 
 private:
   struct ValidatorConcept_t {
     virtual ~ValidatorConcept_t(){};
     virtual ValidatorConcept_t *Copy() = 0;
-    virtual bool isValid_(polly::RejectReason &R) = 0;
+    virtual bool isValid_(llvm::Loop *Scope, polly::RejectReason &R,
+                          polly::InvariantLoadsSetTy *ILS) = 0;
   };
 
   template <typename T> struct Extension : ValidatorConcept_t {
     Extension(const T &E) : Ext(E) {}
     ValidatorConcept_t *Copy() { return new Extension(*this); }
 
-    bool isValid_(polly::RejectReason &R) { return isValid(Ext, R); }
+    bool isValid_(llvm::Loop *Scope, polly::RejectReason &R,
+                  polly::InvariantLoadsSetTy *ILS) {
+      return isValid(Ext, Scope, R, ILS);
+    }
 
     T Ext;
   };
@@ -101,14 +106,38 @@ public:
 class AliasingChecker {};
 class ProfitableChecker {};
 
-template <typename T> bool isValid(T &Ext, polly::RejectReason &R) {
+class HoistableInvariantLoad {
+  llvm::Region &R;
+  llvm::LoopInfo &LI;
+  llvm::ScalarEvolution &SE;
+
+public:
+  llvm::Region &region() { return R; }
+  llvm::LoopInfo &loopInfo() { return LI; }
+  llvm::ScalarEvolution &se() { return SE; }
+  
+  HoistableInvariantLoad(llvm::Region &R, llvm::LoopInfo &LI,
+                         llvm::ScalarEvolution &SE)
+      : R(R), LI(LI), SE(SE) {}
+};
+
+template <typename T>
+bool isValid(T &Ext, llvm::Loop *Scope, polly::RejectReason &R,
+             polly::InvariantLoadsSetTy *ILS) {
   return false;
 }
 
-bool isValid(NonAffineAccessChecker &Chk, polly::RejectReason &Reason);
-bool isValid(NonAffineBranchChecker &Chk, polly::RejectReason &Reason);
-bool isValid(NonAffineLoopBoundChecker &Chk, polly::RejectReason &Reason);
-bool isValid(AliasingChecker &Chk, polly::RejectReason &Reason);
-bool isValid(ProfitableChecker &Chk, polly::RejectReason &Reason);
+bool isValid(NonAffineAccessChecker &Chk, llvm::Loop *Scope,
+             polly::RejectReason &Reason, polly::InvariantLoadsSetTy *ILS);
+bool isValid(NonAffineBranchChecker &Chk, llvm::Loop *Scope,
+             polly::RejectReason &Reason, polly::InvariantLoadsSetTy *ILS);
+bool isValid(NonAffineLoopBoundChecker &Chk, llvm::Loop *Scope,
+             polly::RejectReason &Reason, polly::InvariantLoadsSetTy *ILS);
+bool isValid(AliasingChecker &Chk, llvm::Loop *Scope,
+             polly::RejectReason &Reason, polly::InvariantLoadsSetTy *ILS);
+bool isValid(ProfitableChecker &Chk, llvm::Loop *Scope,
+             polly::RejectReason &Reason, polly::InvariantLoadsSetTy *ILS);
+bool isValid(HoistableInvariantLoad &Chk, llvm::Loop *Scope,
+             polly::RejectReason &Reason, polly::InvariantLoadsSetTy *ILS);
 }
 #endif // POLLI_SCOP_DETECTION_CHECKERS_H
