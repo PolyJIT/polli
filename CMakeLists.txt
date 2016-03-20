@@ -68,7 +68,9 @@ link_directories(${PTHREAD_LIBDIR})
 option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
 option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
 option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fno-rtti -fexceptions")
+
+string(REPLACE "-std=c++11" "-std=c++14" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
