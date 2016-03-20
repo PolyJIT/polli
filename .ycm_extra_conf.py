@@ -50,7 +50,7 @@ def get_system_includes():
 
 
 flags = [
-    "-std=c++11",
+    "-std=c++14",
     "-x", "c++",
     "-DENABLE_GTEST",
     "-DFMT_HEADER_ONLY",
@@ -156,7 +156,7 @@ def FlagsForFile(filename):
     # python list, but a "list-like" StringVec object
     compilation_info = GetCompilationInfoForFile( filename )
     if not compilation_info:
-      return None
+        return { 'flags' : flags, 'do_cache': True }
 
     final_flags = MakeRelativePathsInFlagsAbsolute(
       compilation_info.compiler_flags_,
