@@ -14,7 +14,6 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/InstrumentRegions.h"
-#include "polli/JitScopDetection.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Options.h"
 #include "polli/PapiProfiling.h"
@@ -115,9 +114,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   PM.add(polly::createCodePreparationPass());
   polly::registerCanonicalicationPasses(PM);
   PM.add(polli::createScopDetectionPass());
-  // Schedule us inbetween detection and polly's codegen.
-  if(!opt::Enabled) // FIXME: TEMP until we remove it
-    PM.add(new JitScopDetection(opt::EnableJitable));
+
   if (opt::AnalyzeIR)
     PM.add(new FunctionPassPrinter<polli::JITScopDetection>(outs()));
 
