@@ -23,12 +23,9 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "polli/JitScopDetection.h"
 
-#include "polly/ScopDetection.h"
+#include "polli/ScopDetection.h"
 #include "polly/Support/ScopHelper.h"
-
-#include "polly/LinkAllPasses.h"
 
 namespace llvm {
 class Value;
@@ -44,6 +41,8 @@ class Region;
 typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
 
 namespace polli {
+class JITScopDetection;
+
 /**
  * @brief Initialize PAPI CSCoP profiling
  */
@@ -76,8 +75,7 @@ public:
   static char ID;
 
   virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<ScopDetection>();
-    AU.addRequired<JitScopDetection>();
+    AU.addRequired<polli::JITScopDetection>();
     AU.addRequired<RegionInfoPass>();
   }
 
@@ -85,8 +83,7 @@ public:
   /**  @} */
 
 private:
-  ScopDetection *SD;
-  JitScopDetection *NSD;
+  JITScopDetection *SD;
   RegionInfoPass *RI;
 
   bool processRegion(const Region *R);
