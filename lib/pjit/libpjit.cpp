@@ -20,7 +20,6 @@
 #include <cstdlib>
 #include <atomic>
 #include <vector>
-#include <future>
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -29,32 +28,34 @@
 #include <thread>
 #include <unordered_map>
 
-#include "llvm/IR/Module.h"
+#include "cppformat/format.h"
+
+#define BOOST_THREAD_PROVIDES_FUTURE
+#include <boost/thread/future.hpp>
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/ExecutionEngine/MCJIT.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Function.h"
-
+#include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
+#include "llvm/LinkAllPasses.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
-
-#include "pprof/Tracing.h"
-#include "polli/Options.h"
-#include "polli/VariantFunction.h"
-#include "polli/FunctionDispatcher.h"
-#include "polli/RuntimeValues.h"
-#include "polli/CodeGen.h"
-#include "polli/BlockingMap.h"
-#include "polly/RegisterPasses.h"
-#include "llvm/CodeGen/LinkAllCodegenComponents.h"
-#include "llvm/LinkAllPasses.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
-#include "cppformat/format.h"
+#include "polli/BlockingMap.h"
+#include "polli/CodeGen.h"
+#include "polli/Options.h"
+#include "polli/RuntimeValues.h"
+#include "polli/Tasks.h"
+#include "polli/VariantFunction.h"
+#include "polly/RegisterPasses.h"
+#include "pprof/Tracing.h"
 
 #define DEBUG_TYPE "polyjit"
 
@@ -62,11 +63,9 @@ using namespace llvm;
 using namespace polli;
 
 namespace {
-using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 using fmt::format;
-
+using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
-static FunctionDispatcher Disp;
 
 /**
  * @brief Read the LLVM-IR module from the given prototype string.
@@ -74,10 +73,13 @@ static FunctionDispatcher Disp;
  * @param prototype The prototype string we want to read in.
  * @return llvm::Module& The LLVM-IR module we just read.
  */
-static Module &getModule(const char *prototype) {
+static Module &getModule(const char *prototype, bool &cache_hit) {
   using UniqueMod = std::unique_ptr<Module>;
   static DenseMap<const char *, UniqueMod> ModuleIndex;
+  static mutex _m;
+  std::lock_guard<std::mutex> L(_m);
 
+  cache_hit = true;
   if (!ModuleIndex.count(prototype)) {
     LLVMContext &Ctx = llvm::getGlobalContext();
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
@@ -93,6 +95,7 @@ static Module &getModule(const char *prototype) {
       errs() << format("{:s}\n", prototype);
     }
     assert(ModuleIndex[prototype] && "Parsing the prototype module failed!");
+    cache_hit = false;
   }
 
   return *ModuleIndex[prototype];
@@ -107,9 +110,10 @@ static Module &getModule(const char *prototype) {
  * @param M The prototype module.
  * @return llvm::Function* The first function in the given module.
  */
-static Function *getFunction(Module &M) {
-  Disp.setPrototypeMapping(&*M.begin(), &*M.begin());
-  return &*M.begin();
+static Function &getFunction(Module &M) {
+  assert(M.getFunctionList().size() == 1 &&
+         "Unexpected number of functions in module!");
+  return *M.begin();
 }
 
 static inline void do_shutdown() {
@@ -119,6 +123,7 @@ static inline void do_shutdown() {
     POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
     POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
   }
+
   POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
   POLLI_TRACING_FINALIZE;
 }
@@ -128,44 +133,6 @@ static inline void set_options_from_environment() {
   opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
 }
 
-class StaticInitializer {
-public:
-  StaticInitializer() {
-    using polly::initializePollyPasses;
-
-    set_options_from_environment();
-
-    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
-
-    // Make sure to initialize tracing before planting the atexit handler.
-    POLLI_TRACING_INIT;
-    POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
-
-    // We want to register this after the tracing atexit handler.
-    atexit(do_shutdown);
-
-    PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    polly::initializePollyPasses(Registry);
-    initializeCore(Registry);
-    initializeScalarOpts(Registry);
-    initializeVectorization(Registry);
-    initializeIPO(Registry);
-    initializeAnalysis(Registry);
-    initializeTransformUtils(Registry);
-    initializeInstCombine(Registry);
-    initializeInstrumentation(Registry);
-    initializeTarget(Registry);
-    initializeCodeGenPreparePass(Registry);
-    initializeAtomicExpandPass(Registry);
-    initializeRewriteSymbolsPass(Registry);
-
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    InitializeNativeTargetAsmParser();
-  }
-};
-
-static StaticInitializer InitializeEverything;
 } // end of anonymous namespace
 
 /**
@@ -175,21 +142,20 @@ static StaticInitializer InitializeEverything;
 *
 * @return A new execution engine for M.
 */
-static ExecutionEngine *getEngine(Module *M) {
+static ExecutionEngine *getEngine(std::unique_ptr<Module> M) {
   std::string ErrorMsg;
 
   // If we are supposed to override the target triple, do so now.
   if (!opt::TargetTriple.empty())
     M->setTargetTriple(Triple::normalize(opt::TargetTriple));
 
-  std::unique_ptr<Module> Owner(M);
-  EngineBuilder builder(std::move(Owner));
+  EngineBuilder builder(std::move(M));
   auto MemManager = std::unique_ptr<llvm::SectionMemoryManager>();
 
   CodeGenOpt::Level OLvl;
   switch (opt::OptLevel) {
   default:
-    OLvl = CodeGenOpt::Default;
+    OLvl = CodeGenOpt::Aggressive;
     break;
   case '0':
     OLvl = CodeGenOpt::None;
@@ -228,63 +194,51 @@ static ExecutionEngine *getEngine(Module *M) {
   return EE;
 }
 
-static inline Function *getPrototype(const char *function) {
+static inline Function &getPrototype(const char *function, bool &cache_hit) {
   POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
-  Module &M = getModule(function);
-  Function *F = getFunction(M);
-  if (!F) {
-    errs() << fmt::format("Could not find a function in: {}\n",
-                          M.getModuleIdentifier());
-    llvm_unreachable("Could not find a function in the prototype module");
-    return nullptr;
-  }
+  Module &M = getModule(function, cache_hit);
+  Function &F = getFunction(M);
   POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   return F;
 }
 
 #ifdef DEBUG
-static void printArgs(const Function &F, size_t argc, char **params) {
+static void printArgs(const Function &F, size_t argc, void *params) {
   std::string buf;
   llvm::raw_string_ostream s(buf);
-  F.getType()->print(s);
-  dbgs() << s.str() << "\n";
-  for (size_t i = 0; i < argc; i++) {
-    dbgs() << format("[{}] -> {:d} - {}\n", i,
-                     *reinterpret_cast<uint64_t *>(params[i]),
-                     reinterpret_cast<void *>(params[i]));
+  //dbgs() << fmt::format("{:s} :: {:s}\n", F.getName().str(), s.str());
+
+  size_t i = 0;
+  for (auto &Arg : F.args()) {
+    if (i < argc) {
+      RunValue<uint64_t *> V{reinterpret_cast<uint64_t **>(params)[i], &Arg};
+      if (polli::canSpecialize(V)) {
+        dbgs() << fmt::format("[{:d}] -> {} ", i, *V.value);
+      }
+      i++;
+    }
   }
+  dbgs() << "\n";
 }
 #endif
 
 static void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
-    dbgs() << format("{} matched against {}\n", RV.value, (void *)RV.Arg);
+    dbgs() << fmt::format("{:d} matched against {}\n", *RV.value,
+                          (void *)RV.Arg);
   }
-}
-
-static RunValueList runValues(Function *F, unsigned paramc, void *params) {
-  POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
-                             "polyjit.params.select");
-  int i = 0;
-  RunValueList RunValues;
-
-  for (const Argument &Arg : F->args()) {
-    RunValues.add({(*((uint64_t **)params)[i]), &Arg});
-    i++;
-  }
-  POLLI_TRACING_REGION_STOP(PJIT_REGION_SELECT_PARAMS, "polyjit.params.select");
-  return RunValues;
 }
 
 struct SpecializerRequest {
   const char *IR;
   unsigned ParamC;
-  char **Params;
+  void *Params;
+  Function *F{nullptr};
 
   SpecializerRequest(const char *IR, unsigned ParamC, char **params)
       : IR(IR), ParamC(ParamC) {
         size_t n = ParamC * sizeof(void *);
-        Params = (char **)std::malloc(n);
+        Params = std::malloc(n);
         std::memcpy(Params, params, n);
       }
 
@@ -292,6 +246,23 @@ struct SpecializerRequest {
     std::free(Params);
   }
 };
+
+using JitRequestT = std::shared_ptr<SpecializerRequest>;
+static RunValueList runValues(const SpecializerRequest &Request) {
+  POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
+                             "polyjit.params.select");
+  int i = 0;
+  RunValueList RunValues;
+  assert(Request.F && "Request malformed! Need an llvm function.");
+
+  DEBUG(printArgs(*Request.F, Request.ParamC, Request.Params));
+  for (const Argument &Arg : Request.F->args()) {
+    RunValues.add({reinterpret_cast<uint64_t **>(Request.Params)[i], &Arg});
+    i++;
+  }
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_SELECT_PARAMS, "polyjit.params.select");
+  return RunValues;
+}
 
 struct CacheKey {
   const char *IR;
@@ -315,89 +286,144 @@ template <> struct std::hash<CacheKey> {
   }
 };
 
-static BlockingMap<const char *, llvm::Function *> IRFunctionCache;
-static BlockingMap<CacheKey, uint64_t> CompileCache;
-
 class PolyJIT {
 public:
-  using SpecializerRequestPtr = std::shared_ptr<SpecializerRequest>;
-
-  PolyJIT()
-      : ShuttingDown(false), ShouldStart(false), Generator([&]() {
-          std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
-          pthread_setname_np(pthread_self(), "PolyJIT_CodeGen");
-          while (!ShuttingDown) {
-            while (!ShouldStart) {
-              GeneratorShouldStart.wait(Lock);
-            }
-
-            POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
-            while (!Work.empty()) {
-              const SpecializerRequest &Request = *Work.front();
-              Function *F = getPrototype(Request.IR);
-              IRFunctionCache.insert(std::make_pair(Request.IR, F));
-
-              RunValueList Values =
-                  runValues(F, Request.ParamC, Request.Params);
-
-              CacheKey K(Request.IR, Values.hash());
-              if (!CompileCache.count(K)) {
-                VariantFunctionTy VarFun = Disp.getOrCreateVariantFunction(F);
-                Function *NewF = VarFun->getOrCreateVariant(Values);
-                Module *NewM = NewF->getParent();
-                ExecutionEngine *EE = getEngine(NewM);
-
-                DEBUG(printArgs(*F, Request.ParamC, Request.Params));
-                DEBUG(printRunValues(Values));
-
-                assert(EE && "No execution engine could be constructed.");
-                EE->finalizeObject();
-
-                uint64_t FPtr = EE->getFunctionAddress(NewF->getName().str());
-                assert(FPtr && "Specializer returned nullptr.");
-                auto Entry = std::make_pair(K, FPtr);
-                CompileCache.insert(Entry);
-              }
-              Work.pop_front();
-            }
-            POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
-
-            ShouldStart = false;
-          }
-        }) {}
-
+  explicit PolyJIT() : VariantFunctions(), CodeCache(), EE(nullptr) {}
   ~PolyJIT() {
-    std::unique_lock<std::mutex> Lock(GeneratorRequestMutex);
-    ShuttingDown = true;
-    ShouldStart = true;
-    Work.clear();
-
-    // Wake up the generator to allow it to shut down.
-    Lock.unlock();
-    GeneratorShouldStart.notify_all();
-    Generator.join();
+    System.cancel_pending_jobs();
   }
 
-  void addRequest(SpecializerRequestPtr Request) {
-    {
-      std::lock_guard<std::mutex> Lock(GeneratorRequestMutex);
-      Work.push_back(Request);
-      ShouldStart = true;
+  /** 
+   * @name CodeCache interface.
+   * @{ */
+  using CodeCacheT =
+      std::unordered_map<CacheKey, std::function<void(int, char **)>>;
+  using iterator = CodeCacheT::iterator;
+  using const_iterator = CodeCacheT::const_iterator;
+  using value_type = CodeCacheT::mapped_type;
+
+  const_iterator find(const CacheKey &K) const {
+    return CodeCache.find(K);
+  }
+  iterator begin() { return CodeCache.begin(); }
+  const_iterator begin() const { return CodeCache.begin(); }
+
+  iterator end() { return CodeCache.end(); }
+  const_iterator end() const { return CodeCache.end(); }
+
+  value_type operator[](CacheKey &K) {
+    return CodeCache[K];
+  }
+
+  const value_type operator[](const CacheKey &K) {
+    return CodeCache[K];
+  }
+
+  std::pair<iterator, bool> insert(const CodeCacheT::value_type &el) {
+    return CodeCache.insert(el);
+  }
+  /**  @} */
+
+  ExecutionEngine &engine(std::unique_ptr<Module> NewM) {
+    if (!EE)
+      EE = getEngine(std::move(NewM));
+    else
+      EE->addModule(std::move(NewM));
+    return *EE;
+  }
+
+  /** 
+   * @name Asynchronous task scheduling interface.
+   * @{ */
+  struct deref_functor {
+    template <typename Pointer> void operator()(Pointer const &p) const {
+      (*p)();
     }
-    GeneratorShouldStart.notify_one();
-  }
+  };
 
+  template <typename F, typename... Args>
+  auto async(F &&f, Args &&... args)
+      -> boost::future<std::result_of_t<F(Args...)>> {
+    using result_type = std::result_of_t<F(Args...)>;
+    using task_type = boost::packaged_task<result_type>;
+
+    auto Task = std::make_shared<task_type>(
+        std::bind(std::forward<F>(f), std::forward<Args>(args)...));
+
+    boost::future<result_type> ft = Task->get_future();
+
+    System.async(std::move(std::bind(deref_functor(), Task)));
+    return std::move(ft);
+  }
+  /**  @} */
+
+  /**
+   * @brief Get or Create a new variant function for the given Function.
+   *
+   * @param F The function we get or create the variant function for.
+   *
+   * @return A variant function for function F
+   */
+  VariantFunctionTy getOrCreateVariantFunction(Function *F) {
+    // We have already specialized this function at least once.
+    if (VariantFunctions.count(F))
+      return VariantFunctions.at(F);
+
+    // Create a variant function & specialize a new variant, based on key.
+    VariantFunctionTy VarFun = std::make_shared<VariantFunction>(*F);
+
+    VariantFunctions.insert(std::make_pair(F, VarFun));
+    return VarFun;
+  }
 private:
-  CodeGenQueue<SpecializerRequestPtr> Work;
-  std::atomic_bool ShuttingDown;
-  std::atomic_bool ShouldStart;
-  std::condition_variable GeneratorShouldStart;
-  std::condition_variable GeneratorShutDown;
-  std::mutex GeneratorRequestMutex;
-  std::thread Generator;
+  VariantFunctionMapTy VariantFunctions;
+  CodeCacheT CodeCache;
+  ExecutionEngine *EE;
+  TaskSystem System;
 };
 
-static PolyJIT JIT;
+using JitT = std::shared_ptr<PolyJIT>;
+static JitT &getOrCreateJIT() {
+  static auto JIT = std::make_shared<PolyJIT>();
+  return JIT;
+}
+
+using MainFnT = std::function<void(int, char **)>;
+
+static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
+  bool cache_hit;
+  Request.F = &getPrototype(Request.IR, cache_hit);
+  RunValueList Values = runValues(Request);
+  return std::make_pair(CacheKey(Request.IR, Values.hash()), cache_hit);
+}
+
+static void GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request, CacheKey K,
+                                       JitT Context) {
+  if (Context->find(K) != Context->end())
+    return;
+
+  POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
+  llvm::Function *F = Request->F;
+  VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
+  RunValueList Values = runValues(*Request);
+  std::string FnName;
+  auto Variant = VarFun->createVariant(Values, FnName);
+  ExecutionEngine &EE = Context->engine(std::move(Variant));
+
+  DEBUG(printRunValues(Values));
+
+  // Using the MCJIT: This does _NOT_ recompile all added modules.
+  // The fact that MCJIT does not support recompilation, saves us here.
+  EE.finalizeObject();
+
+  uint64_t FPtr = EE.getFunctionAddress(FnName);
+  assert(FPtr && "Specializer returned nullptr.");
+  auto ret =
+      Context->insert(std::make_pair(K, MainFnT((void (*)(int, char **))FPtr)));
+  assert(ret.second && "Key collision, ouch!");
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
+}
+
 extern "C" {
 /**
  * @brief Runtime callback for PolyJIT.
@@ -409,39 +435,64 @@ extern "C" {
  * @param params arugments of the function we want to call.
  */
 bool pjit_main(const char *fName, unsigned paramc, char **params) {
-  Function *F = nullptr;
-  void (*NewF)(int, char **) = nullptr;
-  bool JitReady = false;
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
+  JitT Context = getOrCreateJIT();
 
-  JIT.addRequest(Request);
-  if (!IRFunctionCache.count(fName)) {
-    // We have never seen this prototype, so we block until the first
-    // version can be delivered.
-    F = IRFunctionCache.blocking_at(fName);
-    RunValueList Values = runValues(F, paramc, params);
-    CacheKey K(Request->IR, Values.hash());
-    uint64_t CacheResult = CompileCache.blocking_at(K);
+  std::pair<CacheKey, bool> K = GetCacheKey(*Request);
+  auto FutureFn =
+      Context->async(GetOrCreateVariantFunction, Request, K.first, Context);
 
-    NewF = (void (*)(int, char **))CacheResult;
-    assert(NewF && "Could not find specialized function in cache!");
-    NewF(paramc, params);
-    JitReady = true;
-  } else {
-    // We have seen this prototype, so we can do everything asynchronously.
-    F = IRFunctionCache[fName];
-    RunValueList Values = runValues(F, paramc, params);
-    CacheKey K(Request->IR, Values.hash());
+  // If it was not a cache-hit, wait until the first variant is ready.
+  if (!K.second)
+    FutureFn.wait();
 
-    if (CompileCache.count(K)) {
-      uint64_t CacheResult = CompileCache[K];
-      NewF = (void (*)(int, char **))CacheResult;
-      assert(NewF && "Could not find specialized function in cache!");
-      NewF(paramc, params);
-      JitReady = true;
-    }
+  auto FnIt = Context->find(K.first);
+  if (FnIt != Context->end()) {
+    (FnIt->second)(paramc, params);
+    return true /* JIT ready */;
   }
 
-  return JitReady;
+  return false /* JIT not ready */;
 }
+}
+
+namespace {
+class StaticInitializer {
+public:
+  StaticInitializer() {
+    using polly::initializePollyPasses;
+
+    set_options_from_environment();
+
+    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
+
+    // Make sure to initialize tracing before planting the atexit handler.
+    POLLI_TRACING_INIT;
+    POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
+
+    // We want to register this after the tracing atexit handler.
+    atexit(do_shutdown);
+
+    PassRegistry &Registry = *PassRegistry::getPassRegistry();
+    polly::initializePollyPasses(Registry);
+    initializeCore(Registry);
+    initializeScalarOpts(Registry);
+    initializeVectorization(Registry);
+    initializeIPO(Registry);
+    initializeAnalysis(Registry);
+    initializeTransformUtils(Registry);
+    initializeInstCombine(Registry);
+    initializeInstrumentation(Registry);
+    initializeTarget(Registry);
+    initializeCodeGenPreparePass(Registry);
+    initializeAtomicExpandPass(Registry);
+    initializeRewriteSymbolsPass(Registry);
+
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+  }
+};
+
+static StaticInitializer InitializeEverything;
 }

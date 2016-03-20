@@ -35,6 +35,8 @@ set(POLLI_LINK_LIBS
   pfm
   papi
   pprof
+  boost_system
+  boost_thread
 )
 
 add_polli_library(pjit STATIC

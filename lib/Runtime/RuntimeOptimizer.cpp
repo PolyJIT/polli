@@ -28,8 +28,10 @@
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/PassSupport.h"
+#include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
 #include "polly/Options.h"
 
@@ -46,7 +48,14 @@ using namespace polly;
 namespace polli {
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
-  polly::registerPollyPasses(PM);
+  PM.add(polly::createScopDetectionPass());
+  PM.add(polly::createScopInfoPass());
+  PM.add(polly::createIslScheduleOptimizerPass());
+  PM.add(polly::createCodeGenerationPass());
+  // FIXME: This dummy ModulePass keeps some programs from miscompiling,
+  // probably some not correctly preserved analyses. It acts as a barrier to
+  // force all analysis results to be recomputed.
+  PM.add(createBarrierNoopPass());
 }
 
 #ifdef DEBUG
@@ -108,9 +117,7 @@ Function &OptimizeForRuntime(Function &F) {
     MPM.run(*M);
   }
 
-  DEBUG(
-  StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll")
-  );
+  DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
   opt::GenerateOutput = false;
 
   return F;

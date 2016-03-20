@@ -45,13 +45,13 @@ inline bool canSpecialize(const RunValue<T> &V) {
 } // end of polli namespace
 
 namespace polli {
-inline size_t hash_value(const polli::RunValue<uint64_t> &V) {
-  return V.value;
+inline size_t hash_value(const polli::RunValue<uint64_t *> &V) {
+  return *(V.value);
 }
 
 class RunValueList {
 public:
-  using RunValueT = RunValue<uint64_t>;
+  using RunValueT = RunValue<uint64_t *>;
   using RunValueListT = std::vector<RunValueT>;
   using iterator = RunValueListT::iterator;
   using const_iterator = RunValueListT::const_iterator;
@@ -96,9 +96,9 @@ public:
       if (i > 0)
         os << ", ";
       if (canSpecialize(V))
-        os << V.value;
+        os << *V.value;
       else
-        os << (void *)(V.value);
+        os << V.value;
       i++;
     }
     os << "]";
