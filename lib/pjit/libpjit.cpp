@@ -288,6 +288,7 @@ template <> struct hash<CacheKey> {
 };
 }
 
+namespace polli {
 class PolyJIT {
 public:
   explicit PolyJIT() : VariantFunctions(), CodeCache(), EE(nullptr) {}
@@ -456,7 +457,8 @@ bool pjit_main(const char *fName, unsigned paramc, char **params) {
 
   return false /* JIT not ready */;
 }
-}
+} /* extern "C" */
+} /* polli */
 
 namespace {
 class StaticInitializer {
