@@ -224,8 +224,9 @@ static void printArgs(const Function &F, size_t argc, void *params) {
 
 static void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
-    dbgs() << fmt::format("{:d} matched against {}\n", *RV.value,
-                          (void *)RV.Arg);
+    dbgs() << fmt::format(
+        "{:d} matched against {}\n", *RV.value,
+        reinterpret_cast<void *>(const_cast<Argument *>(RV.Arg)));
   }
 }
 
