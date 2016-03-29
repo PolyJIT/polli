@@ -347,8 +347,8 @@ public:
 
   template <typename F, typename... Args>
   auto async(F &&f, Args &&... args)
-      -> boost::future<std::result_of_t<F(Args...)>> {
-    using result_type = std::result_of_t<F(Args...)>;
+      -> boost::future<typename std::result_of<F(Args...)>::type> {
+    using result_type = typename std::result_of<F(Args...)>::type;
     using task_type = boost::packaged_task<result_type>;
 
     auto Task = std::make_shared<task_type>(

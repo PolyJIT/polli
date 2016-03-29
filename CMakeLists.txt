@@ -69,9 +69,7 @@ option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance coun
 option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
 option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
 
-string(REPLACE "-std=c++11" "-std=c++14" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 string(REPLACE "-fno-exceptions" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI)
 if (CMAKE_COMPILER_IS_GNUCXX)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual -Wno-long-long -Wall -W -Wno-unused-parameter -Wwrite-strings")

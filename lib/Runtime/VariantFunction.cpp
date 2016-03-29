@@ -243,7 +243,8 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
 
     // Prepare a new module to hold our new function.
     M = BaseF.getParent();
-    NewM = std::make_unique<Module>(M->getModuleIdentifier(), M->getContext());
+    NewM = std::unique_ptr<Module>(
+        new Module(M->getModuleIdentifier(), M->getContext()));
     NewM->setTargetTriple(M->getTargetTriple());
     NewM->setDataLayout(M->getDataLayout());
     NewM->setMaterializer(M->getMaterializer());
