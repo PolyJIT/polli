@@ -112,10 +112,11 @@ private:
 };
 } // end of polli namespace
 
-template<>
-struct std::hash<const polli::RunValueList> {
+namespace std {
+template <> struct hash<const polli::RunValueList> {
   std::size_t operator()(const polli::RunValueList &This) const {
     return This.hash();
   }
 };
+}
 #endif //POLLI_RUNTIME_VALUES_H
