@@ -279,12 +279,14 @@ struct CacheKey {
   }
 };
 
-template <> struct std::hash<CacheKey> {
+namespace std {
+template <> struct hash<CacheKey> {
   std::size_t operator()(const CacheKey &K) const {
     size_t h = (size_t)K.IR ^ K.ValueHash;
     return h;
   }
 };
+}
 
 class PolyJIT {
 public:
