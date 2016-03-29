@@ -6,9 +6,6 @@ set(POLLI_SOURCES
   libpprof-file.cpp
 )
 
-# for pqxx
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
-
 add_polli_library(pprof
   ${POLLI_SOURCES}
 )
