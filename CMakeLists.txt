@@ -71,7 +71,14 @@ option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
 
 string(REPLACE "-std=c++11" "-std=c++14" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
 string(REPLACE "-fno-exceptions" "" CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS})
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions")
+
+add_definitions(-D_GLIBCXX_USE_CXX11_ABI)
+if (CMAKE_COMPILER_IS_GNUCXX)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-common -Woverloaded-virtual
+  -Wno-long-long -Wall -W -Wno-unused-parameter -Wwrite-strings")
+else ()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fexceptions")
+endif ()
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
