@@ -105,7 +105,7 @@ static const unsigned MIN_LOOP_TRIP_COUNT = 8;
 STATISTIC(ValidRegion,
           "Number of regions that are a valid Scop at compile time.");
 STATISTIC(JitRegion,
-          "Number of regions that may become a Scop at program run time.");
+          "Number of jitable SCoPs");
 
 namespace polli {
 class DiagnosticScopFound : public DiagnosticInfo {
