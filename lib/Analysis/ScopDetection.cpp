@@ -695,6 +695,45 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
                                                  Inst, BV);
   }
 
+  // Check if the base pointer of the memory access does alias with
+  // any other pointer. This cannot be handled at the moment.
+  AAMDNodes AATags;
+  Inst->getAAMetadata(AATags);
+  AliasSet &AS = Context.AST.getAliasSetForPointer(
+      BP->getValue(), MemoryLocation::UnknownSize, AATags);
+
+  if (!AS.isMustAlias()) {
+    bool CanBuildRunTimeCheck = true;
+    // The run-time alias check places code that involves the base pointer at
+    // the beginning of the SCoP. This breaks if the base pointer is defined
+    // inside the scop. Hence, we can only create a run-time check if we are
+    // sure the base pointer is not an instruction defined inside the scop.
+    // However, we can ignore loads that will be hoisted.
+
+    // In PolyJIT's version of the RTC, we only check if it is possible to
+    // generate a RTC. The check itself will be created at run-time to enable
+    // further optimization.
+    for (const auto &Ptr : AS) {
+      Instruction *Inst = dyn_cast<Instruction>(Ptr.getValue());
+      if (Inst && Context.CurRegion.contains(Inst)) {
+        auto *Load = dyn_cast<LoadInst>(Inst);
+        if (Load && polly::isHoistableLoad(Load, Context.CurRegion, *LI, *SE)) {
+          Context.RequiredILS.insert(Load);
+          continue;
+        }
+
+        CanBuildRunTimeCheck = false;
+        break;
+      }
+    }
+
+    if (CanBuildRunTimeCheck) {
+      Context.requiresJIT = true;
+      return true;
+    }
+    return invalid<polly::ReportAlias>(Context, /*Assert=*/true, Inst, AS);
+  }
+
   return true;
 }
 
