@@ -2,13 +2,14 @@
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
+
 #include "llvm/Support/Debug.h"
 #include <vector>
 
 using namespace llvm;
 using namespace polli;
 
-#define _TYPE "polli-scev-validator"
+#define DEBUG_TYPE "polli-scev-validator"
 
 namespace polli {
 namespace SCEVType {
@@ -147,7 +148,7 @@ public:
       // parameter.
       return ValidatorResult(SCEVType::PARAM, Expr);
     case SCEVType::IV:
-      dbgs() << "INVALID: Truncation of SCEVType::IV expression";
+      DEBUG(dbgs() << "INVALID: Truncation of SCEVType::IV expression");
       return ValidatorResult(SCEVType::INVALID);
     case SCEVType::INVALID:
       return Op;
@@ -167,7 +168,7 @@ public:
       // parameter.
       return ValidatorResult(SCEVType::PARAM, Expr);
     case SCEVType::IV:
-      dbgs() << "INVALID: ZeroExtend of SCEVType::IV expression";
+      DEBUG(dbgs() << "INVALID: ZeroExtend of SCEVType::IV expression");
       return ValidatorResult(SCEVType::INVALID);
     case SCEVType::INVALID:
       return Op;
@@ -217,11 +218,11 @@ public:
       }
 
       if ((Op.isIV() || Op.isPARAM()) && !Return.isINT()) {
-        dbgs() << "INVALID: More than one non-int operand in MulExpr\n"
-               << "\tExpr: " << *Expr << "\n"
-               << "\tPrevious expression type: " << Return << "\n"
-               << "\tNext operand (" << Op << "): " << *Expr->getOperand(i)
-               << "\n";
+        DEBUG(dbgs() << "INVALID: More than one non-int operand in MulExpr\n"
+                     << "\tExpr: " << *Expr << "\n"
+                     << "\tPrevious expression type: " << Return << "\n"
+                     << "\tNext operand (" << Op
+                     << "): " << *Expr->getOperand(i) << "\n");
 
         return ValidatorResult(SCEVType::INVALID);
       }
@@ -251,13 +252,13 @@ public:
     if (LHS.isPARAM() || RHS.isPARAM())
       return ValidatorResult(SCEVType::PARAM, Expr);
 
-    dbgs() << "INVALID: unsigned division of non-constant expressions";
+    DEBUG(dbgs() << "INVALID: unsigned division of non-constant expressions");
     return ValidatorResult(SCEVType::INVALID);
   }
 
   class ValidatorResult visitAddRecExpr(const SCEVAddRecExpr *Expr) {
     if (!Expr->isAffine()) {
-      dbgs() << "INVALID: AddRec is not affine";
+      DEBUG(dbgs() << "INVALID: AddRec is not affine");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -272,8 +273,8 @@ public:
 
     auto *L = Expr->getLoop();
     if (R->contains(L) && (!Scope || !L->contains(Scope))) {
-      dbgs() << "INVALID: AddRec out of a loop whose exit value is not "
-                "synthesizable";
+      DEBUG(dbgs() << "INVALID: AddRec out of a loop whose exit value is not "
+                "synthesizable");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -292,13 +293,13 @@ public:
       if (Recurrence.isPARAM()) {
         ValidatorResult Result(SCEVType::PARAM, StepRecurr);
         Result.addParamsFrom(Start);
-        dbgs() << "VALID: AddRec within scop has parametrized"
-               << " recurrence part\n";
+        DEBUG(dbgs() << "VALID: AddRec within scop has parametrized"
+                     << " recurrence part\n");
         return Result;
       }
 
-      dbgs() << "INVALID: AddRec within scop has non-int"
-                "recurrence part";
+      DEBUG(dbgs() << "INVALID: AddRec within scop has non-int"
+                "recurrence part");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -344,7 +345,7 @@ public:
       ValidatorResult Op = visit(Expr->getOperand(i));
 
       if (!Op.isConstant()) {
-        dbgs() << "INVALID: UMaxExpr has a non-constant operand";
+        DEBUG(dbgs() << "INVALID: UMaxExpr has a non-constant operand");
         return ValidatorResult(SCEVType::INVALID);
       }
     }
@@ -354,9 +355,9 @@ public:
 
   ValidatorResult visitGenericInst(Instruction *I, const SCEV *S) {
     if (R->contains(I)) {
-      dbgs() << "INVALID: UnknownExpr references an instruction "
-                "within the region\n";
-      dbgs() << *I << "\n";
+      DEBUG(dbgs() << "INVALID: UnknownExpr references an instruction "
+                "within the region\n");
+      DEBUG(dbgs() << *I << "\n");
       //return ValidatorResult(SCEVType::INVALID);
       return ValidatorResult(SCEVType::PARAM, S);
     }
@@ -408,22 +409,22 @@ public:
     //              for arbitrary pointer expressions at the moment. Until
     //              this is fixed we disallow pointer expressions completely.
     if (Expr->getType()->isPointerTy()) {
-      dbgs() << "INVALID: UnknownExpr is a pointer type [FIXME]";
+      DEBUG(dbgs() << "INVALID: UnknownExpr is a pointer type [FIXME]");
       return ValidatorResult(SCEVType::INVALID);
     }
 
     if (!Expr->getType()->isIntegerTy()) {
-      dbgs() << "INVALID: UnknownExpr is not an integer";
+      DEBUG(dbgs() << "INVALID: UnknownExpr is not an integer");
       return ValidatorResult(SCEVType::INVALID);
     }
 
     if (isa<UndefValue>(V)) {
-      dbgs() << "INVALID: UnknownExpr references an undef value";
+      DEBUG(dbgs() << "INVALID: UnknownExpr references an undef value");
       return ValidatorResult(SCEVType::INVALID);
     }
 
     if (BaseAddress == V) {
-      dbgs() << "INVALID: UnknownExpr references BaseAddress\n";
+      DEBUG(dbgs() << "INVALID: UnknownExpr references BaseAddress\n");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -447,24 +448,24 @@ public:
 bool isNonAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
                      ScalarEvolution &SE, const Value *BaseAddress,
                      polly::InvariantLoadsSetTy *ILS) {
-  dbgs() << "\n";
-  dbgs() << "Expr: " << *Expr << "\n";
+  DEBUG(dbgs() << "\n");
+  DEBUG(dbgs() << "Expr: " << *Expr << "\n");
   if (isa<SCEVCouldNotCompute>(Expr))
     return false;
 
   NonAffSCEVValidator Validator(R, Scope, SE, BaseAddress, ILS);
-  {
+  DEBUG({
     dbgs() << "Region: " << R->getNameStr() << "\n";
     dbgs() << " -> ";
-  };
+  });
 
   ValidatorResult Result = Validator.visit(Expr);
 
-  {
+  DEBUG({
     if (Result.isValid())
       dbgs() << "VALID\n";
     dbgs() << "\n";
-  };
+  });
 
   return Result.isValid();
 }
