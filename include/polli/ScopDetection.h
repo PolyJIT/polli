@@ -104,6 +104,15 @@ public:
   /// @brief Set to remember non-affine branches in regions.
   using NonAffineSubRegionSetTy = RegionSet;
 
+  ///
+  // @name Track required params for each detected SCoP candidate.
+  // @{
+  using ParamVec = std::vector<const llvm::SCEV *>;
+  using RegionToParamVec = std::map<const llvm::Region *, ParamVec>;
+  RegionToParamVec RequiredParams;
+  ///  @}
+
+
   /// @brief Context variables for SCoP detection.
   struct DetectionContext {
     Region &CurRegion;   // The region to check.
@@ -146,8 +155,11 @@ public:
     ///        instructions.
     MapInsnToMemAcc InsnToMemAcc;
 
-    /// @brief Flat to indicate that this region requires run-time support.
+    /// @brief Flag to indicate that this region requires run-time support.
     bool requiresJIT;
+
+    /// @brief List of Parameters values we need to know at run time.
+    ParamVec RequiredParams;
 
     /// @brief Initialize a DetectionContext from scratch.
     DetectionContext(Region &R, AliasAnalysis &AA, bool Verify)

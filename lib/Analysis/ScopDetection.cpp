@@ -245,6 +245,9 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
     if (!isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, BaseAddress,
                          &AccessILS))
       return false;
+
+    Context.RequiredParams = getParamsInNonAffineExpr(&Context.CurRegion, Scope,
+                                                      S, *SE, BaseAddress);
     Context.requiresJIT = true;
   }
 
@@ -929,6 +932,7 @@ unsigned JITScopDetection::removeCachedResultsRecursively(const Region &R) {
 
 void JITScopDetection::removeCachedResults(const Region &R) {
   ValidRegions.remove(&R);
+  ValidRuntimeRegions.remove(&R);
   DetectionContextMap.erase(&R);
 }
 
@@ -951,9 +955,11 @@ void JITScopDetection::findScops(Region &R) {
   if (HasErrors) {
     removeCachedResults(R);
   } else {
-    if (Context.requiresJIT)
+    if (Context.requiresJIT) {
+      RequiredParams[&R] = Context.RequiredParams;
+      ValidRuntimeRegions.insert(&R);
       ++JitRegion;
-    else
+    } else
       ++ValidRegion;
     ValidRegions.insert(&R);
     return;
@@ -990,7 +996,16 @@ void JITScopDetection::findScops(Region &R) {
       continue;
 
     R.addSubRegion(ExpandedR, true);
-    ValidRegions.insert(ExpandedR);
+
+    // We could expand the region. Check, if we require the JIT for it.
+    const DetectionContext *ExpandedCtx = getDetectionContext(ExpandedR);
+    if (ExpandedCtx->requiresJIT) {
+      RequiredParams[&R] = Context.RequiredParams;
+      ValidRuntimeRegions.insert(ExpandedR);
+      ValidRegions.insert(ExpandedR);
+    } else {
+      ValidRegions.insert(ExpandedR);
+    }
     removeCachedResults(*CurrentRegion);
 
     // Erase all (direct and indirect) children of ExpandedR from the valid
@@ -1331,6 +1346,8 @@ void JITScopDetection::releaseMemory() {
   RejectLogs.clear();
   ValidRegions.clear();
   DetectionContextMap.clear();
+  ValidRuntimeRegions.clear();
+  RequiredParams.clear();
 
   // Do not clear the invalid function set.
 }
