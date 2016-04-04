@@ -19,6 +19,12 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Debug.h"
+
+#ifndef FMT_HEADER_ONLY
+#define FMT_HEADER_ONLY
+#endif
+#include "cppformat/format.h"
+
 #include <set>
 #include <stack>
 
@@ -1339,7 +1345,25 @@ void JITScopDetection::print(raw_ostream &OS, const Module *) const {
   for (const Region *R : ValidRegions)
     OS << "Valid Region for Scop: " << R->getNameStr() << '\n';
 
-  OS << "\n";
+  unsigned count = ValidRuntimeRegions.size();
+  unsigned i = 0;
+
+  OS << fmt::format("{:d} regions require runtime support:\n", count);
+  for (const Region *R : ValidRuntimeRegions) {
+    if (!R || (R && !RequiredParams.count(R)))
+      continue;
+    const ParamVec &L = RequiredParams.at(R);
+    OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
+                                R->getNameStr(), L.size());
+    unsigned j = 0;
+    for (const SCEV *S : L) {
+      OS.indent(4) << fmt::format("{:d} - ", j);
+      S->print(OS);
+      OS << "\n";
+    }
+
+    OS << "\n";
+  }
 }
 
 void JITScopDetection::releaseMemory() {
