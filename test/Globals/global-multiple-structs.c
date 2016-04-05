@@ -40,5 +40,5 @@ int main(int argc, char **argv) {
 // CHECK-NEXT:   %9 = getelementptr [4 x i8*], [4 x i8*]* %params, i32 0, i32 3
 // CHECK-NEXT:   store i8* bitcast (%struct.TestA* @StructB to i8*), i8** %9
 // CHECK-NEXT:   %10 = bitcast [4 x i8*]* %params to i8*
-// CHECK-NEXT:   %11 = call i1 @pjit_main(i8* getelementptr inbounds ([1784 x i8], [1784 x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 4, i8* %10)
+// CHECK-NEXT:   %11 = call i1 @pjit_main(i8* getelementptr inbounds ([1782 x i8], [1782 x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 4, i8* %10)
 // CHECK-NEXT:   br i1 %11, label %polyjit.ready, label %polyjit.not.ready
