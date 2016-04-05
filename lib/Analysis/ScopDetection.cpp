@@ -924,21 +924,26 @@ static bool regionWithoutLoops(Region &R, LoopInfo *LI) {
   return true;
 }
 
-unsigned JITScopDetection::removeCachedResultsRecursively(const Region &R) {
+unsigned JITScopDetection::removeCachedResultsRecursively(const Region &R,
+                                                          RegionSet &Cache) {
   unsigned Count = 0;
   for (auto &SubRegion : R) {
     if (ValidRegions.count(SubRegion.get())) {
-      removeCachedResults(*SubRegion.get());
+      removeCachedResults(*SubRegion.get(), Cache);
       ++Count;
     } else
-      Count += removeCachedResultsRecursively(*SubRegion);
+      Count += removeCachedResultsRecursively(*SubRegion, Cache);
   }
   return Count;
 }
 
 void JITScopDetection::removeCachedResults(const Region &R) {
-  ValidRegions.remove(&R);
-  ValidRuntimeRegions.remove(&R);
+  removeCachedResults(R, ValidRegions);
+  removeCachedResults(R, ValidRuntimeRegions);
+}
+
+void JITScopDetection::removeCachedResults(const Region &R, RegionSet &Cache) {
+  Cache.remove(&R);
   DetectionContextMap.erase(&R);
 }
 
@@ -965,8 +970,9 @@ void JITScopDetection::findScops(Region &R) {
       RequiredParams[&R] = Context.RequiredParams;
       ValidRuntimeRegions.insert(&R);
       ++JitRegion;
-    } else
-      ++ValidRegion;
+      --ValidRegion;
+    }
+    ++ValidRegion;
     ValidRegions.insert(&R);
     return;
   }
@@ -1016,7 +1022,9 @@ void JITScopDetection::findScops(Region &R) {
 
     // Erase all (direct and indirect) children of ExpandedR from the valid
     // regions and update the number of valid regions.
-    ValidRegion -= removeCachedResultsRecursively(*ExpandedR);
+    ValidRegion -= removeCachedResultsRecursively(*ExpandedR, ValidRegions);
+    JitRegion -=
+        removeCachedResultsRecursively(*ExpandedR, ValidRuntimeRegions);
   }
 }
 

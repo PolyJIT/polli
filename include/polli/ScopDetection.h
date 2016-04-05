@@ -211,12 +211,15 @@ private:
   mutable polly::RejectLogsContainer RejectLogs;
 
   /// @brief Remove cached results for @p R.
+  void removeCachedResults(const Region &R, RegionSet &Cache);
+
+  /// @brief Remove cached results for @p R.
   void removeCachedResults(const Region &R);
 
   /// @brief Remove cached results for the children of @p R recursively.
   ///
   /// @returns The number of regions erased regions.
-  unsigned removeCachedResultsRecursively(const Region &R);
+  unsigned removeCachedResultsRecursively(const Region &R, RegionSet &Cache);
 
   /// @brief Add the region @p AR as over approximated sub-region in @p Context.
   ///
