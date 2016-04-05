@@ -1,4 +1,3 @@
-
 ; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli -polly-only-scop-detection -polly-delinearize=false - -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 polyjit          - Number of jitable SCoPs

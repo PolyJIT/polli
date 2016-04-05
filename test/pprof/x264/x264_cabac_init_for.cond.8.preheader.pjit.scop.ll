@@ -1,7 +1,6 @@
-
 ; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli -polly-only-scop-detection -polly-delinearize=false - -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
-; CHECK: 1 polyjit          - Number of jitable SCoPs
+; CHECK: 4 polyjit          - Number of jitable SCoPs
 
 ; ModuleID = 'common/cabac.c.x264_cabac_init_for.cond.8.preheader.pjit.scop.prototype'
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
