@@ -202,7 +202,7 @@ static inline Function &getPrototype(const char *function, bool &cache_hit) {
   return F;
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 static void printArgs(const Function &F, size_t argc, void *params) {
   std::string buf;
   llvm::raw_string_ostream s(buf);
