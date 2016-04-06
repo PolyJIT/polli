@@ -65,6 +65,10 @@ link_directories(${PQXX_LIBDIR})
 link_directories(${LIKWID_LIBDIR})
 link_directories(${PTHREAD_LIBDIR})
 
+find_package(Boost 1.60.0 REQUIRED COMPONENTS system thread)
+include_directories(BEFORE ${Boost_INCLUDEDIR})
+link_directories(${Boost_LIBRARYDIR})
+
 option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
 option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
 option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
