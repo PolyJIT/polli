@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polli-process-unprofitable -o /dev/null -x c++ %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
+// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polli-process-unprofitable -o /dev/null %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
 
 // Check that we can handle a single global variable during compilation.
 
@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
 // CHECK-NEXT:   %7 = bitcast i64* %5 to i8*
 // CHECK-NEXT:   store i8* %7, i8** %6
 // CHECK-NEXT:   %8 = getelementptr [3 x i8*], [3 x i8*]* %params, i32 0, i32 2
-// CHECK-NEXT:   store i8* bitcast ([10240 x i32]* @_ZL1A to i8*), i8** %8
+// CHECK-NEXT:   store i8* bitcast ([10240 x i32]* @A to i8*), i8** %8
 // CHECK-NEXT:   %9 = bitcast [3 x i8*]* %params to i8*
-// CHECK-NEXT:   %10 = call i1 @pjit_main(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 3, i8* %9)
+// CHECK-NEXT:   %10 = call i1 @pjit_main(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @test{{[0-9a-zA-Z\.\_]+}}.pjit.scop.prototype, i32 0, i32 0), i32 3, i8* %9)
 // CHECK-NEXT:   br i1 %10, label %polyjit.ready, label %polyjit.not.ready

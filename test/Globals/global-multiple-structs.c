@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polli-process-unprofitable -mllvm -o /dev/null -x c++ %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
+// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polli-process-unprofitable -o /dev/null %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
 
 // Check that we can handle a single global variable during compilation.
 
@@ -22,8 +22,7 @@ int main(int argc, char **argv) {
   return StructB.A[0];
 }
 
-// CHECK: define weak void @_Z4testi_for.body.pjit.scop.1(i32, i64) #3 {
-// CHECK-NEXT: polyjit.entry:
+// CHECK: polyjit.entry:
 // CHECK-NEXT:   %params = alloca [4 x i8*]
 // CHECK-NEXT:   %2 = alloca i32
 // CHECK-NEXT:   store volatile i32 %0, i32* %2
@@ -40,5 +39,5 @@ int main(int argc, char **argv) {
 // CHECK-NEXT:   %9 = getelementptr [4 x i8*], [4 x i8*]* %params, i32 0, i32 3
 // CHECK-NEXT:   store i8* bitcast (%struct.TestA* @StructB to i8*), i8** %9
 // CHECK-NEXT:   %10 = bitcast [4 x i8*]* %params to i8*
-// CHECK-NEXT:   %11 = call i1 @pjit_main(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 4, i8* %10)
+// CHECK-NEXT:   %11 = call i1 @pjit_main(i8* getelementptr inbounds ([{{[0-9]+}} x i8], [{{[0-9]+}} x i8]* @test{{[0-9a-zA-Z\.\_]+}}.pjit.scop.prototype, i32 0, i32 0), i32 4, i8* %10)
 // CHECK-NEXT:   br i1 %11, label %polyjit.ready, label %polyjit.not.ready
