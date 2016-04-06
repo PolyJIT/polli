@@ -422,9 +422,10 @@ static void GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Reque
 
   uint64_t FPtr = EE.getFunctionAddress(FnName);
   assert(FPtr && "Specializer returned nullptr.");
-  auto ret =
-      Context->insert(std::make_pair(K, MainFnT((void (*)(int, char **))FPtr)));
-  assert(ret.second && "Key collision, ouch!");
+  if (!Context->insert(
+          std::make_pair(K, MainFnT((void (*)(int, char **))FPtr))).second) {
+    llvm_unreachable("Key collision");
+  }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 }
 
