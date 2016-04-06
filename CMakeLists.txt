@@ -65,7 +65,7 @@ link_directories(${PQXX_LIBDIR})
 link_directories(${LIKWID_LIBDIR})
 link_directories(${PTHREAD_LIBDIR})
 
-find_package(Boost 1.60.0 REQUIRED COMPONENTS system thread)
+find_package(Boost 1.54.0 REQUIRED COMPONENTS system thread)
 include_directories(BEFORE ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
