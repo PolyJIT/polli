@@ -220,7 +220,6 @@ static void printArgs(const Function &F, size_t argc, void *params) {
   }
   dbgs() << "\n";
 }
-#endif
 
 static void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
@@ -229,6 +228,7 @@ static void printRunValues(const RunValueList &Values) {
         reinterpret_cast<void *>(const_cast<Argument *>(RV.Arg)));
   }
 }
+#endif
 
 struct SpecializerRequest {
   const char *IR;
