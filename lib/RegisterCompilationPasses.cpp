@@ -103,12 +103,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (!opt::Enabled)
     return;
 
-  if (polly::PollyDelinearize && opt::EnableJitable)
-    polly::PollyDelinearize = false;
-
-  if (polly::PollyUseRuntimeAliasChecks && opt::EnableJitable)
-    polly::PollyUseRuntimeAliasChecks = false;
-
   DEBUG(printConfig());
 
   PM.add(polly::createCodePreparationPass());
@@ -130,9 +124,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }
   PM.add(llvm::createBarrierNoopPass());
-
-  //registerPollyPasses(PM);
-  //PM.add(polly::createCodeGenerationPass());
 }
 
 static llvm::RegisterStandardPasses
