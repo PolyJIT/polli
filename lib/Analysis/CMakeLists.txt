@@ -1,4 +1,4 @@
-add_library(PolyJIT_Analysis STATIC
+add_polli_library(PolyJIT_Analysis STATIC
   NonAffineSCEVs.cpp
   ScopDetection.cpp
   ScopDetectionCheckers.cpp

@@ -1,4 +1,4 @@
-add_library(PolyJIT_Persist STATIC
+add_polli_library(PolyJIT_Persist STATIC
   Schema.cpp
 )
 

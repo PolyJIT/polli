@@ -50,6 +50,8 @@ add_polli_library(pjit_shared SHARED
   BlockingMap.cpp
   CodeGen.cpp
 )
+
+add_dependencies(pjit PolyJIT_Runtime)
 set_target_properties(pjit_shared PROPERTIES OUTPUT_NAME pjit)
 
 
