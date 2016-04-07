@@ -453,7 +453,6 @@ bool pjit_main(const char *fName, unsigned paramc, char **params) {
 
   auto FnIt = Context->find(K.first);
   if (FnIt != Context->end()) {
-    outs() << "ArgC: " << paramc << " ArgV: " << params << "\n";
     (FnIt->second)(paramc, params);
     return true /* JIT ready */;
   }
