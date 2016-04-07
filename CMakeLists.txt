@@ -36,33 +36,31 @@ set(CMAKE_MODULE_PATH
 include("polli_macros")
 
 find_package(Papi REQUIRED)
-find_package(Pthread REQUIRED)
-find_package(Likwid REQUIRED)
-find_package(Pqxx REQUIRED)
-
 add_library(papi UNKNOWN IMPORTED)
-add_library(pthread UNKNOWN IMPORTED)
-add_library(likwid UNKNOWN IMPORTED)
-add_library(pqxx UNKNOWN IMPORTED)
-
 set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
-set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
-set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
-set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
-
 include_directories(BEFORE ${PAPI_INCLUDE_DIR})
-include_directories(BEFORE ${PQXX_INCLUDE_DIR})
-include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
-include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
-
 get_filename_component(PAPI_LIBDIR ${PAPI_LIBRARY} DIRECTORY)
-get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
-get_filename_component(LIKWID_LIBDIR ${LIKWID_LIBRARY} DIRECTORY)
-get_filename_component(PTHREAD_LIBDIR ${PTHREAD_LIBRARY} DIRECTORY)
-
 link_directories(${PAPI_LIBDIR})
+
+find_package(Pthread REQUIRED)
+add_library(pthread UNKNOWN IMPORTED)
+set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
+include_directories(BEFORE ${PQXX_INCLUDE_DIR})
+get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
 link_directories(${PQXX_LIBDIR})
+
+find_package(Likwid REQUIRED)
+add_library(likwid UNKNOWN IMPORTED)
+set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
+include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
+get_filename_component(LIKWID_LIBDIR ${LIKWID_LIBRARY} DIRECTORY)
 link_directories(${LIKWID_LIBDIR})
+
+find_package(Pqxx REQUIRED)
+add_library(pqxx UNKNOWN IMPORTED)
+set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
+include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
+get_filename_component(PTHREAD_LIBDIR ${PTHREAD_LIBRARY} DIRECTORY)
 link_directories(${PTHREAD_LIBDIR})
 
 find_package(Boost 1.54.0 REQUIRED COMPONENTS system thread)
