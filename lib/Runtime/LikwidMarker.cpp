@@ -96,7 +96,7 @@ void LikwidMarker::releaseMemory() {}
 void LikwidMarker::print(llvm::raw_ostream &OS, const llvm::Module *) const {}
 
 bool LikwidMarker::runOnModule(llvm::Module &M) {
-  LLVMContext &Ctx = getGlobalContext();
+  LLVMContext &Ctx = M.getContext();
   Function *OmpStartFn = M.getFunction("GOMP_loop_runtime_next");
   Function *ThreadInit = static_cast<Function *>(M.getOrInsertFunction(
       "likwid_markerThreadInit", Type::getVoidTy(Ctx), nullptr));
@@ -180,7 +180,7 @@ void TraceMarker::releaseMemory() {}
 void TraceMarker::print(llvm::raw_ostream &OS, const llvm::Module *) const {}
 
 bool TraceMarker::runOnModule(llvm::Module &M) {
-  LLVMContext &Ctx = getGlobalContext();
+  LLVMContext &Ctx = M.getContext();
   Function *OmpStartFn = M.getFunction("GOMP_loop_runtime_next");
   Function *Start = static_cast<Function *>(M.getOrInsertFunction(
       "polliTracingScopStart", Type::getVoidTy(Ctx), Type::getInt64Ty(Ctx),

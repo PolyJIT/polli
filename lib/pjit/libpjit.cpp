@@ -63,9 +63,30 @@ using namespace llvm;
 using namespace polli;
 
 namespace {
+using UniqueMod = std::unique_ptr<Module>;
+using UniqueCtx = std::unique_ptr<LLVMContext>;
+
 using fmt::format;
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
+
+class ModManager {
+public:
+  using ModuleIndexT = DenseMap<const char *, UniqueMod>;
+  using ContextIndexT = SmallVector<UniqueCtx, 8>;
+private:
+  ModuleIndexT ModuleIndex;
+  ContextIndexT CtxIndex;
+
+public:
+  ModuleIndexT &modules() { return ModuleIndex; }
+  ContextIndexT &contexts() { return CtxIndex; }
+
+  ~ModManager() {
+    ModuleIndex.clear();
+    CtxIndex.clear();
+  }
+};
 
 /**
  * @brief Read the LLVM-IR module from the given prototype string.
@@ -74,27 +95,30 @@ static StackTracePtr StackTrace;
  * @return llvm::Module& The LLVM-IR module we just read.
  */
 static Module &getModule(const char *prototype, bool &cache_hit) {
-  using UniqueMod = std::unique_ptr<Module>;
-  static DenseMap<const char *, UniqueMod> ModuleIndex;
+  static ModManager MM;
   static mutex _m;
+  ModManager::ModuleIndexT &ModuleIndex = MM.modules();
+  ModManager::ContextIndexT &ContextIndex = MM.contexts();
   std::lock_guard<std::mutex> L(_m);
 
   cache_hit = true;
-  if (!ModuleIndex.count(prototype)) {
-    LLVMContext &Ctx = llvm::getGlobalContext();
+  if (!MM.modules().count(prototype)) {
+    UniqueCtx Ctx = UniqueCtx(new LLVMContext());
     MemoryBufferRef Buf(prototype, "polli.prototype.module");
     SMDiagnostic Err;
 
-    if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
+    if (UniqueMod Mod = parseIR(Buf, Err, *Ctx)) {
       DEBUG(Mod->dump());
       ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
+      ContextIndex.push_back(std::move(Ctx));
     } else {
       errs() << format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
                        Err.getLineNo(), Err.getColumnNo(),
                        Err.getMessage().str());
       errs() << format("{:s}\n", prototype);
     }
-    assert(ModuleIndex[prototype] && "Parsing the prototype module failed!");
+    assert(ModuleIndex[prototype] &&
+           "Parsing the prototype module failed!");
     cache_hit = false;
   }
 
@@ -401,8 +425,9 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
   return std::make_pair(CacheKey(Request.IR, Values.hash()), cache_hit);
 }
 
-static void GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request, CacheKey K,
-                                       JitT Context) {
+static void
+GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
+                           CacheKey K, JitT Context) {
   if (Context->find(K) != Context->end())
     return;
 
