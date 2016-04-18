@@ -4,3 +4,6 @@
 [submodule "external/cppformat"]
 	path = external/cppformat
 	url = https://github.com/cppformat/cppformat
+[submodule "external/isl-cpp"]
+	path = external/isl
+	url = https://github.com/simbuerg/isl-cpp

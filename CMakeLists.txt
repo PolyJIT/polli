@@ -90,33 +90,26 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}/external/
 )
 
-install(DIRECTORY include/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE
+install(DIRECTORY include/ DESTINATION include
+  FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
   )
 
-install(DIRECTORY external/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "cppformat/*.h"
-  PATTERN ".svn" EXCLUDE
+install(DIRECTORY external/cppformat/ DESTINATION include/cppformat
+  FILES_MATCHING PATTERN "*.h"
   )
 
-install(DIRECTORY ${POLLI_BINARY_DIR}/include/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "*.h"
+install(DIRECTORY external/isl DESTINATION include/isl
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+  )
+
+install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
+  FILES_MATCHING PATTERN "*.h"
   PATTERN "CMakeFiles" EXCLUDE
   PATTERN ".svn" EXCLUDE
   )
 
-install(DIRECTORY ${POLLI_BINARY_DIR}/external/
-  DESTINATION include
-  FILES_MATCHING
-  PATTERN "cppformat/*.h"
-  PATTERN ".svn" EXCLUDE
+install(DIRECTORY ${POLLI_BINARY_DIR}/external/ DESTINATION include
+  FILES_MATCHING PATTERN "cppformat/*.h" PATTERN ".svn" EXCLUDE
   )
 
 add_definitions( -DFMT_HEADER_ONLY )
