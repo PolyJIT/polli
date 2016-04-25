@@ -17,6 +17,7 @@
 #include "polli/Utils.h"
 #include "polli/LikwidMarker.h"
 #include "polli/Options.h"
+#include "polli/BasePointers.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -58,21 +59,6 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(createBarrierNoopPass());
 }
 
-#ifdef DEBUG
-static PassManagerBuilder getDebugBuilder() {
-  PassManagerBuilder Builder;
-
-  Builder.VerifyInput = true;
-  Builder.VerifyOutput = true;
-  Builder.OptLevel = 0;
-  Builder.DisableUnrollLoops = true;
-  Builder.DisableTailCalls = true;
-  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
-                             registerPolly);
-
-  return Builder;
-}
-#else
 static PassManagerBuilder getBuilder() {
   PassManagerBuilder Builder;
 
@@ -84,14 +70,9 @@ static PassManagerBuilder getBuilder() {
 
   return Builder;
 }
-#endif
 
 Function &OptimizeForRuntime(Function &F) {
-#ifdef DEBUG
-  static PassManagerBuilder Builder = getDebugBuilder();
-#else
   static PassManagerBuilder Builder = getBuilder();
-#endif
   Module *M = F.getParent();
   opt::GenerateOutput = true;
   polly::opt::PollyParallel = true;
@@ -99,6 +80,7 @@ Function &OptimizeForRuntime(Function &F) {
   legacy::FunctionPassManager PM = legacy::FunctionPassManager(M);
 
   Builder.populateFunctionPassManager(PM);
+  PM.add(polli::createBasePointersPass());
   PM.doInitialization();
   PM.run(F);
   PM.doFinalization();
