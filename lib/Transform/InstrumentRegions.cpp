@@ -389,10 +389,10 @@ char PapiCScopProfilingInit::ID = 0;
 INITIALIZE_PASS_BEGIN(PapiCScopProfilingInit, "pprof-init",
                       "PAPI CScop Profiling (Initialization)", false, false);
 INITIALIZE_PASS_END(PapiCScopProfilingInit, "pprof-init",
-                      "PAPI CScop Profiling (Initialization)", false, false);
+                      "PAPI CScop Profiling (Initialization)", false, false)
 
 INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy", "PAPI CScop Profiling",
                       false, false);
 INITIALIZE_PASS_DEPENDENCY(JITScopDetection);
 INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy",
-                      "PAPI CScop Profiling", false, false);
+                      "PAPI CScop Profiling", false, false)

@@ -255,7 +255,7 @@ bool TraceMarker::runOnModule(llvm::Module &M) {
     }
   }
   return true;
-};
+}
 
 ModulePass *createLikwidMarkerPass() { return new LikwidMarker(); }
 ModulePass *createTraceMarkerPass() { return new TraceMarker(); }

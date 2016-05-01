@@ -27,9 +27,9 @@ set(LLVM_LINK_COMPONENTS
 )
 
 set(POLLI_LINK_LIBS
-  Polly
   PolyJIT_Runtime
   PolyJIT_Support
+  Polly
   likwid
   pthread
   pfm
