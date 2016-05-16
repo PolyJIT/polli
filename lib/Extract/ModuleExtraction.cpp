@@ -1,7 +1,7 @@
 #include "polli/FunctionCloner.h"
+#include "polli/ScopDetection.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Schema.h"
-#include "polli/ScopMapper.h"
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -51,7 +51,7 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
 }
 
 void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<ScopMapper>();
+  AU.addRequired<JITScopDetection>();
   AU.addRequired<CallGraphWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
 }
@@ -649,7 +649,7 @@ using InstrumentingFunctionCloner =
  * @brief Extract all SCoP regions in a function into a new Module.
  *
  * This extracts all SCoP regions that are marked for extraction by
- * the ScopMapper pass into a new Module that gets stored as a prototype in
+ * the ScopDetection pass into a new Module that gets stored as a prototype in
  * the original module. The original function is then replaced with a
  * new version that calls an indirection called 'pjit_main' with the
  * prototype function and original function's arguments as parameters.
@@ -669,11 +669,11 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     return false;
 
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  ScopMapper &SM = getAnalysis<ScopMapper>();
+  JITScopDetection &SD = getAnalysis<JITScopDetection>();
 
   // Extract all regions marked for extraction into an own function and mark it
   // as 'polyjit-jit-candidate'.
-  for (const Region *R : SM.regions()) {
+  for (const Region *R : SD) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
     if (Extractor.isEligible()) {
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
