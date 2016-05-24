@@ -162,17 +162,16 @@ configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/external/cppformat
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
-  ${CMAKE_CURRENT_BINARY_DIR}/external/
-  ${CMAKE_CURRENT_BINARY_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 
 install(DIRECTORY include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
   )
 
-install(DIRECTORY external/cppformat/ DESTINATION include/cppformat
+install(DIRECTORY external/cppformat DESTINATION include/cppformat
   FILES_MATCHING PATTERN "*.h"
   )
 
@@ -180,14 +179,14 @@ install(DIRECTORY external/isl DESTINATION include/isl
   FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
   )
 
+install(DIRECTORY external/catch/include DESTINATION include
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+  )
+
 install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h"
   PATTERN "CMakeFiles" EXCLUDE
   PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY ${POLLI_BINARY_DIR}/external/ DESTINATION include
-  FILES_MATCHING PATTERN "cppformat/*.h" PATTERN ".svn" EXCLUDE
   )
 
 add_definitions( -DFMT_HEADER_ONLY )

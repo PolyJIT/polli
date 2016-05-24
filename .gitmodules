@@ -7,3 +7,6 @@
 [submodule "external/isl-cpp"]
 	path = external/isl
 	url = https://github.com/simbuerg/isl-cpp
+[submodule "external/catch"]
+	path = external/catch
+	url = https://github.com/philsquared/Catch
