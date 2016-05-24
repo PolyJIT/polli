@@ -2,6 +2,13 @@ macro(add_polli_executable name)
   set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
   set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
   add_llvm_executable( ${name} ${ARGN} )
+
+  if(POLLI_LINK_LIBS)
+    foreach(lib ${POLLI_LINK_LIBS})
+      target_link_libraries(${name} LINK_PRIVATE ${lib})
+    endforeach(lib)
+  endif(POLLI_LINK_LIBS)
+
   set_target_properties(${name} PROPERTIES FOLDER "Polli executables")
   install (TARGETS ${name}
     RUNTIME DESTINATION bin

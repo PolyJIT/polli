@@ -10,6 +10,8 @@
 #define POLLI_RUNTIME_VALUES_H
 
 #include "llvm/Support/Casting.h"
+#include "llvm/IR/Argument.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Type.h"
 
 #include <boost/functional/hash.hpp>
@@ -17,10 +19,6 @@
 #include <vector>
 #include <iostream>
 #include <algorithm>
-
-namespace llvm {
-class Argument;
-}
 
 namespace {
 template <typename C, typename P> C filter(C const &container, P pred) {
@@ -76,6 +74,7 @@ public:
   iterator end() { return List->end(); }
   const_iterator begin() const { return List->begin(); }
   const_iterator end() const { return List->end(); }
+  size_t size() const { return List->size(); }
 
   size_t hash() const {
     RunValueListT Tmp = filter(*List, [](const RunValueT &V) {

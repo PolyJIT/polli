@@ -109,8 +109,6 @@ include("polli_macros")
 
 find_package(Isl REQUIRED)
 include_directories(${ISL_INCLUDE_DIR})
-get_filename_component(Isl_LIBDIR ${ISL_LIBRARY} DIRECTORY)
-link_directories(${Isl_LIBDIR})
 
 find_package(Papi REQUIRED)
 add_library(papi UNKNOWN IMPORTED)
@@ -165,6 +163,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/include
   ${CMAKE_CURRENT_SOURCE_DIR}/external
   ${CMAKE_CURRENT_SOURCE_DIR}/include/
+  ${CMAKE_CURRENT_BINARY_DIR}/include/
 )
 
 install(DIRECTORY include/ DESTINATION include
