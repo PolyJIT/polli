@@ -65,19 +65,12 @@ bool EmitEnv = false;
 bool havePapi() {
   return std::getenv("POLLI_ENABLE_PAPI") != nullptr;
 }
-
 /**
  * @brief Check, if we have likwid support at run-time.
  *
  * @return bool
  */
 bool haveLikwid() {
-  if (EmitEnv) {
-    for (char **current = environ; *current; current++) {
-      dbgs() << *current << "\n";
-    }
-  }
-
   return std::getenv("LIKWID_MODE") != nullptr;
 }
 } // namespace opt

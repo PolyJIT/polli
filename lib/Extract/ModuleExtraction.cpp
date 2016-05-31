@@ -1,8 +1,9 @@
 #include "polli/FunctionCloner.h"
+#include "polli/ScopDetection.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Schema.h"
-#include "polli/ScopMapper.h"
 
+#include "llvm/IR/Attributes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
@@ -28,6 +29,8 @@
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/IPO.h"
 
+#include <algorithm>
+
 using namespace llvm;
 #define DEBUG_TYPE "polyjit"
 
@@ -51,9 +54,10 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
 }
 
 void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<ScopMapper>();
+  AU.addRequired<JITScopDetection>();
   AU.addRequired<CallGraphWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
+  AU.addRequired<ScalarEvolutionWrapperPass>();
 }
 
 void ModuleExtractor::releaseMemory() { InstrumentedFunctions.clear(); }
@@ -642,14 +646,104 @@ static void clearFunctionLocalMetadata(Function *F) {
   }
 }
 
+struct SCEVParamValueExtractor
+    : public SCEVVisitor<SCEVParamValueExtractor, const SCEV *> {
+  SetVector<Value *> ParamValues;
+  ScalarEvolution &SE;
+
+  SCEVParamValueExtractor(ScalarEvolution &SE) : SE(SE) {}
+
+  static SetVector<Value *> extract(const SCEV *P, ScalarEvolution &SE) {
+    SCEVParamValueExtractor SPVE(SE);
+    SPVE.visit(P);
+    return SPVE.ParamValues;
+  }
+
+  const SCEV *visitConstant(const SCEVConstant *S) {
+    return S;
+  }
+
+  const SCEV *visitTruncateExpr(const SCEVTruncateExpr *S) {
+    visit(S->getOperand());
+    return S;
+  }
+
+  const SCEV *visitZeroExtendExpr(const SCEVZeroExtendExpr *S) {
+    visit(S->getOperand());
+    return S;
+  }
+
+  const SCEV *visitSignExtendExpr(const SCEVSignExtendExpr *S) {
+    visit(S->getOperand());
+    return S;
+  }
+
+  const SCEV *visitAddExpr(const SCEVAddExpr *S) {
+    for (auto *Op : S->operands()) {
+      visit(Op);
+    }
+    return S;
+  }
+
+  const SCEV *visitMulExpr(const SCEVMulExpr *S) {
+    for (auto *Op : S->operands()) {
+      visit(Op);
+    }
+    return S;
+  }
+
+  const SCEV *visitSMaxExpr(const SCEVSMaxExpr *S) {
+    for (auto *Op : S->operands()) {
+      visit(Op);
+    }
+    return S;
+  }
+
+  const SCEV *visitUMaxExpr(const SCEVUMaxExpr *S) {
+    for (auto *Op : S->operands()) {
+      visit(Op);
+    }
+    return S;
+  }
+
+  const SCEV *visitUDivExpr(const SCEVUDivExpr *S) {
+    visit(S->getLHS());
+    visit(S->getRHS());
+    return S;
+  }
+
+  const SCEV *visitAddRecExpr(const SCEVAddRecExpr *S) {
+    visit(S->getStart());
+    visit(S->getStepRecurrence(SE));
+    return S;
+  }
+
+  const SCEV *visitUnknown(const SCEVUnknown *S) {
+    ParamValues.insert(S->getValue());
+    return S;
+  }
+};
+
 using InstrumentingFunctionCloner =
     FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
+
+static CallSite findExtractedCallSite(Function &F, Function &SrcF) {
+  for (auto &Inst : instructions(&SrcF)) {
+    CallSite CS(&Inst);
+    if (CS.isCall() || CS.isInvoke()) {
+      Function *CalledF = CS.getCalledFunction();
+      if (CalledF == &F)
+        return CS;
+    }
+  }
+  return CallSite();
+}
 
 /**
  * @brief Extract all SCoP regions in a function into a new Module.
  *
  * This extracts all SCoP regions that are marked for extraction by
- * the ScopMapper pass into a new Module that gets stored as a prototype in
+ * the ScopDetection pass into a new Module that gets stored as a prototype in
  * the original module. The original function is then replaced with a
  * new version that calls an indirection called 'pjit_main' with the
  * prototype function and original function's arguments as parameters.
@@ -669,14 +763,42 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     return false;
 
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  ScopMapper &SM = getAnalysis<ScopMapper>();
+  JITScopDetection &SD = getAnalysis<JITScopDetection>();
+  ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
 
   // Extract all regions marked for extraction into an own function and mark it
   // as 'polyjit-jit-candidate'.
-  for (const Region *R : SM.regions()) {
+  std::set<Value *> TrackedParams;
+  LLVMContext &Ctx = F.getContext();
+  Attribute ParamAttr = llvm::Attribute::get(Ctx, "polli.specialize");
+  AttrBuilder Builder(ParamAttr);
+
+  for (const Region *R : SD) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
     if (Extractor.isEligible()) {
+      JITScopDetection::ParamVec Params = SD.RequiredParams[R];
+      SetVector<Value *> In, Out;
+      Extractor.findInputsOutputs(In, Out);
+      for (auto *P : Params) {
+        SetVector<Value *> Values = SCEVParamValueExtractor::extract(P, SE);
+        std::set_intersection(
+            In.begin(), In.end(), Values.begin(), Values.end(),
+            std::inserter(TrackedParams, TrackedParams.end()));
+      }
+
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
+        CallSite FunctionCall = findExtractedCallSite(*ExtractedF, F);
+        if (FunctionCall.isCall() || FunctionCall.isInvoke()) {
+          Instruction *I = FunctionCall.getInstruction();
+          auto Arg = ExtractedF->arg_begin();
+          for (Use &U : I->operands()) {
+            Value *Operand = U.get();
+            if (TrackedParams.count(Operand))
+              Arg->addAttr(AttributeSet::get(Ctx, 0, Builder));
+            Arg++;
+          }
+        }
+
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");

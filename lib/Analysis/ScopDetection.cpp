@@ -80,10 +80,12 @@ static cl::opt<bool> AllowDifferentTypes(
     cl::desc("Allow different element types for array accesses"), cl::Hidden,
     cl::init(true), cl::ZeroOrMore, cl::cat(PollyCategory));
 
-static cl::opt<bool> AllowUnsigned("polli-allow-unsigned",
-                                   cl::desc("Allow unsigned expressions"),
-                                   cl::Hidden, cl::init(false), cl::ZeroOrMore,
-                                   cl::cat(PollyCategory));
+static cl::opt<bool>
+    AllowModrefCall("polli-allow-modref-calls",
+                    cl::desc("Allow functions with known modref behavior"),
+                    cl::Hidden, cl::init(false), cl::ZeroOrMore,
+                    cl::cat(PollyCategory));
+
 
 static cl::opt<bool, true>
     TrackFailures("polli-detect-track-failures",
@@ -246,7 +248,7 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
                                 Value *BaseAddress) const {
 
   polly::InvariantLoadsSetTy AccessILS;
-  if (!polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE, BaseAddress,
+  if (!polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE,
                            &AccessILS)) {
     if (!isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, BaseAddress,
                          &AccessILS))
@@ -306,26 +308,11 @@ bool JITScopDetection::isValidBranch(BasicBlock &BB, BranchInst *BI,
   }
 
   ICmpInst *ICmp = cast<ICmpInst>(Condition);
-  // Unsigned comparisons are not allowed. They trigger overflow problems
-  // in the code generation.
-  //
-  // TODO: This is not sufficient and just hides bugs. However it does pretty
-  //       well.
-  if (ICmp->isUnsigned() && !AllowUnsigned)
-    return invalid<polly::ReportUnsignedCond>(Context, /*Assert=*/true, BI,
-                                              &BB);
 
   // Are both operands of the ICmp affine?
   if (isa<UndefValue>(ICmp->getOperand(0)) ||
       isa<UndefValue>(ICmp->getOperand(1)))
-    return invalid<polly::ReportUndefOperand>(Context, /*Assert=*/true, &BB,
-                                              ICmp);
-
-  // TODO: FIXME: IslExprBuilder is not capable of producing valid code
-  //              for arbitrary pointer expressions at the moment. Until
-  //              this is fixed we disallow pointer expressions completely.
-  if (ICmp->getOperand(0)->getType()->isPointerTy())
-    return false;
+    return invalid<polly::ReportUndefOperand>(Context, /*Assert=*/true, &BB, ICmp);
 
   Loop *L = LI->getLoopFor(ICmp->getParent());
   const SCEV *LHS = SE->getSCEVAtScope(ICmp->getOperand(0), L);
@@ -400,39 +387,41 @@ bool JITScopDetection::isValidCallInst(CallInst &CI,
   if (CalledFunction == 0)
     return false;
 
-  switch (AA->getModRefBehavior(CalledFunction)) {
-  case llvm::FMRB_UnknownModRefBehavior:
-    return false;
-  case llvm::FMRB_DoesNotAccessMemory:
-  case llvm::FMRB_OnlyReadsMemory:
-    // Implicitly disable delinearization since we have an unknown
-    // accesses with an unknown access function.
-    Context.HasUnknownAccess = true;
-    Context.AST.add(&CI);
-    return true;
-  case llvm::FMRB_OnlyReadsArgumentPointees:
-  case llvm::FMRB_OnlyAccessesArgumentPointees:
-    for (const auto &Arg : CI.arg_operands()) {
-      if (!Arg->getType()->isPointerTy())
-        continue;
-
-      // Bail if a pointer argument has a base address not known to
-      // ScalarEvolution. Note that a zero pointer is acceptable.
-      auto *ArgSCEV = SE->getSCEVAtScope(Arg, LI->getLoopFor(CI.getParent()));
-      if (ArgSCEV->isZero())
-        continue;
-
-      auto *BP = dyn_cast<SCEVUnknown>(SE->getPointerBase(ArgSCEV));
-      if (!BP)
-        return false;
-
+  if (AllowModrefCall) {
+    switch (AA->getModRefBehavior(CalledFunction)) {
+    case llvm::FMRB_UnknownModRefBehavior:
+      return false;
+    case llvm::FMRB_DoesNotAccessMemory:
+    case llvm::FMRB_OnlyReadsMemory:
       // Implicitly disable delinearization since we have an unknown
       // accesses with an unknown access function.
       Context.HasUnknownAccess = true;
-    }
+      Context.AST.add(&CI);
+      return true;
+    case llvm::FMRB_OnlyReadsArgumentPointees:
+    case llvm::FMRB_OnlyAccessesArgumentPointees:
+      for (const auto &Arg : CI.arg_operands()) {
+        if (!Arg->getType()->isPointerTy())
+          continue;
 
-    Context.AST.add(&CI);
-    return true;
+        // Bail if a pointer argument has a base address not known to
+        // ScalarEvolution. Note that a zero pointer is acceptable.
+        auto *ArgSCEV = SE->getSCEVAtScope(Arg, LI->getLoopFor(CI.getParent()));
+        if (ArgSCEV->isZero())
+          continue;
+
+        auto *BP = dyn_cast<SCEVUnknown>(SE->getPointerBase(ArgSCEV));
+        if (!BP)
+          return false;
+
+        // Implicitly disable delinearization since we have an unknown
+        // accesses with an unknown access function.
+        Context.HasUnknownAccess = true;
+      }
+
+      Context.AST.add(&CI);
+      return true;
+    }
   }
 
   return false;
@@ -455,17 +444,21 @@ bool JITScopDetection::isValidIntrinsicInst(IntrinsicInst &II,
   case llvm::Intrinsic::memmove:
   case llvm::Intrinsic::memcpy:
     AF = SE->getSCEVAtScope(cast<MemTransferInst>(II).getSource(), L);
-    BP = dyn_cast<SCEVUnknown>(SE->getPointerBase(AF));
-    // Bail if the source pointer is not valid.
-    if (!isValidAccess(&II, AF, BP, Context))
-      return false;
+    if (!AF->isZero()) {
+      BP = dyn_cast<SCEVUnknown>(SE->getPointerBase(AF));
+      // Bail if the source pointer is not valid.
+      if (!isValidAccess(&II, AF, BP, Context))
+        return false;
+    }
   // Fall through
   case llvm::Intrinsic::memset:
     AF = SE->getSCEVAtScope(cast<MemIntrinsic>(II).getDest(), L);
-    BP = dyn_cast<SCEVUnknown>(SE->getPointerBase(AF));
-    // Bail if the destination pointer is not valid.
-    if (!isValidAccess(&II, AF, BP, Context))
-      return false;
+    if (!AF->isZero()) {
+      BP = dyn_cast<SCEVUnknown>(SE->getPointerBase(AF));
+      // Bail if the destination pointer is not valid.
+      if (!isValidAccess(&II, AF, BP, Context))
+        return false;
+    }
 
     // Bail if the length is not affine.
     if (!isAffine(SE->getSCEVAtScope(cast<MemIntrinsic>(II).getLength(), L), L,
@@ -770,6 +763,9 @@ bool JITScopDetection::isValidInstruction(Instruction &Inst,
       return false;
   }
 
+  if (isa<LandingPadInst>(&Inst) || isa<ResumeInst>(&Inst))
+    return false;
+
   // We only check the call instruction but not invoke instruction.
   if (CallInst *CI = dyn_cast<CallInst>(&Inst)) {
     if (isValidCallInst(*CI, Context))
@@ -805,8 +801,13 @@ bool JITScopDetection::canUseISLTripCount(Loop *L,
   // Ensure the loop has valid exiting blocks as well as latches, otherwise we
   // need to overapproximate it as a boxed loop.
   SmallVector<BasicBlock *, 4> LoopControlBlocks;
-  L->getLoopLatches(LoopControlBlocks);
   L->getExitingBlocks(LoopControlBlocks);
+  // Loops without exiting blocks cannot be handled by the schedule generation
+  // as it depends on a region covering that is not given.
+  if (LoopControlBlocks.empty())
+    return false;
+
+  L->getLoopLatches(LoopControlBlocks);
   for (BasicBlock *ControlBB : LoopControlBlocks) {
     if (!isValidCFG(*ControlBB, true, false, Context))
       return false;
@@ -1033,7 +1034,8 @@ bool JITScopDetection::allBlocksValid(DetectionContext &Context) const {
 
   for (const BasicBlock *BB : CurRegion.blocks()) {
     Loop *L = LI->getLoopFor(BB);
-    if (L && L->getHeader() == BB && (!isValidLoop(L, Context) && !KeepGoing))
+    if (L && L->getHeader() == BB && CurRegion.contains(L) &&
+        (!isValidLoop(L, Context) && !KeepGoing))
       return false;
   }
 

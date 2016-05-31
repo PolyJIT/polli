@@ -1,4 +1,4 @@
-//===-- FunctionCloner.h - Class definition for the ScopMapper --*- C++ -*-===//
+//===-- FunctionCloner.h - Class definition for the cloner     --*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //

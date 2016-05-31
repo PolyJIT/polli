@@ -49,13 +49,17 @@
 #include "llvm/Support/PrettyStackTrace.h"
 
 #include "polli/BlockingMap.h"
+#include "polli/Caching.h"
 #include "polli/CodeGen.h"
 #include "polli/Options.h"
 #include "polli/RuntimeValues.h"
+#include "polli/RunValues.h"
 #include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
+
+#include "catch.hpp"
 
 #define DEBUG_TYPE "polyjit"
 
@@ -224,93 +228,6 @@ static inline Function &getPrototype(const char *function, bool &cache_hit) {
   Function &F = getFunction(M);
   POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   return F;
-}
-
-#ifndef NDEBUG
-static void printArgs(const Function &F, size_t argc, void *params) {
-  std::string buf;
-  llvm::raw_string_ostream s(buf);
-  //dbgs() << fmt::format("{:s} :: {:s}\n", F.getName().str(), s.str());
-
-  size_t i = 0;
-  for (auto &Arg : F.args()) {
-    if (i < argc) {
-      RunValue<uint64_t *> V{reinterpret_cast<uint64_t **>(params)[i], &Arg};
-      if (polli::canSpecialize(V)) {
-        dbgs() << fmt::format("[{:d}] -> {} ", i, *V.value);
-      }
-      i++;
-    }
-  }
-  dbgs() << "\n";
-}
-
-static void printRunValues(const RunValueList &Values) {
-  for (auto &RV : Values) {
-    dbgs() << fmt::format(
-        "{:d} matched against {}\n", *RV.value,
-        reinterpret_cast<void *>(const_cast<Argument *>(RV.Arg)));
-  }
-}
-#endif
-
-struct SpecializerRequest {
-  const char *IR;
-  unsigned ParamC;
-  void *Params;
-  Function *F{nullptr};
-
-  SpecializerRequest(const char *IR, unsigned ParamC, char **params)
-      : IR(IR), ParamC(ParamC) {
-        size_t n = ParamC * sizeof(void *);
-        Params = std::malloc(n);
-        std::memcpy(Params, params, n);
-      }
-
-  ~SpecializerRequest() {
-    std::free(Params);
-  }
-};
-
-using JitRequestT = std::shared_ptr<SpecializerRequest>;
-static RunValueList runValues(const SpecializerRequest &Request) {
-  POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
-                             "polyjit.params.select");
-  int i = 0;
-  RunValueList RunValues;
-  assert(Request.F && "Request malformed! Need an llvm function.");
-
-  DEBUG(printArgs(*Request.F, Request.ParamC, Request.Params));
-  for (const Argument &Arg : Request.F->args()) {
-    RunValues.add({reinterpret_cast<uint64_t **>(Request.Params)[i], &Arg});
-    i++;
-  }
-  POLLI_TRACING_REGION_STOP(PJIT_REGION_SELECT_PARAMS, "polyjit.params.select");
-  return RunValues;
-}
-
-struct CacheKey {
-  const char *IR;
-  size_t ValueHash;
-
-  CacheKey(const char *IR, size_t ValueHash) : IR(IR), ValueHash(ValueHash) {}
-
-  bool operator==(const CacheKey &O) const {
-    return IR == O.IR && ValueHash == O.ValueHash;
-  }
-
-  bool operator<(const CacheKey &O) const {
-    return IR < O.IR || (IR == O.IR && ValueHash < O.ValueHash);
-  }
-};
-
-namespace std {
-template <> struct hash<CacheKey> {
-  std::size_t operator()(const CacheKey &K) const {
-    size_t h = (size_t)K.IR ^ K.ValueHash;
-    return h;
-  }
-};
 }
 
 namespace polli {

@@ -27,9 +27,9 @@ set(LLVM_LINK_COMPONENTS
 )
 
 set(POLLI_LINK_LIBS
-  Polly
   PolyJIT_Runtime
   PolyJIT_Support
+  Polly
   likwid
   pthread
   pfm
@@ -43,15 +43,15 @@ add_polli_library(pjit STATIC
   libpjit.cpp
   BlockingMap.cpp
   CodeGen.cpp
+  RunValues.cpp
 )
 
 add_polli_library(pjit_shared SHARED
   libpjit.cpp
   BlockingMap.cpp
   CodeGen.cpp
+  RunValues.cpp
 )
 
 add_dependencies(pjit PolyJIT_Runtime)
 set_target_properties(pjit_shared PROPERTIES OUTPUT_NAME pjit)
-
-

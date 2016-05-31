@@ -1,3 +1,4 @@
+add_subdirectory(Catch)
 add_subdirectory(Unit)
 
 set(POLLI_TEST_DIRECTORIES

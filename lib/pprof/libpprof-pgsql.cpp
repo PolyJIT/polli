@@ -276,7 +276,7 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   }
 
   w.commit();
-};
+}
 
 } // namespace pgsql
 } // namespace pprof

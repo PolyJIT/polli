@@ -19,7 +19,6 @@
 #include "polli/PapiProfiling.h"
 #include "polli/RegisterCompilationPasses.h"
 #include "polli/ScopDetection.h"
-#include "polli/ScopMapper.h"
 
 #include "polly/Canonicalization.h"
 #include "polly/RegisterPasses.h"
@@ -118,7 +117,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   }
 
   if (!opt::DisableRecompile) {
-    PM.add(new ScopMapper());
     PM.add(new ModuleExtractor());
     if (opt::AnalyzeIR)
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
