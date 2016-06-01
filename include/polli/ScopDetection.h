@@ -269,6 +269,17 @@ private:
   bool hasSufficientCompute(DetectionContext &Context,
                             int NumAffineLoops) const;
 
+  /// @brief Check if the unique affine loop might be amenable to distribution.
+  ///
+  /// This function checks if the number of non-trivial blocks in the unique
+  /// affine loop in Context.CurRegion is at least two. Thus, the loop might
+  /// be amenable to distribution.
+  ///
+  /// @param Context  The context of SCoP detection.
+  ///
+  /// @return True only if the affine loop might be distributable.
+  bool hasPossiblyDistributableLoop(DetectionContext &Context) const;
+
   /// @brief Check if a region is profitable to optimize.
   ///
   /// Regions that are unlikely to expose interesting optimization opportunities

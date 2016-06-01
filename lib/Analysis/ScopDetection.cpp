@@ -1072,6 +1072,26 @@ bool JITScopDetection::hasSufficientCompute(DetectionContext &Context,
   return InstCount >= ProfitabilityMinPerLoopInstructions;
 }
 
+bool JITScopDetection::hasPossiblyDistributableLoop(
+    DetectionContext &Context) const {
+  for (auto *BB : Context.CurRegion.blocks()) {
+    auto *L = LI->getLoopFor(BB);
+    if (!Context.CurRegion.contains(L))
+      continue;
+    if (Context.BoxedLoopsSet.count(L))
+      continue;
+    unsigned StmtsWithStoresInLoops = 0;
+    for (auto *LBB : L->blocks()) {
+      bool MemStore = false;
+      for (auto &I : *LBB)
+        MemStore |= isa<StoreInst>(&I);
+      StmtsWithStoresInLoops += MemStore;
+    }
+    return (StmtsWithStoresInLoops > 1);
+  }
+  return false;
+}
+
 bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
