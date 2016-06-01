@@ -1,3 +1,6 @@
+project(polli)
+cmake_minimum_required(VERSION 3.2)
+
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -5,104 +8,97 @@ set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 # Add path for polli custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 
+set(LLVM_INSTALL_ROOT "" CACHE PATH "Root of LLVM install.")
+if( NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm )
+  message(FATAL_ERROR "LLVM_INSTALL_ROOT (${LLVM_INSTALL_ROOT}) is not a valid LLVM installation.")
+endif(NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm)
 
-if (NOT DEFINED LLVM_MAIN_SRC_DIR)
-  project(polli)
-  cmake_minimum_required(VERSION 2.8)
+# Add LLVM's cmake modules
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
+  "${LLVM_INSTALL_ROOT}/lib/cmake/llvm"
+  "${LLVM_INSTALL_ROOT}/share/llvm/cmake"
+)
 
-  set(LLVM_INSTALL_ROOT "" CACHE PATH "Root of LLVM install.")
-  if( NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm )
-    message(FATAL_ERROR "LLVM_INSTALL_ROOT (${LLVM_INSTALL_ROOT}) is not a valid LLVM installation.")
-  endif(NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm)
+## Find LLVM
+find_package(LLVM REQUIRED PATHS
+  "${LLVM_INSTALL_ROOT}/lib/cmake/llvm"
+  "${LLVM_INSTALL_ROOT}/share/llvm/cmake"
+  NO_DEFAULT_PATH
+)
 
-  # Add LLVM's cmake modules
-  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
-    "${LLVM_INSTALL_ROOT}/lib/cmake/llvm"
-    "${LLVM_INSTALL_ROOT}/share/llvm/cmake"
-  )
+include(AddLLVM)
 
-  ## Find LLVM
-  find_package(LLVM REQUIRED PATHS
-    "${LLVM_INSTALL_ROOT}/lib/cmake/llvm"
-    "${LLVM_INSTALL_ROOT}/share/llvm/cmake"
-    NO_DEFAULT_PATH
-  )
+include_directories(${LLVM_INCLUDE_DIRS} )
+link_directories( ${LLVM_LIBRARY_DIRS} )
+add_definitions( ${LLVM_DEFINITIONS} )
 
-  include(AddLLVM)
+## Find Polly
+find_package(Polly REQUIRED)
+include_directories (${POLLY_INCLUDE_DIR} )
+link_directories( ${POLLY_LINK_DIR} )
+add_definitions( ${POLLY_DEFINITIONS} )
 
-  include_directories( ${LLVM_INCLUDE_DIRS} )
-  link_directories( ${LLVM_LIBRARY_DIRS} )
-  add_definitions( ${LLVM_DEFINITIONS} )
+# Get the system librarys that will link into LLVM.
+function(get_system_libs return_var)
+  # Returns in `return_var' a list of system libraries used by LLVM.
+  if( NOT MSVC )
+    if( MINGW )
+      set(system_libs ${system_libs} imagehlp psapi)
+    elseif( CMAKE_HOST_UNIX )
+      if( HAVE_LIBDL )
+        set(system_libs ${system_libs} ${CMAKE_DL_LIBS})
+      endif()
+      if( LLVM_ENABLE_THREADS AND HAVE_LIBPTHREAD )
+        set(system_libs ${system_libs} pthread)
+      endif()
+    endif( MINGW )
+  endif( NOT MSVC )
+  set(${return_var} ${system_libs} PARENT_SCOPE)
+endfunction(get_system_libs)
 
-  ## Find Polly
-  find_package(Polly REQUIRED)
-  include_directories ( BEFORE ${POLLY_INCLUDE_DIR} )
-  link_directories( ${POLLY_LINK_DIR} )
-  add_definitions( ${POLLY_DEFINITIONS} )
+# Now set the header paths.
+execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --includedir
+                OUTPUT_VARIABLE LLVM_INCLUDE_DIR
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+include_directories( ${LLVM_INCLUDE_DIR} )
 
-  # Get the system librarys that will link into LLVM.
-  function(get_system_libs return_var)
-    # Returns in `return_var' a list of system libraries used by LLVM.
-    if( NOT MSVC )
-      if( MINGW )
-        set(system_libs ${system_libs} imagehlp psapi)
-      elseif( CMAKE_HOST_UNIX )
-        if( HAVE_LIBDL )
-          set(system_libs ${system_libs} ${CMAKE_DL_LIBS})
-        endif()
-        if( LLVM_ENABLE_THREADS AND HAVE_LIBPTHREAD )
-          set(system_libs ${system_libs} pthread)
-        endif()
-      endif( MINGW )
-    endif( NOT MSVC )
-    set(${return_var} ${system_libs} PARENT_SCOPE)
-  endfunction(get_system_libs)
+# Get the TARGET_TRIPLE
+execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --host-target
+                OUTPUT_VARIABLE TARGET_TRIPLE
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  # Now set the header paths.
-  execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --includedir
-                  OUTPUT_VARIABLE LLVM_INCLUDE_DIR
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  include_directories( ${LLVM_INCLUDE_DIR} )
+# And then set the cxx flags.
+execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --cxxflags
+                OUTPUT_VARIABLE LLVM_CXX_FLAGS
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${LLVM_CXX_FLAGS})
 
-  # Get the TARGET_TRIPLE
-  execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --host-target
-                  OUTPUT_VARIABLE TARGET_TRIPLE
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-  # And then set the cxx flags.
-  execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --cxxflags
-                  OUTPUT_VARIABLE LLVM_CXX_FLAGS
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${LLVM_CXX_FLAGS})
-
-  # Check LLVM_ENABLE_ASSERTIONS
-  execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --assertion-mode
-                  OUTPUT_VARIABLE LLVM_ENABLE_ASSERTIONS
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  # Copied from LLVM's HandleLLVMOptions.cmake
-  if( LLVM_ENABLE_ASSERTIONS )
-    # MSVC doesn't like _DEBUG on release builds. See PR 4379.
-    if( NOT MSVC )
-      add_definitions( -D_DEBUG )
-    endif()
-    # On non-Debug builds cmake automatically defines NDEBUG, so we
-    # explicitly undefine it:
-    if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
-      add_definitions( -UNDEBUG )
-      # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
-      foreach (flags_var_to_scrub
-          CMAKE_CXX_FLAGS_RELEASE
-          CMAKE_CXX_FLAGS_RELWITHDEBINFO
-          CMAKE_CXX_FLAGS_MINSIZEREL
-          CMAKE_C_FLAGS_RELEASE
-          CMAKE_C_FLAGS_RELWITHDEBINFO
-          CMAKE_C_FLAGS_MINSIZEREL)
-        string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
-          "${flags_var_to_scrub}" "${${flags_var_to_scrub}}")
-      endforeach()
-    endif()
+# Check LLVM_ENABLE_ASSERTIONS
+execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --assertion-mode
+                OUTPUT_VARIABLE LLVM_ENABLE_ASSERTIONS
+                OUTPUT_STRIP_TRAILING_WHITESPACE)
+# Copied from LLVM's HandleLLVMOptions.cmake
+if( LLVM_ENABLE_ASSERTIONS )
+  # MSVC doesn't like _DEBUG on release builds. See PR 4379.
+  if( NOT MSVC )
+    add_definitions( -D_DEBUG )
   endif()
-
+  # On non-Debug builds cmake automatically defines NDEBUG, so we
+  # explicitly undefine it:
+  if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
+    add_definitions( -UNDEBUG )
+    # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
+    foreach (flags_var_to_scrub
+        CMAKE_CXX_FLAGS_RELEASE
+        CMAKE_CXX_FLAGS_RELWITHDEBINFO
+        CMAKE_CXX_FLAGS_MINSIZEREL
+        CMAKE_C_FLAGS_RELEASE
+        CMAKE_C_FLAGS_RELWITHDEBINFO
+        CMAKE_C_FLAGS_MINSIZEREL)
+      string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
+        "${flags_var_to_scrub}" "${${flags_var_to_scrub}}")
+    endforeach()
+  endif()
 endif()
 
 include("polli_macros")
@@ -147,24 +143,10 @@ option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
 option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
 
 string(REPLACE "-fno-exceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-if (CMAKE_COMPILER_IS_GNUCXX)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-else ()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-endif ()
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
-
-include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/cppformat
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/external
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/
-  ${CMAKE_CURRENT_BINARY_DIR}/include/
-)
 
 install(DIRECTORY include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
@@ -187,6 +169,14 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
   PATTERN "CMakeFiles" EXCLUDE
   PATTERN ".svn" EXCLUDE
   )
+
+include_directories(AFTER
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/cppformat
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/external
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/
+  ${CMAKE_CURRENT_BINARY_DIR}/include/
+)
 
 add_definitions( -DFMT_HEADER_ONLY )
 add_definitions( -D_GNU_SOURCE )
