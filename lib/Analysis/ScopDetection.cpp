@@ -1294,40 +1294,12 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
   return false;
 }
 
-bool JITScopDetection::isNonAffineSubRegion(const Region *SubR,
-                                            const Region *ScopR) const {
-  const DetectionContext *DC = getDetectionContext(ScopR);
-  assert(DC && "ScopR is no valid region!");
-  return DC->NonAffineSubRegionSet.count(SubR);
-}
-
 const JITScopDetection::DetectionContext *
 JITScopDetection::getDetectionContext(const Region *R) const {
   auto DCMIt = DetectionContextMap.find(polly::getBBPairForRegion(R));
   if (DCMIt == DetectionContextMap.end())
     return nullptr;
   return &DCMIt->second;
-}
-
-const JITScopDetection::BoxedLoopsSetTy *
-JITScopDetection::getBoxedLoops(const Region *R) const {
-  const DetectionContext *DC = getDetectionContext(R);
-  assert(DC && "ScopR is no valid region!");
-  return &DC->BoxedLoopsSet;
-}
-
-const MapInsnToMemAcc *
-JITScopDetection::getInsnToMemAccMap(const Region *R) const {
-  const DetectionContext *DC = getDetectionContext(R);
-  assert(DC && "ScopR is no valid region!");
-  return &DC->InsnToMemAcc;
-}
-
-const polly::InvariantLoadsSetTy *
-JITScopDetection::getRequiredInvariantLoads(const Region *R) const {
-  const DetectionContext *DC = getDetectionContext(R);
-  assert(DC && "ScopR is no valid region!");
-  return &DC->RequiredILS;
 }
 
 const polly::RejectLog *JITScopDetection::lookupRejectionLog(const Region *R) const {

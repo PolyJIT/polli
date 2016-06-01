@@ -98,12 +98,6 @@ public:
   // Remember the valid run-time regions
   RegionSet ValidRuntimeRegions;
 
-  /// @brief Set of loops (used to remember loops in non-affine subregions).
-  using BoxedLoopsSetTy = SetVector<const Loop *>;
-
-  /// @brief Set to remember non-affine branches in regions.
-  using NonAffineSubRegionSetTy = RegionSet;
-
   ///
   // @name Track required params for each detected SCoP candidate.
   // @{
@@ -145,10 +139,10 @@ public:
     bool HasUnknownAccess;
 
     /// @brief The set of non-affine subregions in the region we analyze.
-    NonAffineSubRegionSetTy NonAffineSubRegionSet;
+    RegionSet NonAffineSubRegionSet;
 
     /// @brief The set of loops contained in non-affine regions.
-    BoxedLoopsSetTy BoxedLoopsSet;
+    polly::BoxedLoopsSetTy BoxedLoopsSet;
 
     /// @brief Loads that need to be invariant during execution.
     polly::InvariantLoadsSetTy RequiredILS;
@@ -492,13 +486,6 @@ public:
 
   /// @brief Return the detection context for @p R, nullptr if @p R was invalid.
   const DetectionContext *getDetectionContext(const Region *R) const;
-
-  /// @brief Return the set of loops in non-affine subregions for @p R.
-  const BoxedLoopsSetTy *getBoxedLoops(const Region *R) const;
-
-  /// @brief Get the instruction to memory access mapping of the current
-  ///        function for @p R.
-  const MapInsnToMemAcc *getInsnToMemAccMap(const Region *R) const;
 
   /// @brief Return the set of required invariant loads for @p R.
   const polly::InvariantLoadsSetTy *getRequiredInvariantLoads(const Region *R) const;
