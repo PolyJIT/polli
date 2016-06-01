@@ -478,7 +478,7 @@ public:
   bool isMaxRegionInScop(const Region &R, bool Verify = true) const;
 
   /// @brief Return the detection context for @p R, nullptr if @p R was invalid.
-  const DetectionContext *getDetectionContext(const Region *R) const;
+  DetectionContext *getDetectionContext(const Region *R) const;
 
   /// @brief Return the set of required invariant loads for @p R.
   const polly::InvariantLoadsSetTy *getRequiredInvariantLoads(const Region *R) const;

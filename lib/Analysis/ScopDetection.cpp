@@ -1301,7 +1301,7 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
   return false;
 }
 
-const JITScopDetection::DetectionContext *
+JITScopDetection::DetectionContext *
 JITScopDetection::getDetectionContext(const Region *R) const {
   auto DCMIt = DetectionContextMap.find(polly::getBBPairForRegion(R));
   if (DCMIt == DetectionContextMap.end())
