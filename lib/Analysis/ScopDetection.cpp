@@ -1152,9 +1152,6 @@ bool JITScopDetection::isValidRegion(DetectionContext &Context) const {
     return invalid<polly::ReportIrreducibleRegion>(Context, /*Assert=*/true,
                                                    &CurRegion, DbgLoc);
 
-  if (!isProfitableRegion(Context))
-    return false;
-
   DEBUG(dbgs() << "OK\n");
   return true;
 }
@@ -1271,6 +1268,19 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
     return false;
 
   findScops(*TopRegion);
+
+  // Prune non-profitable regions.
+  for (auto &DIt : DetectionContextMap) {
+    auto &DC = DIt.getSecond();
+    if (DC.Log.hasErrors())
+      continue;
+    if (!ValidRegions.count(&DC.CurRegion))
+      continue;
+    if (isProfitableRegion(DC))
+      continue;
+
+    ValidRegions.remove(&DC.CurRegion);
+  }
 
   // Only makes sense when we tracked errors.
   if (PollyTrackFailures)
