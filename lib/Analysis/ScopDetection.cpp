@@ -1181,6 +1181,13 @@ void JITScopDetection::emitMissedRemarks(const Function &F) {
   }
 }
 
+/// @brief Enum for coloring BBs in Region.
+///
+/// WHITE - Unvisited BB in DFS walk.
+/// GREY - BBs which are currently on the DFS stack for processing.
+/// BLACK - Visited and completely processed BB.
+enum Color { WHITE, GREY, BLACK };
+
 bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
   BasicBlock *REntry = R.getEntry();
   BasicBlock *RExit = R.getExit();
@@ -1195,10 +1202,10 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
 
   // Initialize the map for all BB with WHITE color.
   for (auto *BB : R.blocks())
-    BBColorMap[BB] = JITScopDetection::WHITE;
+    BBColorMap[BB] = WHITE;
 
   // Process the entry block of the Region.
-  BBColorMap[CurrBB] = JITScopDetection::GREY;
+  BBColorMap[CurrBB] = GREY;
   DFSStack.push(std::make_pair(CurrBB, 0));
 
   while (!DFSStack.empty()) {
@@ -1219,15 +1226,15 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
         continue;
 
       // WHITE indicates an unvisited BB in DFS walk.
-      if (BBColorMap[SuccBB] == JITScopDetection::WHITE) {
+      if (BBColorMap[SuccBB] == WHITE) {
         // Push the current BB and the index of the next child to be visited.
         DFSStack.push(std::make_pair(CurrBB, I + 1));
         // Push the next BB to be processed.
         DFSStack.push(std::make_pair(SuccBB, 0));
         // First time the BB is being processed.
-        BBColorMap[SuccBB] = JITScopDetection::GREY;
+        BBColorMap[SuccBB] = GREY;
         break;
-      } else if (BBColorMap[SuccBB] == JITScopDetection::GREY) {
+      } else if (BBColorMap[SuccBB] == GREY) {
         // GREY indicates a loop in the control flow.
         // If the destination dominates the source, it is a natural loop
         // else, an irreducible control flow in the region is detected.
@@ -1242,7 +1249,7 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
     // If all children of current BB have been processed,
     // then mark that BB as fully processed.
     if (AdjacentBlockIndex == NSucc)
-      BBColorMap[CurrBB] = JITScopDetection::BLACK;
+      BBColorMap[CurrBB] = BLACK;
   }
 
   return true;
