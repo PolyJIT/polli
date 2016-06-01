@@ -178,6 +178,9 @@ include_directories(AFTER
   ${CMAKE_CURRENT_BINARY_DIR}/include/
 )
 
+set(POLLI_BINARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
+set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
+
 add_definitions( -DFMT_HEADER_ONLY )
 add_definitions( -D_GNU_SOURCE )
 
