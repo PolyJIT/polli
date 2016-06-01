@@ -48,7 +48,7 @@ std::string TargetTriple = "";
 std::string MArch = "";
 std::string MCPU = "";
 std::vector<std::string> MAttrs;
-llvm::Reloc::Model RelocModel = Reloc::Default;
+llvm::Reloc::Model RelocModel = Reloc::PIC_;
 llvm::CodeModel::Model CModel = CodeModel::JITDefault;
 llvm::FloatABI::ABIType FloatABIForCalls = FloatABI::Default;
 bool GenerateSoftFloatCalls = false;

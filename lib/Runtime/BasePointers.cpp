@@ -40,7 +40,7 @@ namespace polli {
 char BasePointers::ID = 0;
 
 void BasePointers::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<polly::ScopInfo>();
+  AU.addRequired<polly::ScopInfoRegionPass>();
   AU.addRequired<llvm::DominatorTreeWrapperPass>();
 }
 
