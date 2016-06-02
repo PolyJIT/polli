@@ -1,17 +1,17 @@
 /* Polly's ScopDetection adapted for the use within PolyJIT
-* 
+*
 * Copyright © 2016 Andreas Simbürger <simbuerg@lairosiel.de>
-* 
+*
 * Permission is hereby granted, free of charge, to any person obtaining
 * a copy of this software and associated documentation files (the "Software"),
 * to deal in the Software without restriction, including without limitation
 * the rights to use, copy, modify, merge, publish, distribute, sublicense,
 * and/or sell copies of the Software, and to permit persons to whom the
 * Software is furnished to do so, subject to the following conditions:
-* 
+*
 * The above copyright notice and this permission notice shall be included
 * in all copies or substantial portions of the Software.
-* 
+*
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 * OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -19,7 +19,7 @@
 * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/ 
+*/
 #ifndef POLLI_SCOP_DETECTION
 #define POLLI_SCOP_DETECTION
 
@@ -98,12 +98,6 @@ public:
   // Remember the valid run-time regions
   RegionSet ValidRuntimeRegions;
 
-  /// @brief Set of loops (used to remember loops in non-affine subregions).
-  using BoxedLoopsSetTy = SetVector<const Loop *>;
-
-  /// @brief Set to remember non-affine branches in regions.
-  using NonAffineSubRegionSetTy = RegionSet;
-
   ///
   // @name Track required params for each detected SCoP candidate.
   // @{
@@ -118,6 +112,8 @@ public:
     Region &CurRegion;   // The region to check.
     AliasSetTracker AST; // The AliasSetTracker to hold the alias information.
     bool Verifying;      // If we are in the verification phase?
+
+    /// @brief Container to remember rejection reasons for this region.
     polly::RejectLog Log;
 
     /// @brief Map a base pointer to all access functions accessing it.
@@ -143,10 +139,10 @@ public:
     bool HasUnknownAccess;
 
     /// @brief The set of non-affine subregions in the region we analyze.
-    NonAffineSubRegionSetTy NonAffineSubRegionSet;
+    RegionSet NonAffineSubRegionSet;
 
     /// @brief The set of loops contained in non-affine regions.
-    BoxedLoopsSetTy BoxedLoopsSet;
+    polly::BoxedLoopsSetTy BoxedLoopsSet;
 
     /// @brief Loads that need to be invariant during execution.
     polly::InvariantLoadsSetTy RequiredILS;
@@ -196,19 +192,9 @@ private:
   AliasAnalysis *AA;
   //@}
 
-  /// @brief Enum for coloring BBs in Region.
-  ///
-  /// WHITE - Unvisited BB in DFS walk.
-  /// GREY - BBs which are currently on the DFS stack for processing.
-  /// BLACK - Visited and completely processed BB.
-  enum Color { WHITE, GREY, BLACK };
-
-  /// @brief Map to remember detection contexts for valid regions.
-  using DetectionContextMapTy = DenseMap<const Region *, DetectionContext>;
+  /// @brief Map to remember detection contexts for all regions.
+  using DetectionContextMapTy = DenseMap<polly::BBPair, DetectionContext>;
   mutable DetectionContextMapTy DetectionContextMap;
-
-  // Remember a list of errors for every region.
-  mutable polly::RejectLogsContainer RejectLogs;
 
   /// @brief Remove cached results for @p R.
   void removeCachedResults(const Region &R, RegionSet &Cache);
@@ -268,6 +254,17 @@ private:
   ///         false otherwise.
   bool hasSufficientCompute(DetectionContext &Context,
                             int NumAffineLoops) const;
+
+  /// @brief Check if the unique affine loop might be amenable to distribution.
+  ///
+  /// This function checks if the number of non-trivial blocks in the unique
+  /// affine loop in Context.CurRegion is at least two. Thus, the loop might
+  /// be amenable to distribution.
+  ///
+  /// @param Context  The context of SCoP detection.
+  ///
+  /// @return True only if the affine loop might be distributable.
+  bool hasPossiblyDistributableLoop(DetectionContext &Context) const;
 
   /// @brief Check if a region is profitable to optimize.
   ///
@@ -481,17 +478,13 @@ public:
   bool isMaxRegionInScop(const Region &R, bool Verify = true) const;
 
   /// @brief Return the detection context for @p R, nullptr if @p R was invalid.
-  const DetectionContext *getDetectionContext(const Region *R) const;
-
-  /// @brief Return the set of loops in non-affine subregions for @p R.
-  const BoxedLoopsSetTy *getBoxedLoops(const Region *R) const;
-
-  /// @brief Get the instruction to memory access mapping of the current
-  ///        function for @p R.
-  const MapInsnToMemAcc *getInsnToMemAccMap(const Region *R) const;
+  DetectionContext *getDetectionContext(const Region *R) const;
 
   /// @brief Return the set of required invariant loads for @p R.
   const polly::InvariantLoadsSetTy *getRequiredInvariantLoads(const Region *R) const;
+
+  /// @brief Return the set of rejection causes for @p R.
+  const polly::RejectLog *lookupRejectionLog(const Region *R) const;
 
   /// @brief Return true if @p SubR is a non-affine subregion in @p ScopR.
   bool isNonAffineSubRegion(const Region *SubR, const Region *ScopR) const;
@@ -518,36 +511,10 @@ public:
   const_iterator end() const { return ValidRegions.end(); }
   //@}
 
-  /// @name Reject log iterators
-  ///
-  /// These iterators iterate over the logs of all rejected regions of this
-  //  function.
-  //@{
-  typedef std::map<const Region *, polly::RejectLog>::iterator reject_iterator;
-  typedef std::map<const Region *, polly::RejectLog>::const_iterator
-      const_reject_iterator;
-
-  reject_iterator reject_begin() { return RejectLogs.begin(); }
-  reject_iterator reject_end() { return RejectLogs.end(); }
-
-  const_reject_iterator reject_begin() const { return RejectLogs.begin(); }
-  const_reject_iterator reject_end() const { return RejectLogs.end(); }
-  //@}
-
-  /// @brief Emit rejection remarks for all smallest invalid regions.
+  /// @brief Emit rejection remarks for all rejected regions.
   ///
   /// @param F The function to emit remarks for.
-  /// @param R The region to start the region tree traversal for.
-  void emitMissedRemarksForLeaves(const Function &F, const Region *R);
-
-  /// @brief Emit rejection remarks for the parent regions of all valid regions.
-  ///
-  /// Emitting rejection remarks for the parent regions of all valid regions
-  /// may give the end-user clues about how to increase the size of the
-  /// detected Scops.
-  ///
-  /// @param F The function to emit remarks for.
-  void emitMissedRemarksForValidRegions(const Function &F);
+  void emitMissedRemarks(const Function &F);
 
   /// @brief Mark the function as invalid so we will not extract any scop from
   ///        the function.

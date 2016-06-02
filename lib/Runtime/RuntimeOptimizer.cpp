@@ -50,7 +50,7 @@ namespace polli {
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
   PM.add(polly::createScopDetectionPass());
-  PM.add(polly::createScopInfoPass());
+  PM.add(polly::createScopInfoRegionPassPass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,

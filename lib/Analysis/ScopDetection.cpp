@@ -184,10 +184,10 @@ bool JITScopDetection::isMaxRegionInScop(const Region &R, bool Verify) const {
     return false;
 
   if (Verify) {
-    DetectionContextMap.erase(&R);
-    const auto &It = DetectionContextMap.insert(
-        std::make_pair(&R, DetectionContext(const_cast<Region &>(R), *AA,
-                                            false /*verifying*/)));
+    DetectionContextMap.erase(polly::getBBPairForRegion(&R));
+    const auto &It = DetectionContextMap.insert(std::make_pair(
+      polly::getBBPairForRegion(&R),
+      DetectionContext(const_cast<Region &>(R), *AA, false /*verifying*/)));
     DetectionContext &Context = It.first->second;
     return isValidRegion(Context);
   }
@@ -196,19 +196,16 @@ bool JITScopDetection::isMaxRegionInScop(const Region &R, bool Verify) const {
 }
 
 std::string JITScopDetection::regionIsInvalidBecause(const Region *R) const {
-  if (!RejectLogs.count(R))
-    return "";
-
   // Get the first error we found. Even in keep-going mode, this is the first
   // reason that caused the candidate to be rejected.
-  polly::RejectLog Errors = RejectLogs.at(R);
+  auto *Log = lookupRejectionLog(R);
 
   // This can happen when we marked a region invalid, but didn't track
   // an error for it.
-  if (Errors.size() == 0)
+  if (!Log || !Log->hasErrors())
     return "";
 
-  polly::RejectReasonPtr RR = *Errors.begin();
+  polly::RejectReasonPtr RR = *Log->begin();
   return RR->getMessage();
 }
 
@@ -876,7 +873,7 @@ Region *JITScopDetection::expandRegion(Region &R) {
 
   while (ExpandedRegion) {
     const auto &It = DetectionContextMap.insert(std::make_pair(
-        ExpandedRegion.get(),
+        polly::getBBPairForRegion(ExpandedRegion.get()),
         DetectionContext(*ExpandedRegion, *AA, false /*verifying*/)));
     DetectionContext &Context = It.first->second;
     DEBUG(dbgs() << "\t\tTrying " << ExpandedRegion->getNameStr() << "\n");
@@ -945,12 +942,12 @@ void JITScopDetection::removeCachedResults(const Region &R) {
 
 void JITScopDetection::removeCachedResults(const Region &R, RegionSet &Cache) {
   Cache.remove(&R);
-  DetectionContextMap.erase(&R);
 }
 
 void JITScopDetection::findScops(Region &R) {
   const auto &It = DetectionContextMap.insert(
-      std::make_pair(&R, DetectionContext(R, *AA, false /*verifying*/)));
+      std::make_pair(polly::getBBPairForRegion(&R),
+                     DetectionContext(R, *AA, false /*verifying*/)));
   DetectionContext &Context = It.first->second;
 
   bool RegionIsValid = false;
@@ -960,9 +957,6 @@ void JITScopDetection::findScops(Region &R) {
     RegionIsValid = isValidRegion(Context);
 
   bool HasErrors = !RegionIsValid || Context.Log.size() > 0;
-
-  if (PollyTrackFailures && HasErrors)
-    RejectLogs.insert(std::make_pair(&R, Context.Log));
 
   if (HasErrors) {
     removeCachedResults(R);
@@ -993,14 +987,14 @@ void JITScopDetection::findScops(Region &R) {
     ToExpand.push_back(SubRegion.get());
 
   for (Region *CurrentRegion : ToExpand) {
-    // Skip regions that had errors.
-    bool HadErrors = RejectLogs.hasErrors(CurrentRegion);
-    if (HadErrors)
-      continue;
-
     // Skip invalid regions. Regions may become invalid, if they are element of
     // an already expanded region.
     if (!ValidRegions.count(CurrentRegion))
+      continue;
+
+    // Skip regions that had errors.
+    bool HadErrors = lookupRejectionLog(CurrentRegion)->hasErrors();
+    if (HadErrors)
       continue;
 
     Region *ExpandedR = expandRegion(*CurrentRegion);
@@ -1072,6 +1066,26 @@ bool JITScopDetection::hasSufficientCompute(DetectionContext &Context,
   return InstCount >= ProfitabilityMinPerLoopInstructions;
 }
 
+bool JITScopDetection::hasPossiblyDistributableLoop(
+    DetectionContext &Context) const {
+  for (auto *BB : Context.CurRegion.blocks()) {
+    auto *L = LI->getLoopFor(BB);
+    if (!Context.CurRegion.contains(L))
+      continue;
+    if (Context.BoxedLoopsSet.count(L))
+      continue;
+    unsigned StmtsWithStoresInLoops = 0;
+    for (auto *LBB : L->blocks()) {
+      bool MemStore = false;
+      for (auto &I : *LBB)
+        MemStore |= isa<StoreInst>(&I);
+      StmtsWithStoresInLoops += MemStore;
+    }
+    return (StmtsWithStoresInLoops > 1);
+  }
+  return false;
+}
+
 bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
@@ -1138,9 +1152,6 @@ bool JITScopDetection::isValidRegion(DetectionContext &Context) const {
     return invalid<polly::ReportIrreducibleRegion>(Context, /*Assert=*/true,
                                                    &CurRegion, DbgLoc);
 
-  if (!isProfitableRegion(Context))
-    return false;
-
   DEBUG(dbgs() << "OK\n");
   return true;
 }
@@ -1162,31 +1173,20 @@ void JITScopDetection::printLocations(llvm::Function &F) {
   }
 }
 
-void JITScopDetection::emitMissedRemarksForValidRegions(const Function &F) {
-  for (const Region *R : ValidRegions) {
-    const Region *Parent = R->getParent();
-    if (Parent && !Parent->isTopLevelRegion() && RejectLogs.count(Parent))
-      emitRejectionRemarks(F, RejectLogs.at(Parent));
+void JITScopDetection::emitMissedRemarks(const Function &F) {
+  for (auto &DIt : DetectionContextMap) {
+    auto &DC = DIt.getSecond();
+    if (DC.Log.hasErrors())
+      polly::emitRejectionRemarks(DIt.getFirst(), DC.Log);
   }
 }
 
-void JITScopDetection::emitMissedRemarksForLeaves(const Function &F,
-                                                  const Region *R) {
-  for (const std::unique_ptr<Region> &Child : *R) {
-    bool IsValid = DetectionContextMap.count(Child.get());
-    if (IsValid)
-      continue;
-
-    bool IsLeaf = Child->begin() == Child->end();
-    if (!IsLeaf)
-      emitMissedRemarksForLeaves(F, Child.get());
-    else {
-      if (RejectLogs.count(Child.get())) {
-        emitRejectionRemarks(F, RejectLogs.at(Child.get()));
-      }
-    }
-  }
-}
+/// @brief Enum for coloring BBs in Region.
+///
+/// WHITE - Unvisited BB in DFS walk.
+/// GREY - BBs which are currently on the DFS stack for processing.
+/// BLACK - Visited and completely processed BB.
+enum Color { WHITE, GREY, BLACK };
 
 bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
   BasicBlock *REntry = R.getEntry();
@@ -1202,10 +1202,10 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
 
   // Initialize the map for all BB with WHITE color.
   for (auto *BB : R.blocks())
-    BBColorMap[BB] = JITScopDetection::WHITE;
+    BBColorMap[BB] = WHITE;
 
   // Process the entry block of the Region.
-  BBColorMap[CurrBB] = JITScopDetection::GREY;
+  BBColorMap[CurrBB] = GREY;
   DFSStack.push(std::make_pair(CurrBB, 0));
 
   while (!DFSStack.empty()) {
@@ -1226,15 +1226,15 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
         continue;
 
       // WHITE indicates an unvisited BB in DFS walk.
-      if (BBColorMap[SuccBB] == JITScopDetection::WHITE) {
+      if (BBColorMap[SuccBB] == WHITE) {
         // Push the current BB and the index of the next child to be visited.
         DFSStack.push(std::make_pair(CurrBB, I + 1));
         // Push the next BB to be processed.
         DFSStack.push(std::make_pair(SuccBB, 0));
         // First time the BB is being processed.
-        BBColorMap[SuccBB] = JITScopDetection::GREY;
+        BBColorMap[SuccBB] = GREY;
         break;
-      } else if (BBColorMap[SuccBB] == JITScopDetection::GREY) {
+      } else if (BBColorMap[SuccBB] == GREY) {
         // GREY indicates a loop in the control flow.
         // If the destination dominates the source, it is a natural loop
         // else, an irreducible control flow in the region is detected.
@@ -1249,7 +1249,7 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
     // If all children of current BB have been processed,
     // then mark that BB as fully processed.
     if (AdjacentBlockIndex == NSucc)
-      BBColorMap[CurrBB] = JITScopDetection::BLACK;
+      BBColorMap[CurrBB] = BLACK;
   }
 
   return true;
@@ -1276,54 +1276,42 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
 
   findScops(*TopRegion);
 
-  // Only makes sense when we tracked errors.
-  if (PollyTrackFailures) {
-    emitMissedRemarksForValidRegions(F);
-    emitMissedRemarksForLeaves(F, TopRegion);
+  // Prune non-profitable regions.
+  for (auto &DIt : DetectionContextMap) {
+    auto &DC = DIt.getSecond();
+    if (DC.Log.hasErrors())
+      continue;
+    if (!ValidRegions.count(&DC.CurRegion))
+      continue;
+    if (isProfitableRegion(DC))
+      continue;
+
+    ValidRegions.remove(&DC.CurRegion);
   }
+
+  // Only makes sense when we tracked errors.
+  if (PollyTrackFailures)
+    emitMissedRemarks(F);
 
   if (ReportLevel)
     printLocations(F);
 
-  assert(ValidRegions.size() == DetectionContextMap.size() &&
+  assert(ValidRegions.size() <= DetectionContextMap.size() &&
          "Cached more results than valid regions");
   return false;
 }
 
-bool JITScopDetection::isNonAffineSubRegion(const Region *SubR,
-                                            const Region *ScopR) const {
-  const DetectionContext *DC = getDetectionContext(ScopR);
-  assert(DC && "ScopR is no valid region!");
-  return DC->NonAffineSubRegionSet.count(SubR);
-}
-
-const JITScopDetection::DetectionContext *
+JITScopDetection::DetectionContext *
 JITScopDetection::getDetectionContext(const Region *R) const {
-  auto DCMIt = DetectionContextMap.find(R);
+  auto DCMIt = DetectionContextMap.find(polly::getBBPairForRegion(R));
   if (DCMIt == DetectionContextMap.end())
     return nullptr;
   return &DCMIt->second;
 }
 
-const JITScopDetection::BoxedLoopsSetTy *
-JITScopDetection::getBoxedLoops(const Region *R) const {
+const polly::RejectLog *JITScopDetection::lookupRejectionLog(const Region *R) const {
   const DetectionContext *DC = getDetectionContext(R);
-  assert(DC && "ScopR is no valid region!");
-  return &DC->BoxedLoopsSet;
-}
-
-const MapInsnToMemAcc *
-JITScopDetection::getInsnToMemAccMap(const Region *R) const {
-  const DetectionContext *DC = getDetectionContext(R);
-  assert(DC && "ScopR is no valid region!");
-  return &DC->InsnToMemAcc;
-}
-
-const polly::InvariantLoadsSetTy *
-JITScopDetection::getRequiredInvariantLoads(const Region *R) const {
-  const DetectionContext *DC = getDetectionContext(R);
-  assert(DC && "ScopR is no valid region!");
-  return &DC->RequiredILS;
+  return DC ? &DC->Log : nullptr;
 }
 
 void polli::JITScopDetection::verifyRegion(const Region &R) const {
@@ -1377,7 +1365,6 @@ void JITScopDetection::print(raw_ostream &OS, const Module *) const {
 }
 
 void JITScopDetection::releaseMemory() {
-  RejectLogs.clear();
   ValidRegions.clear();
   DetectionContextMap.clear();
   ValidRuntimeRegions.clear();
