@@ -8,7 +8,7 @@ config.llvm_src_root = lit.util.capture([llvm_config, '--src-root']).strip()
 config.llvm_obj_root = lit.util.capture([llvm_config, '--obj-root']).strip()
 config.llvm_tools_dir = lit.util.capture([llvm_config, '--bindir']).strip()
 config.llvm_libs_dir = lit.util.capture([llvm_config, '--libdir']).strip()
-config.polli_obj_root = "@POLLI_BINARY_DIR@"
+config.polli_obj_root = "@POLLI_OBJ_ROOT@"
 config.polli_lib_dir = "@POLLI_LIB_DIR@"
 config.target_triple = "@TARGET_TRIPLE@"
 

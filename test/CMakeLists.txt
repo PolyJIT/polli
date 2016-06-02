@@ -18,6 +18,7 @@ set(LLVM_TOOLS_DIR "${LLVM_INSTALL_ROOT}/bin")
 set(LLVM_LIBS_DIR "${LLVM_INSTALL_ROOT}/lib")
 set(POLLI_LIB_DIR "${POLLI_BINARY_DIR}/lib")
 set(POLLI_BINARY_DIR "${POLLI_BINARY_DIR}/bin")
+set(POLLI_OBJ_ROOT "${POLLI_BINARY_DIR}")
 
 # We are building polli out of tree, adjust the settings.
 # FIXME: FileCheck is not available in llvm install directory at the moment.
