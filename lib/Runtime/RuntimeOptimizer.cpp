@@ -74,33 +74,43 @@ static PassManagerBuilder getBuilder() {
 Function &OptimizeForRuntime(Function &F) {
   static PassManagerBuilder Builder = getBuilder();
   Module *M = F.getParent();
+#ifdef POLLI_STORE_OUTPUT
   opt::GenerateOutput = true;
+#endif
   polly::opt::PollyParallel = true;
 
   legacy::FunctionPassManager PM = legacy::FunctionPassManager(M);
 
   Builder.populateFunctionPassManager(PM);
+#ifdef POLLI_ENABLE_BASE_POINTERS
   PM.add(polli::createBasePointersPass());
+#endif
   PM.doInitialization();
   PM.run(F);
   PM.doFinalization();
 
+#ifdef POLLI_ENABLE_PAPI
   if (opt::havePapi()) {
     legacy::PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createTraceMarkerPass());
     MPM.run(*M);
   }
+#endif
 
+#ifdef POLLI_ENABLE_LIKWID
   if (opt::haveLikwid()) {
     legacy::PassManager MPM;
     Builder.populateModulePassManager(MPM);
     MPM.add(polli::createLikwidMarkerPass());
     MPM.run(*M);
   }
+#endif
 
+#ifdef POLLI_STORE_OUTPUT
   DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
   opt::GenerateOutput = false;
+#endif
 
   return F;
 }

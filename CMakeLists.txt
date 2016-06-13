@@ -138,9 +138,11 @@ find_package(Boost 1.54.0 REQUIRED COMPONENTS system thread)
 include_directories(BEFORE ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" ON)
+option(POLLI_ENABLE_TRACING "Trace critical parts of polli with performance counters" OFF)
 option(POLLI_ENABLE_LIKWID "Enable tracing via Likwid Tools" OFF)
-option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" ON)
+option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" OFF)
+option(POLLI_ENABLE_BASE_POINTERS "Enable SubExpression modelling" OFF)
+option(POLLI_STORE_OUTPUT "Store intermediate SCoPs as IR" OFF)
 
 string(REPLACE "-fno-exceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall")
