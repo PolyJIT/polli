@@ -133,15 +133,20 @@ static Module &getModule(const char *prototype, bool &cache_hit) {
  * @brief Get the protoype function stored in this module.
  *
  * This assumes that it operates on a prototype module of PolyJIT. Such
- * a module only contains one function.
+ * a module contains at most one function with the 'polyjit-jit-candidate'
+ * attribute.
  *
  * @param M The prototype module.
  * @return llvm::Function* The first function in the given module.
  */
 static Function &getFunction(Module &M) {
-  assert(M.getFunctionList().size() == 1 &&
-         "Unexpected number of functions in module!");
-  return *M.begin();
+  for (Function &F : M) {
+    if (F.hasFnAttribute("polyjit-jit-candidate"))
+      return F;
+  }
+
+  errs() << "No JIT candidate in prototype!\n";
+  llvm_unreachable("No JIT candidate found in prototype!");
 }
 
 static inline void do_shutdown() {
