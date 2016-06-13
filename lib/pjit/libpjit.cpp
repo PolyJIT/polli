@@ -354,6 +354,9 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   RunValueList Values = runValues(*Request);
   std::string FnName;
   auto Variant = VarFun->createVariant(Values, FnName);
+  if (!Variant)
+    return;
+
   ExecutionEngine &EE = Context->engine(std::move(Variant));
 
   DEBUG(printRunValues(Values));

@@ -243,6 +243,10 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
 
     // Prepare a new module to hold our new function.
     M = BaseF.getParent();
+    if (!M)
+      return std::unique_ptr<Module>(nullptr);
+
+    assert(M && "Function without parent module?!");
     NewM = std::unique_ptr<Module>(
         new Module(M->getModuleIdentifier(), M->getContext()));
     NewM->setTargetTriple(M->getTargetTriple());
