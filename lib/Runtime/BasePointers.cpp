@@ -96,8 +96,9 @@ struct InstructionStmt {
       : Parent(Parent), Domain(Domain), Schedule(Sched), SubEx(SubEx) {}
 
   void print(raw_ostream &OS, unsigned indent = 0) {
-    (OS << "\n").indent(indent + 4)
-        << fmt::format("{:s}\n", "{ " + Schedule.toStr() + " }");
+    (OS << "\n").indent(indent) << "Inst: ";
+    (OS << "\n").indent(indent)
+        << fmt::format("{:s}\n", Schedule.toStr());
     SubEx->print(OS);
   }
 };
