@@ -243,7 +243,7 @@ public:
     System.cancel_pending_jobs();
   }
 
-  /** 
+  /**
    * @name CodeCache interface.
    * @{ */
   using CodeCacheT =
@@ -282,7 +282,7 @@ public:
     return *EE;
   }
 
-  /** 
+  /**
    * @name Asynchronous task scheduling interface.
    * @{ */
   struct deref_functor {
