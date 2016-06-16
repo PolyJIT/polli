@@ -38,7 +38,7 @@ struct RunValue {
 
 template<typename T>
 inline bool canSpecialize(const RunValue<T> &V) {
-  return llvm::isa<llvm::IntegerType>(V.Arg->getType());
+  return V.Arg->hasAttr("polli.specialize");
 }
 } // end of polli namespace
 

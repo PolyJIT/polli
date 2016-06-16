@@ -1,9 +1,9 @@
 #include "likwid.h"
 
-#include "polli/VariantFunction.h"
 #include "polli/FunctionCloner.h"
-#include "polli/Utils.h"
 #include "polli/RuntimeOptimizer.h"
+#include "polli/Utils.h"
+#include "polli/VariantFunction.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -201,7 +201,9 @@ public:
 
     unsigned i = 0;
     for (Argument &Arg : From->args()) {
-      ParamT P = SpecValues[i];
+      if (!canSpecialize(SpecValues[i++]))
+        continue;
+      ParamT P = SpecValues[i++];
 
       if (IntegerType *IntTy = dyn_cast<IntegerType>(Arg.getType())) {
         // Get a constant value for P.
@@ -213,7 +215,6 @@ public:
           }
         }
       }
-      i++;
     }
   }
 };
@@ -256,28 +257,21 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
                                           M->getModuleIdentifier(),
                                           BaseF.getName().str(), K.hash()));
 
-    DEBUG(dbgs() << fmt::format("Create Variant for: {} Hash: {:d}", K.str(),
+    DEBUG(dbgs() << fmt::format("Create Variant for: {} Hash: {:d}\n", K.str(),
                                 K.hash()));
     // Perform parameter value substitution.
-    if (!opt::DisableRecompile) {
-      FunctionCloner<MainCreator, IgnoreSource,
-                     SpecializeEndpoint<RunValue<uint64_t *>>>
-          Specializer(VMap, NewM.get());
+    FunctionCloner<MainCreator, IgnoreSource,
+                   SpecializeEndpoint<RunValue<uint64_t *>>>
+        Specializer(VMap, NewM.get());
 
-      /* Perform a parameter specialization by taking the unchanged base
-       * function
-       * and substitute all known parameter values.
-       */
-      Specializer.setParameters(K);
-      Specializer.setSource(&BaseF);
+    /* Perform a parameter specialization by taking the unchanged base
+     * function
+     * and substitute all known parameter values.
+     */
+    Specializer.setParameters(K);
+    Specializer.setSource(&BaseF);
 
-      F = &OptimizeForRuntime(*Specializer.start(true));
-    } else {
-      FunctionCloner<MainCreator, IgnoreSource, ConnectTarget> Specializer(
-          VMap, NewM.get());
-      Specializer.setSource(&BaseF);
-      F = &OptimizeForRuntime(*Specializer.start());
-    }
+    F = &OptimizeForRuntime(*Specializer.start(true));
     FnName = F->getName().str();
   }
   return NewM;
