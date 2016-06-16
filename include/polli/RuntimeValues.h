@@ -55,7 +55,8 @@ public:
   using const_iterator = RunValueListT::const_iterator;
   using reference = RunValueT&;
 
-  explicit RunValueList() : List(new RunValueListT()) {};
+  explicit RunValueList(std::size_t Seed = 0)
+      : List(new RunValueListT()), Seed(Seed){};
 
   RunValueList(const RunValueList & Other) = default;
   RunValueList &operator=(const RunValueList & Other) = default;
@@ -77,10 +78,13 @@ public:
   size_t size() const { return List->size(); }
 
   size_t hash() const {
+    size_t LocalSeed = Seed;
     RunValueListT Tmp = filter(*List, [](const RunValueT &V) {
       return !canSpecialize(V);
     });
-    return boost::hash_range(Tmp.begin(), Tmp.end());
+
+    boost::hash_range(LocalSeed, Tmp.begin(), Tmp.end());
+    return LocalSeed;
   }
 
   std::string str() const {
@@ -108,6 +112,7 @@ public:
 
 private:
   std::shared_ptr<RunValueListT> List;
+  std::size_t Seed;
 };
 } // end of polli namespace
 
