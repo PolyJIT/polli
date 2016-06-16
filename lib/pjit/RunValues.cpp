@@ -38,6 +38,13 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
       if (polli::canSpecialize(V)) {
         llvm::dbgs() << fmt::format("[{:d}] -> {} ", i, *V.value);
       }
+      llvm::Type *Ty = Arg.getType();
+      if (Ty->isIntegerTy())
+        llvm::dbgs() << fmt::format("[{:d}] -> {} ", i, (int)*((uint64_t**)params)[i]);
+      if (Ty->isDoubleTy())
+        llvm::dbgs() << fmt::format("[{:d}] -> {:g} ", i, (double)*((double**)params)[i]);
+      if (Ty->isPointerTy())
+        llvm::dbgs() << fmt::format("[{:d}] -> 0x{:x} ", i, (uint64_t)((uint64_t**)params)[i]);
       i++;
     }
   }
