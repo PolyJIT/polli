@@ -23,8 +23,6 @@
 #define POLLI_RUNVALUES_H
 
 #include "polli/RuntimeValues.h"
-#include "pprof/Tracing.h"
-
 #include <cassert>
 #include <memory>
 #include <cstring>
