@@ -71,44 +71,19 @@ struct PapiTracer : public Tracer {
   }
 };
 
-static std::unique_ptr<Tracer> createTracer() {
-  if (opt::havePapi())
-    return std::unique_ptr<Tracer>(new PapiTracer());
-  else if (opt::haveLikwid())
-    return std::unique_ptr<Tracer>(new LikwidTracer());
-
-  return std::unique_ptr<Tracer>(new Tracer());
-}
-
-static std::unique_ptr<Tracer> ActiveTracer = createTracer();
+using TracerTy = std::unique_ptr<polli::Tracer>;
+TracerTy getOrCreateActiveTracer();
 }
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-void polliTracingInit() {
-  polli::ActiveTracer->init();
-}
-
-void polliTracingFinalize() {
-  polli::ActiveTracer->finalize();
-}
-
-void polliTracingRegionStart(uint64_t Id, const char *Name) {
-  polli::ActiveTracer->regionStart(Id, Name);
-}
-
-void polliTracingRegionStop(uint64_t Id, const char *Name) {
-  polli::ActiveTracer->regionStop(Id, Name);
-}
-
-void polliTracingScopStart(uint64_t Id, const char *Name) {
-  polli::ActiveTracer->scopStart(Id, Name);
-}
-
-void polliTracingScopStop(uint64_t Id, const char *Name) {
-  polli::ActiveTracer->scopStop(Id, Name);
-}
+void polliTracingInit();
+void polliTracingFinalize();
+void polliTracingRegionStart(uint64_t Id, const char *Name);
+void polliTracingRegionStop(uint64_t Id, const char *Name);
+void polliTracingScopStart(uint64_t Id, const char *Name);
+void polliTracingScopStop(uint64_t Id, const char *Name);
 #ifdef __cplusplus
 }
 #endif
