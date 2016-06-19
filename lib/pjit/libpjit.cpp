@@ -54,11 +54,13 @@
 #include "polli/Options.h"
 #include "polli/RuntimeValues.h"
 #include "polli/RunValues.h"
+#include "polli/Stats.h"
 #include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
 
+#include "papi.h"
 #include "catch.hpp"
 
 #define DEBUG_TYPE "polyjit"
@@ -236,6 +238,7 @@ static inline Function &getPrototype(const char *function, bool &cache_hit) {
 }
 
 namespace polli {
+
 class PolyJIT {
 public:
   explicit PolyJIT() : VariantFunctions(), CodeCache(), EE(nullptr) {}
