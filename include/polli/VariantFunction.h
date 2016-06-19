@@ -119,42 +119,8 @@ struct Param {
 
 typedef ParamVector<Param> FunctionKey;
 
-struct Stats {
-  // PAPI_flops(...)
-  float RealTime;
-  float ProcTime;
-  float MFLOPS;
-
-  long long flpops;
-  // PAPI_flops(...)
-
-  // libpprof
-  long long ExecCount;
-
-  explicit Stats()
-      : RealTime(0.0f), ProcTime(0.0f), MFLOPS(0.0f), flpops(0), ExecCount(0) {}
-
-  Stats(const Stats &Other)
-      : RealTime(Other.RealTime), ProcTime(Other.ProcTime),
-        MFLOPS(Other.MFLOPS), flpops(Other.flpops), ExecCount(Other.ExecCount) {
-  }
-  Stats &operator=(const Stats &Other) {
-    if (this != &Other) {
-      RealTime = Other.RealTime;
-      ProcTime = Other.ProcTime;
-      MFLOPS = Other.MFLOPS;
-      flpops = Other.flpops;
-      ExecCount = Other.ExecCount;
-    }
-    return *this;
-  }
-};
-
 class VariantFunction {
 private:
-  // @brief Track various stats about this function;
-  Stats S;
-
   // @brief Our base function to create new variants from.
   llvm::Function &BaseF;
 
@@ -174,13 +140,6 @@ public:
    * @param SourceF
    */
   explicit VariantFunction(llvm::Function &BaseF) : BaseF(BaseF) {}
-
-  /**
-   * @brief Return a reference to our statistics.
-   *
-   * @return
-   */
-  Stats &stats() { return S; }
 
   // @brief Create a new function variant with they values included in the
   // key replaced.
