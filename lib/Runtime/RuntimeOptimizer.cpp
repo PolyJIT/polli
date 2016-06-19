@@ -34,6 +34,7 @@
 
 #include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
+#include "polly/ScopDetection.h"
 #include "polly/Options.h"
 
 #include <unistd.h>
@@ -65,6 +66,10 @@ static PassManagerBuilder getBuilder() {
   Builder.VerifyInput = false;
   Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
+  polly::opt::PollyParallel = true;
+  // We accept them blindly.
+  polly::ProfitabilityMinPerLoopInstructions = 0;
+
   Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
                              registerPolly);
 
@@ -77,7 +82,6 @@ Function &OptimizeForRuntime(Function &F) {
 #ifdef POLLI_STORE_OUTPUT
   opt::GenerateOutput = true;
 #endif
-  polly::opt::PollyParallel = true;
 
   legacy::FunctionPassManager PM = legacy::FunctionPassManager(M);
 
