@@ -2,6 +2,7 @@
 #include "polli/ScopDetection.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Schema.h"
+#include "polli/Stats.h"
 
 #include "llvm/IR/Attributes.h"
 #include "llvm/ADT/SetVector.h"
@@ -507,7 +508,8 @@ struct InstrumentEndpoint {
 
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
         "pjit_main", Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
-        Type::getInt32Ty(Ctx), Type::getInt8PtrTy(Ctx), NULL));
+        Type::getInt64PtrTy(Ctx), Type::getInt32Ty(Ctx),
+        Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
     To->deleteBody();
@@ -579,9 +581,12 @@ struct InstrumentEndpoint {
       }
     }
 
-    SmallVector<Value *, 3> Args;
+    Value *PrefixData = polli::registerStatStruct(*To, To->getName());
+
+    SmallVector<Value *, 4> Args;
     Args.push_back((PrototypeF) ? PrototypeF
                                 : Builder.CreateGlobalStringPtr(To->getName()));
+    Args.push_back(Builder.CreateBitCast(PrefixData, Type::getInt64PtrTy(Ctx)));
     Args.push_back(ParamC);
     Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
 

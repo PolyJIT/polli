@@ -380,6 +380,10 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 }
 
 extern "C" {
+static void printStats(const Stats &S, raw_ostream &OS) {
+  outs() << "ID: " << &S << " N: " << S.NumCalls << " LT: " << S.LookupTime
+         << " RT: " << S.LastRuntime << "\n";
+}
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -389,11 +393,23 @@ extern "C" {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-bool pjit_main(const char *fName, unsigned paramc, char **params) {
+bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
+               char **params) {
+  static int ok = PAPI_library_init(PAPI_VERSION);
+  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+  if (FnStats) {
+    printStats(*FnStats, outs());
+  }
+
+  if (opt::DisableRecompile)
+    return false;
+
+  uint64_t start = PAPI_get_real_nsec();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   JitT Context = getOrCreateJIT();
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
+  Function *F = Request->F;
   auto FutureFn =
       Context->async(GetOrCreateVariantFunction, Request, K.first, Context);
 
@@ -402,8 +418,13 @@ bool pjit_main(const char *fName, unsigned paramc, char **params) {
     FutureFn.wait();
 
   auto FnIt = Context->find(K.first);
+
   if (FnIt != Context->end()) {
+    FnStats->NumCalls++;
+    FnStats->LookupTime = PAPI_get_real_nsec() - start;
+    start = PAPI_get_real_nsec();
     (FnIt->second)(paramc, params);
+    FnStats->LastRuntime = PAPI_get_real_nsec() - start;
     return true /* JIT ready */;
   }
 
