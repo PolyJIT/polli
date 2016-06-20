@@ -354,18 +354,36 @@ public:
     return visitGenericInst(I, S);
   }
 
-  ValidatorResult visitSDivInstruction(Instruction *SDiv, const SCEV *S) {
+  ValidatorResult visitDivision(const SCEV *Dividend, const SCEV *Divisor,
+                                const SCEV *DivExpr,
+                                Instruction *SDiv = nullptr) {
+    // First check if we might be able to model the division, thus if the
+    // divisor is constant. If so, check the dividend, otherwise check if
+    // the whole division can be seen as a parameter.
+    if (isa<SCEVConstant>(Divisor) && !Divisor->isZero())
+      return visit(Dividend);
+
+    // For signed divisions use the SDiv instruction to check for a parameter
+    // division, for unsigned divisions check the operands.
+    if (SDiv)
+      return visitGenericInst(SDiv, DivExpr);
+
+    ValidatorResult LHS = visit(Dividend);
+    ValidatorResult RHS = visit(Divisor);
+    if (LHS.isConstant() && RHS.isConstant())
+      return ValidatorResult(SCEVType::PARAM, DivExpr);
+
+    DEBUG(dbgs() << "INVALID: unsigned division of non-constant expressions");
+    return ValidatorResult(SCEVType::INVALID);
+  }
+
+  ValidatorResult visitSDivInstruction(Instruction *SDiv, const SCEV *Expr) {
     assert(SDiv->getOpcode() == Instruction::SDiv &&
            "Assumed SDiv instruction!");
 
-    auto *Divisor = SDiv->getOperand(1);
-    auto *CI = dyn_cast<ConstantInt>(Divisor);
-    if (!CI)
-      return visitGenericInst(SDiv, S);
-
-    auto *Dividend = SDiv->getOperand(0);
-    auto *DividendSCEV = SE.getSCEV(Dividend);
-    return visit(DividendSCEV);
+    auto *Dividend = SE.getSCEV(SDiv->getOperand(0));
+    auto *Divisor = SE.getSCEV(SDiv->getOperand(1));
+    return visitDivision(Dividend, Divisor, Expr, SDiv);
   }
 
   ValidatorResult visitSRemInstruction(Instruction *SRem, const SCEV *S) {
@@ -374,7 +392,7 @@ public:
 
     auto *Divisor = SRem->getOperand(1);
     auto *CI = dyn_cast<ConstantInt>(Divisor);
-    if (!CI)
+    if (!CI || CI->isZeroValue())
       return visitGenericInst(SRem, S);
 
     auto *Dividend = SRem->getOperand(0);
@@ -385,14 +403,6 @@ public:
   ValidatorResult visitUnknown(const SCEVUnknown *Expr) {
     Value *V = Expr->getValue();
 
-    // TODO: FIXME: IslExprBuilder is not capable of producing valid code
-    //              for arbitrary pointer expressions at the moment. Until
-    //              this is fixed we disallow pointer expressions completely.
-    if (Expr->getType()->isPointerTy()) {
-      DEBUG(dbgs() << "INVALID: UnknownExpr is a pointer type [FIXME]");
-      return ValidatorResult(SCEVType::INVALID);
-    }
-
     if (!Expr->getType()->isIntegerTy()) {
       DEBUG(dbgs() << "INVALID: UnknownExpr is not an integer");
       return ValidatorResult(SCEVType::INVALID);
@@ -400,11 +410,6 @@ public:
 
     if (isa<UndefValue>(V)) {
       DEBUG(dbgs() << "INVALID: UnknownExpr references an undef value");
-      return ValidatorResult(SCEVType::INVALID);
-    }
-
-    if (BaseAddress == V) {
-      DEBUG(dbgs() << "INVALID: UnknownExpr references BaseAddress\n");
       return ValidatorResult(SCEVType::INVALID);
     }
 
