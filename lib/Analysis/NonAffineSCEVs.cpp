@@ -162,10 +162,6 @@ public:
   }
 
   class ValidatorResult visitSignExtendExpr(const SCEVSignExtendExpr *Expr) {
-    // We currently allow only signed SCEV expressions. In the case of a
-    // signed value, a sign extend is a noop.
-    //
-    // TODO: Reconsider this when we add support for unsigned values.
     return visit(Expr->getOperand());
   }
 
