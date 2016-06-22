@@ -6,6 +6,7 @@
 
 #include "llvm/IR/Attributes.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -38,6 +39,8 @@ using namespace llvm;
 STATISTIC(Instrumented, "Number of instrumented functions");
 STATISTIC(MappedGlobals, "Number of global to argument redirections");
 STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
+STATISTIC(DuplicatePredsInPHI, "Number of functions that contain duplicate "
+                               "predecessor lists in some PHI nodes.");
 
 namespace polli {
 char ModuleExtractor::ID = 0;
@@ -103,6 +106,9 @@ using GlobalList = SetVector<const GlobalValue *>;
  */
 static Value *getPointerOperand(Instruction &I) {
   Value *V = nullptr;
+
+  if (BitCastInst *B = dyn_cast<BitCastInst>(&I))
+    V = B->getOperand(0);
 
   if (LoadInst *L = dyn_cast<LoadInst>(&I))
     V = L->getPointerOperand();
