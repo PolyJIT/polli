@@ -183,17 +183,20 @@ using InstrList = SmallVector<Instruction *, 4>;
  * @return void
  */
 static inline void constantExprToInstruction(Instruction &I,
-                                             InstrList &Converted) {
+                                             InstrList &Converted,
+                                             ValueToValueMapTy &VMap) {
   Value *V = getPointerOperand(I);
   if (V) {
     if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
       Instruction *Inst = C->getAsInstruction();
       Inst->insertBefore(&I);
-
-      DEBUG(llvm::outs() << "I: " << I << "\nInst: " << *Inst << "\n";
-            llvm::outs() << "Users:\n";
-            dumpUsers(*C));
-      setPointerOperand(I, *Inst);
+      DEBUG({
+        llvm::outs() << "I: " << I << "\nInst: " << *Inst << "\n";
+        llvm::outs() << "Users:\n";
+        dumpUsers(*C);
+      });
+      setPointerOperand(I, *Inst, VMap);
+      constantExprToInstruction(*Inst, Converted, VMap);
       Converted.push_back(&I);
     }
   }
