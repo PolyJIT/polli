@@ -26,6 +26,8 @@ struct Stats {
   uint64_t LookupTime;
   uint64_t LastRuntime;
   bool JumpIntoJIT;
+  uint64_t RegionEnter;
+  uint64_t RegionExit;
 };
 
 llvm::Value *registerStatStruct(llvm::Function &F,

@@ -509,6 +509,16 @@ struct InstrumentEndpoint {
         Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
+    Function *TraceFnStatsEntry = cast<Function>(
+        M->getOrInsertFunction("pjit_trace_fnstats_entry", Type::getVoidTy(Ctx),
+                               Type::getInt64PtrTy(Ctx),
+                               Type::getInt1Ty(Ctx), NULL));
+    Function *TraceFnStatsExit = cast<Function>(
+        M->getOrInsertFunction("pjit_trace_fnstats_exit", Type::getVoidTy(Ctx),
+                               Type::getInt64PtrTy(Ctx),
+                               Type::getInt1Ty(Ctx), NULL));
+
+
     To->deleteBody();
     To->setLinkage(GlobalValue::WeakAnyLinkage);
 
@@ -579,11 +589,12 @@ struct InstrumentEndpoint {
     }
 
     Value *PrefixData = polli::registerStatStruct(*To, To->getName());
+    PrefixData = Builder.CreateBitCast(PrefixData, Type::getInt64PtrTy(Ctx));
 
     SmallVector<Value *, 4> Args;
     Args.push_back((PrototypeF) ? PrototypeF
                                 : Builder.CreateGlobalStringPtr(To->getName()));
-    Args.push_back(Builder.CreateBitCast(PrefixData, Type::getInt64PtrTy(Ctx)));
+    Args.push_back(PrefixData);
     Args.push_back(ParamC);
     Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
 
@@ -608,7 +619,11 @@ struct InstrumentEndpoint {
     // function, otherwise we would call ourselves until the jit is ready.
     FallbackF->replaceAllUsesWith(To);
 
+    Value *False = ConstantInt::getFalse(Ctx);
+
+    Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
     Builder.CreateCall(FallbackF, ToArgs);
+    Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
     Builder.CreateBr(Exit);
     Builder.SetInsertPoint(Exit);
     Builder.CreateRetVoid();

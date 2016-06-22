@@ -21,6 +21,8 @@ public:
                            TypeBuilder<types::i<64>, xcompile>::get(Context),
                            TypeBuilder<types::i<64>, xcompile>::get(Context),
                            TypeBuilder<types::i<1>, xcompile>::get(Context),
+                           TypeBuilder<types::i<64>, xcompile>::get(Context),
+                           TypeBuilder<types::i<64>, xcompile>::get(Context),
                            nullptr);
   }
 
@@ -28,7 +30,9 @@ public:
     NUM_CALLS,
     LOOKUP_TIME,
     LAST_RUNTIME,
-    JUMP_INTO_JIT };
+    JUMP_INTO_JIT,
+    REGION_ENTER,
+    REGION_EXIT };
   };
 } // namespace llvm
 

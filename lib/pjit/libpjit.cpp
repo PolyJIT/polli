@@ -385,8 +385,27 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 extern "C" {
 static void printStats(const Stats &S, raw_ostream &OS) {
   outs() << "ID: " << &S << " N: " << S.NumCalls << " LT: " << S.LookupTime
-         << " RT: " << S.LastRuntime << "\n";
+         << " RT: " << S.LastRuntime
+         << " Overhead: " << S.LookupTime * 100 / (double)S.LastRuntime << "%\n";
 }
+
+void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
+  dbgs() << "ID: " << prefix << " IsVariant? " << is_variant << "\n";
+  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+  if (!FnStats)
+    return;
+  FnStats->NumCalls++;
+  FnStats->RegionEnter = PAPI_get_real_nsec();
+}
+
+void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
+  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+  if (!FnStats)
+    return;
+
+  FnStats->RegionExit = PAPI_get_real_nsec();
+}
+
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -400,10 +419,6 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
   static int ok = PAPI_library_init(PAPI_VERSION);
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  if (FnStats) {
-    printStats(*FnStats, outs());
-  }
-
   if (opt::DisableRecompile)
     return false;
 
@@ -422,16 +437,23 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 
   auto FnIt = Context->find(K.first);
 
+  bool JitReady = false;
   if (FnIt != Context->end()) {
-    FnStats->NumCalls++;
     FnStats->LookupTime = PAPI_get_real_nsec() - start;
-    start = PAPI_get_real_nsec();
+    pjit_trace_fnstats_entry(prefix, true);
     (FnIt->second)(paramc, params);
-    FnStats->LastRuntime = PAPI_get_real_nsec() - start;
-    return true /* JIT ready */;
+    pjit_trace_fnstats_exit(prefix, true);
+    FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
+    JitReady = true;
+  } else {
+    FnStats->LookupTime = PAPI_get_real_nsec() - start;
   }
 
-  return false /* JIT not ready */;
+  if (FnStats) {
+    printStats(*FnStats, outs());
+  }
+
+  return JitReady;
 }
 } /* extern "C" */
 } /* polli */
