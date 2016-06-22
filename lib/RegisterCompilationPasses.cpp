@@ -12,7 +12,6 @@
 // Register the compilation sequence required for the PolyJIT runtime support.
 //
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "polyjit"
 #include "polli/InstrumentRegions.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Options.h"
@@ -26,19 +25,21 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
+
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Scalar.h"
 
-
+#define DEBUG_TYPE "polyjit"
+#include "llvm/Support/Debug.h"
 #include "cppformat/format.h"
-
-using namespace llvm;
-using namespace polli;
 
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
+
+using namespace llvm;
+using namespace polli;
 
 namespace polli {
 
@@ -104,23 +105,27 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 
   DEBUG(printConfig());
 
+  PM.add(llvm::createBarrierNoopPass());
+  PM.add(llvm::createInstructionCombiningPass(true));
   PM.add(polly::createCodePreparationPass());
-  polly::registerCanonicalicationPasses(PM);
+  //polly::registerCanonicalicationPasses(PM);
   PM.add(polli::createScopDetectionPass());
 
   if (opt::AnalyzeIR)
     PM.add(new FunctionPassPrinter<polli::JITScopDetection>(outs()));
 
-  if (opt::InstrumentRegions) {
-    PM.add(new PapiCScopProfiling());
-    return;
-  }
+//  if (opt::InstrumentRegions) {
+//    PM.add(new PapiCScopProfiling());
+//    return;
+//  }
 
   if (!opt::DisableRecompile) {
+    PM.add(llvm::createCFGSimplificationPass());
     PM.add(new ModuleExtractor());
     if (opt::AnalyzeIR)
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }
+  PM.add(llvm::createCFGSimplificationPass());
   PM.add(llvm::createBarrierNoopPass());
 }
 
