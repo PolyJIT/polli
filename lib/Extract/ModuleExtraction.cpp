@@ -766,6 +766,33 @@ static bool hasDuplicatePredsInPHI(Function &F) {
   return false;
 }
 
+
+static void fixSuccessorPHI(BasicBlock *BB) {
+  if (!BB)
+    return;
+
+  for (BasicBlock *Succ : llvm::successors(BB)) {
+    for (Instruction &I : *Succ) {
+      if (PHINode *PHI = dyn_cast<PHINode>(&I)) {
+        unsigned n = PHI->getNumIncomingValues();
+        SetVector<BasicBlock *> IncomingEdges;
+        SmallVector<int, 2> MarkedIndices;
+        for (unsigned i = 0; i < n; i++) {
+          BasicBlock *Pred = PHI->getIncomingBlock(n-(i+1));
+          if (!IncomingEdges.insert(Pred))
+            MarkedIndices.push_back(n-(i+1));
+        }
+        for (int j : MarkedIndices) {
+          PHI->removeIncomingValue(j);
+        }
+
+        if (MarkedIndices.size() > 0)
+          PHI->print(dbgs() << "\nFixed: ");
+      }
+    }
+  }
+}
+
 /**
  * @brief Extract all regions marked for extraction into an own function and
  * mark it * as 'polyjit-jit-candidate'.
@@ -801,6 +828,7 @@ static SetVector<Function *> extractCandidates(Function &F,
         CallSite FunctionCall = findExtractedCallSite(*ExtractedF, F);
         if (FunctionCall.isCall() || FunctionCall.isInvoke()) {
           Instruction *I = FunctionCall.getInstruction();
+          BasicBlock *BB = I->getParent();
           auto Arg = ExtractedF->arg_begin();
           for (Use &U : I->operands()) {
             Value *Operand = U.get();
@@ -808,6 +836,7 @@ static SetVector<Function *> extractCandidates(Function &F,
               Arg->addAttr(AttributeSet::get(Ctx, 0, Builder));
             Arg++;
           }
+          fixSuccessorPHI(BB);
         }
 
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
