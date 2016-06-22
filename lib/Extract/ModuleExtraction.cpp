@@ -741,39 +741,48 @@ static CallSite findExtractedCallSite(Function &F, Function &SrcF) {
   return CallSite();
 }
 
+static bool hasDuplicatePredsInPHI(BasicBlock *BB) {
+  for (Instruction &I : *BB) {
+    if (PHINode *PHI = dyn_cast<PHINode>(&I)) {
+      DenseMap<Value *, BasicBlock *> NewValues;
+      SetVector<std::pair<Value *, BasicBlock *>> IncomingValues;
+      unsigned n = PHI->getNumIncomingValues();
+
+      for (unsigned i = 0; i < n; i++) {
+        Value *V = PHI->getIncomingValue(i);
+        BasicBlock *BB = PHI->getIncomingBlock(i);
+        if (BB && !IncomingValues.insert(std::make_pair(V, BB)))
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool hasDuplicatePredsInPHI(Function &F) {
+  for (BasicBlock &BB : F)
+    if (hasDuplicatePredsInPHI(&BB))
+      return true;
+  return false;
+}
+
 /**
- * @brief Extract all SCoP regions in a function into a new Module.
- *
- * This extracts all SCoP regions that are marked for extraction by
- * the ScopDetection pass into a new Module that gets stored as a prototype in
- * the original module. The original function is then replaced with a
- * new version that calls an indirection called 'pjit_main' with the
- * prototype function and original function's arguments as parameters.
- *
- * From there, the PolyJIT can begin working.
- *
- * @param F The Function we extract all SCoPs from.
- * @return bool
+ * @brief Extract all regions marked for extraction into an own function and
+ * mark it * as 'polyjit-jit-candidate'.
  */
-bool ModuleExtractor::runOnFunction(Function &F) {
+static SetVector<Function *> extractCandidates(Function &F,
+                                               JITScopDetection &SD,
+                                               ScalarEvolution &SE,
+                                               DominatorTree &DT) {
   SetVector<Function *> Functions;
-  bool Changed = false;
-
-  if (F.isDeclaration())
-    return false;
-  if (F.hasFnAttribute("polyjit-jit-candidate"))
-    return false;
-
-  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  JITScopDetection &SD = getAnalysis<JITScopDetection>();
-  ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-
-  // Extract all regions marked for extraction into an own function and mark it
-  // as 'polyjit-jit-candidate'.
   std::set<Value *> TrackedParams;
   LLVMContext &Ctx = F.getContext();
   Attribute ParamAttr = llvm::Attribute::get(Ctx, "polli.specialize");
   AttrBuilder Builder(ParamAttr);
+  if (hasDuplicatePredsInPHI(F)) {
+    DuplicatePredsInPHI++;
+    return Functions;
+  }
 
   for (const Region *R : SD) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
@@ -806,10 +815,42 @@ bool ModuleExtractor::runOnFunction(Function &F) {
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
         Functions.insert(ExtractedF);
-        Changed |= true;
       }
     }
   }
+  return Functions;
+}
+
+/**
+ * @brief Extract all SCoP regions in a function into a new Module.
+ *
+ * This extracts all SCoP regions that are marked for extraction by
+ * the ScopDetection pass into a new Module that gets stored as a prototype in
+ * the original module. The original function is then replaced with a
+ * new version that calls an indirection called 'pjit_main' with the
+ * prototype function and original function's arguments as parameters.
+ *
+ * From there, the PolyJIT can begin working.
+ *
+ * @param F The Function we extract all SCoPs from.
+ * @return bool
+ */
+bool ModuleExtractor::runOnFunction(Function &F) {
+  SetVector<Function *> Functions;
+  bool Changed = false;
+
+  if (F.isDeclaration())
+    return false;
+  if (F.hasFnAttribute("polyjit-jit-candidate"))
+    return false;
+
+  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  JITScopDetection &SD = getAnalysis<JITScopDetection>();
+  ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+
+  Functions = extractCandidates(F, SD, SE, DT);
+  if (Functions.size() > 0)
+    Changed |= true;
 
   // Instrument all extracted functions.
   for (Function *F : Functions) {
