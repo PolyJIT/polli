@@ -74,7 +74,7 @@ class FunctionCloner : public OnCreate,
 public:
   explicit FunctionCloner(
       ValueToValueMapTy &map, Module *m = NULL)
-      : ToM(m), From(nullptr), To(nullptr) {}
+      : VMap(map), ToM(m), From(nullptr), To(nullptr) {}
 
   void setTarget(Function *F) { To = F; }
   FunctionCloner &setSource(Function *F) {
@@ -103,7 +103,6 @@ public:
    * If target module does not exist, create the target
    * function in the source module. */
   Function *start(bool RemapCalls = false) {
-    ValueToValueMapTy VMap;
     if (!ToM)
       ToM = From->getParent();
 
@@ -133,6 +132,7 @@ public:
   }
 
 private:
+  ValueToValueMapTy &VMap;
   Module *ToM;
   Function *From;
   Function *To;
