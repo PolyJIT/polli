@@ -126,28 +126,17 @@ static Value *getPointerOperand(Instruction &I) {
  * @param V The value we set as new pointer operand.
  * @return void
  */
-static void setPointerOperand(Instruction &I, Value &V) {
-  IRBuilder<> Builder = IRBuilder<>(&I);
-
-  Value *NewV;
-  if (isa<LoadInst>(&I)) {
-    NewV = Builder.CreateLoad(&V);
+static void setPointerOperand(Instruction &I, Value &V,
+                              ValueToValueMapTy &VMap) {
+  if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
+    LI->llvm::User::setOperand(0, &V);
   } else if (StoreInst *S = dyn_cast<StoreInst>(&I)) {
-    NewV = Builder.CreateStore(S->getValueOperand(), &V);
+    S->setOperand(/*Address operand=*/1, &V);
   } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-    SmallVector<Value *, 4> Indices;
-    for (GetElementPtrInst::const_op_iterator I = GEP->idx_begin(),
-                                              E = GEP->idx_end();
-         I != E; ++I) {
-      Value *V = (*I).get();
-      Indices.push_back(V);
-    }
-    NewV = Builder.CreateGEP(&V, Indices);
-  } else {
-    return;
+    GEP->setOperand(0, &V);
+  } else if (BitCastInst *Cast = dyn_cast<BitCastInst>(&I)) {
+    Cast->setOperand(0, &V);
   }
-
-  I.replaceAllUsesWith(NewV);
 }
 
 /**
@@ -430,16 +419,15 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
+  using namespace std::placeholders;
 
   DEBUG(dbgs() << fmt::format("Source to Prototype -> {:s}\n",
                               F.getName().str()));
   // Prepare the source function.
   // We need to substitute all instructions that use ConstantExpressions.
-  InstrList Converted = apply<InstrList>(F, constantExprToInstruction);
+  InstrList Converted = apply<InstrList>(
+      F, std::bind(constantExprToInstruction, _1, _2, std::ref(VMap)));
 
-  for (Instruction *I : Converted) {
-    I->eraseFromParent();
-  }
 
   // First create a new prototype function.
   ExtractFunction Cloner(VMap, &M);
