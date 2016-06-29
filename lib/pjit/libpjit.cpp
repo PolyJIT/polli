@@ -35,12 +35,22 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
-#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/IR/Mangler.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/ExecutionEngine/Orc/CompileUtils.h"
+#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
+#include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
+#include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
+
+#include "llvm/ExecutionEngine/OrcMCJITReplacement.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/LinkAllPasses.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -51,6 +61,7 @@
 #include "polli/CodeGen.h"
 #include "polli/Options.h"
 #include "polli/RuntimeValues.h"
+#include "polli/RuntimeOptimizer.h"
 #include "polli/RunValues.h"
 #include "polli/Stats.h"
 #include "polli/Tasks.h"
@@ -69,8 +80,8 @@ using namespace polli;
 using namespace spdlog;
 
 namespace {
-using UniqueMod = std::unique_ptr<Module>;
-using UniqueCtx = std::unique_ptr<LLVMContext>;
+using UniqueMod = std::shared_ptr<Module>;
+using UniqueCtx = std::shared_ptr<LLVMContext>;
 
 using spdlog::details::fmt::format;
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
@@ -89,47 +100,10 @@ public:
   ContextIndexT &contexts() { return CtxIndex; }
 
   ~ModManager() {
-    ModuleIndex.clear();
-    CtxIndex.clear();
+//    ModuleIndex.clear();
+//    CtxIndex.clear();
   }
 };
-
-/**
- * @brief Read the LLVM-IR module from the given prototype string.
- *
- * @param prototype The prototype string we want to read in.
- * @return llvm::Module& The LLVM-IR module we just read.
- */
-static Module &getModule(const char *prototype, bool &cache_hit) {
-  static ModManager MM;
-  static mutex _m;
-  ModManager::ModuleIndexT &ModuleIndex = MM.modules();
-  ModManager::ContextIndexT &ContextIndex = MM.contexts();
-  std::lock_guard<std::mutex> L(_m);
-
-  cache_hit = true;
-  if (!MM.modules().count(prototype)) {
-    UniqueCtx Ctx = UniqueCtx(new LLVMContext());
-    MemoryBufferRef Buf(prototype, "polli.prototype.module");
-    SMDiagnostic Err;
-
-    if (UniqueMod Mod = parseIR(Buf, Err, *Ctx)) {
-      DEBUG(Mod->dump());
-      ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
-      ContextIndex.push_back(std::move(Ctx));
-    } else {
-      errs() << format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
-                       Err.getLineNo(), Err.getColumnNo(),
-                       Err.getMessage().str());
-      errs() << format("{:s}\n", prototype);
-    }
-    assert(ModuleIndex[prototype] &&
-           "Parsing the prototype module failed!");
-    cache_hit = false;
-  }
-
-  return *ModuleIndex[prototype];
-}
 
 /**
  * @brief Get the protoype function stored in this module.
@@ -170,68 +144,122 @@ static inline void set_options_from_environment() {
 
 } // end of anonymous namespace
 
-/**
-* @brief Get a new Execution engine for the given module.
-*
-* @param M The module that needs a new execution engine.
-*
-* @return A new execution engine for M.
-*/
-static ExecutionEngine *getEngine(std::unique_ptr<Module> M) {
-  std::string ErrorMsg;
 
-  // If we are supposed to override the target triple, do so now.
-  if (!opt::TargetTriple.empty())
-    M->setTargetTriple(Triple::normalize(opt::TargetTriple));
-
-  EngineBuilder builder(std::move(M));
-  auto MemManager = std::unique_ptr<llvm::SectionMemoryManager>();
-
-  CodeGenOpt::Level OLvl;
-  switch (opt::OptLevel) {
-  default:
-    OLvl = CodeGenOpt::Aggressive;
-    break;
-  case '0':
-    OLvl = CodeGenOpt::None;
-    break;
-  case '1':
-    OLvl = CodeGenOpt::Less;
-    break;
-  case '2':
-    OLvl = CodeGenOpt::Default;
-    break;
-  case '3':
-    OLvl = CodeGenOpt::Aggressive;
-    break;
+namespace polli {
+class PolyJITEngine {
+public:
+  using ObjLayerT = orc::ObjectLinkingLayer<>;
+  using CompileLayerT = orc::IRCompileLayer<ObjLayerT>;
+  using ModuleHandleT = CompileLayerT::ModuleSetHandleT;
+  using UniqueModule = std::unique_ptr<Module>;
+private:
+  using OptimizeFunction = std::function<UniqueModule>(UniqueModule);
+  orc::IRTransformLayer<CompileLayerT, OptimizeFunction> OptimizeLayer;
+public:
+  PolyJITEngine()
+      : TM(EngineBuilder().selectTarget()), DL(TM->createDataLayout()),
+        CompileLayer(ObjectLayer, orc::SimpleCompiler(*TM)),
+        OptimizeLayer(CompileLayer, [this](UniqueModule M) {
+          return polli::OptimizeForRuntime(std::move(M));
+        }) {
+    llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
   }
 
-  builder.setMArch(opt::MArch);
-  builder.setMCPU(opt::MCPU);
-  builder.setMAttrs(opt::MAttrs);
-  builder.setRelocationModel(opt::RelocModel);
-  builder.setCodeModel(opt::CModel);
-  builder.setErrorStr(&ErrorMsg);
-  builder.setEngineKind(EngineKind::JIT);
-  builder.setMCJITMemoryManager(std::move(MemManager));
-  builder.setOptLevel(OLvl);
+  /**
+   * @brief Read the LLVM-IR module from the given prototype string.
+   *
+   * @param prototype The prototype string we want to read in.
+   * @return llvm::Module& The LLVM-IR module we just read.
+   */
+  Module &getModule(const char *prototype, bool &cache_hit) {
+    static ModManager MM;
+    static mutex _m;
+    ModManager::ModuleIndexT &ModuleIndex = MM.modules();
+    //ModManager::ContextIndexT &ContextIndex = MM.contexts();
+    std::lock_guard<std::mutex> L(_m);
 
-  llvm::TargetOptions Options;
-  if (opt::FloatABIForCalls != FloatABI::Default)
-    Options.FloatABIType = opt::FloatABIForCalls;
-  if (opt::GenerateSoftFloatCalls)
-    opt::FloatABIForCalls = FloatABI::Soft;
+    cache_hit = true;
+    if (!MM.modules().count(prototype)) {
+      //UniqueCtx Ctx = UniqueCtx(new LLVMContext());
+      MemoryBufferRef Buf(prototype, "polli.prototype.module");
 
-  builder.setTargetOptions(Options);
-  ExecutionEngine *EE = builder.create();
-  if (!EE)
-    std::cerr << "ERROR: " << ErrorMsg << "\n";
+      SMDiagnostic Err;
+      if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
+        //dbgs() << "PrototypeM:\n";
+        //Mod->dump();
+        ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
+        //ContextIndex.push_back(std::move(Ctx));
+      } else {
+        errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
+                         Err.getLineNo(), Err.getColumnNo(),
+                         Err.getMessage().str());
+        errs() << fmt::format("{:s}\n", prototype);
+      }
+      assert(ModuleIndex[prototype] &&
+             "Parsing the prototype module failed!");
+      cache_hit = false;
+    }
+
+    return *ModuleIndex[prototype];
+  }
+
+  ModuleHandleT addModule(std::unique_ptr<Module> M) {
+    if (CompiledModules.count(M.get()))
+      return CompiledModules[M.get()];
+
+    auto Resolver = orc::createLambdaResolver(
+        [&](const std::string &Name) {
+          if (auto Sym = findSymbol(Name))
+            return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
+          return RuntimeDyld::SymbolInfo(nullptr);
+        },
+        [] (const std::string &S) {
+          if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
+            return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
+          return RuntimeDyld::SymbolInfo(nullptr);
+        }
+    );
+
+    std::vector<std::unique_ptr<Module>> MS;
+    MS.push_back(std::move(M));
+    ModuleHandleT MH = CompileLayer.addModuleSet(std::move(MS), make_unique<SectionMemoryManager>(), std::move(Resolver));
+    CompiledModules.insert(std::make_pair(M.get(), MH));
+    return MH;
+  }
+
+  void removeModule(ModuleHandleT H) {
+    CompileLayer.removeModuleSet(H);
+  }
+
+  orc::JITSymbol findSymbol(const std::string &Name) {
+    std::string MangledName;
+    raw_string_ostream MangledNameStream(MangledName);
+    Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
+    orc::JITSymbol S =CompileLayer.findSymbol(MangledNameStream.str(), false);
+    uint64_t *Addr = (uint64_t *)S.getAddress();
+    outs() << "findSymbol: " << Name << " " << Addr << "\n";
+    return S;
+  }
+
+private:
+  llvm::LLVMContext Ctx;
+  std::unique_ptr<TargetMachine> TM;
+  const DataLayout DL;
+  ObjLayerT ObjectLayer;
+  CompileLayerT CompileLayer;
+  llvm::DenseMap<const char *, Module *> LoadedModules;
+  llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
+};
+
+static PolyJITEngine &getEE() {
+  static PolyJITEngine EE;
   return EE;
+}
 }
 
 static inline Function &getPrototype(const char *function, bool &cache_hit) {
   POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
-  Module &M = getModule(function, cache_hit);
+  Module &M = getEE().getModule(function, cache_hit);
   Function &F = getFunction(M);
   POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   return F;
@@ -241,7 +269,7 @@ namespace polli {
 
 class PolyJIT {
 public:
-  explicit PolyJIT() : VariantFunctions(), CodeCache(), EE(nullptr) {}
+  explicit PolyJIT() : VariantFunctions(), CodeCache() {}
   ~PolyJIT() {
     System.cancel_pending_jobs();
   }
@@ -276,14 +304,6 @@ public:
     return CodeCache.insert(el);
   }
   /**  @} */
-
-  ExecutionEngine &engine(std::unique_ptr<Module> NewM) {
-    if (!EE)
-      EE = getEngine(std::move(NewM));
-    else
-      EE->addModule(std::move(NewM));
-    return *EE;
-  }
 
   /**
    * @name Asynchronous task scheduling interface.
@@ -331,7 +351,6 @@ public:
 private:
   VariantFunctionMapTy VariantFunctions;
   CodeCacheT CodeCache;
-  ExecutionEngine *EE;
   TaskSystem System;
 };
 
@@ -353,6 +372,38 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
                            CacheKey K, JitT Context) {
+  static PolyJITEngine EE;
+  if (Context->find(K) != Context->end())
+    return;
+
+  POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
+  llvm::Function *F = Request->F;
+  VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
+  RunValueList Values = runValues(*Request);
+  std::string FnName;
+  auto Variant = VarFun->createVariant(Values, FnName);
+  if (!Variant)
+    return;
+
+  EE.addModule(std::move(Variant));
+  DEBUG(printRunValues(Values));
+
+
+  orc::JITSymbol FPtr = EE.findSymbol(FnName);
+  assert(FPtr && "Specializer returned nullptr.");
+  if (!Context
+           ->insert(std::make_pair(
+               K, MainFnT((void (*)(int, char **))FPtr.getAddress())))
+           .second) {
+    llvm_unreachable("Key collision");
+  }
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
+}
+
+/*
+static void
+GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
+                           CacheKey K, JitT Context) {
   if (Context->find(K) != Context->end())
     return;
 
@@ -366,7 +417,6 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
     return;
 
   ExecutionEngine &EE = Context->engine(std::move(Variant));
-
   DEBUG(printRunValues(Values));
 
   // Using the MCJIT: This does _NOT_ recompile all added modules.
@@ -381,6 +431,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 }
+*/
 
 extern "C" {
 static void printStats(const Stats &S, raw_ostream &OS) {
@@ -404,6 +455,27 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
     return;
 
   FnStats->RegionExit = PAPI_get_real_nsec();
+}
+
+void pjit_after_param_load(unsigned paramc, char **params) {
+  dbgs() << fmt::format("{:d} Params loaded.\n", paramc);
+}
+
+void pjit_print(char *message) {
+  dbgs() << message << "\n";
+}
+
+void pjit_print_store_addr(char *message, uint64_t idx, uint64_t *addr) {
+//  static std::map<uint64_t, uint64_t> Counts;
+//  if (!Counts.count(idx))
+//    Counts[idx] = 0;
+//  dbgs() << message << " @ " << addr << " no calls: " << Counts[idx] << "\n";
+  dbgs() << message << " @ " << addr << "\n";
+//  Counts[idx]++;
+}
+
+void pjit_print_global_addr(char *message, uint64_t *addr) {
+  dbgs() << message << " @ " << addr << "\n";
 }
 
 /**
@@ -437,21 +509,24 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 
   auto FnIt = Context->find(K.first);
 
+//  polli::printArgs(*F, paramc, params);
   bool JitReady = false;
   if (FnIt != Context->end()) {
-    FnStats->LookupTime = PAPI_get_real_nsec() - start;
-    pjit_trace_fnstats_entry(prefix, true);
+    //FnStats->LookupTime = PAPI_get_real_nsec() - start;
+    //pjit_trace_fnstats_entry(prefix, true);
+    //dbgs() << "Count: " << paramc << "\n";
     (FnIt->second)(paramc, params);
-    pjit_trace_fnstats_exit(prefix, true);
-    FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
+    //pjit_trace_fnstats_exit(prefix, true);
+    //FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
     JitReady = true;
-  } else {
-    FnStats->LookupTime = PAPI_get_real_nsec() - start;
+//    } else {
+//      FnStats->LookupTime = PAPI_get_real_nsec() - start;
   }
 
-  if (FnStats) {
-    printStats(*FnStats, outs());
-  }
+
+//  if (FnStats) {
+//    printStats(*FnStats, outs());
+//  }
 
   return JitReady;
 }
