@@ -298,14 +298,20 @@ struct AddGlobalsPolicy {
       VMap[&Arg] = &*(NewArg++);
     }
 
+    LLVMContext &Ctx = To->getContext();
+    Attribute ParamAttr =
+        llvm::Attribute::get(Ctx, "polli.gv");
+    AttrBuilder Builder;
+    Builder.addAttribute(Attribute::NonNull);
+    Builder.addAttribute(ParamAttr);
+
     GlobalList ReqGlobals = getGVsUsedInFunction(*From);
     for (const GlobalValue *GV : ReqGlobals) {
-      AttrBuilder Builder;
       // It's actually a global variable, so we guarantee that this pointer
       // is not null.
-      Builder.addAttribute(Attribute::NonNull);
+      NewArg->addAttr(AttributeSet::get(Ctx, 0, Builder));
+      NewArg->addAttr(AttributeSet::get(Ctx, 1, Builder));
 
-      NewArg->addAttr(AttributeSet::get(To->getContext(), 1, Builder));
       /* FIXME: We rely heavily on the name later on.
        * The problem is that we do not keep track of mappings between
        * different invocations of the FunctionCloner.
