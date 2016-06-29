@@ -518,15 +518,12 @@ struct InstrumentEndpoint {
         Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
-    Function *TraceFnStatsEntry = cast<Function>(
-        M->getOrInsertFunction("pjit_trace_fnstats_entry", Type::getVoidTy(Ctx),
-                               Type::getInt64PtrTy(Ctx),
-                               Type::getInt1Ty(Ctx), NULL));
-    Function *TraceFnStatsExit = cast<Function>(
-        M->getOrInsertFunction("pjit_trace_fnstats_exit", Type::getVoidTy(Ctx),
-                               Type::getInt64PtrTy(Ctx),
-                               Type::getInt1Ty(Ctx), NULL));
-
+    Function *TraceFnStatsEntry = cast<Function>(M->getOrInsertFunction(
+        "pjit_trace_fnstats_entry", Type::getVoidTy(Ctx),
+        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx), NULL));
+    Function *TraceFnStatsExit = cast<Function>(M->getOrInsertFunction(
+        "pjit_trace_fnstats_exit", Type::getVoidTy(Ctx),
+        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx), NULL));
 
     To->deleteBody();
     To->setLinkage(GlobalValue::WeakAnyLinkage);
@@ -589,7 +586,7 @@ struct InstrumentEndpoint {
         /* Get the appropriate slot in the parameters array and store
          * the stack slot in form of a i8*. */
         Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
-        Value *Dest = Builder.CreateGEP(Params, {Idx0, ArrIdx});
+        Value *Dest = Builder.CreateInBoundsGEP(Params, {Idx0, ArrIdx});
 
         Builder.CreateStore(
             Builder.CreateBitCast(GV, StackArrayT->getArrayElementType()),
@@ -599,13 +596,14 @@ struct InstrumentEndpoint {
 
     Value *PrefixData = polli::registerStatStruct(*To, To->getName());
     PrefixData = Builder.CreateBitCast(PrefixData, Type::getInt64PtrTy(Ctx));
+    Value *CastParams = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
 
     SmallVector<Value *, 4> Args;
     Args.push_back((PrototypeF) ? PrototypeF
                                 : Builder.CreateGlobalStringPtr(To->getName()));
     Args.push_back(PrefixData);
     Args.push_back(ParamC);
-    Args.push_back(Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx)));
+    Args.push_back(CastParams);
 
     BasicBlock *JitReady = BasicBlock::Create(Ctx, "polyjit.ready", To);
     BasicBlock *JitNotReady = BasicBlock::Create(Ctx, "polyjit.not.ready", To);
@@ -861,7 +859,7 @@ static SetVector<Function *> extractCandidates(Function &F,
         }
 
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
-        ExtractedF->setName(ExtractedF->getName() + ".pjit.scop");
+        ExtractedF->setName(F.getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
         Functions.insert(ExtractedF);
