@@ -70,7 +70,7 @@ static PassManagerBuilder createPMB() {
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 0;
 
-  Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
+  Builder.addGlobalExtension(PassManagerBuilder::EP_VectorizerStart,
                              registerPolly);
 
   return Builder;
