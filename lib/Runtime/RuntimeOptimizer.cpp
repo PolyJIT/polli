@@ -60,7 +60,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(createBarrierNoopPass());
 }
 
-static PassManagerBuilder getBuilder() {
+static PassManagerBuilder createPMB() {
   PassManagerBuilder Builder;
 
   Builder.VerifyInput = false;
@@ -81,7 +81,7 @@ std::unique_ptr<Module> OptimizeForRuntime(std::unique_ptr<Module> M) {
 }
 
 Function &OptimizeForRuntime(Function &F) {
-  static PassManagerBuilder Builder = getBuilder();
+  static PassManagerBuilder Builder = createPMB();
   Module *M = F.getParent();
 #ifdef POLLI_STORE_OUTPUT
   opt::GenerateOutput = true;
