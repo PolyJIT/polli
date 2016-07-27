@@ -29,5 +29,11 @@ namespace polli {
 // @param F The function to optimize
 // @return The optimized function.
 Function &OptimizeForRuntime(Function &F);
+
+/// @brief Optimize a module during the runtime of the program.
+//
+// @param M The module to optimize
+// @return The optimized function.
+std::unique_ptr<Module> OptimizeForRuntime(std::unique_ptr<Module> M);
 }
 #endif // RUNTIMEOPTIMIZER_H

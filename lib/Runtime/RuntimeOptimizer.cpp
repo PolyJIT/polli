@@ -76,6 +76,10 @@ static PassManagerBuilder getBuilder() {
   return Builder;
 }
 
+std::unique_ptr<Module> OptimizeForRuntime(std::unique_ptr<Module> M) {
+  return M;
+}
+
 Function &OptimizeForRuntime(Function &F) {
   static PassManagerBuilder Builder = getBuilder();
   Module *M = F.getParent();
