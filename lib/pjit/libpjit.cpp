@@ -137,7 +137,6 @@ public:
   using UniqueModule = std::unique_ptr<Module>;
 private:
   using OptimizeFunction = std::function<UniqueModule(UniqueModule)>;
-  orc::IRTransformLayer<CompileLayerT, OptimizeFunction> OptimizeLayer;
 public:
   PolyJITEngine()
       : TM(EngineBuilder().selectTarget()), DL(TM->createDataLayout()),
@@ -228,6 +227,7 @@ private:
   const DataLayout DL;
   ObjLayerT ObjectLayer;
   CompileLayerT CompileLayer;
+  orc::IRTransformLayer<CompileLayerT, OptimizeFunction> OptimizeLayer;
   llvm::DenseMap<const char *, Module *> LoadedModules;
   llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
 };
