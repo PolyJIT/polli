@@ -90,23 +90,22 @@ struct MainCreator {
   static void CreateUnpackParamsO2(IRBuilder<> &Builder,
                                    ValueToValueMapTy &VMap, Function *SrcF,
                                    Function *TgtF) {
+    LLVMContext &Ctx = Builder.getContext();
     // 2nd argument is our array, 1st is argc
     Function::arg_iterator TgtArg = TgtF->arg_begin();
-    Argument *ArgC = &*TgtArg;
-    Value *ArgV = &*++TgtArg;
+    Argument &ArgV = *++TgtArg;
 
-    ArgC->setName("argc");
-    ArgV->setName("argv");
+
+    ArgV.setName("argv");
 
     // Unpack params. Allocate space on the stack and store the pointers.
     // Some parameters are not required anymore.
-    LLVMContext &Ctx = Builder.getContext();
     unsigned i = 0;
     for (Argument &Arg : SrcF->args()) {
       Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), i++);
 
       Type *ArgTy = Arg.getType();
-      Value *ArrIdx = Builder.CreateInBoundsGEP(ArgV, {IdxI});
+      Value *ArrIdx = Builder.CreateInBoundsGEP(&ArgV, {IdxI});
       Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo());
       Value *LoadArr = Builder.CreateLoad(CastVal, "polyjit.param.idx");
       VMap[&Arg] = LoadArr;
