@@ -1,5 +1,4 @@
-#include <cppformat/format.h>
-
+#include "polli/log.h"
 #include "pprof/pgsql.h"
 #include "pprof/pprof.h"
 #include <pqxx/pqxx>
@@ -11,6 +10,7 @@
 #include <thread>
 
 using namespace pqxx;
+using spdlog::details::fmt::format;
 
 namespace pprof {
 DbOptions getDBOptionsFromEnv() {
@@ -53,7 +53,6 @@ struct DBConnection {
 
 public:
   DBConnection() {
-    using namespace fmt;
     std::string CONNECTION_FMT_STR =
       "user={} port={} host={} dbname={} password={}";
     DbOptions Opts = getDBOptionsFromEnv();
@@ -96,8 +95,6 @@ static DBConnection& getDatabase() {
 }
 
 UuidSet ReadAvailableRunGroups() {
-  using namespace fmt;
-
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::read_transaction txn(*getDatabase().c);
   pqxx::result r = txn.prepared("select_run_groups")(Opts.exp_uuid).exec();
@@ -111,8 +108,6 @@ UuidSet ReadAvailableRunGroups() {
 }
 
 IdVector ReadAvailableRunIDs(std::string run_group) {
-  using namespace fmt;
-
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::read_transaction txn(*getDatabase().c);
   pqxx::result r = txn.prepared("select_run_ids")(run_group).exec();
@@ -183,7 +178,6 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
                                           "start, duration, name, tid, run_id) "
                                           "VALUES";
 
-  using namespace fmt;
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::work w(*getDatabase().c);
   pqxx::result project_exists =
@@ -229,8 +223,6 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
 }
 
 Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
-  using namespace fmt;
-
   DbOptions Opts = getDBOptionsFromEnv();
   Run<Event> Events(run_id);
   Events.clear();
@@ -259,8 +251,6 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
 
 void StoreRunMetrics(long run_id, const Metrics &M) {
   using namespace std;
-  using namespace fmt;
-
   const DbOptions Opts = getDBOptionsFromEnv();
   static std::string NewMetric =
       "INSERT INTO metrics (name, value, run_id) VALUES ('{}', {}, {});";

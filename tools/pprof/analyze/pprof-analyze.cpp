@@ -1,3 +1,4 @@
+#include "polli/log.h"
 #include "pprof/pprof.h"
 #include "pprof/file.h"
 #include "pprof/pgsql.h"
@@ -15,12 +16,9 @@
 
 #include <assert.h>
 #include <memory>
-#include <stdexcept>
-
-#include <cppformat/format.h>
 
 using namespace llvm;
-using namespace fmt;
+namespace fmt = spdlog::details::fmt;
 
 static std::map<uint32_t, uint64_t> PPDurations;
 

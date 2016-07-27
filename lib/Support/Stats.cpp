@@ -8,10 +8,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/TypeBuilder.h"
 
-#include "format.h"
-
 using namespace llvm;
-using namespace fmt;
 
 namespace llvm {
 template <bool xcompile> class TypeBuilder<polli::Stats, xcompile> {

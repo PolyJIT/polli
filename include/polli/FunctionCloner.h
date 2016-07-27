@@ -16,6 +16,7 @@
 #define POLLI_FUNCTION_CLONER_H
 
 #include "polli/Options.h"
+#include "polli/log.h"
 
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
@@ -36,9 +37,8 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
-#include "cppformat/format.h"
-
 using namespace llvm;
+namespace fmt = spdlog::details::fmt;
 
 namespace polli {
 

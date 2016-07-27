@@ -144,18 +144,14 @@ option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" OFF)
 option(POLLI_ENABLE_BASE_POINTERS "Enable SubExpression modelling" OFF)
 option(POLLI_STORE_OUTPUT "Store intermediate SCoPs as IR" OFF)
 
-string(REPLACE "-fno-exceptions" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -Wall")
+string(REPLACE "-fno-exceptions" "-fexceptions" NEW_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${NEW_CMAKE_CXX_FLAGS} -pthread -Wall")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
 
 install(DIRECTORY include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY external/cppformat DESTINATION include/cppformat
-  FILES_MATCHING PATTERN "*.h"
   )
 
 install(DIRECTORY external/isl DESTINATION include/isl
@@ -173,9 +169,9 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
   )
 
 include_directories(AFTER
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/cppformat
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/spdlog/include
   ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/external
+  ${CMAKE_CURRENT_SOURCE_DIR}/external/
   ${CMAKE_CURRENT_SOURCE_DIR}/include/
   ${CMAKE_CURRENT_BINARY_DIR}/include/
 )
@@ -183,10 +179,9 @@ include_directories(AFTER
 set(POLLI_BINARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
 set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
-add_definitions( -DFMT_HEADER_ONLY )
 add_definitions( -D_GNU_SOURCE )
 
+add_subdirectory(tools)
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
-add_subdirectory(tools)

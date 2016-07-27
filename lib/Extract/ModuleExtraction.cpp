@@ -3,6 +3,7 @@
 #include "polli/ModuleExtractor.h"
 #include "polli/Schema.h"
 #include "polli/Stats.h"
+#include "polli/log.h"
 
 #include "llvm/IR/Attributes.h"
 #include "llvm/ADT/SetVector.h"
@@ -34,6 +35,8 @@
 #include <algorithm>
 
 using namespace llvm;
+namespace fmt = spdlog::details::fmt;
+
 #define DEBUG_TYPE "polyjit"
 
 STATISTIC(Instrumented, "Number of instrumented functions");
@@ -800,9 +803,6 @@ static void fixSuccessorPHI(BasicBlock *BB) {
         for (int j : MarkedIndices) {
           PHI->removeIncomingValue(j);
         }
-
-        if (MarkedIndices.size() > 0)
-          PHI->print(dbgs() << "\nFixed: ");
       }
     }
   }

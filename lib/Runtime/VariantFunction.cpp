@@ -4,6 +4,7 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 #include "polli/VariantFunction.h"
+#include "polli/log.h"
 
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
@@ -15,11 +16,10 @@
 
 #include <mutex>
 
-#include "cppformat/format.h"
-
 #define DEBUG_TYPE "polyjit"
 
 using namespace llvm;
+namespace fmt = spdlog::details::fmt;
 
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {

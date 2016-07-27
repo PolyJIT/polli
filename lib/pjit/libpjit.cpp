@@ -28,8 +28,6 @@
 #include <thread>
 #include <unordered_map>
 
-#include "cppformat/format.h"
-
 #define BOOST_THREAD_PROVIDES_FUTURE
 #include <boost/thread/future.hpp>
 
@@ -57,6 +55,7 @@
 #include "polli/Stats.h"
 #include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
+#include "polli/log.h"
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
 
@@ -67,12 +66,13 @@
 
 using namespace llvm;
 using namespace polli;
+using namespace spdlog;
 
 namespace {
 using UniqueMod = std::unique_ptr<Module>;
 using UniqueCtx = std::unique_ptr<LLVMContext>;
 
-using fmt::format;
+using spdlog::details::fmt::format;
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 
@@ -390,7 +390,7 @@ static void printStats(const Stats &S, raw_ostream &OS) {
 }
 
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  dbgs() << "ID: " << prefix << " IsVariant? " << is_variant << "\n";
+  log()->debug("ID: {0:x} IsVariant? {1}\n", (uint64_t)prefix, is_variant);
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
   if (!FnStats)
     return;

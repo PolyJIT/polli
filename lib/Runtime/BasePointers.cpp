@@ -15,6 +15,7 @@
 ///
 //===----------------------------------------------------------------------===//
 #include "polli/BasePointers.h"
+#include "polli/log.h"
 
 #include "polly/Support/SCEVAffinator.h"
 #include "polly/ScopInfo.h"
@@ -36,12 +37,11 @@
 #include "isl/UnionSet.hpp"
 #include "isl/Val.hpp"
 
-#include "format.h"
-
 using namespace isl;
 using namespace polli;
 using namespace polly;
 using namespace llvm;
+using spdlog::details::fmt::format;
 
 namespace polli {
 char BasePointers::ID = 0;
@@ -97,7 +97,7 @@ struct InstructionStmt {
   void print(raw_ostream &OS, unsigned indent = 0) {
     (OS << "\n").indent(indent) << "Inst: ";
     (OS << "\n").indent(indent)
-        << fmt::format("{:s}\n", Schedule.toStr());
+        << format("{:s}\n", Schedule.toStr());
     SubEx->print(OS);
   }
 };
@@ -175,7 +175,7 @@ private:
       for (Instruction &I : *BB) {
         Map InstSchedule = Schedule.addDims(DimType::Out, 1);
         Id InstId = Id::alloc(
-            C, fmt::format("Inst_{:s}_{:d}", BB->getName().str(), i), &I);
+            C, format("Inst_{:s}_{:d}", BB->getName().str(), i), &I);
         Val Idx = Val::intFromSi(C, i++);
         int idx = InstSchedule.dim(DimType::Out);
 

@@ -1,5 +1,3 @@
-#include <cppformat/format.h>
-
 #include "pprof/pprof.h"
 
 #include <fstream>
@@ -56,14 +54,12 @@ Options getPprofOptionsFromEnv() {
  */
 const pprof::Event simplify(const PPEvent &Ev, const PPEvent &ExitEv,
                             uint64_t TimeOffset) {
-  using namespace fmt;
   return pprof::Event(Ev.id(), Ev.event(), Ev.timestamp() - TimeOffset,
                       ExitEv.timestamp() - Ev.timestamp(), Ev.userString());
 }
 
 const Run<PPEvent>::iterator
 getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
-  using namespace fmt;
   const Run<PPEvent>::iterator Cur = It;
 
   while (It != End) {

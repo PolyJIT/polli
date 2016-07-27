@@ -2,6 +2,7 @@ set(LLVM_LINK_COMPONENTS
   ${LLVM_TARGETS_TO_BUILD}
   Support
 )
+
 add_polli_executable(pprof-analyze
   pprof-analyze.cpp
 )

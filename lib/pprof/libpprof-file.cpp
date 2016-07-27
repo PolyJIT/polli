@@ -1,5 +1,3 @@
-#include <cppformat/format.h>
-
 #include "pprof/file.h"
 #include "pprof/pprof.h"
 

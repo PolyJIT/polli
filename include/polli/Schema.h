@@ -11,12 +11,14 @@
 //===----------------------------------------------------------------------===//
 #ifndef POLLI_SCHEMA_H
 #define POLLI_SCHEMA_H
+#include "polli/log.h"
 #include "pprof/pprof.h"
 #include "pprof/pgsql.h"
 #include "llvm/IR/Module.h"
-#include "cppformat/format.h"
 #include <pqxx/pqxx>
 #include <string>
+
+using spdlog::details::fmt::format;
 
 namespace polli {
 using ModulePtr = std::shared_ptr<const llvm::Module>;
@@ -68,8 +70,8 @@ static ConnectionPtr
 createDefaultConnection(const pprof::DbOptions *DbOpts = nullptr) {
   const pprof::DbOptions Opts = DbOpts ? *DbOpts : pprof::getDBOptionsFromEnv();
   std::string ConnectString =
-      fmt::format("user={} port={} host={} dbname={} password={}", Opts.user,
-                  Opts.port, Opts.host, Opts.name, Opts.pass);
+      format("user={} port={} host={} dbname={} password={}", Opts.user,
+             Opts.port, Opts.host, Opts.name, Opts.pass);
   static std::shared_ptr<pqxx::connection> C;
   if (!C || !C->is_open())
     C = std::make_shared<pqxx::connection>(ConnectString);
