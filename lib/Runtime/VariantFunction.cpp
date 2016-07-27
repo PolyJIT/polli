@@ -171,14 +171,6 @@ public:
         [&](Function::arg_iterator &It) { return It->getName() == ArgName; });
   }
 
-    // 'Cheap' find
-    while (result != end && result->getName() != ArgName) {
-      ++result;
-    }
-
-    return result;
-  }
-
   /**
    * @brief Apply the parameter value specialization in the endpoint.
    *

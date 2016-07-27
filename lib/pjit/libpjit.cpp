@@ -77,13 +77,12 @@
 
 using namespace llvm;
 using namespace polli;
-using namespace spdlog;
+namespace fmt = spdlog::details::fmt;
 
 namespace {
 using UniqueMod = std::shared_ptr<Module>;
 using UniqueCtx = std::shared_ptr<LLVMContext>;
 
-using spdlog::details::fmt::format;
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 
@@ -153,7 +152,7 @@ public:
   using ModuleHandleT = CompileLayerT::ModuleSetHandleT;
   using UniqueModule = std::unique_ptr<Module>;
 private:
-  using OptimizeFunction = std::function<UniqueModule>(UniqueModule);
+  using OptimizeFunction = std::function<UniqueModule(UniqueModule)>;
   orc::IRTransformLayer<CompileLayerT, OptimizeFunction> OptimizeLayer;
 public:
   PolyJITEngine()
@@ -185,15 +184,13 @@ public:
 
       SMDiagnostic Err;
       if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
-        //dbgs() << "PrototypeM:\n";
-        //Mod->dump();
         ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
-        //ContextIndex.push_back(std::move(Ctx));
       } else {
-        errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", Err.getFilename().str(),
+        std::string FileName = Err.getFilename().str();
+        errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", FileName,
                          Err.getLineNo(), Err.getColumnNo(),
                          Err.getMessage().str());
-        errs() << fmt::format("{:s}\n", prototype);
+        errs() << fmt::format("{0}\n", prototype);
       }
       assert(ModuleIndex[prototype] &&
              "Parsing the prototype module failed!");
