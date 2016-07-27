@@ -17,26 +17,17 @@
 #include "polli/Options.h"
 #include "polli/PapiProfiling.h"
 #include "polli/RegisterCompilationPasses.h"
-#include "polli/ScopDetection.h"
 #include "polli/log.h"
 
 #include "polly/Canonicalization.h"
 #include "polly/RegisterPasses.h"
 #include "polly/CodeGen/CodegenCleanup.h"
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 
 #define DEBUG_TYPE "polyjit"
-#include "llvm/Support/Debug.h"
-
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
 
 using namespace llvm;
 using namespace polli;

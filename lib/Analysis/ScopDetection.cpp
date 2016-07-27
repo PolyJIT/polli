@@ -7,7 +7,6 @@
 #include "polly/Support/SCEVValidator.h"
 #include "polly/Support/ScopLocation.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/Analysis/RegionIterator.h"
@@ -17,11 +16,8 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IntrinsicInst.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/Support/Debug.h"
 
 #include "polli/log.h"
-#include <set>
 #include <stack>
 
 using namespace llvm;

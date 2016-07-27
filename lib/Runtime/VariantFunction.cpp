@@ -4,18 +4,6 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 #include "polli/VariantFunction.h"
-#include "polli/log.h"
-
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/ValueMap.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
-
-#include <mutex>
 
 #define DEBUG_TYPE "polyjit"
 

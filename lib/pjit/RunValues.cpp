@@ -2,14 +2,11 @@
 #include "polli/RunValues.h"
 #include "polli/log.h"
 
-#include "llvm/IR/Argument.h"
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
-
-#include <string>
 
 using spdlog::details::fmt::format;
 

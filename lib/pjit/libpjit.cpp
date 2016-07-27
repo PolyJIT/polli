@@ -16,15 +16,12 @@
 #include <likwid.h>
 
 #include <stdlib.h>
-#include <pthread.h>
 #include <cstdlib>
 #include <atomic>
 #include <vector>
 #include <condition_variable>
 #include <deque>
 #include <memory>
-#include <mutex>
-#include <string>
 #include <thread>
 #include <unordered_map>
 
@@ -44,21 +41,11 @@
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
 
-#include "llvm/ExecutionEngine/OrcMCJITReplacement.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/LinkAllPasses.h"
 #include "llvm/Support/DynamicLibrary.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Support/PrettyStackTrace.h"
 
-#include "polli/BlockingMap.h"
 #include "polli/Caching.h"
-#include "polli/CodeGen.h"
 #include "polli/Options.h"
 #include "polli/RuntimeValues.h"
 #include "polli/RuntimeOptimizer.h"
@@ -69,9 +56,6 @@
 #include "polli/log.h"
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
-
-#include "papi.h"
-#include "catch.hpp"
 
 #define DEBUG_TYPE "polyjit"
 

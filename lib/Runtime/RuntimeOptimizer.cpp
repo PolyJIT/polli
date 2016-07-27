@@ -15,20 +15,12 @@
 #define DEBUG_TYPE "polyjit"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
-#include "polli/LikwidMarker.h"
-#include "polli/Options.h"
 #include "polli/BasePointers.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Support/Debug.h"
 
-#include "llvm/Pass.h"
-#include "llvm/PassAnalysisSupport.h"
-#include "llvm/PassRegistry.h"
-#include "llvm/PassSupport.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
@@ -36,8 +28,6 @@
 #include "polly/RegisterPasses.h"
 #include "polly/ScopDetection.h"
 #include "polly/Options.h"
-
-#include <unistd.h>
 
 namespace llvm {
 class Function;

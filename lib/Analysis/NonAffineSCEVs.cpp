@@ -3,9 +3,6 @@
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
 
-#include "llvm/Support/Debug.h"
-#include <vector>
-
 using namespace llvm;
 using namespace polli;
 

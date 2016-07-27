@@ -20,22 +20,10 @@
 #include "polly/Support/SCEVAffinator.h"
 #include "polly/ScopInfo.h"
 
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Dominators.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include "isl/Aff.h"
-#include "isl/Ctx.hpp"
 #include "isl/Constraint.hpp"
-#include "isl/LocalSpace.hpp"
-#include "isl/PwAff.hpp"
-#include "isl/Set.hpp"
-#include "isl/Space.hpp"
-#include "isl/UnionMap.hpp"
-#include "isl/UnionSet.hpp"
-#include "isl/Val.hpp"
 
 using namespace isl;
 using namespace polli;

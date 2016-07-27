@@ -1,11 +1,6 @@
 #include "polli/Stats.h"
 
-#include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Value.h"
-#include "llvm/IR/GlobalValue.h"
-#include "llvm/IR/GlobalVariable.h"
-#include "llvm/IR/Type.h"
 #include "llvm/IR/TypeBuilder.h"
 
 using namespace llvm;

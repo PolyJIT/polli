@@ -1,6 +1,4 @@
 #include "polli/Schema.h"
-#include "polli/log.h"
-#include "llvm/Support/raw_ostream.h"
 
 using spdlog::details::fmt::format;
 

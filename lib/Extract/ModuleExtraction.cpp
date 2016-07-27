@@ -3,36 +3,16 @@
 #include "polli/ModuleExtractor.h"
 #include "polli/Schema.h"
 #include "polli/Stats.h"
-#include "polli/log.h"
 
-#include "llvm/IR/Attributes.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
-#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/IR/Attributes.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Dominators.h"
-#include "llvm/IR/Function.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/IR/InstIterator.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
-#include "llvm/IR/Metadata.h"
-#include "llvm/IR/PassManager.h"
-#include "llvm/Pass.h"
-#include "llvm/PassAnalysisSupport.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/IPO.h"
-
-#include <algorithm>
 
 using namespace llvm;
 namespace fmt = spdlog::details::fmt;
