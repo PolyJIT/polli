@@ -166,7 +166,10 @@ public:
   void setParameters(RunValueList const &Values) { SpecValues = Values; }
 
   Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
-    Function::arg_iterator result = F->arg_begin(), end = F->arg_end();
+    return std::find_if(
+        F->arg_begin(), F->arg_end(),
+        [&](Function::arg_iterator &It) { return It->getName() == ArgName; });
+  }
 
     // 'Cheap' find
     while (result != end && result->getName() != ArgName) {
