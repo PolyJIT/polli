@@ -415,10 +415,12 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 */
 
 extern "C" {
-static void printStats(const Stats &S, raw_ostream &OS) {
-  outs() << "ID: " << &S << " N: " << S.NumCalls << " LT: " << S.LookupTime
-         << " RT: " << S.LastRuntime
-         << " Overhead: " << S.LookupTime * 100 / (double)S.LastRuntime << "%\n";
+static void printStats(const Stats &S) {
+  log()->debug(
+    "ID: {0:x} N: {1:d} LT: {2:d} RT: {3:d} Overhead: {4:3.2f}%",
+    (uint64_t)(&S), S.NumCalls, S.LookupTime, S.LastRuntime, S.LookupTime,
+    (S.LookupTime * 100 / (double)S.LastRuntime)
+  );
 }
 
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
@@ -438,27 +440,6 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
   FnStats->RegionExit = PAPI_get_real_nsec();
 }
 
-void pjit_after_param_load(unsigned paramc, char **params) {
-  dbgs() << fmt::format("{:d} Params loaded.\n", paramc);
-}
-
-void pjit_print(char *message) {
-  dbgs() << message << "\n";
-}
-
-void pjit_print_store_addr(char *message, uint64_t idx, uint64_t *addr) {
-//  static std::map<uint64_t, uint64_t> Counts;
-//  if (!Counts.count(idx))
-//    Counts[idx] = 0;
-//  dbgs() << message << " @ " << addr << " no calls: " << Counts[idx] << "\n";
-  dbgs() << message << " @ " << addr << "\n";
-//  Counts[idx]++;
-}
-
-void pjit_print_global_addr(char *message, uint64_t *addr) {
-  dbgs() << message << " @ " << addr << "\n";
-}
-
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -470,7 +451,8 @@ void pjit_print_global_addr(char *message, uint64_t *addr) {
  */
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
-  static int ok = PAPI_library_init(PAPI_VERSION);
+  if (!PAPI_is_initialized())
+    PAPI_library_init(PAPI_VERSION);
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
   if (opt::DisableRecompile)
     return false;
@@ -480,7 +462,6 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   JitT Context = getOrCreateJIT();
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
-  Function *F = Request->F;
   auto FutureFn =
       Context->async(GetOrCreateVariantFunction, Request, K.first, Context);
 
@@ -490,24 +471,20 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 
   auto FnIt = Context->find(K.first);
 
-//  polli::printArgs(*F, paramc, params);
   bool JitReady = false;
   if (FnIt != Context->end()) {
-    //FnStats->LookupTime = PAPI_get_real_nsec() - start;
-    //pjit_trace_fnstats_entry(prefix, true);
-    //dbgs() << "Count: " << paramc << "\n";
+    FnStats->LookupTime = PAPI_get_real_nsec() - start;
+    pjit_trace_fnstats_entry(prefix, true);
     (FnIt->second)(paramc, params);
-    //pjit_trace_fnstats_exit(prefix, true);
-    //FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
+    pjit_trace_fnstats_exit(prefix, true);
+    FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
     JitReady = true;
-//    } else {
-//      FnStats->LookupTime = PAPI_get_real_nsec() - start;
+  } else {
+    FnStats->LookupTime = PAPI_get_real_nsec() - start;
   }
 
-
-//  if (FnStats) {
-//    printStats(*FnStats, outs());
-//  }
+  if (FnStats)
+    printStats(*FnStats);
 
   return JitReady;
 }
