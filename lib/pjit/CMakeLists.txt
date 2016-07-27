@@ -14,7 +14,7 @@ set(LLVM_LINK_COMPONENTS
   IPO
   Linker
   MC
-  MCJIT
+  OrcJIT
   native
   objcarcopts
   RuntimeDyld
