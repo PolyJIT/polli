@@ -217,7 +217,7 @@ public:
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
     orc::JITSymbol S =CompileLayer.findSymbol(MangledNameStream.str(), false);
     uint64_t *Addr = (uint64_t *)S.getAddress();
-    outs() << "findSymbol: " << Name << " " << Addr << "\n";
+    log()->debug("FindSymbol: {0:s} Addr: {0:x}", Name, (uint64_t)Addr);
     return S;
   }
 
