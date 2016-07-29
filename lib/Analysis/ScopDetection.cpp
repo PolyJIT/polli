@@ -954,13 +954,12 @@ void JITScopDetection::findScops(Region &R) {
   if (HasErrors) {
     removeCachedResults(R);
   } else {
+    ++ValidRegion;
     if (Context.requiresJIT) {
       RequiredParams[&R] = Context.RequiredParams;
       ValidRuntimeRegions.insert(&R);
       ++JitRegion;
-      --ValidRegion;
     }
-    ++ValidRegion;
     ValidRegions.insert(&R);
     return;
   }
