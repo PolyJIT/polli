@@ -18,6 +18,7 @@ set(POLLI_LINK_LIBS
   likwid
   pthread
   pqxx
+  boost_system
 )
 
 #if(NOT LINK_POLLY_INTO_TOOLS)
