@@ -41,7 +41,8 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
   return GV;
 }
 
-void trackStatsChange(const llvm::Function *F, const Stats &S,
+void TrackStatsChange(const llvm::Function *F, const Stats &S,
                       PolyJIT &Context) {
+
 }
 } // namespace polli

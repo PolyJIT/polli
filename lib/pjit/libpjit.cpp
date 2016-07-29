@@ -395,7 +395,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   }
 
   if (FnStats)
-    trackStatsChange(Request->F, *FnStats);
+    Context->async(TrackStatsChange(Request->F, *FnStats));
 
   return JitReady;
 }
