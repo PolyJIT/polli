@@ -43,6 +43,7 @@ add_polli_library(pjit STATIC
   libpjit.cpp
   BlockingMap.cpp
   CodeGen.cpp
+  Jit.cpp
   RunValues.cpp
 )
 
@@ -50,6 +51,7 @@ add_polli_library(pjit_shared SHARED
   libpjit.cpp
   BlockingMap.cpp
   CodeGen.cpp
+  Jit.cpp
   RunValues.cpp
 )
 
