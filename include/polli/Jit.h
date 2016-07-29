@@ -15,8 +15,11 @@
 namespace polli {
 
 class PolyJIT {
+  void setup();
 public:
-  explicit PolyJIT() : VariantFunctions(), CodeCache() {}
+  explicit PolyJIT() : VariantFunctions(), CodeCache() {
+    setup();
+  }
   ~PolyJIT() {
     System.cancel_pending_jobs();
   }

@@ -1,4 +1,5 @@
 #include "polli/Jit.h"
+#include "pprof/pprof.h"
 
 #include "llvm/IR/Function.h"
 
@@ -16,5 +17,9 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 
   VariantFunctions.insert(std::make_pair(F, VarFun));
   return VarFun;
+}
+
+void PolyJIT::setup() {
+  papi_region_setup();
 }
 }
