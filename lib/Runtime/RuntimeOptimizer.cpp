@@ -67,6 +67,21 @@ static PassManagerBuilder createPMB() {
 }
 
 std::unique_ptr<Module> OptimizeForRuntime(std::unique_ptr<Module> M) {
+  static PassManagerBuilder Builder = createPMB();
+  legacy::FunctionPassManager PM = legacy::FunctionPassManager(M.get());
+
+  Builder.populateFunctionPassManager(PM);
+#ifdef POLLI_ENABLE_BASE_POINTERS
+  PM.add(polli::createBasePointersPass());
+#endif
+  PM.doInitialization();
+  for (auto &F : *M) {
+    if (F.isDeclaration())
+      continue;
+    PM.run(F);
+  }
+  PM.doFinalization();
+
   return M;
 }
 
