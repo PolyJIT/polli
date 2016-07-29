@@ -209,8 +209,9 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
 
       if (j != i)
         vals << ",";
-      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})", Ev.ID,
-                     Ev.Type, Ev.Start, Ev.Duration, Ev.Name, Ev.TID, run_id);
+
+      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})",
+          Ev.ID, (int)Ev.Type, Ev.Start, Ev.Duration, Ev.Name, Ev.TID, run_id);
     }
     vals << ";";
 
