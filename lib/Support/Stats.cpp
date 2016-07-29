@@ -3,6 +3,8 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/TypeBuilder.h"
 
+#include "polli/Jit.h"
+
 using namespace llvm;
 
 namespace llvm {
@@ -37,5 +39,9 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
                                           "polyjit.stats." + NameSuffix);
   F.setPrefixData(GV);
   return GV;
+}
+
+void trackStatsChange(const llvm::Function *F, const Stats &S,
+                      PolyJIT &Context) {
 }
 } // namespace polli

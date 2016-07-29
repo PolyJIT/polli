@@ -32,5 +32,7 @@ struct Stats {
 
 llvm::Value *registerStatStruct(llvm::Function &F,
                                 const llvm::Twine &NameSuffix);
+
+void trackStatsChange(const llvm::Function *F, const Stats &S);
 } // namespace polli
 #endif /* end of include guard: POLLI_STATS_H */
