@@ -4,6 +4,7 @@
 #include "llvm/IR/TypeBuilder.h"
 
 #include "polli/Jit.h"
+#include "pprof/pprof.h"
 
 using namespace llvm;
 
@@ -41,8 +42,20 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
   return GV;
 }
 
-void TrackStatsChange(const llvm::Function *F, const Stats &S,
-                      PolyJIT &Context) {
+static inline unsigned int getCandidateId(const Function *F) {
+  uint64_t n = 0;
+  std::string name_tag = "polyjit_id";
+  if (F->hasFnAttribute(name_tag))
+    if (!(std::stringstream(
+              F->getFnAttribute(name_tag).getValueAsString()) >>
+          n))
+      n = 0;
+  return n;
+}
 
+uint64_t TrackStatsChange(const llvm::Function *F, const Stats &S) {
+  uint64_t id = getCandidateId(F);
+  record_stats(id, F->getName().str().c_str(), S.RegionEnter, S.RegionExit);
+  return id;
 }
 } // namespace polli

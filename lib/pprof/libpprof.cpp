@@ -142,6 +142,18 @@ void papi_region_enter(uint64_t id, const char *dbg) {
 }
 
 /**
+ * @brief Partially record polli::Stats objects as papi events.
+ */
+void record_stats(uint64_t id, const char *dbg,
+                  uint64_t enter, uint64_t exit) {
+  do_papi_thread_init_once();
+  PPEvent Enter(id, RegionEnter, enter, dbg);
+  PPEvent Exit(id, RegionExit, exit, dbg);
+  papi_local_events()->push_back(Enter);
+  papi_local_events()->push_back(Exit);
+}
+
+/**
  * @brief Mark the exit of a Region
  *
  * @param id An unique ID that identifies the Region.

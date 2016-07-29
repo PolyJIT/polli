@@ -47,6 +47,11 @@ void papi_region_enter(uint64_t id, const char *dbg);
 void papi_region_exit(uint64_t id, const char *dbg);
 
 /**
+ * @brief Partially record polli::Stats objects as papi events.
+ */
+void record_stats(uint64_t id, const char *dbg, uint64_t enter, uint64_t exit);
+
+/**
  * @brief Setup the atexit handler
  */
 void papi_atexit_handler(void);

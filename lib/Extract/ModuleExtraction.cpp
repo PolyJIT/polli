@@ -415,6 +415,7 @@ struct RemoveGlobalsPolicy {
  */
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
+  static unsigned int i = 0;
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
   using namespace std::placeholders;
@@ -429,7 +430,9 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
 
   // First create a new prototype function.
   ExtractFunction Cloner(VMap, &M);
-  return Cloner.setSource(&F).start(true);
+  Function *Proto = Cloner.setSource(&F).start(true);
+  Proto->addFnAttr("polyjit-id", fmt::format("{:d}", i++));
+  return Proto;
 }
 
 /**
