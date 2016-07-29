@@ -16,14 +16,14 @@ namespace pprof {
 DbOptions getDBOptionsFromEnv() {
   DbOptions Opts;
 
-  const char *host = std::getenv("PPROF_DB_HOST");
-  const char *user = std::getenv("PPROF_DB_USER");
-  const char *pass = std::getenv("PPROF_DB_PASS");
-  const char *name = std::getenv("PPROF_DB_NAME");
-  const char *port = std::getenv("PPROF_DB_PORT");
-  const char *run_id = std::getenv("PPROF_DB_RUN_ID");
-  const char *uuid = std::getenv("PPROF_DB_RUN_GROUP");
-  const char *exp_uuid = std::getenv("PPROF_EXPERIMENT_ID");
+  const char *host = std::getenv("BB_DB_HOST");
+  const char *user = std::getenv("BB_DB_USER");
+  const char *pass = std::getenv("BB_DB_PASS");
+  const char *name = std::getenv("BB_DB_NAME");
+  const char *port = std::getenv("BB_DB_PORT");
+  const char *run_id = std::getenv("BB_DB_RUN_ID");
+  const char *uuid = std::getenv("BB_DB_RUN_GROUP");
+  const char *exp_uuid = std::getenv("BB_EXPERIMENT_ID");
 
   Opts.host = host ? host : "localhost";
   Opts.port = port ? stoi(port) : 5432;
@@ -66,10 +66,10 @@ public:
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
       std::string SELECT_SIMPLE_RUN =
-          "SELECT id,type,start,duration,name,tid FROM pprof_events WHERE run_id=$1 ORDER BY "
+          "SELECT id,type,start,duration,name,tid FROM benchbuild_events WHERE run_id=$1 ORDER BY "
           "start;";
       std::string DELETE_SIMPLE_RUN =
-          "DELETE FROM pprof_events WHERE run_id=$1";
+          "DELETE FROM benchbuild_events WHERE run_id=$1";
       std::string SELECT_RUN_IDs =
           "SELECT id FROM run WHERE run_group = $1;";
       std::string SELECT_RUN_GROUPS =
@@ -174,7 +174,7 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
       "project_name, experiment_name, run_group, experiment_group) "
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
-  static std::string NEW_RUN_RESULT_SQL = "INSERT INTO pprof_events (id, type, "
+  static std::string NEW_RUN_RESULT_SQL = "INSERT INTO benchbuild_events (id, type, "
                                           "start, duration, name, tid, run_id) "
                                           "VALUES";
 

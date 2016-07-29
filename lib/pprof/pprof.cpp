@@ -13,16 +13,16 @@ namespace pprof {
 Options getPprofOptionsFromEnv() {
   Options Opts;
 
-  const char *exp = std::getenv("PPROF_EXPERIMENT");
-  const char *prj = std::getenv("PPROF_PROJECT");
-  const char *dom = std::getenv("PPROF_DOMAIN");
-  const char *grp = std::getenv("PPROF_GROUP");
-  const char *uri = std::getenv("PPROF_SRC_URI");
-  const char *cmd = std::getenv("PPROF_CMD");
-  const char *db = std::getenv("PPROF_USE_DATABASE");
-  const char *csv = std::getenv("PPROF_USE_CSV");
-  const char *file = std::getenv("PPROF_USE_FILE");
-  const char *exec = std::getenv("PPROF_ENABLE");
+  const char *exp = std::getenv("BB_EXPERIMENT");
+  const char *prj = std::getenv("BB_PROJECT");
+  const char *dom = std::getenv("BB_DOMAIN");
+  const char *grp = std::getenv("BB_GROUP");
+  const char *uri = std::getenv("BB_SRC_URI");
+  const char *cmd = std::getenv("BB_CMD");
+  const char *db = std::getenv("BB_USE_DATABASE");
+  const char *csv = std::getenv("BB_USE_CSV");
+  const char *file = std::getenv("BB_USE_FILE");
+  const char *exec = std::getenv("BB_ENABLE");
 
   Opts.experiment = exp ? exp : "unknown";
   Opts.project = prj ? prj : "unknown";
