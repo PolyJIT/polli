@@ -216,7 +216,7 @@ public:
     std::string MangledName;
     raw_string_ostream MangledNameStream(MangledName);
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
-    orc::JITSymbol S =CompileLayer.findSymbol(MangledNameStream.str(), false);
+    orc::JITSymbol S = CompileLayer.findSymbol(MangledNameStream.str(), false);
     uint64_t *Addr = (uint64_t *)S.getAddress();
     log()->notice("FindSymbol: {:s} Addr: {:x}", Name, (uint64_t)Addr);
     return S;

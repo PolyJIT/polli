@@ -1,4 +1,5 @@
 #include "polli/Stats.h"
+#include "polli/log.h"
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/TypeBuilder.h"
@@ -42,9 +43,9 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
   return GV;
 }
 
-static inline unsigned int getCandidateId(const Function *F) {
+unsigned int GetCandidateId(const Function *F) {
   uint64_t n = 0;
-  std::string name_tag = "polyjit_id";
+  std::string name_tag = "polyjit-id";
   if (F->hasFnAttribute(name_tag))
     if (!(std::stringstream(
               F->getFnAttribute(name_tag).getValueAsString()) >>

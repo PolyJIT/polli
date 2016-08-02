@@ -34,6 +34,9 @@
 #include <vector>
 #include <deque>
 
+#include "polli/log.h"
+namespace fmt = spdlog::details::fmt;
+
 namespace polli {
 using LockT = std::unique_lock<std::mutex>;
 
@@ -104,13 +107,15 @@ public:
 
 class TaskSystem {
 private:
-  //const unsigned Count{std::thread::hardware_concurrency() - 1};
-  const unsigned Count{1};
+  const unsigned Count{std::thread::hardware_concurrency() - 1};
+  //const unsigned Count{1};
   std::vector<std::thread> Threads;
   std::vector<polli::JobQueue> JobQs{Count};
   std::atomic<unsigned> Index{0};
 
   void run(unsigned i) {
+    pthread_setname_np(pthread_self(),
+                       fmt::format("polyjit_worker_{:d}", i).c_str());
     while (true) {
       std::function<void()> F;
 
