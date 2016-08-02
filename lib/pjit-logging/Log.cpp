@@ -11,14 +11,11 @@ static inline void setup() {
     return;
   init = true;
 
-  spdlog::set_async_mode(8192);
+  spdlog::set_async_mode(1048576);
   spdlog::set_level(LOG_LEVEL);
 
   auto sharedFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-      LOG_FILENAME, "txt", LOG_SIZE, 1, true);
-  auto default_log = std::make_shared<spdlog::logger>("default", sharedFileSink);
-  auto pprof_log = std::make_shared<spdlog::logger>("pprof", sharedFileSink);
-
+      LOG_FILENAME, "log", LOG_SIZE, 5, false);
   spdlog::create("default", {sharedFileSink});
   spdlog::create("pprof", {sharedFileSink});
 }
