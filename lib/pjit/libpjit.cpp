@@ -217,7 +217,7 @@ private:
   llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
 };
 
-static PolyJITEngine &getEE() {
+static PolyJITEngine &getOrCreateEngine() {
   static PolyJITEngine EE;
   return EE;
 }
@@ -225,7 +225,7 @@ static PolyJITEngine &getEE() {
 
 static inline Function &getPrototype(const char *function, bool &cache_hit) {
   POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
-  Module &M = getEE().getModule(function, cache_hit);
+  Module &M = getOrCreateEngine().getModule(function, cache_hit);
   Function &F = getFunction(M);
   POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   return F;
@@ -251,7 +251,7 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
                            CacheKey K, uint64_t prefix, JitT Context) {
-  static PolyJITEngine EE;
+  PolyJITEngine &EE = getOrCreateEngine();
   log()->notice("{:s}: Enter GetOrCreateVariantFunction.",
                 Request->F->getName().str());
   if (Context->find(K) != Context->end())
@@ -260,6 +260,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   Context->UpdatePrefixMap(prefix, Request->F);
   log()->notice("{:s}: Create new Variant.", Request->F->getName().str());
   log()->notice("Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
+
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
   llvm::Function *F = Request->F;
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
@@ -397,6 +398,9 @@ public:
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
+
+    getOrCreateEngine();
+    getOrCreateJIT();
   }
 };
 
