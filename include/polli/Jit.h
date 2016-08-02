@@ -29,6 +29,7 @@ public:
   using iterator = CodeCacheT::iterator;
   using const_iterator = CodeCacheT::const_iterator;
   using value_type = CodeCacheT::mapped_type;
+  using fn_type = llvm::Function;
 
   const_iterator find(const CacheKey &K) const { return CodeCache.find(K); }
 
@@ -82,10 +83,15 @@ public:
    * @return A variant function for function F
    */
   VariantFunctionTy getOrCreateVariantFunction(llvm::Function *F);
+
+  void UpdatePrefixMap(uint64_t Prefix, const llvm::Function *);
+  const fn_type *FromPrefix(uint64_t K) { return PrefixToFnMap[K]; }
 private:
   VariantFunctionMapTy VariantFunctions;
   CodeCacheT CodeCache;
   TaskSystem System;
+
+  std::unordered_map<uint64_t, const llvm::Function *> PrefixToFnMap;
 };
 }
 #endif /* end of include guard: POLLI_JIT_H */

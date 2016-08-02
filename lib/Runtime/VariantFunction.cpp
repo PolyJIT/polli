@@ -4,6 +4,8 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 #include "polli/VariantFunction.h"
+#include "polli/Stats.h"
+#include "polli/log.h"
 
 #define DEBUG_TYPE "polyjit"
 
@@ -301,7 +303,13 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
     Specializer.setParameters(K);
     Specializer.setSource(&BaseF);
 
+    if (!BaseF.hasFnAttribute("polyjit-id"))
+      log()->warn("{:s} has no polyjit-id. Tracking will not work.",
+                  BaseF.getName().str());
+
     F = &OptimizeForRuntime(*Specializer.start(true));
+    F->addFnAttr("polyjit-id",
+                 fmt::format("{:d}", polli::GetCandidateId(&BaseF)));
     FnName = F->getName().str();
   }
   return NewM;

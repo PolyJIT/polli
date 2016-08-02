@@ -263,11 +263,12 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
-                           CacheKey K, JitT Context) {
+                           CacheKey K, uint64_t prefix, JitT Context) {
   static PolyJITEngine EE;
   if (Context->find(K) != Context->end())
     return;
 
+  Context->UpdatePrefixMap(prefix, Request->F);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
   llvm::Function *F = Request->F;
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
@@ -373,8 +374,8 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   JitT Context = getOrCreateJIT();
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
-  auto FutureFn =
-      Context->async(GetOrCreateVariantFunction, Request, K.first, Context);
+  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, K.first,
+                                 (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!K.second)

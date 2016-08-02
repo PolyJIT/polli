@@ -22,4 +22,8 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 void PolyJIT::setup() {
   papi_region_setup();
 }
+
+void PolyJIT::UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F) {
+  PrefixToFnMap[Prefix] = F;
+}
 }
