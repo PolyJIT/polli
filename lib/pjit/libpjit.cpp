@@ -116,6 +116,7 @@ static inline void do_shutdown() {
 
   POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
   POLLI_TRACING_FINALIZE;
+  log()->notice("PolyJIT engine stopped.");
 }
 
 static inline void set_options_from_environment() {
@@ -168,13 +169,15 @@ public:
         ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
       } else {
         std::string FileName = Err.getFilename().str();
-        errs() << fmt::format("{:s}:{:d}:{:d} {:s}\n", FileName,
-                         Err.getLineNo(), Err.getColumnNo(),
-                         Err.getMessage().str());
-        errs() << fmt::format("{0}\n", prototype);
+        log()->critical("{:s}:{:d}:{:d} {:s}", FileName, Err.getLineNo(),
+                        Err.getColumnNo(), Err.getMessage().str());
+        log()->critical("{0}", prototype);
       }
-      assert(ModuleIndex[prototype] &&
-             "Parsing the prototype module failed!");
+
+      auto PrototypeM = ModuleIndex[prototype];
+      if (!PrototypeM)
+        log()->critical("Parsing the prototype module at failed.");
+      assert(PrototypeM && "Parsing the prototype module failed!");
       cache_hit = false;
     }
 
@@ -215,7 +218,7 @@ public:
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
     orc::JITSymbol S =CompileLayer.findSymbol(MangledNameStream.str(), false);
     uint64_t *Addr = (uint64_t *)S.getAddress();
-    log()->debug("FindSymbol: {0:s} Addr: {0:x}", Name, (uint64_t)Addr);
+    log()->notice("FindSymbol: {:s} Addr: {:x}", Name, (uint64_t)Addr);
     return S;
   }
 
@@ -265,22 +268,27 @@ static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
                            CacheKey K, uint64_t prefix, JitT Context) {
   static PolyJITEngine EE;
+  log()->notice("{:s}: Enter GetOrCreateVariantFunction.",
+                Request->F->getName().str());
   if (Context->find(K) != Context->end())
     return;
 
   Context->UpdatePrefixMap(prefix, Request->F);
+  log()->notice("{:s}: Create new Variant.", Request->F->getName().str());
+  log()->notice("Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
   llvm::Function *F = Request->F;
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
   RunValueList Values = runValues(*Request);
   std::string FnName;
   auto Variant = VarFun->createVariant(Values, FnName);
-  if (!Variant)
+  if (!Variant) {
+    log()->error("Failed.");
     return;
+  }
 
   EE.addModule(std::move(Variant));
   DEBUG(printRunValues(Values));
-
 
   orc::JITSymbol FPtr = EE.findSymbol(FnName);
   assert(FPtr && "Specializer returned nullptr.");
@@ -288,6 +296,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
            ->insert(std::make_pair(
                K, MainFnT((void (*)(int, char **))FPtr.getAddress())))
            .second) {
+    log()->critical("Key collision in function cache, abort.");
     llvm_unreachable("Key collision");
   }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
@@ -327,16 +336,8 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 */
 
 extern "C" {
-static void printStats(const Stats &S) {
-  log()->debug(
-    "ID: {0:x} N: {1:d} LT: {2:d} RT: {3:d} Overhead: {4:3.2f}%",
-    (uint64_t)(&S), S.NumCalls, S.LookupTime, S.LastRuntime, S.LookupTime,
-    (S.LookupTime * 100 / (double)S.LastRuntime)
-  );
-}
-
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  log()->debug("ID: {0:x} IsVariant? {1}\n", (uint64_t)prefix, is_variant);
+  log()->notice("ID: {0:x} IsVariant? {1}", (uint64_t)prefix, is_variant);
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
   if (!FnStats)
     return;
@@ -378,13 +379,17 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                                  (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
+  log()->notice("Hash: {0:x} IR: {2:x} CacheHit? {1:d}", K.first.ValueHash,
+                K.second, (uint64_t)K.first.IR);
   if (!K.second)
     FutureFn.wait();
 
   auto FnIt = Context->find(K.first);
+  log()->notice("FnIt: {0:d}", FnIt != Context->end());
 
   bool JitReady = false;
   if (FnIt != Context->end()) {
+    log()->notice("Called variant: {0:s}", Request->F->getName().str());
     FnStats->LookupTime = PAPI_get_real_nsec() - start;
     pjit_trace_fnstats_entry(prefix, true);
     (FnIt->second)(paramc, params);
@@ -398,6 +403,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   if (FnStats)
     Context->async(TrackStatsChange, Request->F, *FnStats);
 
+  log()->notice("pjit_main complete - Cache Ready? {:d}", JitReady);
   return JitReady;
 }
 } /* extern "C" */
@@ -416,6 +422,8 @@ public:
     // Make sure to initialize tracing before planting the atexit handler.
     POLLI_TRACING_INIT;
     POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
+    log()->notice("");
+    log()->notice("PolyJIT engine started.");
 
     // We want to register this after the tracing atexit handler.
     atexit(do_shutdown);
