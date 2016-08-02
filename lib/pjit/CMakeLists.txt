@@ -35,6 +35,7 @@ set(POLLI_LINK_LIBS
   pfm
   papi
   pprof
+  pjit-logging
   boost_system
   boost_thread
 )

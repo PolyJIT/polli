@@ -7,6 +7,7 @@ add_subdirectory(Transform)
 
 add_subdirectory(pprof)
 add_subdirectory(pjit)
+add_subdirectory(pjit-logging)
 
 set(POLLI_LINK_LIBS
   PolyJIT_Analysis
@@ -15,6 +16,7 @@ set(POLLI_LINK_LIBS
   PolyJIT_Runtime
   PolyJIT_Support
   PolyJIT_Transform
+  pjit-logging
   likwid
   pthread
   pqxx
