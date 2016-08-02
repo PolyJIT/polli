@@ -351,6 +351,9 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
     return;
 
   FnStats->RegionExit = PAPI_get_real_nsec();
+  JitT Context = getOrCreateJIT();
+  Context->async(TrackStatsChange, Context->FromPrefix((uint64_t)prefix),
+                 *FnStats);
 }
 
 /**
@@ -399,9 +402,6 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   } else {
     FnStats->LookupTime = PAPI_get_real_nsec() - start;
   }
-
-  if (FnStats)
-    Context->async(TrackStatsChange, Request->F, *FnStats);
 
   log()->notice("pjit_main complete - Cache Ready? {:d}", JitReady);
   return JitReady;
