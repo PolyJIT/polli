@@ -181,7 +181,9 @@ public:
 
     std::vector<std::unique_ptr<Module>> MS;
     MS.push_back(std::move(M));
-    ModuleHandleT MH = CompileLayer.addModuleSet(std::move(MS), make_unique<SectionMemoryManager>(), std::move(Resolver));
+    ModuleHandleT MH = CompileLayer.addModuleSet(
+        std::move(MS), make_unique<SectionMemoryManager>(),
+        std::move(Resolver));
     CompiledModules.insert(std::make_pair(M.get(), MH));
     return MH;
   }
@@ -283,39 +285,6 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 }
-
-/*
-static void
-GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
-                           CacheKey K, JitT Context) {
-  if (Context->find(K) != Context->end())
-    return;
-
-  POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
-  llvm::Function *F = Request->F;
-  VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
-  RunValueList Values = runValues(*Request);
-  std::string FnName;
-  auto Variant = VarFun->createVariant(Values, FnName);
-  if (!Variant)
-    return;
-
-  ExecutionEngine &EE = Context->engine(std::move(Variant));
-  DEBUG(printRunValues(Values));
-
-  // Using the MCJIT: This does _NOT_ recompile all added modules.
-  // The fact that MCJIT does not support recompilation, saves us here.
-  EE.finalizeObject();
-
-  uint64_t FPtr = EE.getFunctionAddress(FnName);
-  assert(FPtr && "Specializer returned nullptr.");
-  if (!Context->insert(
-          std::make_pair(K, MainFnT((void (*)(int, char **))FPtr))).second) {
-    llvm_unreachable("Key collision");
-  }
-  POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
-}
-*/
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
