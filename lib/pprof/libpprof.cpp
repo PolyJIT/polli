@@ -20,10 +20,19 @@
 
 #include "pprof/pgsql.h"
 #include "pprof/file.h"
+#include "polli/log.h"
+
+#include "spdlog/spdlog.h"
 
 using namespace pprof;
+namespace spd = spdlog;
 
 namespace pprof {
+std::shared_ptr<spd::logger> log() {
+  static auto l = polli::log("pprof");
+  return l;
+}
+
 Options *getOptions() {
   static Options opts = getPprofOptionsFromEnv();
   return &opts;
@@ -87,8 +96,8 @@ static inline void do_papi_thread_init_once() {
         PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
       } else {
-        fprintf(stderr, "[ERROR] PAPI_thread_init() = %d\n", ret);
-        fprintf(stderr, "[ERROR] %s\n", PAPI_strerror(ret));
+        log()->error("PAPI_thread_init() = {:d}", ret);
+        log()->error("{:s}", PAPI_strerror(ret));
         exit(ret);
       }
     } else {
@@ -187,10 +196,10 @@ void papi_atexit_handler(void) {
   }
   if (opts.use_db) {
     thread::id tid = std::this_thread::get_id();
-    fprintf(stderr, "libpprof: %ld tid %ld events - %f MB\n",
-            papi_get_tid_map()[tid], papi_threaded_events()[tid].size(),
-            papi_threaded_events()[tid].size() * sizeof(PPEvent) /
-                (double)(1024 * 1024));
+    log()->notice("libpprof: {:d} tid {:d} events - {:f} MB",
+                  papi_get_tid_map()[tid], papi_threaded_events()[tid].size(),
+                  papi_threaded_events()[tid].size() * sizeof(PPEvent) /
+                      (double)(1024 * 1024));
 
     pgsql::StoreRun(papi_get_tid_map()[tid], papi_threaded_events()[tid], opts);
   }
@@ -211,16 +220,18 @@ void papi_atexit_handler(void) {
 void papi_region_setup() {
   int init = PAPI_library_init(PAPI_VER_CURRENT);
   if (init != PAPI_VER_CURRENT) {
-    fprintf(stderr, "[ERROR] PAPI_library_init = %d\n", init);
-    fprintf(stderr, "[ERROR] %s\n", PAPI_strerror(init));
+    log()->error("[ERROR] PAPI_library_init = {:d}", init);
+    log()->error("[ERROR] {:s}", PAPI_strerror(init));
   }
 
   papi_init = true;
   do_papi_thread_init_once();
 
+  uint64_t tid = papi_get_thread_id();
+  log()->notice("papi_region_setup from thread: {:d}", tid);
+
   if (int err = atexit(papi_atexit_handler))
-    fprintf(stderr, "[ERROR] Failed to setup papi_atexit_handler (%d).\n",
-            err);
+    log()->error("Failed to setup papi_atexit_handler ({:d}).", err);
 
   papi_local_events()->push_back(PPEvent(0, RegionEnter, "START"));
   papi_init = true;
