@@ -3,6 +3,7 @@
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/TypeBuilder.h"
+#include "llvm/IR/Function.h"
 
 #include "polli/Jit.h"
 #include "pprof/pprof.h"
@@ -43,29 +44,37 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
   return GV;
 }
 
-unsigned int GetCandidateId(const Function *F) {
+unsigned int GetCandidateId(const Function &F) {
   uint64_t n = 0;
   std::string name_tag = "polyjit-id";
-  if (F->hasFnAttribute(name_tag))
+  if (F.hasFnAttribute(name_tag))
     if (!(std::stringstream(
-              F->getFnAttribute(name_tag).getValueAsString()) >>
+              F.getFnAttribute(name_tag).getValueAsString()) >>
           n))
       n = 0;
   return n;
 }
 
-static void printStats(const llvm::Function *F, const Stats &S) {
+static void printStats(const llvm::Function &F, const Stats &S) {
   log()->notice(
       "F: {:s} ID: {:x} N: {:d} LT: {:d} RT: {:d} Overhead: {:3.2f}%",
-      F->getName().str(), (uint64_t)(&S), S.NumCalls, S.LookupTime,
+      F.getName().str(), (uint64_t)(&S), S.NumCalls, S.LookupTime,
       S.LastRuntime, (S.LookupTime * 100 / (double)S.LastRuntime));
 }
 
-uint64_t TrackStatsChange(const llvm::Function *F, Stats &S) {
+uint64_t TrackStatsChange(const llvm::Function *F, Stats S) {
+  if (!F)
+    log()->error("Function is a nullptr!");
+  assert(F && "Function argument is a nullptr!");
+
+  if (F->isDeclaration())
+    log()->error("Function needs a definition for tracking.");
+  assert(!F->isDeclaration() && "Function needs to have a definition!");
+
   S.LastRuntime = S.RegionExit - S.RegionEnter;
   printStats(F, S);
 
-  uint64_t id = GetCandidateId(F);
+  uint64_t id = GetCandidateId(*F);
   log()->notice("Candidate ID: {:d}", id);
   record_stats(id, F->getName().str().c_str(), S.RegionEnter, S.RegionExit);
   return id;

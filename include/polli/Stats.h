@@ -33,7 +33,7 @@ struct Stats {
 llvm::Value *registerStatStruct(llvm::Function &F,
                                 const llvm::Twine &NameSuffix);
 
-uint64_t TrackStatsChange(const llvm::Function *F, Stats &S);
-unsigned int GetCandidateId(const llvm::Function *F);
+uint64_t TrackStatsChange(const llvm::Function *F, Stats S);
+unsigned int GetCandidateId(const llvm::Function &F);
 } // namespace polli
 #endif /* end of include guard: POLLI_STATS_H */

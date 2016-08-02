@@ -309,7 +309,7 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
 
     F = &OptimizeForRuntime(*Specializer.start(true));
     F->addFnAttr("polyjit-id",
-                 fmt::format("{:d}", polli::GetCandidateId(&BaseF)));
+                 fmt::format("{:d}", polli::GetCandidateId(BaseF)));
     FnName = F->getName().str();
   }
   return NewM;
