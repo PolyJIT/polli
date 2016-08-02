@@ -98,7 +98,6 @@ static inline void do_shutdown() {
 
   POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
   POLLI_TRACING_FINALIZE;
-  log()->notice("PolyJIT engine stopped.");
 }
 
 static inline void set_options_from_environment() {
@@ -125,6 +124,7 @@ public:
         OptimizeLayer(CompileLayer, [this](UniqueModule M) {
           return polli::OptimizeForRuntime(std::move(M));
         }) {
+    log()->notice("Starting PolyJIT Engine.");
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
   }
 
@@ -198,6 +198,10 @@ public:
     uint64_t *Addr = (uint64_t *)S.getAddress();
     log()->notice("FindSymbol: {:s} Addr: {:x}", Name, (uint64_t)Addr);
     return S;
+  }
+
+  ~PolyJITEngine () {
+    log()->notice("Stopping PolyJIT Engine.");
   }
 
 private:
@@ -401,7 +405,7 @@ public:
     POLLI_TRACING_INIT;
     POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
     log()->notice("");
-    log()->notice("PolyJIT engine started.");
+    log()->notice("StaticInitializer running.");
 
     // We want to register this after the tracing atexit handler.
     atexit(do_shutdown);
