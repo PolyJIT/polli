@@ -16,13 +16,10 @@ namespace polli {
 
 class PolyJIT {
   void setup();
+
 public:
-  explicit PolyJIT() : VariantFunctions(), CodeCache() {
-    setup();
-  }
-  ~PolyJIT() {
-    System.cancel_pending_jobs();
-  }
+  explicit PolyJIT() : VariantFunctions(), CodeCache() { setup(); }
+  ~PolyJIT() { System.cancel_pending_jobs(); }
 
   /**
    * @name CodeCache interface.
@@ -34,12 +31,19 @@ public:
   using value_type = CodeCacheT::mapped_type;
 
   const_iterator find(const CacheKey &K) const { return CodeCache.find(K); }
+
   iterator begin() { return CodeCache.begin(); }
+
   const_iterator begin() const { return CodeCache.begin(); }
+
   iterator end() { return CodeCache.end(); }
+
   const_iterator end() const { return CodeCache.end(); }
+
   value_type operator[](CacheKey &K) { return CodeCache[K]; }
+
   const value_type operator[](const CacheKey &K) { return CodeCache[K]; }
+
   std::pair<iterator, bool> insert(const CodeCacheT::value_type &el) {
     return CodeCache.insert(el);
   }
