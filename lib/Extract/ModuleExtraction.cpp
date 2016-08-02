@@ -415,7 +415,7 @@ struct RemoveGlobalsPolicy {
  */
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
-  static unsigned int i = 0;
+  static unsigned int i = 65536;
   using ExtractFunction =
       FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
   using namespace std::placeholders;
