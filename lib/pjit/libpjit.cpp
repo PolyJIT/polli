@@ -68,24 +68,6 @@ using UniqueCtx = std::shared_ptr<LLVMContext>;
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 
-class ModManager {
-public:
-  using ModuleIndexT = DenseMap<const char *, UniqueMod>;
-  using ContextIndexT = SmallVector<UniqueCtx, 8>;
-private:
-  ModuleIndexT ModuleIndex;
-  ContextIndexT CtxIndex;
-
-public:
-  ModuleIndexT &modules() { return ModuleIndex; }
-  ContextIndexT &contexts() { return CtxIndex; }
-
-  ~ModManager() {
-//    ModuleIndex.clear();
-//    CtxIndex.clear();
-  }
-};
-
 /**
  * @brief Get the protoype function stored in this module.
  *
@@ -153,20 +135,16 @@ public:
    * @return llvm::Module& The LLVM-IR module we just read.
    */
   Module &getModule(const char *prototype, bool &cache_hit) {
-    static ModManager MM;
     static mutex _m;
-    ModManager::ModuleIndexT &ModuleIndex = MM.modules();
-    //ModManager::ContextIndexT &ContextIndex = MM.contexts();
     std::lock_guard<std::mutex> L(_m);
 
     cache_hit = true;
-    if (!MM.modules().count(prototype)) {
-      //UniqueCtx Ctx = UniqueCtx(new LLVMContext());
+    if (!LoadedModules.count(prototype)) {
       MemoryBufferRef Buf(prototype, "polli.prototype.module");
 
       SMDiagnostic Err;
       if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
-        ModuleIndex.insert(std::make_pair(prototype, std::move(Mod)));
+        LoadedModules.insert(std::make_pair(prototype, std::move(Mod)));
       } else {
         std::string FileName = Err.getFilename().str();
         log()->critical("{:s}:{:d}:{:d} {:s}", FileName, Err.getLineNo(),
@@ -174,14 +152,14 @@ public:
         log()->critical("{0}", prototype);
       }
 
-      auto PrototypeM = ModuleIndex[prototype];
+      auto PrototypeM = LoadedModules[prototype];
       if (!PrototypeM)
         log()->critical("Parsing the prototype module at failed.");
       assert(PrototypeM && "Parsing the prototype module failed!");
       cache_hit = false;
     }
 
-    return *ModuleIndex[prototype];
+    return *LoadedModules[prototype];
   }
 
   ModuleHandleT addModule(std::unique_ptr<Module> M) {
@@ -229,7 +207,7 @@ private:
   ObjLayerT ObjectLayer;
   CompileLayerT CompileLayer;
   orc::IRTransformLayer<CompileLayerT, OptimizeFunction> OptimizeLayer;
-  llvm::DenseMap<const char *, Module *> LoadedModules;
+  llvm::DenseMap<const char *, UniqueMod> LoadedModules;
   llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
 };
 
