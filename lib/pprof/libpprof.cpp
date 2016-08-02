@@ -205,13 +205,16 @@ void papi_atexit_handler(void) {
     bytes += elem.second.size() * sizeof(PPEvent);
   }
   if (opts.use_db) {
-    thread::id tid = std::this_thread::get_id();
-    log()->notice("libpprof: {:d} tid {:d} events - {:f} MB",
-                  papi_get_tid_map()[tid], papi_threaded_events()[tid].size(),
-                  papi_threaded_events()[tid].size() * sizeof(PPEvent) /
-                      (double)(1024 * 1024));
+    for (auto KV : papi_get_tid_map()) {
+      thread::id tid = KV.first;
+      uint64_t id = KV.second;
+      log()->notice("papi_atexit_handler({:d}): {:d} events - {:f} MB", id,
+                    papi_threaded_events()[tid].size(),
+                    papi_threaded_events()[tid].size() * sizeof(PPEvent) /
+                        (double)(1024 * 1024));
+      pgsql::StoreRun(id, papi_threaded_events()[tid], opts);
+    }
 
-    pgsql::StoreRun(papi_get_tid_map()[tid], papi_threaded_events()[tid], opts);
   }
   if (opts.use_file)
     file::StoreRun(PapiEvents, opts);
