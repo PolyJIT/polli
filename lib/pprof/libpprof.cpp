@@ -86,15 +86,22 @@ Run<PPEvent> PapiEvents;
 static __thread bool papi_thread_init = false;
 static bool papi_init = false;
 static inline void do_papi_thread_init_once() {
+  log()->notice("do_papi_thread_init_once({:d})", papi_get_thread_id());
   if (!papi_thread_init) {
-    if (!papi_init)
+    if (!papi_init) {
+      log()->notice("do_papi_thread_init_once({:d}): call papi_region-setup()",
+                   papi_get_thread_id());
       papi_region_setup();
+    }
     int ret = PAPI_thread_init(papi_get_thread_id);
 
     if (ret != PAPI_OK) {
       if (ret == PAPI_ENOINIT) {
         PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
+        log()->notice(
+            "do_papi_thread_init_once({:d}): call do_papi_thread_init_once()",
+            papi_get_thread_id());
       } else {
         log()->error("PAPI_thread_init() = {:d}", ret);
         log()->error("{:s}", PAPI_strerror(ret));
@@ -103,6 +110,8 @@ static inline void do_papi_thread_init_once() {
     } else {
       papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
       papi_thread_init = (ret == PAPI_OK);
+      log()->notice("do_papi_thread_init_once({:d}): initialized",
+                   papi_get_thread_id());
     }
   }
 }
@@ -160,6 +169,7 @@ void record_stats(uint64_t id, const char *dbg,
   PPEvent Exit(id, RegionExit, exit, dbg);
   papi_local_events()->push_back(Enter);
   papi_local_events()->push_back(Exit);
+  log()->notice("record_stats({:d}): complete.", papi_get_thread_id());
 }
 
 /**

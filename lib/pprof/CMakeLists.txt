@@ -16,6 +16,7 @@ target_link_libraries(pprof
   papi
   pqxx
   pthread
+  pjit-logging
 )
 
 set_target_properties(pprof
