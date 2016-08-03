@@ -2,16 +2,16 @@
 #include "spdlog/spdlog.h"
 
 namespace {
-const char *LOG_FILENAME = "/tmp/.polyjit";
-const size_t LOG_SIZE = 1048576 * 100;
-const spdlog::level::level_enum LOG_LEVEL = spdlog::level::notice;
-
-static inline spdlog::sinks_init_list global_init() {
+static inline spdlog::sinks_init_list &global_init() {
   static bool init = false;
   static spdlog::sinks_init_list sinks = {};
   if (init)
     return sinks;
   init = true;
+
+  const char *LOG_FILENAME = "/tmp/.polyjit";
+  const size_t LOG_SIZE = 1048576 * 100;
+  const spdlog::level::level_enum LOG_LEVEL = spdlog::level::notice;
 
   spdlog::set_async_mode(1048576);
   spdlog::set_level(LOG_LEVEL);
