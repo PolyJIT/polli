@@ -127,7 +127,7 @@ public:
         OptimizeLayer(CompileLayer, [this](UniqueModule M) {
           return polli::OptimizeForRuntime(std::move(M));
         }) {
-    console->notice("Starting PolyJIT Engine.");
+    SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
   }
 
@@ -200,14 +200,12 @@ public:
     raw_string_ostream MangledNameStream(MangledName);
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
     orc::JITSymbol S = CompileLayer.findSymbol(MangledNameStream.str(), false);
-    uint64_t *Addr = (uint64_t *)S.getAddress();
-    console->notice("FindSymbol: {:s} Addr: {:x}", Name, (uint64_t)Addr);
+    SPDLOG_DEBUG("libpjit", "FindSymbol: {:s} Addr: {:x}", Name,
+                 (uint64_t)S.getAddress());
     return S;
   }
 
-  ~PolyJITEngine () {
-    console->notice("Stopping PolyJIT Engine.");
-  }
+  ~PolyJITEngine() { SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine."); }
 
 private:
   llvm::LLVMContext Ctx;
@@ -255,14 +253,15 @@ static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
                            CacheKey K, uint64_t prefix, JitT Context) {
   PolyJITEngine &EE = getOrCreateEngine();
-  console->notice("{:s}: Enter GetOrCreateVariantFunction.",
-                Request->F->getName().str());
+  SPDLOG_DEBUG("libpjit", "{:s}: Enter GetOrCreateVariantFunction.",
+               Request->F->getName().str());
   if (Context->find(K) != Context->end())
     return;
 
   Context->UpdatePrefixMap(prefix, Request->F);
-  console->notice("{:s}: Create new Variant.", Request->F->getName().str());
-  console->notice("Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
+  SPDLOG_DEBUG("libpjit", "{:s}: Create new Variant.",
+               Request->F->getName().str());
+  SPDLOG_DEBUG("libpjit", "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
 
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
   llvm::Function *F = Request->F;
@@ -292,7 +291,8 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  console->notice("ID: {0:x} IsVariant? {1}", (uint64_t)prefix, is_variant);
+  SPDLOG_DEBUG("libpjit", "ID: {0:x} IsVariant? {1}", (uint64_t)prefix,
+               is_variant);
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
   if (!FnStats)
     return;
@@ -337,17 +337,17 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                                  (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
-  console->notice("Hash: {0:x} IR: {2:x} CacheHit? {1:d}", K.first.ValueHash,
-                K.second, (uint64_t)K.first.IR);
+  SPDLOG_DEBUG("libpjit", "Hash: {0:x} IR: {2:x} CacheHit? {1:d}",
+               K.first.ValueHash, K.second, (uint64_t)K.first.IR);
   if (!K.second)
     FutureFn.wait();
 
   auto FnIt = Context->find(K.first);
-  console->notice("FnIt: {0:d}", FnIt != Context->end());
+  SPDLOG_DEBUG("libpjit", "FnIt: {0:d}", FnIt != Context->end());
 
   bool JitReady = false;
   if (FnIt != Context->end()) {
-    console->notice("Called variant: {0:s}", Request->F->getName().str());
+    SPDLOG_DEBUG("Called variant: {0:s}", Request->F->getName().str());
     FnStats->LookupTime = PAPI_get_real_nsec() - start;
     pjit_trace_fnstats_entry(prefix, true);
     (FnIt->second)(paramc, params);
@@ -358,7 +358,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
     FnStats->LookupTime = PAPI_get_real_nsec() - start;
   }
 
-  console->notice("pjit_main complete - Cache Ready? {:d}", JitReady);
+  SPDLOG_DEBUG("libpjit", "pjit_main complete - Cache Ready? {:d}", JitReady);
   return JitReady;
 }
 } /* extern "C" */
@@ -377,8 +377,8 @@ public:
     // Make sure to initialize tracing before planting the atexit handler.
     POLLI_TRACING_INIT;
     POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
-    console->notice("");
-    console->notice("StaticInitializer running.");
+    SPDLOG_DEBUG("libpjit", "");
+    SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
 
     // We want to register this after the tracing atexit handler.
     atexit(do_shutdown);

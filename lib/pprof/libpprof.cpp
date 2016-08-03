@@ -83,10 +83,12 @@ Run<PPEvent> PapiEvents;
 static __thread bool papi_thread_init = false;
 static bool papi_init = false;
 static inline void do_papi_thread_init_once() {
-  console->notice("do_papi_thread_init_once({:d})", papi_get_thread_id());
+  SPDLOG_DEBUG("libpprof", "do_papi_thread_init_once({:d})",
+               papi_get_thread_id());
   if (!papi_thread_init) {
     if (!papi_init) {
-      console->notice("do_papi_thread_init_once({:d}): call papi_region-setup()",
+      SPDLOG_DEBUG("libpprof",
+                   "do_papi_thread_init_once({:d}): call papi_region-setup()",
                    papi_get_thread_id());
       papi_region_setup();
     }
@@ -96,7 +98,8 @@ static inline void do_papi_thread_init_once() {
       if (ret == PAPI_ENOINIT) {
         PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
-        console->notice(
+        SPDLOG_DEBUG(
+            "libpprof",
             "do_papi_thread_init_once({:d}): call do_papi_thread_init_once()",
             papi_get_thread_id());
       } else {
@@ -107,7 +110,7 @@ static inline void do_papi_thread_init_once() {
     } else {
       papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
       papi_thread_init = (ret == PAPI_OK);
-      console->notice("do_papi_thread_init_once({:d}): initialized",
+      SPDLOG_DEBUG("libpprof", "do_papi_thread_init_once({:d}): initialized",
                    papi_get_thread_id());
     }
   }
@@ -166,7 +169,8 @@ void record_stats(uint64_t id, const char *dbg,
   PPEvent Exit(id, RegionExit, exit, dbg);
   papi_local_events()->push_back(Enter);
   papi_local_events()->push_back(Exit);
-  console->notice("record_stats({:d}): complete.", papi_get_thread_id());
+  SPDLOG_DEBUG("libpprof", "record_stats({:d}): complete.",
+               papi_get_thread_id());
 }
 
 /**
@@ -237,8 +241,8 @@ void papi_region_setup() {
   papi_init = true;
   do_papi_thread_init_once();
 
-  uint64_t tid = papi_get_thread_id();
-  console->notice("papi_region_setup from thread: {:d}", tid);
+  SPDLOG_DEBUG("libpprof", "papi_region_setup from thread: {:d}",
+               papi_get_thread_id());
 
   if (int err = atexit(papi_atexit_handler))
     console->error("Failed to setup papi_atexit_handler ({:d}).", err);
