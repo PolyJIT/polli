@@ -209,10 +209,10 @@ void papi_atexit_handler(void) {
     for (auto KV : papi_get_tid_map()) {
       thread::id tid = KV.first;
       uint64_t id = KV.second;
-      console->notice("papi_atexit_handler({:d}): {:d} events - {:f} MB", id,
-                      papi_threaded_events()[tid].size(),
-                      papi_threaded_events()[tid].size() * sizeof(PPEvent) /
-                          (double)(1024 * 1024));
+      console->trace("papi_atexit_handler({:d}): {:d} events - {:f} MB", id,
+                     papi_threaded_events()[tid].size(),
+                     papi_threaded_events()[tid].size() * sizeof(PPEvent) /
+                         (double)(1024 * 1024));
       pgsql::StoreRun(id, papi_threaded_events()[tid], opts);
     }
 

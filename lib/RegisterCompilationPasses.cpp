@@ -31,7 +31,6 @@
 
 using namespace llvm;
 using namespace polli;
-using spdlog::details::fmt::format;
 
 namespace polli {
 
@@ -42,15 +41,15 @@ void initializePolliPasses(PassRegistry &Registry) {
 }
 
 static void printConfig() {
-  errs() << format("PolyJIT - Config:\n");
-  errs() << format(" polyjit.jitable: {}\n", opt::EnableJitable);
-  errs() << format(" polyjit.recompile: {}\n", !opt::DisableRecompile);
-  errs() << format(" polyjit.execute: {}\n", !opt::DisableExecution);
-  errs() << format(" polyjit.instrument: {}\n", opt::InstrumentRegions);
-  errs() << format(" polly.delinearize: {}\n", polly::PollyDelinearize);
-  errs() << format(" polly.aliaschecks: {}\n",
+  errs() << fmt::format("PolyJIT - Config:\n");
+  errs() << fmt::format(" polyjit.jitable: {}\n", opt::EnableJitable);
+  errs() << fmt::format(" polyjit.recompile: {}\n", !opt::DisableRecompile);
+  errs() << fmt::format(" polyjit.execute: {}\n", !opt::DisableExecution);
+  errs() << fmt::format(" polyjit.instrument: {}\n", opt::InstrumentRegions);
+  errs() << fmt::format(" polly.delinearize: {}\n", polly::PollyDelinearize);
+  errs() << fmt::format(" polly.aliaschecks: {}\n",
                         polly::PollyUseRuntimeAliasChecks);
-  errs() << format(" polyjit.collect-regression: {}\n",
+  errs() << fmt::format(" polyjit.collect-regression: {}\n",
                         opt::CollectRegressionTests);
 }
 
@@ -71,7 +70,7 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
   bool runOnFunction(Function &F) override {
     P = &getAnalysis<T>();
 
-    Out << format("Printing analysis '{:s}' for function '{:s}':\n",
+    Out << fmt::format("Printing analysis '{:s}' for function '{:s}':\n",
                        P->getPassName(), F.getName().str());
     P->print(Out, F.getParent());
     return true;

@@ -22,7 +22,6 @@
 
 using namespace llvm;
 using namespace polli;
-using spdlog::details::fmt::format;
 
 #define DEBUG_TYPE "polyjit"
 
@@ -1338,16 +1337,16 @@ void JITScopDetection::print(raw_ostream &OS, const Module *) const {
   unsigned count = ValidRuntimeRegions.size();
   unsigned i = 0;
 
-  OS << format("{:d} regions require runtime support:\n", count);
+  OS << fmt::format("{:d} regions require runtime support:\n", count);
   for (const Region *R : ValidRuntimeRegions) {
     if (!R || (R && !RequiredParams.count(R)))
       continue;
     const ParamVec &L = RequiredParams.at(R);
-    OS.indent(2) << format("{:d} region {:s} requires {:d} params\n", i++,
+    OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
                            R->getNameStr(), L.size());
     unsigned j = 0;
     for (const SCEV *S : L) {
-      OS.indent(4) << format("{:d} - ", j);
+      OS.indent(4) << fmt::format("{:d} - ", j);
       S->print(OS);
       OS << "\n";
     }

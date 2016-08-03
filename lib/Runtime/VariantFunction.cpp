@@ -10,7 +10,6 @@
 #define DEBUG_TYPE "polyjit"
 
 using namespace llvm;
-namespace fmt = spdlog::details::fmt;
 
 REGISTER_LOG(console, "variants");
 

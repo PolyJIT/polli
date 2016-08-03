@@ -51,9 +51,9 @@
 #include "polli/Stats.h"
 #include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
-#include "polli/log.h"
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
+#include "polli/log.h"
 
 #define DEBUG_TYPE "polyjit"
 
@@ -61,7 +61,6 @@ REGISTER_LOG(console, "libpjit");
 
 using namespace llvm;
 using namespace polli;
-namespace fmt = spdlog::details::fmt;
 
 namespace {
 using UniqueMod = std::shared_ptr<Module>;
@@ -346,9 +345,9 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 
   bool JitReady = false;
   if (FnIt != Context->end()) {
-    SPDLOG_DEBUG("Called variant: {0:s}", Request->F->getName().str());
     FnStats->LookupTime = PAPI_get_real_nsec() - start;
     pjit_trace_fnstats_entry(prefix, true);
+    SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
     (FnIt->second)(paramc, params);
     pjit_trace_fnstats_exit(prefix, true);
     FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;

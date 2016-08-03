@@ -18,8 +18,6 @@
 #include <pqxx/pqxx>
 #include <string>
 
-using spdlog::details::fmt::format;
-
 namespace polli {
 using ModulePtr = std::shared_ptr<const llvm::Module>;
 using ConnectionPtr = std::shared_ptr<pqxx::connection>;
@@ -70,8 +68,8 @@ static ConnectionPtr
 createDefaultConnection(const pprof::DbOptions *DbOpts = nullptr) {
   const pprof::DbOptions Opts = DbOpts ? *DbOpts : pprof::getDBOptionsFromEnv();
   std::string ConnectString =
-      format("user={} port={} host={} dbname={} password={}", Opts.user,
-             Opts.port, Opts.host, Opts.name, Opts.pass);
+      fmt::format("user={} port={} host={} dbname={} password={}", Opts.user,
+                  Opts.port, Opts.host, Opts.name, Opts.pass);
   static std::shared_ptr<pqxx::connection> C;
   if (!C || !C->is_open())
     C = std::make_shared<pqxx::connection>(ConnectString);

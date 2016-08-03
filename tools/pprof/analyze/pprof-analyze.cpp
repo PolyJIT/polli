@@ -18,8 +18,6 @@
 #include <memory>
 
 using namespace llvm;
-namespace fmt = spdlog::details::fmt;
-
 static std::map<uint32_t, uint64_t> PPDurations;
 
 static uint64_t getTimeInSCoPs(const pprof::Run<PPEvent> &Events) {

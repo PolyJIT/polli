@@ -38,7 +38,6 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 using namespace llvm;
-namespace fmt = spdlog::details::fmt;
 
 namespace polli {
 

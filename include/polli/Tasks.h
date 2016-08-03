@@ -35,7 +35,6 @@
 #include <deque>
 
 #include "polli/log.h"
-namespace fmt = spdlog::details::fmt;
 
 namespace polli {
 using LockT = std::unique_lock<std::mutex>;

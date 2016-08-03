@@ -13,20 +13,22 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
 
   const char *LOG_FILENAME = "/tmp/.polyjit";
   const size_t LOG_SIZE = 1048576 * 100;
-  const spdlog::level::level_enum LOG_LEVEL = spdlog::level::notice;
 
-  spdlog::set_async_mode(1048576);
-  spdlog::set_level(LOG_LEVEL);
-  auto sharedFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-      LOG_FILENAME, "log", LOG_SIZE, 5, false);
-  sinks.push_back(sharedFileSink);
+  //spdlog::set_async_mode(1048576);
+  sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
+      LOG_FILENAME, "log", LOG_SIZE, 5, true));
+  //sinks.push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());
   return sinks;
 }
 
 static inline void setup(const std::string &name) {
   if (!spdlog::get(name)) {
     auto &sinks = global_init();
-        spdlog::create(name, sinks.begin(), sinks.end());
+    auto logger =
+        std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
+    spdlog::register_logger(logger);
+    logger->set_level(spdlog::level::trace);
+    logger->critical("registered.");
   }
 }
 }

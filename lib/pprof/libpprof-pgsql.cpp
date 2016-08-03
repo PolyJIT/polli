@@ -10,7 +10,6 @@
 #include <thread>
 
 using namespace pqxx;
-using spdlog::details::fmt::format;
 
 namespace pprof {
 DbOptions getDBOptionsFromEnv() {
@@ -57,8 +56,8 @@ public:
       "user={} port={} host={} dbname={} password={}";
     DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
-        format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host, Opts.name,
-               Opts.pass);
+        fmt::format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host,
+                    Opts.name, Opts.pass);
 
     c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
     if (c) {
@@ -181,17 +180,18 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::work w(*getDatabase().c);
   pqxx::result project_exists =
-      submit(format(SEARCH_PROJECT_SQL, opts.project), w);
+      submit(fmt::format(SEARCH_PROJECT_SQL, opts.project), w);
 
   if (project_exists.affected_rows() == 0)
-    submit(format(NEW_PROJECT_SQL, opts.project, opts.project, opts.src_uri,
-                  opts.domain, opts.group), w);
+    submit(fmt::format(NEW_PROJECT_SQL, opts.project, opts.project,
+                       opts.src_uri, opts.domain, opts.group),
+           w);
 
   uint64_t run_id = 0;
   if (!Opts.run_id) {
     pqxx::result r =
-        submit(format(NEW_RUN_SQL, now(), opts.command, opts.project,
-                      opts.experiment, Opts.uuid, Opts.exp_uuid),
+        submit(fmt::format(NEW_RUN_SQL, now(), opts.command, opts.project,
+                           opts.experiment, Opts.uuid, Opts.exp_uuid),
                w);
     r[0]["id"].to(run_id);
   } else {
@@ -210,8 +210,9 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
       if (j != i)
         vals << ",";
 
-      vals << format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})",
-          Ev.ID, (int)Ev.Type, Ev.Start, Ev.Duration, Ev.Name, Ev.TID, run_id);
+      vals << fmt::format(" ({:d}, {:d}, {:d}, {:d}, '{:s}', {:d}, {:d})",
+                          Ev.ID, (int)Ev.Type, Ev.Start, Ev.Duration, Ev.Name,
+                          Ev.TID, run_id);
     }
     vals << ";";
 
@@ -259,11 +260,11 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   pqxx::work w(*getDatabase().c);
 
   pqxx::result r =
-      w.exec(format("SELECT name FROM metrics WHERE run_id = {}", run_id));
+      w.exec(fmt::format("SELECT name FROM metrics WHERE run_id = {}", run_id));
 
   if (r.affected_rows() == 0) {
     for (auto e : M)
-      w.exec(format(NewMetric, e.first, e.second, run_id));
+      w.exec(fmt::format(NewMetric, e.first, e.second, run_id));
   }
 
   w.commit();

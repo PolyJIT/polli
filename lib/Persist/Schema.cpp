@@ -1,12 +1,10 @@
 #include "polli/Schema.h"
 
-using spdlog::details::fmt::format;
-
 namespace polli {
 namespace db {
 
 const std::string RegressionTest::str() const {
-  return format("<RegressionTest ({:d}) Module<{:s}>>", runID(), name());
+  return fmt::format("<RegressionTest ({:d}) Module<{:s}>>", runID(), name());
 }
 
 const std::string RegressionTest::formulate(pqxx::work &W) const {
@@ -18,7 +16,7 @@ const std::string RegressionTest::formulate(pqxx::work &W) const {
    *             - avoid duplicated SCoPs for the same project and
    *             - preserve the original run, where we captured this SCoP.
    */
-  return format(
+  return fmt::format(
       "INSERT INTO {:s} (run_id, project_name, name, module) "
       "SELECT {:d}, '{:s}', '{:s}', '{:s}'"
       "WHERE NOT EXISTS (SELECT name FROM {:s} WHERE name = '{:s}'"

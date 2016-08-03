@@ -3,6 +3,7 @@
 #include "polli/ModuleExtractor.h"
 #include "polli/Schema.h"
 #include "polli/Stats.h"
+#include "polli/log.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
@@ -15,8 +16,6 @@
 #include "llvm/Transforms/IPO.h"
 
 using namespace llvm;
-namespace fmt = spdlog::details::fmt;
-
 #define DEBUG_TYPE "polyjit"
 
 STATISTIC(Instrumented, "Number of instrumented functions");
@@ -24,6 +23,7 @@ STATISTIC(MappedGlobals, "Number of global to argument redirections");
 STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
 STATISTIC(DuplicatePredsInPHI, "Number of functions that contain duplicate "
                                "predecessor lists in some PHI nodes.");
+REGISTER_LOG(console, "extract");
 
 namespace polli {
 char ModuleExtractor::ID = 0;
@@ -815,6 +815,7 @@ static SetVector<Function *> extractCandidates(Function &F,
 
   for (const Region *R : SD) {
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
+    console->info("Extracting region: {:s}", R->getNameStr());
     if (Extractor.isEligible()) {
       JITScopDetection::ParamVec Params = SD.RequiredParams[R];
       SetVector<Value *> In, Out;
@@ -887,6 +888,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
   for (Function *F : Functions) {
     if (F->isDeclaration())
       continue;
+    console->info("Extracting: {:s}", F->getName().str());
 
     ValueToValueMapTy VMap;
     Module *M = F->getParent();

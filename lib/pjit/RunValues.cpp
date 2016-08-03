@@ -8,8 +8,6 @@
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
-using spdlog::details::fmt::format;
-
 namespace polli {
 RunValueList runValues(const SpecializerRequest &Request) {
   POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
@@ -37,15 +35,18 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
     if (i < argc) {
       RunValue<uint64_t *> V{reinterpret_cast<uint64_t **>(params)[i], &Arg};
       if (polli::canSpecialize(V)) {
-        llvm::dbgs() << format("[{:d}] -> {} ", i, *V.value);
+        llvm::dbgs() << fmt::format("[{:d}] -> {} ", i, *V.value);
       }
       llvm::Type *Ty = Arg.getType();
       if (Ty->isIntegerTy())
-        llvm::dbgs() << format("[{:d}] -> {} ", i, (int)*((uint64_t**)params)[i]);
+        llvm::dbgs() << fmt::format("[{:d}] -> {} ", i,
+                                    (int)*((uint64_t **)params)[i]);
       if (Ty->isDoubleTy())
-        llvm::dbgs() << format("[{:d}] -> {:g} ", i, (double)*((double**)params)[i]);
+        llvm::dbgs() << fmt::format("[{:d}] -> {:g} ", i,
+                                    (double)*((double **)params)[i]);
       if (Ty->isPointerTy())
-        llvm::dbgs() << format("[{:d}] -> 0x{:x} ", i, (uint64_t)((uint64_t**)params)[i]);
+        llvm::dbgs() << fmt::format("[{:d}] -> 0x{:x} ", i,
+                                    (uint64_t)((uint64_t **)params)[i]);
       i++;
     }
   }
@@ -54,7 +55,7 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
 
 void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
-    llvm::dbgs() << format(
+    llvm::dbgs() << fmt::format(
         "{:d} matched against {}\n", *RV.value,
         reinterpret_cast<void *>(const_cast<llvm::Argument *>(RV.Arg)));
   }
