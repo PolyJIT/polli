@@ -30,6 +30,7 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/IR/Mangler.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
@@ -406,5 +407,5 @@ public:
   }
 };
 
-static StaticInitializer InitializeEverything;
+static ManagedStatic<StaticInitializer> InitializeEverything;
 }
