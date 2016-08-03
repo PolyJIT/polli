@@ -46,7 +46,7 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
   return GV;
 }
 
-unsigned int GetCandidateId(const Function &F) {
+uint64_t GetCandidateId(const Function &F) {
   uint64_t n = 0;
   std::string name_tag = "polyjit-id";
   if (F.hasFnAttribute(name_tag))
