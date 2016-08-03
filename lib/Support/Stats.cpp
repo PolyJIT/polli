@@ -10,6 +10,10 @@
 
 using namespace llvm;
 
+namespace {
+static auto console = polli::register_log("stats");
+}
+
 namespace llvm {
 template <bool xcompile> class TypeBuilder<polli::Stats, xcompile> {
 public:
@@ -56,7 +60,7 @@ unsigned int GetCandidateId(const Function &F) {
 }
 
 static void printStats(const llvm::Function &F, const Stats &S) {
-  log()->notice(
+  console->notice(
       "F: {:s} ID: {:x} N: {:d} LT: {:d} RT: {:d} Overhead: {:3.2f}%",
       F.getName().str(), (uint64_t)(&S), S.NumCalls, S.LookupTime,
       S.LastRuntime, (S.LookupTime * 100 / (double)S.LastRuntime));
@@ -64,18 +68,18 @@ static void printStats(const llvm::Function &F, const Stats &S) {
 
 uint64_t TrackStatsChange(const llvm::Function *F, Stats S) {
   if (!F)
-    log()->error("Function is a nullptr!");
+    console->error("Function is a nullptr!");
   assert(F && "Function argument is a nullptr!");
 
   if (F->isDeclaration())
-    log()->error("Function needs a definition for tracking.");
+    console->error("Function needs a definition for tracking.");
   assert(!F->isDeclaration() && "Function needs to have a definition!");
 
   S.LastRuntime = S.RegionExit - S.RegionEnter;
-  printStats(F, S);
+  //printStats(F, S);
 
   uint64_t id = GetCandidateId(*F);
-  log()->notice("Candidate ID: {:d}", id);
+  console->notice("Candidate ID: {:d}", id);
   record_stats(id, F->getName().str().c_str(), S.RegionEnter, S.RegionExit);
   return id;
 }

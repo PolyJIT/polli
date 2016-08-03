@@ -12,6 +12,10 @@
 using namespace llvm;
 namespace fmt = spdlog::details::fmt;
 
+namespace {
+static auto console = polli::register_log("variants");
+}
+
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
   return OS << P.Val->getUniqueInteger();
@@ -304,7 +308,7 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
     Specializer.setSource(&BaseF);
 
     if (!BaseF.hasFnAttribute("polyjit-id"))
-      log()->warn("{:s} has no polyjit-id. Tracking will not work.",
+      console->warn("{:s} has no polyjit-id. Tracking will not work.",
                   BaseF.getName().str());
 
     F = &OptimizeForRuntime(*Specializer.start(true));

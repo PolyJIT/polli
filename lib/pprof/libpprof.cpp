@@ -27,12 +27,11 @@
 using namespace pprof;
 namespace spd = spdlog;
 
-namespace pprof {
-std::shared_ptr<spd::logger> log() {
-  static auto l = polli::log("pprof");
-  return l;
+namespace {
+static auto console = polli::register_log("libpprof");
 }
 
+namespace pprof {
 Options *getOptions() {
   static Options opts = getPprofOptionsFromEnv();
   return &opts;
@@ -86,10 +85,10 @@ Run<PPEvent> PapiEvents;
 static __thread bool papi_thread_init = false;
 static bool papi_init = false;
 static inline void do_papi_thread_init_once() {
-  log()->notice("do_papi_thread_init_once({:d})", papi_get_thread_id());
+  console->notice("do_papi_thread_init_once({:d})", papi_get_thread_id());
   if (!papi_thread_init) {
     if (!papi_init) {
-      log()->notice("do_papi_thread_init_once({:d}): call papi_region-setup()",
+      console->notice("do_papi_thread_init_once({:d}): call papi_region-setup()",
                    papi_get_thread_id());
       papi_region_setup();
     }
@@ -99,18 +98,18 @@ static inline void do_papi_thread_init_once() {
       if (ret == PAPI_ENOINIT) {
         PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
-        log()->notice(
+        console->notice(
             "do_papi_thread_init_once({:d}): call do_papi_thread_init_once()",
             papi_get_thread_id());
       } else {
-        log()->error("PAPI_thread_init() = {:d}", ret);
-        log()->error("{:s}", PAPI_strerror(ret));
+        console->error("PAPI_thread_init() = {:d}", ret);
+        console->error("{:s}", PAPI_strerror(ret));
         exit(ret);
       }
     } else {
       papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
       papi_thread_init = (ret == PAPI_OK);
-      log()->notice("do_papi_thread_init_once({:d}): initialized",
+      console->notice("do_papi_thread_init_once({:d}): initialized",
                    papi_get_thread_id());
     }
   }
@@ -169,7 +168,7 @@ void record_stats(uint64_t id, const char *dbg,
   PPEvent Exit(id, RegionExit, exit, dbg);
   papi_local_events()->push_back(Enter);
   papi_local_events()->push_back(Exit);
-  log()->notice("record_stats({:d}): complete.", papi_get_thread_id());
+  console->notice("record_stats({:d}): complete.", papi_get_thread_id());
 }
 
 /**
@@ -208,7 +207,7 @@ void papi_atexit_handler(void) {
     for (auto KV : papi_get_tid_map()) {
       thread::id tid = KV.first;
       uint64_t id = KV.second;
-      log()->notice("papi_atexit_handler({:d}): {:d} events - {:f} MB", id,
+      console->notice("papi_atexit_handler({:d}): {:d} events - {:f} MB", id,
                     papi_threaded_events()[tid].size(),
                     papi_threaded_events()[tid].size() * sizeof(PPEvent) /
                         (double)(1024 * 1024));
@@ -233,18 +232,18 @@ void papi_atexit_handler(void) {
 void papi_region_setup() {
   int init = PAPI_library_init(PAPI_VER_CURRENT);
   if (init != PAPI_VER_CURRENT) {
-    log()->error("[ERROR] PAPI_library_init = {:d}", init);
-    log()->error("[ERROR] {:s}", PAPI_strerror(init));
+    console->error("[ERROR] PAPI_library_init = {:d}", init);
+    console->error("[ERROR] {:s}", PAPI_strerror(init));
   }
 
   papi_init = true;
   do_papi_thread_init_once();
 
   uint64_t tid = papi_get_thread_id();
-  log()->notice("papi_region_setup from thread: {:d}", tid);
+  console->notice("papi_region_setup from thread: {:d}", tid);
 
   if (int err = atexit(papi_atexit_handler))
-    log()->error("Failed to setup papi_atexit_handler ({:d}).", err);
+    console->error("Failed to setup papi_atexit_handler ({:d}).", err);
 
   papi_local_events()->push_back(PPEvent(0, RegionEnter, "START"));
   papi_init = true;

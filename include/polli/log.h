@@ -6,6 +6,6 @@
 using namespace spdlog;
 
 namespace polli {
-std::shared_ptr<spdlog::logger> log(const std::string &name = "default");
+std::shared_ptr<spdlog::logger> register_log(const std::string &name = "default");
 }
 #endif // POLLI_LOG_H
