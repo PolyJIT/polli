@@ -108,7 +108,6 @@ public:
 class TaskSystem {
 private:
   const unsigned Count{std::thread::hardware_concurrency() - 1};
-  //const unsigned Count{1};
   std::vector<std::thread> Threads;
   std::vector<polli::JobQueue> JobQs{Count};
   std::atomic<unsigned> Index{0};
