@@ -12,9 +12,7 @@
 using namespace llvm;
 namespace fmt = spdlog::details::fmt;
 
-namespace {
-static auto console = polli::register_log("variants");
-}
+REGISTER_LOG(console, "variants");
 
 namespace polli {
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
