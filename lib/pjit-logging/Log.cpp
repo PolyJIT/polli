@@ -22,7 +22,7 @@ static inline spdlog::sinks_init_list global_init() {
 }
 
 static inline void setup(const std::string &name) {
-  if (spdlog::get(name) == nullptr)
+  if (!spdlog::get(name))
         spdlog::create(name, global_init());
 }
 }
