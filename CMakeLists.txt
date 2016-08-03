@@ -150,6 +150,10 @@ set(CMAKE_CXX_FLAGS "${NEW_CMAKE_CXX_FLAGS} -pthread -Wall")
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
 
+FILE(GLOB_RECURSE PolliHeaderFiles "include/polli/*.h")
+FILE(GLOB_RECURSE PprofHeaderFiles "include/pprof/*.h")
+add_custom_target(headers SOURCES ${PolliHeaderFiles} ${PprofHeaderFiles})
+
 install(DIRECTORY include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
   )
