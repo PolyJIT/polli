@@ -11,7 +11,7 @@ std::shared_ptr<spdlog::logger> register_log(const std::string &name = "default"
 struct WrappedLogger {
   WrappedLogger(const std::string &name) : Name(name) {}
 
-  auto operator->() const -> std::shared_ptr<spdlog::logger> {
+  auto operator->() const -> std::shared_ptr<spdlog::logger>& {
     static std::shared_ptr<spdlog::logger> _log = polli::register_log(Name);
     return _log;
   }
