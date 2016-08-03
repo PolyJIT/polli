@@ -7,5 +7,8 @@ using namespace spdlog;
 
 namespace polli {
 std::shared_ptr<spdlog::logger> register_log(const std::string &name = "default");
+
+#define REGISTER_LOG(VARNAME, NAME) \
+    static std::shared_ptr<spdlog::logger> VARNAME = polli::register_log(NAME)
 }
 #endif // POLLI_LOG_H

@@ -57,14 +57,13 @@
 
 #define DEBUG_TYPE "polyjit"
 
+REGISTER_LOG(console, "libpjit");
 
 using namespace llvm;
 using namespace polli;
 namespace fmt = spdlog::details::fmt;
 
 namespace {
-static auto console = polli::register_log("libpjit");
-
 using UniqueMod = std::shared_ptr<Module>;
 using UniqueCtx = std::shared_ptr<LLVMContext>;
 

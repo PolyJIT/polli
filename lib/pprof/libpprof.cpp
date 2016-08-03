@@ -27,9 +27,7 @@
 using namespace pprof;
 namespace spd = spdlog;
 
-namespace {
-static auto console = polli::register_log("libpprof");
-}
+REGISTER_LOG(console, "libpprof");
 
 namespace pprof {
 Options *getOptions() {
