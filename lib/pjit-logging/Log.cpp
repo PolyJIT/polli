@@ -1,10 +1,12 @@
+#include <vector>
+
 #include "polli/log.h"
 #include "spdlog/spdlog.h"
 
 namespace {
-static inline spdlog::sinks_init_list &global_init() {
+static inline std::vector<spdlog::sink_ptr> &global_init() {
   static bool init = false;
-  static spdlog::sinks_init_list sinks = {};
+  static std::vector<spdlog::sink_ptr> sinks;
   if (init)
     return sinks;
   init = true;
@@ -17,13 +19,15 @@ static inline spdlog::sinks_init_list &global_init() {
   spdlog::set_level(LOG_LEVEL);
   auto sharedFileSink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
       LOG_FILENAME, "log", LOG_SIZE, 5, false);
-  sinks = {sharedFileSink};
+  sinks.push_back(sharedFileSink);
   return sinks;
 }
 
 static inline void setup(const std::string &name) {
-  if (!spdlog::get(name))
-        spdlog::create(name, global_init());
+  if (!spdlog::get(name)) {
+    auto &sinks = global_init();
+        spdlog::create(name, sinks.begin(), sinks.end());
+  }
 }
 }
 

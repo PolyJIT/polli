@@ -10,9 +10,7 @@
 
 using namespace llvm;
 
-namespace {
-static auto console = polli::register_log("stats");
-}
+REGISTER_LOG(console, "stats");
 
 namespace llvm {
 template <bool xcompile> class TypeBuilder<polli::Stats, xcompile> {
