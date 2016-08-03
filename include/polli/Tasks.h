@@ -115,7 +115,7 @@ private:
 
   void run(unsigned i) {
     pthread_setname_np(pthread_self(),
-                       fmt::format("polyjit_worker_{:d}", i).c_str());
+                       fmt::format("pjit_worker_{:d}", i).c_str());
     while (true) {
       std::function<void()> F;
 
