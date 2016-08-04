@@ -136,9 +136,6 @@ public:
    * @return llvm::Module& The LLVM-IR module we just read.
    */
   Module &getModule(const char *prototype, bool &cache_hit) {
-    static mutex _m;
-    std::lock_guard<std::mutex> L(_m);
-
     cache_hit = true;
     if (!LoadedModules.count(prototype)) {
       MemoryBufferRef Buf(prototype, "polli.prototype.module");
@@ -321,7 +318,6 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
   if (!PAPI_is_initialized())
     PAPI_library_init(PAPI_VERSION);
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
   if (opt::DisableRecompile)
     return false;
 
@@ -342,21 +338,19 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   auto FnIt = Context->find(K.first);
   SPDLOG_DEBUG("libpjit", "FnIt: {0:d}", FnIt != Context->end());
 
-  bool JitReady = false;
+  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+
+  FnStats->LookupTime = PAPI_get_real_nsec() - start;
   if (FnIt != Context->end()) {
-    FnStats->LookupTime = PAPI_get_real_nsec() - start;
     pjit_trace_fnstats_entry(prefix, true);
     SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
     (FnIt->second)(paramc, params);
     pjit_trace_fnstats_exit(prefix, true);
     FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
-    JitReady = true;
-  } else {
-    FnStats->LookupTime = PAPI_get_real_nsec() - start;
+    return true;
   }
 
-  SPDLOG_DEBUG("libpjit", "pjit_main complete - Cache Ready? {:d}", JitReady);
-  return JitReady;
+  return false;
 }
 } /* extern "C" */
 } /* polli */
