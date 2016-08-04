@@ -305,6 +305,19 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
                  *FnStats);
 }
 
+static inline bool should_use_variant(const Stats *S) {
+  if (!S)
+    return true;
+
+  if (S->NumCalls == 0)
+    return true;
+
+  if (S->NumCalls > 0)
+    return (S->LastRuntime * 2) > S->LookupTime;
+
+  return false;
+}
+
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -341,6 +354,9 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
 
   FnStats->LookupTime = PAPI_get_real_nsec() - start;
+  if (!should_use_variant(FnStats))
+    return false;
+
   if (FnIt != Context->end()) {
     pjit_trace_fnstats_entry(prefix, true);
     SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
