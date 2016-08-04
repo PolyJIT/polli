@@ -250,18 +250,16 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
                            CacheKey K, uint64_t prefix, JitT Context) {
-  PolyJITEngine &EE = getOrCreateEngine();
-  SPDLOG_DEBUG("libpjit", "{:s}: Enter GetOrCreateVariantFunction.",
-               Request->F->getName().str());
   if (Context->find(K) != Context->end())
     return;
 
-  Context->UpdatePrefixMap(prefix, Request->F);
+  console->debug("{:s}: Create new Variant.", Request->F->getName().str());
   SPDLOG_DEBUG("libpjit", "{:s}: Create new Variant.",
                Request->F->getName().str());
   SPDLOG_DEBUG("libpjit", "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
-
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
+
+  Context->UpdatePrefixMap(prefix, Request->F);
   llvm::Function *F = Request->F;
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
   RunValueList Values = runValues(*Request);
@@ -272,6 +270,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
     return;
   }
 
+  PolyJITEngine &EE = getOrCreateEngine();
   EE.addModule(std::move(Variant));
   DEBUG(printRunValues(Values));
 
