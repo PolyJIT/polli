@@ -387,7 +387,7 @@ public:
     SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
 
     // We want to register this after the tracing atexit handler.
-    atexit(do_shutdown);
+    //atexit(do_shutdown);
 
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
@@ -410,6 +410,10 @@ public:
 
     getOrCreateEngine();
     getOrCreateJIT();
+  }
+
+  ~StaticInitializer() {
+    do_shutdown();
   }
 };
 
