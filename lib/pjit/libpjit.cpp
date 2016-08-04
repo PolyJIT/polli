@@ -329,8 +329,6 @@ static inline bool should_use_variant(const Stats *S) {
  */
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
-  if (!PAPI_is_initialized())
-    PAPI_library_init(PAPI_VERSION);
   if (opt::DisableRecompile)
     return false;
 
@@ -383,6 +381,7 @@ public:
 
     // Make sure to initialize tracing before planting the atexit handler.
     POLLI_TRACING_INIT;
+    papi_region_setup();
     POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
     SPDLOG_DEBUG("libpjit", "");
     SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
