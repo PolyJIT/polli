@@ -23,6 +23,7 @@
 #include "polly/RegisterPasses.h"
 #include "polly/CodeGen/CodegenCleanup.h"
 
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
@@ -52,6 +53,34 @@ static void printConfig() {
   errs() << fmt::format(" polyjit.collect-regression: {}\n",
                         opt::CollectRegressionTests);
 }
+struct InjectMain : public FunctionPass {
+  std::string PassName;
+  static char ID;
+
+  InjectMain()
+      : FunctionPass(ID), PassName("PolyJIT - Main Injector") {}
+
+  bool runOnFunction(Function &F) override {
+    bool IsMain = F.getName() == "main";
+
+    if (IsMain) {
+      Module *M = F.getParent();
+      LLVMContext &Ctx = M->getContext();
+      IRBuilder<> Builder(Ctx);
+      Function *PJMainFn = cast<Function>(M->getOrInsertFunction(
+          "pjit_library_init", Type::getVoidTy(Ctx), NULL));
+      BasicBlock &Entry = F.getEntryBlock();
+      Builder.SetInsertPoint(Entry.getFirstNonPHI());
+      Builder.CreateCall(PJMainFn);
+    }
+
+    return IsMain;
+  }
+
+  const char *getPassName() const override { return PassName.c_str(); }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {}
+};
 
 /**
  * @brief Copy of opt's FunctionPassPrinter.
@@ -88,6 +117,7 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 
 template <> char FunctionPassPrinter<JITScopDetection>::ID = 0;
 template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
+char InjectMain::ID = 0;
 
 static void registerPolyJIT(const llvm::PassManagerBuilder &,
                             llvm::legacy::PassManagerBase &PM) {
@@ -117,6 +147,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }
   PM.add(llvm::createCFGSimplificationPass());
+  PM.add(new InjectMain());
   PM.add(llvm::createBarrierNoopPass());
 }
 
