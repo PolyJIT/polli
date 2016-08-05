@@ -14,11 +14,11 @@
 #ifndef POLLI_OPTIONS_H
 #define POLLI_OPTIONS_H
 
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/CodeGen.h"
-#include "llvm/Target/TargetOptions.h"
-
 #include <string>
+#include <vector>
+#include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Target/TargetOptions.h"
 
 extern llvm::cl::OptionCategory PolliCategory;
 
