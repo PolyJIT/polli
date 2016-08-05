@@ -144,16 +144,6 @@ static inline size_t getGlobalCount(Function *F) {
   return n;
 }
 
-#ifdef DEBUG
-static void dumpUsers(Value &V) {
-  for (const auto &U : V.users()) {
-    U->print(outs().indent(2));
-    outs() << "\n";
-  }
-  llvm::outs() << "====\n";
-}
-#endif
-
 using InstrList = SmallVector<Instruction *, 4>;
 /**
  * @brief Convert a ConstantExpr pointer operand to an Instruction Value.
