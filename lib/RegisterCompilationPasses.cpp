@@ -41,18 +41,6 @@ void initializePolliPasses(PassRegistry &Registry) {
   initializeJITScopDetectionPass(Registry);
 }
 
-static void printConfig() {
-  errs() << fmt::format("PolyJIT - Config:\n");
-  errs() << fmt::format(" polyjit.jitable: {}\n", opt::EnableJitable);
-  errs() << fmt::format(" polyjit.recompile: {}\n", !opt::DisableRecompile);
-  errs() << fmt::format(" polyjit.execute: {}\n", !opt::DisableExecution);
-  errs() << fmt::format(" polyjit.instrument: {}\n", opt::InstrumentRegions);
-  errs() << fmt::format(" polly.delinearize: {}\n", polly::PollyDelinearize);
-  errs() << fmt::format(" polly.aliaschecks: {}\n",
-                        polly::PollyUseRuntimeAliasChecks);
-  errs() << fmt::format(" polyjit.collect-regression: {}\n",
-                        opt::CollectRegressionTests);
-}
 struct InjectMain : public FunctionPass {
   std::string PassName;
   static char ID;
@@ -123,8 +111,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
                             llvm::legacy::PassManagerBase &PM) {
   if (!opt::Enabled)
     return;
-
-  DEBUG(printConfig());
 
   PM.add(llvm::createBarrierNoopPass());
   PM.add(llvm::createInstructionCombiningPass(true));
