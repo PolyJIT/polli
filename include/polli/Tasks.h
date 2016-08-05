@@ -140,7 +140,8 @@ public:
     for (auto &Q : JobQs)
       Q.done();
     for (auto &T : Threads)
-      T.join();
+      if (T.joinable())
+        T.join();
   }
 
   void cancel_pending_jobs() {
