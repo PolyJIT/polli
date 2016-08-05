@@ -366,6 +366,9 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 
   return false;
 }
+
+void pjit_library_init() {
+}
 } /* extern "C" */
 } /* polli */
 
