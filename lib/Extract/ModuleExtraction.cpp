@@ -163,11 +163,6 @@ static inline void constantExprToInstruction(Instruction &I,
     if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
       Instruction *Inst = C->getAsInstruction();
       Inst->insertBefore(&I);
-      DEBUG({
-        llvm::outs() << "I: " << I << "\nInst: " << *Inst << "\n";
-        llvm::outs() << "Users:\n";
-        dumpUsers(*C);
-      });
       setPointerOperand(I, *Inst, VMap);
       constantExprToInstruction(*Inst, Converted, VMap);
       Converted.push_back(&I);
@@ -186,15 +181,23 @@ static inline void constantExprToInstruction(Instruction &I,
  * @return void
  */
 static inline void selectGV(Instruction &I, GlobalList &Globals) {
-  Value *V = getPointerOperand(I);
+  if (isa<llvm::IntrinsicInst>(&I))
+    return;
 
-  if (V) {
-    if (GlobalValue *GV = dyn_cast<GlobalValue>(V))
-      Globals.insert(GV);
+  for (unsigned i = 0; i < I.getNumOperands(); i++) {
+    Value *V = I.getOperand(i);
 
-    if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
-      Instruction *Inst = C->getAsInstruction();
-      selectGV(*Inst, Globals);
+    if (V) {
+      // RemapCalls can take care of this.
+      if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
+        GV->dump();
+        Globals.insert(GV);
+      }
+
+      if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
+        Instruction *Inst = C->getAsInstruction();
+        selectGV(*Inst, Globals);
+      }
     }
   }
 }
@@ -599,11 +602,11 @@ struct InstrumentEndpoint {
     // function, otherwise we would call ourselves until the jit is ready.
     FallbackF->replaceAllUsesWith(To);
 
-    Value *False = ConstantInt::getFalse(Ctx);
+    //Value *False = ConstantInt::getFalse(Ctx);
 
-    Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
+    //Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
     Builder.CreateCall(FallbackF, ToArgs);
-    Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
+    //Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
     Builder.CreateBr(Exit);
     Builder.SetInsertPoint(Exit);
     Builder.CreateRetVoid();
@@ -918,7 +921,6 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstF->addFnAttr(Attribute::NoInline);
 
     InstrumentedFunctions.insert(InstF);
-    VMap.clear();
     Instrumented++;
   }
 

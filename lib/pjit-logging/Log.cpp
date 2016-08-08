@@ -14,7 +14,7 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
   const char *LOG_FILENAME = "/tmp/.polyjit";
   const size_t LOG_SIZE = 1048576 * 100;
 
-  //spdlog::set_async_mode(1048576);
+  spdlog::set_async_mode(1048576);
   sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
       LOG_FILENAME, "log", LOG_SIZE, 5, true));
   //sinks.push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());

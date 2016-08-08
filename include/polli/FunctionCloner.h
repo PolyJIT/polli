@@ -29,6 +29,7 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "polyjit"
@@ -40,6 +41,10 @@
 using namespace llvm;
 
 namespace polli {
+namespace log {
+REGISTER_LOG(console, "cloner");
+}
+
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
   std::string buffer;
@@ -48,8 +53,10 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
   if (F && !F->isDeclaration()) {
     if (!verifyFunction(*F, &s))
       s << " OK";
-    else
+    else {
+      F->getParent()->dump();
       s << " FAILED";
+    }
   } else if (F && F->isDeclaration()) {
     F->getType()->print(s << " OK \n\t\t(declare) : ");
   } else {
@@ -82,6 +89,11 @@ public:
   }
 
   void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
+    if (SrcF.getParent() == TgtM)
+      return;
+
+    polli::log::console->debug("Checking for functions to remap in {:s}",
+                               SrcF.getName().str());
     for (Instruction &I : instructions(SrcF)) {
       if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
         CallSite CS = CallSite(&I);
@@ -91,6 +103,7 @@ public:
               CalledF->getAttributes()));
           NewF->setLinkage(CalledF->getLinkage());
           VMap[CalledF] = NewF;
+          polli::log::console->debug("Mapped: {:s}", NewF->getName().str());
         }
       }
     }
@@ -112,18 +125,18 @@ public:
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
 
+    DEBUG(polli::verifyFunctions("\t>> ", From, To));
+
     // Collect all calls for remapping.
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
 
-    DEBUG(polli::verifyFunctions("\t>> ", From, To));
-
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
-
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
     DEBUG(polli::verifyFunctions("\t<< ", From, To));
+    polli::verifyFunctions("\n<< ", From, To);
 
     // Store function mapping for the linker.
     VMap[From] = To;

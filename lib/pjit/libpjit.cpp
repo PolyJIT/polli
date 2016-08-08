@@ -81,8 +81,10 @@ static StackTracePtr StackTrace;
  */
 static Function &getFunction(Module &M) {
   for (Function &F : M) {
-    if (F.hasFnAttribute("polyjit-jit-candidate"))
+    if (F.hasFnAttribute("polyjit-jit-candidate")) {
+      console->debug("fn-jit-candidate: {:s}", F.getName().str());
       return F;
+    }
   }
 
   errs() << "No JIT candidate in prototype!\n";
@@ -110,21 +112,78 @@ static inline void set_options_from_environment() {
 
 
 namespace polli {
+/// @brief Simple compile functor: Takes a single IR module and returns an
+///        ObjectFile.
+class SimpleErrorReportingCompiler {
+public:
+  /// @brief Construct a simple compile functor with the given target.
+  SimpleErrorReportingCompiler(TargetMachine &TM) : TM(TM) {}
+
+  /// @brief Compile a Module to an ObjectFile.
+  object::OwningBinary<object::ObjectFile> operator()(Module &M) const {
+    SmallVector<char, 0> ObjBufferSV;
+    raw_svector_ostream ObjStream(ObjBufferSV);
+
+    legacy::PassManager PM;
+    MCContext *Ctx;
+
+    TM.setOptLevel(CodeGenOpt::None);
+    if (TM.addPassesToEmitMC(PM, Ctx, ObjStream))
+      llvm_unreachable("Target does not support MC emission.");
+    PM.add(llvm::createModuleDebugInfoPrinterPass());
+    PM.run(M);
+    std::unique_ptr<MemoryBuffer> ObjBuffer(
+        new ObjectMemoryBuffer(std::move(ObjBufferSV)));
+    Expected<std::unique_ptr<object::ObjectFile>> Obj =
+        object::ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
+    typedef object::OwningBinary<object::ObjectFile> OwningObj;
+    if (Obj)
+      return OwningObj(std::move(*Obj), std::move(ObjBuffer));
+
+
+    consumeError(Obj.takeError());
+    return OwningObj(nullptr, nullptr);
+  }
+
+private:
+  TargetMachine &TM;
+};
+
+class PolySectionMemoryManager : public SectionMemoryManager {
+  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID,
+                               StringRef SectionName) override {
+    uint8_t *ptr = SectionMemoryManager::allocateCodeSection(
+        Size, Alignment, SectionID, SectionName);
+    console->debug("cs @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s}",
+                   (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID,
+                   SectionName.str());
+    return ptr;
+  }
+
+  uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
+                               unsigned SectionID, StringRef SectionName,
+                               bool isReadOnly) override {
+    uint8_t *ptr = SectionMemoryManager::allocateDataSection(
+        Size, Alignment, SectionID, SectionName, isReadOnly);
+    console->debug(
+        "ds @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s} ro: {:d}",
+        (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str(),
+        isReadOnly);
+    return ptr;
+  }
+};
+
 class PolyJITEngine {
 public:
   using ObjLayerT = orc::ObjectLinkingLayer<>;
   using CompileLayerT = orc::IRCompileLayer<ObjLayerT>;
   using ModuleHandleT = CompileLayerT::ModuleSetHandleT;
   using UniqueModule = std::unique_ptr<Module>;
-private:
-  using OptimizeFunction = std::function<UniqueModule(UniqueModule)>;
-public:
+
   PolyJITEngine()
       : TM(EngineBuilder().selectTarget()), DL(TM->createDataLayout()),
-        CompileLayer(ObjectLayer, orc::SimpleCompiler(*TM)),
-        OptimizeLayer(CompileLayer, [this](UniqueModule M) {
-          return polli::OptimizeForRuntime(std::move(M));
-        }) {
+        CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)) {
     SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
   }
@@ -139,9 +198,11 @@ public:
     cache_hit = true;
     if (!LoadedModules.count(prototype)) {
       MemoryBufferRef Buf(prototype, "polli.prototype.module");
-
       SMDiagnostic Err;
-      if (UniqueMod Mod = parseIR(Buf, Err, Ctx)) {
+      auto Ctx = std::make_shared<LLVMContext>();
+
+      CtxList.push_back(Ctx);
+      if (UniqueMod Mod = parseIR(Buf, Err, *Ctx)) {
         LoadedModules.insert(std::make_pair(prototype, std::move(Mod)));
       } else {
         std::string FileName = Err.getFilename().str();
@@ -180,7 +241,7 @@ public:
     std::vector<std::unique_ptr<Module>> MS;
     MS.push_back(std::move(M));
     ModuleHandleT MH = CompileLayer.addModuleSet(
-        std::move(MS), make_unique<SectionMemoryManager>(),
+        std::move(MS), std::make_unique<PolySectionMemoryManager>(),
         std::move(Resolver));
     CompiledModules.insert(std::make_pair(M.get(), MH));
     return MH;
@@ -200,15 +261,19 @@ public:
     return S;
   }
 
-  ~PolyJITEngine() { SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine."); }
+  ~PolyJITEngine() {
+    CompiledModules.clear();
+    LoadedModules.clear();
+    CtxList.clear();
+    SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine.");
+  }
 
 private:
-  llvm::LLVMContext Ctx;
+  std::vector<std::shared_ptr<LLVMContext>> CtxList;
   std::unique_ptr<TargetMachine> TM;
   const DataLayout DL;
   ObjLayerT ObjectLayer;
   CompileLayerT CompileLayer;
-  orc::IRTransformLayer<CompileLayerT, OptimizeFunction> OptimizeLayer;
   llvm::DenseMap<const char *, UniqueMod> LoadedModules;
   llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
 };
@@ -272,6 +337,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   DEBUG(printRunValues(Values));
 
   orc::JITSymbol FPtr = EE.findSymbol(FnName);
+  console->debug("fn ptr: 0x{:x}", FPtr.getAddress());
   assert(FPtr && "Specializer returned nullptr.");
   if (!Context
            ->insert(std::make_pair(
@@ -285,24 +351,24 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  SPDLOG_DEBUG("libpjit", "ID: {0:x} IsVariant? {1}", (uint64_t)prefix,
-               is_variant);
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  if (!FnStats)
-    return;
-  FnStats->NumCalls++;
-  FnStats->RegionEnter = PAPI_get_real_nsec();
+  //SPDLOG_DEBUG("libpjit", "ID: {0:x} IsVariant? {1}", (uint64_t)prefix,
+  //             is_variant);
+  //polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+  //if (!FnStats)
+  //  return;
+  //FnStats->NumCalls++;
+  //FnStats->RegionEnter = PAPI_get_real_nsec();
 }
 
 void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  if (!FnStats)
-    return;
+  //polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+  //if (!FnStats)
+  //  return;
 
-  FnStats->RegionExit = PAPI_get_real_nsec();
-  JitT Context = getOrCreateJIT();
-  Context->async(TrackStatsChange, Context->FromPrefix((uint64_t)prefix),
-                 *FnStats);
+  //FnStats->RegionExit = PAPI_get_real_nsec();
+  //JitT Context = getOrCreateJIT();
+  //Context->async(TrackStatsChange, Context->FromPrefix((uint64_t)prefix),
+  //               *FnStats);
 }
 
 static inline bool should_use_variant(const Stats *S) {
@@ -329,38 +395,47 @@ static inline bool should_use_variant(const Stats *S) {
  */
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
-  if (opt::DisableRecompile)
-    return false;
-
-  uint64_t start = PAPI_get_real_nsec();
+//  if (opt::DisableRecompile)
+//    return false;
+//
+  //uint64_t start = PAPI_get_real_nsec();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   JitT Context = getOrCreateJIT();
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
-  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, K.first,
-                                 (uint64_t)prefix, Context);
+  //auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, K.first,
+  //                               (uint64_t)prefix, Context);
+  GetOrCreateVariantFunction(Request, K.first, (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
-  SPDLOG_DEBUG("libpjit", "Hash: {0:x} IR: {2:x} CacheHit? {1:d}",
+  console->debug("Hash: {0:x} IR: {2:x} CacheHit? {1:d}",
                K.first.ValueHash, K.second, (uint64_t)K.first.IR);
-  if (!K.second)
-    FutureFn.wait();
+
+  if (K.second) {
+    console->debug("Cache HIT. Die.");
+    exit(-1);
+  }
+    
+  //if (!K.second)
+  //  FutureFn.wait();
 
   auto FnIt = Context->find(K.first);
   SPDLOG_DEBUG("libpjit", "FnIt: {0:d}", FnIt != Context->end());
 
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
+  //polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
 
-  FnStats->LookupTime = PAPI_get_real_nsec() - start;
-  if (!should_use_variant(FnStats))
-    return false;
+  //FnStats->LookupTime = PAPI_get_real_nsec() - start;
+  //if (!should_use_variant(FnStats))
+  //  return false;
 
   if (FnIt != Context->end()) {
-    pjit_trace_fnstats_entry(prefix, true);
-    SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
+    polli::printArgs(*Request->F, paramc, params);
+    //pjit_trace_fnstats_entry(prefix, true);
+    //console->debug("call variant: {0:s}", Request->F->getName().str());
+    //SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
     (FnIt->second)(paramc, params);
-    pjit_trace_fnstats_exit(prefix, true);
-    FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
+    //pjit_trace_fnstats_exit(prefix, true);
+    //FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
     return true;
   }
 

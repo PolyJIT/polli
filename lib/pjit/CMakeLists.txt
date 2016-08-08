@@ -13,7 +13,6 @@ set(LLVM_LINK_COMPONENTS
   Instrumentation
   IPO
   Linker
-  MC
   OrcJIT
   native
   objcarcopts

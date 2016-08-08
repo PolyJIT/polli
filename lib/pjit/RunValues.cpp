@@ -8,6 +8,8 @@
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
+REGISTER_LOG(console, "runvals");
+
 namespace polli {
 RunValueList runValues(const SpecializerRequest &Request) {
   POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
@@ -25,7 +27,6 @@ RunValueList runValues(const SpecializerRequest &Request) {
   return RunValues;
 }
 
-#ifndef NDEBUG
 void printArgs(const llvm::Function &F, size_t argc, void *params) {
   std::string buf;
   llvm::raw_string_ostream s(buf);
@@ -39,14 +40,12 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
       }
       llvm::Type *Ty = Arg.getType();
       if (Ty->isIntegerTy())
-        llvm::dbgs() << fmt::format("[{:d}] -> {} ", i,
-                                    (int)*((uint64_t **)params)[i]);
+        console->debug("[{:d}] -> {} ", i, (int)*((uint64_t **)params)[i]);
       if (Ty->isDoubleTy())
-        llvm::dbgs() << fmt::format("[{:d}] -> {:g} ", i,
-                                    (double)*((double **)params)[i]);
+        console->debug("[{:d}] -> {:g} ", i, (double)*((double **)params)[i]);
       if (Ty->isPointerTy())
-        llvm::dbgs() << fmt::format("[{:d}] -> 0x{:x} ", i,
-                                    (uint64_t)((uint64_t **)params)[i]);
+        console->debug("[{:d}] -> 0x{:x} ", i,
+                       (uint64_t)((uint64_t **)params)[i]);
       i++;
     }
   }
@@ -55,10 +54,9 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
 
 void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
-    llvm::dbgs() << fmt::format(
+    console->debug(
         "{:d} matched against {}\n", *RV.value,
         reinterpret_cast<void *>(const_cast<llvm::Argument *>(RV.Arg)));
   }
 }
-#endif
 }
