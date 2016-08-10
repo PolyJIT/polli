@@ -12,11 +12,11 @@ REGISTER_LOG(console, "runvals");
 
 namespace polli {
 RunValueList runValues(const SpecializerRequest &Request) {
+  assert(Request.F && "Request malformed! Need an llvm function.");
   POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
                              "polyjit.params.select");
   int i = 0;
   RunValueList RunValues(boost::hash_value(Request.F->getName().str()));
-  assert(Request.F && "Request malformed! Need an llvm function.");
 
   DEBUG(printArgs(*Request.F, Request.ParamC, Request.Params));
   for (const llvm::Argument &Arg : Request.F->args()) {

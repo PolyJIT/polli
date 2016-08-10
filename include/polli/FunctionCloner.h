@@ -92,8 +92,8 @@ public:
     if (SrcF.getParent() == TgtM)
       return;
 
-    polli::log::console->debug("Checking for functions to remap in {:s}",
-                               SrcF.getName().str());
+    SPDLOG_DEBUG("cloner", "Checking for functions to remap in {:s}",
+                 SrcF.getName().str());
     for (Instruction &I : instructions(SrcF)) {
       if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
         CallSite CS = CallSite(&I);
@@ -103,7 +103,7 @@ public:
               CalledF->getAttributes()));
           NewF->setLinkage(CalledF->getLinkage());
           VMap[CalledF] = NewF;
-          polli::log::console->debug("Mapped: {:s}", NewF->getName().str());
+          SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
       }
     }
@@ -136,7 +136,6 @@ public:
     TargetAfterClone::Apply(From, To, VMap);
 
     DEBUG(polli::verifyFunctions("\t<< ", From, To));
-    polli::verifyFunctions("\n<< ", From, To);
 
     // Store function mapping for the linker.
     VMap[From] = To;

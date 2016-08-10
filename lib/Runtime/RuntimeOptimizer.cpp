@@ -53,15 +53,15 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
 static PassManagerBuilder createPMB() {
   PassManagerBuilder Builder;
 
-  Builder.VerifyInput = true;
-  Builder.VerifyOutput = true;
-  Builder.OptLevel = 0;
-  //polly::opt::PollyParallel = true;
+  Builder.VerifyInput = false;
+  Builder.VerifyOutput = false;
+  Builder.OptLevel = 3;
+  polly::opt::PollyParallel = true;
   // We accept them blindly.
-  //polly::ProfitabilityMinPerLoopInstructions = 0;
+  polly::ProfitabilityMinPerLoopInstructions = 0;
 
-  //Builder.addGlobalExtension(PassManagerBuilder::EP_EarlyAsPossible,
-  //                           registerPolly);
+  Builder.addGlobalExtension(PassManagerBuilder::EP_VectorizerStart,
+                             registerPolly);
 
   return Builder;
 }

@@ -602,11 +602,11 @@ struct InstrumentEndpoint {
     // function, otherwise we would call ourselves until the jit is ready.
     FallbackF->replaceAllUsesWith(To);
 
-    //Value *False = ConstantInt::getFalse(Ctx);
+    Value *False = ConstantInt::getFalse(Ctx);
 
-    //Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
+    Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
     Builder.CreateCall(FallbackF, ToArgs);
-    //Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
+    Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
     Builder.CreateBr(Exit);
     Builder.SetInsertPoint(Exit);
     Builder.CreateRetVoid();
