@@ -47,11 +47,10 @@ std::string now() {
 
 namespace pgsql {
 
-struct DBConnection {
+class DBConnection {
   std::unique_ptr<pqxx::connection> c;
 
-public:
-  DBConnection() {
+  void connect() {
     std::string CONNECTION_FMT_STR =
       "user={} port={} host={} dbname={} password={}";
     DbOptions Opts = getDBOptionsFromEnv();
@@ -82,6 +81,23 @@ public:
     }
   }
 
+public:
+  DBConnection() { connect(); }
+
+  pqxx::connection &operator->() {
+    if (c)
+      return *c;
+    connect();
+    return *c;
+  }
+
+  pqxx::connection &operator*() {
+    if (c)
+      return *c;
+    connect();
+    return *c;
+  }
+
   ~DBConnection() {
     c->disconnect();
     c.reset(nullptr);
@@ -95,7 +111,7 @@ static DBConnection& getDatabase() {
 
 UuidSet ReadAvailableRunGroups() {
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::read_transaction txn(*getDatabase().c);
+  pqxx::read_transaction txn(*getDatabase());
   pqxx::result r = txn.prepared("select_run_groups")(Opts.exp_uuid).exec();
 
   UuidSet RunGroups;
@@ -108,7 +124,7 @@ UuidSet ReadAvailableRunGroups() {
 
 IdVector ReadAvailableRunIDs(std::string run_group) {
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::read_transaction txn(*getDatabase().c);
+  pqxx::read_transaction txn(*getDatabase());
   pqxx::result r = txn.prepared("select_run_ids")(run_group).exec();
 
   IdVector RunIDs(r.size());
@@ -178,7 +194,7 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
                                           "VALUES";
 
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::work w(*getDatabase().c);
+  pqxx::work w(*getDatabase());
   pqxx::result project_exists =
       submit(fmt::format(SEARCH_PROJECT_SQL, opts.project), w);
 
@@ -229,7 +245,7 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
   Run<Event> Events(run_id);
   Events.clear();
 
-  pqxx::work txn(*getDatabase().c);
+  pqxx::work txn(*getDatabase());
   pqxx::result r = txn.prepared("select_simple_run")(run_id).exec();
 
   Events.ID = run_id;
@@ -257,7 +273,7 @@ void StoreRunMetrics(long run_id, const Metrics &M) {
   static std::string NewMetric =
       "INSERT INTO metrics (name, value, run_id) VALUES ('{}', {}, {});";
 
-  pqxx::work w(*getDatabase().c);
+  pqxx::work w(*getDatabase());
 
   pqxx::result r =
       w.exec(fmt::format("SELECT name FROM metrics WHERE run_id = {}", run_id));
