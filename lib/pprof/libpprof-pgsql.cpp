@@ -177,21 +177,21 @@ static pqxx::result submit(const std::string &Query,
 
 void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
               const pprof::Options &opts) {
-  static std::string SEARCH_PROJECT_SQL =
+  std::string SEARCH_PROJECT_SQL =
       "SELECT name FROM project WHERE name = '{}';";
 
-  static std::string NEW_PROJECT_SQL =
+  std::string NEW_PROJECT_SQL =
       "INSERT INTO project (name, description, src_url, domain, group_name) "
       "VALUES ('{}', '{}', '{}', '{}', '{}');";
 
-  static std::string NEW_RUN_SQL =
+  std::string NEW_RUN_SQL =
       "INSERT INTO run (\"end\", command, "
       "project_name, experiment_name, run_group, experiment_group) "
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
-  static std::string NEW_RUN_RESULT_SQL = "INSERT INTO benchbuild_events (id, type, "
-                                          "start, duration, name, tid, run_id) "
-                                          "VALUES";
+  std::string NEW_RUN_RESULT_SQL = "INSERT INTO benchbuild_events (id, type, "
+                                   "start, duration, name, tid, run_id) "
+                                   "VALUES";
 
   DbOptions Opts = getDBOptionsFromEnv();
   pqxx::work w(*getDatabase());
@@ -270,7 +270,7 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
 void StoreRunMetrics(long run_id, const Metrics &M) {
   using namespace std;
   const DbOptions Opts = getDBOptionsFromEnv();
-  static std::string NewMetric =
+  std::string NewMetric =
       "INSERT INTO metrics (name, value, run_id) VALUES ('{}', {}, {});";
 
   pqxx::work w(*getDatabase());
