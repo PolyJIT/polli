@@ -216,7 +216,6 @@ void papi_atexit_handler(void) {
   if (opts.use_file)
     file::StoreRun(PapiEvents, opts);
 
-  papi_local_events()->clear();
   PAPI_shutdown();
 }
 
