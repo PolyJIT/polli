@@ -67,7 +67,9 @@ struct InjectMain : public FunctionPass {
 
   const char *getPassName() const override { return PassName.c_str(); }
 
-  void getAnalysisUsage(AnalysisUsage &AU) const override {}
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.setPreservesAll();
+  }
 };
 
 /**
