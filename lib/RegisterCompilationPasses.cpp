@@ -114,29 +114,23 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (!opt::Enabled)
     return;
 
-  PM.add(llvm::createBarrierNoopPass());
-  PM.add(llvm::createInstructionCombiningPass(true));
   PM.add(polly::createCodePreparationPass());
-  //polly::registerCanonicalicationPasses(PM);
   PM.add(polli::createScopDetectionPass());
 
   if (opt::AnalyzeIR)
     PM.add(new FunctionPassPrinter<polli::JITScopDetection>(outs()));
 
-//  if (opt::InstrumentRegions) {
-//    PM.add(new PapiCScopProfiling());
-//    return;
-//  }
+  if (opt::InstrumentRegions) {
+    PM.add(new PapiCScopProfiling());
+    return;
+  }
 
   if (!opt::DisableRecompile) {
-    PM.add(llvm::createCFGSimplificationPass());
     PM.add(new ModuleExtractor());
     if (opt::AnalyzeIR)
       PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   }
-  PM.add(llvm::createCFGSimplificationPass());
   PM.add(new InjectMain());
-  PM.add(llvm::createBarrierNoopPass());
 }
 
 static llvm::RegisterStandardPasses
