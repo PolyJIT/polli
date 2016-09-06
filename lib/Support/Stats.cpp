@@ -54,6 +54,9 @@ uint64_t GetCandidateId(const Function &F) {
               F.getFnAttribute(name_tag).getValueAsString()) >>
           n))
       n = 0;
+
+  if (n == 0)
+    console->critical("Could not find the polyjit-id!");
   return n;
 }
 
