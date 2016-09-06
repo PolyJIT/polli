@@ -19,6 +19,9 @@ using namespace llvm;
 #define DEBUG_TYPE "polyjit"
 
 STATISTIC(Instrumented, "Number of instrumented functions");
+STATISTIC(Extracted, "Number of extracted SCoP functions");
+STATISTIC(NotEligible,
+          "Number of SCoP candidates that are not eligible for extraction.");
 STATISTIC(MappedGlobals, "Number of global to argument redirections");
 STATISTIC(UnmappedGlobals, "Number of argument to global redirections");
 STATISTIC(DuplicatePredsInPHI, "Number of functions that contain duplicate "
@@ -840,7 +843,10 @@ static SetVector<Function *> extractCandidates(Function &F,
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
         Functions.insert(ExtractedF);
+        Extracted++;
       }
+    } else {
+      NotEligible++;
     }
   }
   return Functions;
