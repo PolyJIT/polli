@@ -920,7 +920,7 @@ unsigned JITScopDetection::removeCachedResultsRecursively(const Region &R,
                                                           RegionSet &Cache) {
   unsigned Count = 0;
   for (auto &SubRegion : R) {
-    if (ValidRegions.count(SubRegion.get())) {
+    if (Cache.count(SubRegion.get())) {
       removeCachedResults(*SubRegion.get(), Cache);
       ++Count;
     } else
@@ -955,13 +955,13 @@ void JITScopDetection::findScops(Region &R) {
   if (HasErrors) {
     removeCachedResults(R);
   } else {
+    ValidRegions.insert(&R);
     ++ValidRegion;
     if (Context.requiresJIT) {
       RequiredParams[&R] = Context.RequiredParams;
       ValidRuntimeRegions.insert(&R);
       ++JitRegion;
     }
-    ValidRegions.insert(&R);
     return;
   }
 
@@ -1002,11 +1002,11 @@ void JITScopDetection::findScops(Region &R) {
     if (ExpandedCtx->requiresJIT) {
       RequiredParams[ExpandedR] = ExpandedCtx->RequiredParams;
       ValidRuntimeRegions.insert(ExpandedR);
-      ValidRegions.insert(ExpandedR);
-    } else {
-      ValidRegions.insert(ExpandedR);
+      ++JitRegion;
     }
-    removeCachedResults(*CurrentRegion);
+    ValidRegions.insert(ExpandedR);
+    ++ValidRegion;
+//    removeCachedResults(*CurrentRegion);
 
     // Erase all (direct and indirect) children of ExpandedR from the valid
     // regions and update the number of valid regions.
@@ -1249,6 +1249,9 @@ bool JITScopDetection::isReducibleRegion(Region &R, DebugLoc &DbgLoc) const {
 }
 
 bool JITScopDetection::runOnFunction(llvm::Function &F) {
+  if (F.hasFnAttribute("polyjit-jit-candidate"))
+    return false;
+
   LI = &getAnalysis<LoopInfoWrapperPass>().getLoopInfo();
   RI = &getAnalysis<RegionInfoPass>().getRegionInfo();
   if (!PollyProcessUnprofitable && LI->empty())
@@ -1280,6 +1283,12 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
       continue;
 
     ValidRegions.remove(&DC.CurRegion);
+    --ValidRegion;
+
+    if (ValidRuntimeRegions.count(&DC.CurRegion)) {
+      ValidRuntimeRegions.remove(&DC.CurRegion);
+      --JitRegion;
+    }
   }
 
   // Only makes sense when we tracked errors.
