@@ -241,7 +241,8 @@ public:
     std::vector<std::unique_ptr<Module>> MS;
     MS.push_back(std::move(M));
     ModuleHandleT MH = CompileLayer.addModuleSet(
-        std::move(MS), std::make_unique<PolySectionMemoryManager>(),
+        std::move(MS), std::unique_ptr<PolySectionMemoryManager>(
+                           new PolySectionMemoryManager()),
         std::move(Resolver));
     CompiledModules.insert(std::make_pair(M.get(), MH));
     return MH;
