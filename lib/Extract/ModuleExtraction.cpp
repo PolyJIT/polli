@@ -193,7 +193,6 @@ static inline void selectGV(Instruction &I, GlobalList &Globals) {
     if (V) {
       // RemapCalls can take care of this.
       if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
-        GV->dump();
         Globals.insert(GV);
       }
 
