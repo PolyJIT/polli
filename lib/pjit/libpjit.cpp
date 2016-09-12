@@ -433,6 +433,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 }
 
 void pjit_library_init() {
+    POLLI_TRACING_INIT;
 }
 } /* extern "C" */
 } /* polli */
@@ -448,8 +449,6 @@ public:
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
     // Make sure to initialize tracing before planting the atexit handler.
-    POLLI_TRACING_INIT;
-    papi_region_setup();
     POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
     SPDLOG_DEBUG("libpjit", "");
     SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
