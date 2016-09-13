@@ -54,6 +54,7 @@
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
 #include "polli/log.h"
+#include "polli/Options.h"
 
 #define DEBUG_TYPE "polyjit"
 
@@ -182,7 +183,12 @@ public:
   using UniqueModule = std::unique_ptr<Module>;
 
   PolyJITEngine()
-      : TM(EngineBuilder().selectTarget()), DL(TM->createDataLayout()),
+      : TM(EngineBuilder()
+               .setMArch(polli::opt::MArch)
+               .setMCPU(polli::opt::MCPU)
+               .setMAttrs(polli::opt::MAttrs)
+               .selectTarget()),
+        DL(TM->createDataLayout()),
         CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)) {
     SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
     llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
