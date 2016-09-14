@@ -356,6 +356,52 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 }
 
+namespace {
+class StaticInitializer {
+public:
+  StaticInitializer() {
+    using polly::initializePollyPasses;
+
+    set_options_from_environment();
+
+    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
+
+    // Make sure to initialize tracing before planting the atexit handler.
+    POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
+    SPDLOG_DEBUG("libpjit", "");
+    SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
+
+    PassRegistry &Registry = *PassRegistry::getPassRegistry();
+    polly::initializePollyPasses(Registry);
+    initializeCore(Registry);
+    initializeScalarOpts(Registry);
+    initializeVectorization(Registry);
+    initializeIPO(Registry);
+    initializeAnalysis(Registry);
+    initializeTransformUtils(Registry);
+    initializeInstCombine(Registry);
+    initializeInstrumentation(Registry);
+    initializeTarget(Registry);
+    initializeCodeGenPreparePass(Registry);
+    initializeAtomicExpandPass(Registry);
+    initializeRewriteSymbolsPass(Registry);
+
+    InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+
+    getOrCreateEngine();
+    getOrCreateJIT();
+  }
+
+  ~StaticInitializer() {
+    do_shutdown();
+  }
+};
+
+}
+
+
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
   SPDLOG_DEBUG("libpjit", "ID: {0:x} IsVariant? {1}", (uint64_t)prefix,
@@ -439,53 +485,9 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 }
 
 void pjit_library_init() {
-    POLLI_TRACING_INIT;
+  static StaticInitializer InitializeEverything;
+  POLLI_TRACING_INIT;
 }
 } /* extern "C" */
 } /* polli */
 
-namespace {
-class StaticInitializer {
-public:
-  StaticInitializer() {
-    using polly::initializePollyPasses;
-
-    set_options_from_environment();
-
-    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
-
-    // Make sure to initialize tracing before planting the atexit handler.
-    POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
-    SPDLOG_DEBUG("libpjit", "");
-    SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
-
-    PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    polly::initializePollyPasses(Registry);
-    initializeCore(Registry);
-    initializeScalarOpts(Registry);
-    initializeVectorization(Registry);
-    initializeIPO(Registry);
-    initializeAnalysis(Registry);
-    initializeTransformUtils(Registry);
-    initializeInstCombine(Registry);
-    initializeInstrumentation(Registry);
-    initializeTarget(Registry);
-    initializeCodeGenPreparePass(Registry);
-    initializeAtomicExpandPass(Registry);
-    initializeRewriteSymbolsPass(Registry);
-
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    InitializeNativeTargetAsmParser();
-
-    getOrCreateEngine();
-    getOrCreateJIT();
-  }
-
-  ~StaticInitializer() {
-    do_shutdown();
-  }
-};
-
-static StaticInitializer InitializeEverything;
-}
