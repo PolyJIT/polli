@@ -534,10 +534,10 @@ public:
 
   /// @name FunctionPass interface
   //@{
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const;
-  virtual void releaseMemory();
-  virtual bool runOnFunction(Function &F);
-  virtual void print(raw_ostream &OS, const Module *) const;
+  virtual void getAnalysisUsage(AnalysisUsage &AU) const override;
+  virtual void releaseMemory() override;
+  virtual bool runOnFunction(Function &F) override;
+  virtual void print(raw_ostream &OS, const Module *) const override;
   //@}
 };
 
