@@ -67,7 +67,7 @@ static uint64_t papi_get_thread_id() {
   thread::id sTID = std::this_thread::get_id();
   TIDMapT &TIDMap = papi_get_tid_map();
 
-  if (!(TIDMap.find(sTID) == TIDMap.end()))
+  if (TIDMap.find(sTID) != TIDMap.end())
     return TIDMap.at(sTID);
 
   TIDMap[sTID] = TID++;
@@ -83,25 +83,15 @@ Run<PPEvent> PapiEvents;
 static __thread bool papi_thread_init = false;
 static bool papi_init = false;
 static inline void do_papi_thread_init_once() {
-  SPDLOG_DEBUG("libpprof", "do_papi_thread_init_once({:d})",
-               papi_get_thread_id());
   if (!papi_thread_init) {
-    if (!papi_init) {
-      SPDLOG_DEBUG("libpprof",
-                   "do_papi_thread_init_once({:d}): call papi_region-setup()",
-                   papi_get_thread_id());
+    if (!papi_init)
       papi_region_setup();
-    }
-    int ret = PAPI_thread_init(papi_get_thread_id);
 
+    int ret = PAPI_thread_init(papi_get_thread_id);
     if (ret != PAPI_OK) {
       if (ret == PAPI_ENOINIT) {
         PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
-        SPDLOG_DEBUG(
-            "libpprof",
-            "do_papi_thread_init_once({:d}): call do_papi_thread_init_once()",
-            papi_get_thread_id());
       } else {
         console->error("PAPI_thread_init() = {:d}", ret);
         console->error("{:s}", PAPI_strerror(ret));
@@ -110,8 +100,8 @@ static inline void do_papi_thread_init_once() {
     } else {
       papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
       papi_thread_init = (ret == PAPI_OK);
-      SPDLOG_DEBUG("libpprof", "do_papi_thread_init_once({:d}): initialized",
-                   papi_get_thread_id());
+      console->error("initialized new thread({:d}): complete.",
+                     papi_get_thread_id());
     }
   }
 }
