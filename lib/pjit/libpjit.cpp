@@ -484,6 +484,20 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   return false;
 }
 
+/**
+ * @brief Runtime callback for PolyJIT.
+ *
+ * This entry-point will just return false and invoke the non-optimized
+ * version of the scop we want to jit.
+ *
+ * @param fName The function name we want to call.
+ * @param paramc number of arguments of the function we want to call
+ * @param params arugments of the function we want to call.
+ */
+bool pjit_main_no_recompile(const char *, uint64_t *, unsigned, char **) {
+  return false;
+}
+
 void pjit_library_init() {
   static StaticInitializer InitializeEverything;
   POLLI_TRACING_INIT;

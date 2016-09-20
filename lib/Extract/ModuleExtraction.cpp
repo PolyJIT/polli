@@ -4,6 +4,7 @@
 #include "polli/Schema.h"
 #include "polli/Stats.h"
 #include "polli/log.h"
+#include "polli/Options.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
@@ -489,9 +490,12 @@ struct InstrumentEndpoint {
     assert(M && "TgtF has no parent module!");
 
     LLVMContext &Ctx = M->getContext();
+    std::string CallbackName = "pjit_main";
+    if (polli::opt::DisableRecompile)
+      CallbackName = "pjit_main_no_recompile";
 
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        "pjit_main", Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
+        CallbackName, Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt64PtrTy(Ctx), Type::getInt32Ty(Ctx),
         Type::getInt8PtrTy(Ctx), NULL));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
