@@ -446,9 +446,6 @@ static inline bool should_use_variant(const Stats *S) {
  */
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
-  if (opt::DisableRecompile)
-    return false;
-
   uint64_t start = PAPI_get_real_nsec();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   JitT Context = getOrCreateJIT();
@@ -492,7 +489,18 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-bool pjit_main_no_recompile(const char *, uint64_t *, unsigned, char **) {
+bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
+                            unsigned paramc, char **params) {
+  auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
+  JitT Context = getOrCreateJIT();
+
+  std::pair<CacheKey, bool> K = GetCacheKey(*Request);
+  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, K.first,
+                                 (uint64_t)prefix, Context);
+
+  // If it was not a cache-hit, wait until the first variant is ready.
+  if (!K.second)
+    FutureFn.wait();
   return false;
 }
 
