@@ -92,18 +92,6 @@ static Function &getFunction(Module &M) {
   llvm_unreachable("No JIT candidate found in prototype!");
 }
 
-static inline void do_shutdown() {
-  // This forces the linker to keep the symbols around, if tracing is
-  // enabled.
-  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
-    POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
-    POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
-  }
-
-  POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
-  POLLI_TRACING_FINALIZE;
-}
-
 static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
   opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
@@ -301,11 +289,23 @@ static inline Function &getPrototype(const char *function, bool &cache_hit) {
 }
 
 namespace polli {
-
 using JitT = std::shared_ptr<PolyJIT>;
 static JitT &getOrCreateJIT() {
   static auto JIT = std::make_shared<PolyJIT>();
   return JIT;
+}
+
+static inline void do_shutdown() {
+  // This forces the linker to keep the symbols around, if tracing is
+  // enabled.
+  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
+    POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
+    POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
+  }
+  getOrCreateJIT()->shutdown();
+
+  POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
+  POLLI_TRACING_FINALIZE;
 }
 
 using MainFnT = std::function<void(int, char **)>;
@@ -394,9 +394,7 @@ public:
     getOrCreateJIT();
   }
 
-  ~StaticInitializer() {
-    do_shutdown();
-  }
+  ~StaticInitializer() {}
 };
 
 }
@@ -501,6 +499,7 @@ bool pjit_main_no_recompile(const char *, uint64_t *, unsigned, char **) {
 void pjit_library_init() {
   static StaticInitializer InitializeEverything;
   POLLI_TRACING_INIT;
+  atexit(do_shutdown);
 }
 } /* extern "C" */
 } /* polli */

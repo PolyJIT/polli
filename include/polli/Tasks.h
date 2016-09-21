@@ -144,6 +144,12 @@ public:
         T.join();
   }
 
+  void wait_for_running_jobs() {
+    for (auto &T : Threads)
+      if (T.joinable())
+        T.join();
+  }
+
   void cancel_pending_jobs() {
     for (auto &Q : JobQs)
       Q.done();

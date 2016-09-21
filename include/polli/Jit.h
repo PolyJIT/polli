@@ -21,6 +21,12 @@ public:
   explicit PolyJIT() : VariantFunctions(), CodeCache() { setup(); }
   ~PolyJIT() { System.cancel_pending_jobs(); }
 
+  //@brief Shutdown the task system.
+  void shutdown() {
+    System.cancel_pending_jobs();
+    System.wait_for_running_jobs();
+  }
+
   /**
    * @name CodeCache interface.
    * @{ */
