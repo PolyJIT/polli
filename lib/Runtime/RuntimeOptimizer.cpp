@@ -27,7 +27,11 @@
 #include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
 #include "polly/ScopDetection.h"
+#include "polly/CodeGen/CodegenCleanup.h"
 #include "polly/Options.h"
+#include "polli/log.h"
+
+REGISTER_LOG(console, "optmize");
 
 namespace llvm {
 class Function;
@@ -40,6 +44,7 @@ using namespace polly;
 namespace polli {
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
+  PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
   PM.add(polly::createScopInfoRegionPassPass());
   PM.add(polly::createIslScheduleOptimizerPass());
@@ -48,6 +53,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
   PM.add(createBarrierNoopPass());
+  PM.add(polly::createCodegenCleanupPass());
 }
 
 static PassManagerBuilder createPMB() {
@@ -77,15 +83,13 @@ Function &OptimizeForRuntime(Function &F) {
   opt::GenerateOutput = true;
 #endif
 
-  legacy::FunctionPassManager PM = legacy::FunctionPassManager(M);
+  legacy::PassManager PM = legacy::PassManager();
 
-  Builder.populateFunctionPassManager(PM);
+  Builder.populateModulePassManager(PM);
 #ifdef POLLI_ENABLE_BASE_POINTERS
   PM.add(polli::createBasePointersPass());
 #endif
-  PM.doInitialization();
-  PM.run(F);
-  PM.doFinalization();
+  PM.run(*M);
 
 #ifdef POLLI_ENABLE_PAPI
   if (opt::havePapi()) {
@@ -109,6 +113,12 @@ Function &OptimizeForRuntime(Function &F) {
   DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
   opt::GenerateOutput = false;
 #endif
+
+  if (F.hasFnAttribute("polly-optimized")) {
+    console->error("fn got optimized by polly");
+  } else {
+    console->error("fn did not get optimized by polly");
+  }
 
   return F;
 }
