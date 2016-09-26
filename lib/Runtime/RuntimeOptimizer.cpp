@@ -28,6 +28,7 @@
 #include "polly/RegisterPasses.h"
 #include "polly/ScopDetection.h"
 #include "polly/CodeGen/CodegenCleanup.h"
+#include "polly/CodeGen/CodeGeneration.h"
 #include "polly/Options.h"
 #include "polli/log.h"
 
@@ -63,6 +64,7 @@ static PassManagerBuilder createPMB() {
   Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
   polly::opt::PollyParallel = true;
+  polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 0;
 
