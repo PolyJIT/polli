@@ -925,6 +925,7 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     InstCloner.setSource(ProtoF);
     InstCloner.setPrototype(Prototype);
     InstCloner.setFallback(F);
+    InstCloner.setDominatorTree(&DT);
 
     Function *InstF = InstCloner.start(/* RemapCalls */ true);
     InstF->addFnAttr(Attribute::OptimizeNone);

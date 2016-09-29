@@ -18,6 +18,8 @@
 #include "polli/Options.h"
 #include "polli/log.h"
 
+#include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -86,6 +88,10 @@ public:
     return *this;
   }
 
+  void setDominatorTree(DominatorTree *DT) {
+    this->DT = DT;
+  }
+
   void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
     if (SrcF.getParent() == TgtM)
       return;
@@ -112,7 +118,7 @@ public:
    * target module.
    * If target module does not exist, create the target
    * function in the source module. */
-  Function *start(bool RemapCalls = false) {
+  Function *start(bool RemapCalls = false, DominatorTree *DT = nullptr) {
     if (!ToM)
       ToM = From->getParent();
 
@@ -133,6 +139,9 @@ public:
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
+    if (DT)
+      removeFunctionFromDomTree(To, *DT);
+
     DEBUG(polli::verifyFunctions("\t<< ", From, To));
 
     // Store function mapping for the linker.
@@ -141,8 +150,26 @@ public:
   }
 
 private:
+  /* @brief Remove the given function from the dominator tree.
+   *
+   * If we have a DominatorTree available, we can remove the extracted
+   * function from it, to avoid further problems with wrong dominance
+   * information.
+   */
+  void removeFunctionFromDomTree(Function *F, DominatorTree &DT) {
+    DomTreeNode *N = DT.getNode(&F->getEntryBlock());
+    std::vector<BasicBlock *> Nodes;
+
+    for (po_iterator<DomTreeNode *> I = po_begin(N), E = po_end(N); I != E; ++I)
+      Nodes.push_back(I->getBlock());
+
+    for (BasicBlock *BB : Nodes)
+      DT.eraseNode(BB);
+  }
+
   ValueToValueMapTy &VMap;
   Module *ToM;
+  DominatorTree *DT;
   Function *From;
   Function *To;
 };
