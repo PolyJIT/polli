@@ -327,8 +327,8 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   SPDLOG_DEBUG("libpjit", "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
-  Context->UpdatePrefixMap(prefix, Request->F);
   llvm::Function *F = Request->F;
+  Context->UpdatePrefixMap(prefix, F);
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
   RunValueList Values = runValues(*Request);
   std::string FnName;
