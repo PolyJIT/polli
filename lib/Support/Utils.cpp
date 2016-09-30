@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/Utils.h"
+#include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/PostDominators.h"
 
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Verifier.h"          // for createVerifierPass
@@ -74,3 +76,23 @@ void StoreModules(ManagedModules &Modules) {
     StoreModule(*M, M->getModuleIdentifier());
   }
 }
+
+namespace polli {
+/* @brief Remove the given function from the dominator tree.
+ *
+ * If we have a DominatorTree available, we can remove the extracted
+ * function from it, to avoid further problems with wrong dominance
+ * information.
+ */
+void removeFunctionFromDomTree(Function *F, DominatorTree &DT) {
+  DomTreeNode *N = DT.getNode(&F->getEntryBlock());
+  std::vector<BasicBlock *> Nodes;
+
+  for (po_iterator<DomTreeNode *> I = po_begin(N), E = po_end(N); I != E; ++I)
+    Nodes.push_back(I->getBlock());
+
+  for (BasicBlock *BB : Nodes)
+    DT.eraseNode(BB);
+}
+}
+

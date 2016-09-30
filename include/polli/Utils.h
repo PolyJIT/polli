@@ -14,6 +14,7 @@
 
 #include "polli/Options.h"
 
+#include "llvm/Analysis/PostDominators.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
@@ -66,4 +67,7 @@ void StoreModules(ManagedModules &Modules);
  */
 llvm::raw_ostream &report(const size_t Indent = 0);
 
+namespace polli {
+void removeFunctionFromDomTree(llvm::Function *F, llvm::DominatorTree &DT);
+}
 #endif // POLLI_UTILS_H

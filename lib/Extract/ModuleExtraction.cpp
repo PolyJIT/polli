@@ -5,6 +5,7 @@
 #include "polli/Stats.h"
 #include "polli/log.h"
 #include "polli/Options.h"
+#include "polli/Utils.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"

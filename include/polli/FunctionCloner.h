@@ -16,9 +16,9 @@
 #define POLLI_FUNCTION_CLONER_H
 
 #include "polli/Options.h"
+#include "polli/Utils.h"
 #include "polli/log.h"
 
-#include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
@@ -140,7 +140,7 @@ public:
     TargetAfterClone::Apply(From, To, VMap);
 
     if (DT)
-      removeFunctionFromDomTree(To, *DT);
+      polli::removeFunctionFromDomTree(To, *DT);
 
     DEBUG(polli::verifyFunctions("\t<< ", From, To));
 
@@ -150,23 +150,6 @@ public:
   }
 
 private:
-  /* @brief Remove the given function from the dominator tree.
-   *
-   * If we have a DominatorTree available, we can remove the extracted
-   * function from it, to avoid further problems with wrong dominance
-   * information.
-   */
-  void removeFunctionFromDomTree(Function *F, DominatorTree &DT) {
-    DomTreeNode *N = DT.getNode(&F->getEntryBlock());
-    std::vector<BasicBlock *> Nodes;
-
-    for (po_iterator<DomTreeNode *> I = po_begin(N), E = po_end(N); I != E; ++I)
-      Nodes.push_back(I->getBlock());
-
-    for (BasicBlock *BB : Nodes)
-      DT.eraseNode(BB);
-  }
-
   ValueToValueMapTy &VMap;
   Module *ToM;
   DominatorTree *DT;
