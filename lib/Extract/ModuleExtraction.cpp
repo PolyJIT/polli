@@ -8,7 +8,9 @@
 #include "polli/Utils.h"
 
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/CallGraph.h"
+#include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -50,6 +52,7 @@ void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JITScopDetection>();
   AU.addRequired<DominatorTreeWrapperPass>();
   AU.addRequired<ScalarEvolutionWrapperPass>();
+  AU.addRequired<RegionInfoPass>();
 }
 
 void ModuleExtractor::releaseMemory() { ExtractedFunctions.clear(); }
@@ -796,6 +799,21 @@ static void fixSuccessorPHI(BasicBlock *BB) {
   }
 }
 
+static void PrepareRegionForExtraction(const Region *R, RegionInfo &RI, DominatorTree &DT) {
+  // This region lacks a single-exit edge.
+  if (!R->getExitingBlock()) {
+    BasicBlock *Exit = R->getExit();
+    SmallVector<BasicBlock *, 4> ExitPreds;
+    for (auto *PredBB: predecessors(Exit)) {
+      if (R->contains(PredBB))
+        ExitPreds.push_back(PredBB);
+    }
+    BasicBlock *NewBB =
+        SplitBlockPredecessors(Exit, ExitPreds, ".polyjit.ext.split", &DT);
+    RI.setRegionFor(NewBB, const_cast<Region *>(R));
+  }
+}
+
 /**
  * @brief Extract all regions marked for extraction into an own function and
  * mark it * as 'polyjit-jit-candidate'.
@@ -803,7 +821,8 @@ static void fixSuccessorPHI(BasicBlock *BB) {
 static SetVector<Function *> extractCandidates(Function &F,
                                                JITScopDetection &SD,
                                                ScalarEvolution &SE,
-                                               DominatorTree &DT) {
+                                               DominatorTree &DT,
+                                               RegionInfo &RI) {
   SetVector<Function *> Functions;
   std::set<Value *> TrackedParams;
   LLVMContext &Ctx = F.getContext();
@@ -815,8 +834,9 @@ static SetVector<Function *> extractCandidates(Function &F,
   }
 
   for (const Region *R : SD) {
+    PrepareRegionForExtraction(R, RI, DT);
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
-    console->info("Extracting region: {:s}", R->getNameStr());
+
     if (Extractor.isEligible()) {
       JITScopDetection::ParamVec Params = SD.RequiredParams[R];
       SetVector<Value *> In, Out;
@@ -842,7 +862,6 @@ static SetVector<Function *> extractCandidates(Function &F,
           }
           fixSuccessorPHI(BB);
         }
-
         ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
         ExtractedF->setName(F.getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
@@ -872,6 +891,7 @@ static SetVector<Function *> extractCandidates(Function &F,
  * @return bool
  */
 bool ModuleExtractor::runOnFunction(Function &F) {
+  RegionInfo &RI = getAnalysis<RegionInfoPass>().getRegionInfo();
 
   if (F.isDeclaration())
     return false;
