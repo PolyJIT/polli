@@ -126,6 +126,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   }
 
   PM.add(new ModuleExtractor());
+  PM.add(new ModuleInstrumentation());
   if (opt::AnalyzeIR)
     PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   PM.add(new InjectMain());
