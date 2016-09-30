@@ -64,6 +64,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
   } else {
     s << " OK (F is nullptr)";
   }
+  errs() << "\n" << s.str() << "\n";
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
