@@ -32,6 +32,7 @@ REGISTER_LOG(console, "extract");
 
 namespace polli {
 char ModuleExtractor::ID = 0;
+char ModuleInstrumentation::ID = 0;
 
 using ModulePtrT = std::unique_ptr<Module>;
 
@@ -47,12 +48,11 @@ static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
 
 void ModuleExtractor::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<JITScopDetection>();
-  AU.addRequired<CallGraphWrapperPass>();
   AU.addRequired<DominatorTreeWrapperPass>();
   AU.addRequired<ScalarEvolutionWrapperPass>();
 }
 
-void ModuleExtractor::releaseMemory() { InstrumentedFunctions.clear(); }
+void ModuleExtractor::releaseMemory() { ExtractedFunctions.clear(); }
 
 /**
  * @brief Convert a module to a string.
@@ -872,8 +872,6 @@ static SetVector<Function *> extractCandidates(Function &F,
  * @return bool
  */
 bool ModuleExtractor::runOnFunction(Function &F) {
-  SetVector<Function *> Functions;
-  bool Changed = false;
 
   if (F.isDeclaration())
     return false;
@@ -884,12 +882,40 @@ bool ModuleExtractor::runOnFunction(Function &F) {
   JITScopDetection &SD = getAnalysis<JITScopDetection>();
   ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
 
-  Functions = extractCandidates(F, SD, SE, DT);
-  if (Functions.size() > 0)
-    Changed |= true;
+  ExtractedFunctions = extractCandidates(F, SD, SE, DT, RI);
+  return (ExtractedFunctions.size() > 0);
+}
 
-  // Instrument all extracted functions.
-  for (Function *F : Functions) {
+void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
+  int i = 0;
+  for (const Function *F : ExtractedFunctions) {
+    os << fmt::format("{:d} {:s} ", i++, F->getName().str());
+    F->print(os);
+    os << "\n";
+  }
+}
+
+void ModuleInstrumentation::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<ModuleExtractor>();
+  AU.addRequired<DominatorTreeWrapperPass>();
+}
+
+void ModuleInstrumentation::releaseMemory() { InstrumentedFunctions.clear(); }
+
+void ModuleInstrumentation::print(raw_ostream &os, const Module *M) const {
+  int i = 0;
+  for (const Function *F : InstrumentedFunctions) {
+    os << fmt::format("{:d} {:s} ", i++, F->getName().str());
+    F->print(os);
+    os << "\n";
+  }
+}
+
+bool ModuleInstrumentation::runOnFunction(Function &F) {
+  ModuleExtractor &ME = getAnalysis<ModuleExtractor>();
+  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+
+  for (auto *F : ME) {
     if (F->isDeclaration())
       continue;
     console->info("Extracting: {:s}", F->getName().str());
@@ -936,18 +962,11 @@ bool ModuleExtractor::runOnFunction(Function &F) {
     Instrumented++;
   }
 
-  return Changed;
-}
-
-void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
-  int i = 0;
-  for (const Function *F : InstrumentedFunctions) {
-    os << fmt::format("{:d} {:s} ", i++, F->getName().str());
-    F->print(os);
-    os << "\n";
-  }
+  return true;
 }
 
 static RegisterPass<ModuleExtractor>
     X("polli-extract-scops", "PolyJIT - Move extracted SCoPs into new modules");
+static RegisterPass<ModuleInstrumentation>
+    Y("polli-instrument-scops", "PolyJIT - Instrument extracted SCoPs");
 } // namespace polli
