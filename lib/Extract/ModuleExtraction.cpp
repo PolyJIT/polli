@@ -1,6 +1,7 @@
 #include "polli/FunctionCloner.h"
 #include "polli/ScopDetection.h"
 #include "polli/ModuleExtractor.h"
+#include "polli/FuncTools.h"
 #include "polli/Schema.h"
 #include "polli/Stats.h"
 #include "polli/log.h"
@@ -82,61 +83,6 @@ using ExprList = SetVector<Instruction *>;
 using GlobalList = SetVector<const GlobalValue *>;
 
 /**
- * @brief Get the pointer operand to this Instruction, if possible
- *
- * @param I the Instruction we fetch the pointer operand from, if it has one.
- *
- * @return the pointer operand, if it exists.
- */
-
-/**
- * @brief Get the pointer operand to this Instruction, if possible.
- *
- * @param I The Instruction we fetch the pointer operand from, if it has one.
- * @return llvm::Value* The pointer operand we found.
- */
-static Value *getPointerOperand(Instruction &I) {
-  Value *V = nullptr;
-
-  if (BitCastInst *B = dyn_cast<BitCastInst>(&I))
-    V = B->getOperand(0);
-
-  if (LoadInst *L = dyn_cast<LoadInst>(&I))
-    V = L->getPointerOperand();
-
-  if (StoreInst *S = dyn_cast<StoreInst>(&I))
-    V = S->getPointerOperand();
-
-  if (GetElementPtrInst *G = dyn_cast<GetElementPtrInst>(&I))
-    V = G->getPointerOperand();
-
-  return V;
-}
-
-/**
- * @brief Set the pointer operand for this instruction to a new value.
- *
- * This is done by creating a new (almost identical) instruction that replaces
- * the new one.
- *
- * @param I The instruction we set a new pointer operand for.
- * @param V The value we set as new pointer operand.
- * @return void
- */
-static void setPointerOperand(Instruction &I, Value &V,
-                              ValueToValueMapTy &VMap) {
-  if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
-    LI->llvm::User::setOperand(0, &V);
-  } else if (StoreInst *S = dyn_cast<StoreInst>(&I)) {
-    S->setOperand(/*Address operand=*/1, &V);
-  } else if (GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(&I)) {
-    GEP->setOperand(0, &V);
-  } else if (BitCastInst *Cast = dyn_cast<BitCastInst>(&I)) {
-    Cast->setOperand(0, &V);
-  }
-}
-
-/**
  * @brief Get the number of globals we carry within this function signature.
  *
  * @param F The Function we want to cound the globals on.
@@ -150,89 +96,6 @@ static inline size_t getGlobalCount(Function *F) {
           n))
       n = 0;
   return n;
-}
-
-using InstrList = SmallVector<Instruction *, 4>;
-/**
- * @brief Convert a ConstantExpr pointer operand to an Instruction Value.
- *
- * This is used in conjunction with the apply function.
- *
- * @param I The Instruction we want to convert the operand in.
- * @param Converted A list of Instructions where we keep track of all found
- *                  Instructions so far.
- * @return void
- */
-static inline void constantExprToInstruction(Instruction &I,
-                                             InstrList &Converted,
-                                             ValueToValueMapTy &VMap) {
-  Value *V = getPointerOperand(I);
-  if (V) {
-    if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
-      Instruction *Inst = C->getAsInstruction();
-      Inst->insertBefore(&I);
-      setPointerOperand(I, *Inst, VMap);
-      constantExprToInstruction(*Inst, Converted, VMap);
-      Converted.push_back(&I);
-    }
-  }
-}
-
-/**
- * @brief Collect all global variables used within this Instruction.
- *
- * We need to keep track of global vars, when extracting prototypes.
- * This is used in conjunction with the apply function.
- *
- * @param I The Instruction we collect globals from.
- * @param Globals A list of globals we collected so far.
- * @return void
- */
-static inline void selectGV(Instruction &I, GlobalList &Globals) {
-  if (isa<llvm::IntrinsicInst>(&I))
-    return;
-
-  for (unsigned i = 0; i < I.getNumOperands(); i++) {
-    Value *V = I.getOperand(i);
-
-    if (V) {
-      // RemapCalls can take care of this.
-      if (!isa<Function>(V))
-        if (GlobalValue *GV = dyn_cast<GlobalValue>(V)) {
-          Globals.insert(GV);
-        }
-
-      if (ConstantExpr *C = dyn_cast<ConstantExpr>(V)) {
-        Instruction *Inst = C->getAsInstruction();
-        selectGV(*Inst, Globals);
-      }
-    }
-  }
-}
-
-/**
- * @brief Apply a selector function on the function body.
- *
- * This is a little helper function that allows us to scan over all instructions
- * within a function, collecting arbitrary stuff on the way.
- *
- * @param T The type we track our state in.
- * @param F The Function we operate on.
- * @param I The Instruction the selector operates on next.
- * @param L The state the SelectorF operates with.
- * @param SelectorF The selector function we apply to all instructions in the
- *                  function.
- * @return T
- */
-template <typename T>
-static T apply(Function &F,
-               std::function<void(Instruction &I, T &L)> SelectorF) {
-  T L;
-  for (BasicBlock &BB : F)
-    for (Instruction &I : BB)
-      SelectorF(I, L);
-
-  return L;
 }
 
 /**
@@ -279,6 +142,12 @@ struct AddGlobalsPolicy {
       VMap[&Arg] = &*(NewArg++);
     }
 
+    Module *SourceM = From->getParent();
+    Module *TargetM = To->getParent();
+
+    if (SourceM == TargetM)
+      return;
+
     LLVMContext &Ctx = To->getContext();
     Attribute ParamAttr =
         llvm::Attribute::get(Ctx, "polli.gv");
@@ -298,7 +167,7 @@ struct AddGlobalsPolicy {
        * different invocations of the FunctionCloner.
        */
       NewArg->setName(GV->getName());
-      VMap[GV] = &*(NewArg++);
+      NewArg++;
       MappedGlobals++;
     }
   }
@@ -427,7 +296,6 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   // We need to substitute all instructions that use ConstantExpressions.
   InstrList Converted = apply<InstrList>(
       F, std::bind(constantExprToInstruction, _1, _2, std::ref(VMap)));
-
 
   // First create a new prototype function.
   ExtractFunction Cloner(VMap, &M);

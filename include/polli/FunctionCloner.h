@@ -17,7 +17,9 @@
 
 #include "polli/Options.h"
 #include "polli/Utils.h"
+#include "polli/TypeMapper.h"
 #include "polli/log.h"
+#include "polli/FuncTools.h"
 
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
@@ -32,6 +34,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/Linker/IRMover.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "polyjit"
@@ -114,12 +117,29 @@ public:
     }
   }
 
+  void mapGlobals(Function &SrcF, Module *TgtM,
+                  ValueToValueMapTy &VMap) const {
+    if (SrcF.getParent() == TgtM)
+      return;
+
+    GlobalList GVs = apply<GlobalList>(SrcF, selectGV);
+    for (auto *GV : GVs) {
+      GlobalValue *NewGV = TgtM->getNamedGlobal(GV->getName());
+      if (!NewGV) {
+        NewGV = cast<GlobalValue>(
+            TgtM->getOrInsertGlobal(GV->getName(), GV->getValueType()));
+      }
+      VMap[GV] = NewGV;
+    }
+  }
+
   /* Clone the source function into the target function.
    * If target function does not exist, create one in
    * target module.
    * If target module does not exist, create the target
    * function in the source module. */
-  Function *start(bool RemapCalls = false, DominatorTree *DT = nullptr) {
+  Function *start(bool RemapCalls = false, DominatorTree *DT = nullptr,
+                  bool RemapGlobals = true) {
     if (!ToM)
       ToM = From->getParent();
 
@@ -132,11 +152,18 @@ public:
 
     DEBUG(polli::verifyFunctions("\t>> ", From, To));
 
+    if (RemapGlobals)
+      mapGlobals(*From, ToM, VMap);
     // Collect all calls for remapping.
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
 
-    CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns);
+    ClonedCodeInfo CI;
+    IRMover::IdentifiedStructTypeSet DstStructTypesSet;
+    TypeMapTy TM(DstStructTypesSet);
+    CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns,
+                      "", &CI, &TM);
+
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
