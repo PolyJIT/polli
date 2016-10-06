@@ -833,6 +833,7 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     bool BrokenDbg;
     if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
       // We failed verification, skip this region.
+      PrototypeM->dump();
       errs() << "Prototype: " << PrototypeM->getModuleIdentifier()
              << " failed verification. Skipping.\n";
       continue;
