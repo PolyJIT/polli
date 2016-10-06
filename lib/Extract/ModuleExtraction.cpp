@@ -677,6 +677,18 @@ static void PrepareRegionForExtraction(const Region *R, RegionInfo &RI, Dominato
         SplitBlockPredecessors(Exit, ExitPreds, ".polyjit.ext.split", &DT);
     RI.setRegionFor(NewBB, const_cast<Region *>(R));
   }
+
+  for (auto *BB : R->blocks()) {
+    if (isa<PHINode>(BB->begin())) {
+      unsigned NumSuccessors = std::distance(succ_begin(BB), succ_end(BB));
+
+      if (NumSuccessors > 1) {
+        auto *AfterPHI = BB->getFirstNonPHI();
+        BasicBlock *NewBB = SplitBlock(BB, AfterPHI, &DT);
+        RI.setRegionFor(NewBB, const_cast<Region *>(R));
+      }
+    }
+  }
 }
 
 /**
