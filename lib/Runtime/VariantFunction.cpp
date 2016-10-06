@@ -316,10 +316,10 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
     Specializer.setSource(&BaseF);
 
     if (!BaseF.hasFnAttribute("polyjit-id"))
-      console->warn("{:s} has no polyjit-id. Tracking will not work.",
+      console->critical("{:s} has no polyjit-id. Tracking will not work.",
                   BaseF.getName().str());
-
-    F = &OptimizeForRuntime(*Specializer.start(true));
+    Function *NewF = Specializer.start(true);
+    F = &OptimizeForRuntime(*NewF);
     F->addFnAttr("polyjit-id",
                  fmt::format("{:d}", polli::GetCandidateId(BaseF)));
     FnName = F->getName().str();
