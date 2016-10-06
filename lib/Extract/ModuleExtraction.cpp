@@ -37,10 +37,10 @@ namespace polli {
 char ModuleExtractor::ID = 0;
 char ModuleInstrumentation::ID = 0;
 
-using ModulePtrT = std::unique_ptr<Module>;
+using UniqueModule = std::unique_ptr<Module>;
 
-static ModulePtrT copyModule(ValueToValueMapTy &VMap, Module &M) {
-  auto NewM = ModulePtrT(new Module(M.getModuleIdentifier(), M.getContext()));
+static inline UniqueModule copyModule(const Module &M) {
+  auto NewM = UniqueModule(new Module(M.getModuleIdentifier(), M.getContext()));
   NewM->setDataLayout(M.getDataLayout());
   NewM->setTargetTriple(M.getTargetTriple());
   NewM->setMaterializer(M.getMaterializer());
@@ -812,7 +812,7 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     Module *M = F->getParent();
     StringRef ModuleName = F->getParent()->getModuleIdentifier();
     StringRef FromName = F->getName();
-    ModulePtrT PrototypeM = copyModule(VMap, *M);
+    UniqueModule PrototypeM = copyModule(*M);
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
