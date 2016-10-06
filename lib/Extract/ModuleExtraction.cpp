@@ -739,7 +739,7 @@ static SetVector<Function *> extractCandidates(Function &F,
           }
           fixSuccessorPHI(BB);
         }
-        ExtractedF->setLinkage(GlobalValue::WeakAnyLinkage);
+        ExtractedF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         ExtractedF->setName(F.getName() + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
