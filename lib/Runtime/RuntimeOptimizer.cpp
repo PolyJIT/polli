@@ -116,11 +116,11 @@ Function &OptimizeForRuntime(Function &F) {
   opt::GenerateOutput = false;
 #endif
 
-  if (F.hasFnAttribute("polly-optimized")) {
-    console->error("fn got optimized by polly");
-  } else {
-    console->error("fn did not get optimized by polly");
-  }
+  //if (F.hasFnAttribute("polly-optimized")) {
+  //  console->error("fn got optimized by polly");
+  //} else {
+  //  console->error("fn did not get optimized by polly");
+  //}
 
   return F;
 }
