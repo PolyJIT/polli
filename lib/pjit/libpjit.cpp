@@ -451,14 +451,16 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   JitT Context = getOrCreateJIT();
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
-  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, K.first,
+  CacheKey Key = K.first;
+  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, Key,
                                  (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
-  if (!K.second)
+  bool CacheHit = K.second;
+  if (!CacheHit)
     FutureFn.wait();
 
-  auto FnIt = Context->find(K.first);
+  auto FnIt = Context->find(Key);
   SPDLOG_DEBUG("libpjit", "FnIt: {0:d}", FnIt != Context->end());
 
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
