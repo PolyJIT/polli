@@ -285,15 +285,9 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   static unsigned int i = 65536;
   using ExtractFunction =
       FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>;
-  using namespace std::placeholders;
 
   DEBUG(dbgs() << fmt::format("Source to Prototype -> {:s}\n",
                               F.getName().str()));
-  // Prepare the source function.
-  // We need to substitute all instructions that use ConstantExpressions.
-  InstrList Converted = apply<InstrList>(
-      F, std::bind(constantExprToInstruction, _1, _2, std::ref(VMap)));
-
   // First create a new prototype function.
   ExtractFunction Cloner(VMap, &M);
   Function *Proto = Cloner.setSource(&F).start(true);

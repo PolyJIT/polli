@@ -140,12 +140,18 @@ public:
    * function in the source module. */
   Function *start(bool RemapCalls = false, DominatorTree *DT = nullptr,
                   bool RemapGlobals = true) {
+    using namespace std::placeholders;
     if (!ToM)
       ToM = From->getParent();
 
     if (!To)
       To = OnCreate::Create(From, ToM);
     OnCreate::MapArguments(VMap, From, To);
+
+    // Prepare the source function.
+    // We need to substitute all instructions that use ConstantExpressions.
+    InstrList L = apply<InstrList>(
+        *From, std::bind(constantExprToInstruction, _1, _2, std::ref(VMap)));
 
     /* Copy function body ExtractedF over to ClonedF */
     SmallVector<ReturnInst *, 8> Returns;
