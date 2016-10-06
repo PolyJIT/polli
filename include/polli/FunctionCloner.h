@@ -129,9 +129,16 @@ public:
 
       if (const GlobalVariable *GVar = dyn_cast<GlobalVariable>(GV)) {
         GlobalVariable *NewGVar = cast<GlobalVariable>(
-            TgtM->getOrInsertGlobal(GVar->getName(), GVar->getType()));
-        NewGVar->setLinkage(
-            GlobalValue::LinkageTypes::AvailableExternallyLinkage);
+            TgtM->getOrInsertGlobal(GVar->getName(), GVar->getValueType()));
+        NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
+        if (NewGVar->getValueType()->isAggregateType()) {
+          NewGVar->setInitializer(
+              ConstantAggregateZero::get(GVar->getValueType()));
+        } else {
+          NewGVar->setInitializer(Constant::getNullValue(GVar->getValueType()));
+        }
+
+        NewGVar->setAlignment(GVar->getAlignment());
         VMap[GV] = NewGVar;
       }
     }
