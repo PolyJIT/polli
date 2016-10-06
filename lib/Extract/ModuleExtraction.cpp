@@ -284,7 +284,7 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
   static unsigned int i = 65536;
   using ExtractFunction =
-      FunctionCloner<AddGlobalsPolicy, IgnoreSource, IgnoreTarget>;
+      FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>;
   using namespace std::placeholders;
 
   DEBUG(dbgs() << fmt::format("Source to Prototype -> {:s}\n",
@@ -601,7 +601,7 @@ struct SCEVParamValueExtractor
 };
 
 using InstrumentingFunctionCloner =
-    FunctionCloner<RemoveGlobalsPolicy, IgnoreSource, InstrumentEndpoint>;
+    FunctionCloner<CopyCreator, IgnoreSource, InstrumentEndpoint>;
 
 static CallSite findExtractedCallSite(Function &F, Function &SrcF) {
   for (auto &Inst : instructions(&SrcF)) {
