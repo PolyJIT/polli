@@ -178,10 +178,8 @@ public:
       mapGlobals(*From, ToM, VMap);
 
     ClonedCodeInfo CI;
-    IRMover::IdentifiedStructTypeSet DstStructTypesSet;
-    TypeMapTy TM(DstStructTypesSet);
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns,
-                      "", &CI, &TM);
+                      "", &CI);
 
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
