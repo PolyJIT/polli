@@ -56,6 +56,8 @@
 #include "polli/log.h"
 #include "polli/Options.h"
 
+#include <dlfcn.h>
+
 #define DEBUG_TYPE "polyjit"
 
 REGISTER_LOG(console, "libpjit");
@@ -177,9 +179,10 @@ public:
                .setMAttrs(polli::opt::MAttrs)
                .selectTarget()),
         DL(TM->createDataLayout()),
-        CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)) {
+        CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)),
+        LibHandle(nullptr) {
     SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
-    llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+    LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
   }
 
   /**
@@ -232,6 +235,20 @@ public:
         }
     );
 
+    for (GlobalValue &GV : M->globals()) {
+      if (GlobalVariable *GVar = dyn_cast<GlobalVariable>(&GV)) {
+        {
+          std::lock_guard<std::mutex> Lock(DLMutex);
+          dlerror();
+          void *Addr = dlsym(LibHandle, GVar->getName().str().c_str());
+          char *Error = dlerror();
+          console->error("dlerror: {:s}", Error);
+          if (Addr)
+            llvm::sys::DynamicLibrary::AddSymbol(GVar->getName(), Addr);
+        }
+      }
+    }
+
     std::vector<std::unique_ptr<Module>> MS;
     MS.push_back(std::move(M));
     ModuleHandleT MH = CompileLayer.addModuleSet(
@@ -265,6 +282,7 @@ public:
   }
 
 private:
+  std::mutex DLMutex;
   std::vector<std::shared_ptr<LLVMContext>> CtxList;
   std::unique_ptr<TargetMachine> TM;
   const DataLayout DL;
@@ -272,6 +290,7 @@ private:
   CompileLayerT CompileLayer;
   llvm::DenseMap<const char *, UniqueMod> LoadedModules;
   llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
+  void *LibHandle;
 };
 
 static PolyJITEngine &getOrCreateEngine() {
