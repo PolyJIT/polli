@@ -109,7 +109,6 @@ public:
           Function *NewF = cast<Function>(TgtM->getOrInsertFunction(
               CalledF->getName(), CalledF->getFunctionType(),
               CalledF->getAttributes()));
-          NewF->setLinkage(CalledF->getLinkage());
           VMap[CalledF] = NewF;
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
