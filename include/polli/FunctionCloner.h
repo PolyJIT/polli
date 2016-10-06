@@ -118,7 +118,8 @@ public:
 
   void mapGlobals(Function &SrcF, Module *TgtM,
                   ValueToValueMapTy &VMap) const {
-    if (SrcF.getParent() == TgtM)
+    Module *SrcM = SrcF.getParent();
+    if (SrcM == TgtM)
       return;
 
     GlobalList GVs = apply<GlobalList>(SrcF, selectGV);
@@ -169,11 +170,12 @@ public:
 
     DEBUG(polli::verifyFunctions("\t>> ", From, To));
 
-    if (RemapGlobals)
-      mapGlobals(*From, ToM, VMap);
     // Collect all calls for remapping.
     if (RemapCalls)
       mapCalls(*From, ToM, VMap);
+
+    if (RemapGlobals)
+      mapGlobals(*From, ToM, VMap);
 
     ClonedCodeInfo CI;
     IRMover::IdentifiedStructTypeSet DstStructTypesSet;
