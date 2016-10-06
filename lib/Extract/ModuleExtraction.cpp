@@ -836,6 +836,14 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     MPM.add(llvm::createStripSymbolsPass(true));
     MPM.run(*PrototypeM);
 
+    bool BrokenDbg;
+    if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
+      // We failed verification, skip this region.
+      errs() << "Prototype: " << PrototypeM->getModuleIdentifier()
+             << " failed verification. Skipping.\n";
+      continue;
+    }
+
     clearFunctionLocalMetadata(F);
 
     // Make sure that we do not destroy the function before we're done
