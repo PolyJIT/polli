@@ -79,9 +79,6 @@ static std::string moduleToString(Module &M) {
   return ModStr;
 }
 
-using ExprList = SetVector<Instruction *>;
-using GlobalList = SetVector<const GlobalValue *>;
-
 /**
  * @brief Get the number of globals we carry within this function signature.
  *
