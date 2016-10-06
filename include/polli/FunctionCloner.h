@@ -125,11 +125,16 @@ public:
     GlobalList GVs = apply<GlobalList>(SrcF, selectGV);
     for (auto *GV : GVs) {
       GlobalValue *NewGV = TgtM->getNamedGlobal(GV->getName());
-      if (!NewGV) {
-        NewGV = cast<GlobalValue>(
-            TgtM->getOrInsertGlobal(GV->getName(), GV->getValueType()));
+      if (NewGV)
+        continue;
+
+      if (const GlobalVariable *GVar = dyn_cast<GlobalVariable>(GV)) {
+        GlobalVariable *NewGVar = cast<GlobalVariable>(
+            TgtM->getOrInsertGlobal(GVar->getName(), GVar->getType()));
+        NewGVar->setLinkage(
+            GlobalValue::LinkageTypes::AvailableExternallyLinkage);
+        VMap[GV] = NewGVar;
       }
-      VMap[GV] = NewGV;
     }
   }
 
