@@ -812,6 +812,11 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
   ModuleExtractor &ME = getAnalysis<ModuleExtractor>();
   DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
+  if (F.isDeclaration())
+    return false;
+  if (F.hasFnAttribute("polyjit-jit-candidate"))
+    return false;
+
   for (auto *F : ME) {
     if (F->isDeclaration())
       continue;
