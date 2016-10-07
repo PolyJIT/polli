@@ -1,9 +1,12 @@
 #include "polli/Jit.h"
+#include "polli/log.h"
 #include "pprof/pprof.h"
 
 #include "llvm/IR/Function.h"
 
 using namespace llvm;
+
+REGISTER_LOG(console, "jit");
 
 namespace polli {
 
@@ -20,6 +23,7 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 }
 
 void PolyJIT::setup() {
+  console->critical("init called.");
   papi_region_setup();
 }
 

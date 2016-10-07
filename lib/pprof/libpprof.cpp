@@ -82,7 +82,7 @@ Run<PPEvent> PapiEvents;
 
 static __thread bool papi_thread_init = false;
 static bool papi_init = false;
-static inline void do_papi_thread_init_once() {
+static void do_papi_thread_init_once() {
   if (!papi_thread_init) {
     if (!papi_init)
       papi_region_setup();
@@ -100,7 +100,7 @@ static inline void do_papi_thread_init_once() {
     } else {
       papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
       papi_thread_init = (ret == PAPI_OK);
-      console->error("initialized new thread({:d}): complete.",
+      console->error("new papi thread initialized (id: {:d})",
                      papi_get_thread_id());
     }
   }

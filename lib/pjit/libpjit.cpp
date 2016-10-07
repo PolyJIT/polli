@@ -183,6 +183,7 @@ public:
         LibHandle(nullptr) {
     SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
     LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
+    llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
   }
 
   /**
@@ -222,19 +223,6 @@ public:
     if (CompiledModules.count(M.get()))
       return CompiledModules[M.get()];
 
-    auto Resolver = orc::createLambdaResolver(
-        [&](const std::string &Name) {
-          if (auto Sym = findSymbol(Name))
-            return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
-          return RuntimeDyld::SymbolInfo(nullptr);
-        },
-        [] (const std::string &S) {
-          if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
-            return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
-          return RuntimeDyld::SymbolInfo(nullptr);
-        }
-    );
-
     for (GlobalValue &GV : M->globals()) {
       if (GlobalVariable *GVar = dyn_cast<GlobalVariable>(&GV)) {
         {
@@ -248,6 +236,19 @@ public:
         }
       }
     }
+
+    auto Resolver = orc::createLambdaResolver(
+        [&](const std::string &Name) {
+          if (auto Sym = findSymbol(Name))
+            return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
+          return RuntimeDyld::SymbolInfo(nullptr);
+        },
+        [] (const std::string &S) {
+          if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
+            return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
+          return RuntimeDyld::SymbolInfo(nullptr);
+        }
+    );
 
     std::vector<std::unique_ptr<Module>> MS;
     MS.push_back(std::move(M));
@@ -269,8 +270,11 @@ public:
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
     orc::JITSymbol S = CompileLayer.findSymbol(MangledNameStream.str(), false);
 
-    SPDLOG_DEBUG("libpjit", "FindSymbol: {:s} Addr: {:x}", Name,
-                 (uint64_t)S.getAddress());
+    if (!S.getAddress()) {
+      console->critical(
+          "symbol not found in already compiled objects {:s} {:x}", Name,
+          S.getAddress());
+    }
     return S;
   }
 
@@ -353,10 +357,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   std::string FnName;
 
   auto Variant = VarFun->createVariant(Values, FnName);
-  if (!Variant) {
-    console->error("Failed.");
-    return;
-  }
+  assert(Variant && "Failed to get a new variant.");
 
   PolyJITEngine &EE = getOrCreateEngine();
   EE.addModule(std::move(Variant));
