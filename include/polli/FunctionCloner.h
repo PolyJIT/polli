@@ -109,6 +109,8 @@ public:
           Function *NewF = cast<Function>(TgtM->getOrInsertFunction(
               CalledF->getName(), CalledF->getFunctionType(),
               CalledF->getAttributes()));
+          if (CalledF->hasPersonalityFn())
+            NewF->setPersonalityFn(CalledF->getPersonalityFn());
           VMap[CalledF] = NewF;
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
