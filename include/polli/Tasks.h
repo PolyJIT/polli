@@ -34,8 +34,6 @@
 #include <vector>
 #include <deque>
 
-#include "polli/log.h"
-
 namespace polli {
 using LockT = std::unique_lock<std::mutex>;
 
@@ -112,30 +110,9 @@ private:
   std::vector<polli::JobQueue> JobQs{Count};
   std::atomic<unsigned> Index{0};
 
-  void run(unsigned i) {
-    pthread_setname_np(pthread_self(),
-                       fmt::format("pjit_worker_{:d}", i).c_str());
-    while (true) {
-      std::function<void()> F;
-
-      for (unsigned n = 0; n != Count * 32; ++n) {
-        if (JobQs[(i + n) % Count].try_pop(F))
-          break;
-      }
-
-      if (!F && !JobQs[i].pop(F))
-        break;
-
-      F();
-    }
-  }
-
+  void run(unsigned i);
 public:
-  TaskSystem() {
-    for (unsigned n = 0; n != Count; ++n) {
-      Threads.emplace_back([&, n] { run(n); });
-    }
-  }
+  TaskSystem();
 
   ~TaskSystem() {
     for (auto &Q : JobQs)
@@ -159,7 +136,7 @@ public:
   template <typename F> void async(F &&Fn) {
     auto i = Index++;
 
-    for (unsigned n = 0; n != Count; ++n) {
+    for (unsigned n = 0; n < Count; ++n) {
       if (JobQs[(i + n) % Count].try_push(std::forward<F>(Fn)))
         return;
     }
