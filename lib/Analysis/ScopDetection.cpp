@@ -25,6 +25,10 @@ using namespace polli;
 
 #define DEBUG_TYPE "polyjit"
 
+namespace {
+  REGISTER_LOG(console, DEBUG_TYPE);
+}
+
 namespace polli {
 bool PollyTrackFailures = false;
 bool PollyProcessUnprofitable;
@@ -155,6 +159,7 @@ template <class RR, typename... Args>
 inline bool JITScopDetection::invalid(DetectionContext &Context, bool Assert,
                                       Args &&... Arguments) const {
 
+  RI->printStyle = Region::PrintStyle::PrintBB;
   if (!Context.Verifying) {
     polly::RejectLog &Log = Context.Log;
     std::shared_ptr<RR> RejectReason = std::make_shared<RR>(Arguments...);
@@ -162,6 +167,8 @@ inline bool JITScopDetection::invalid(DetectionContext &Context, bool Assert,
     if (PollyTrackFailures)
       Log.report(RejectReason);
 
+    console->error("R: {:s} - {:s}",
+        Context.CurRegion.getNameStr(), RejectReason->getMessage());
     DEBUG(dbgs() << RejectReason->getMessage());
     DEBUG(dbgs() << "\n");
   } else {

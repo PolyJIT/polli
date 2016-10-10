@@ -710,6 +710,15 @@ static SetVector<Function *> extractCandidates(Function &F,
 
     if (Extractor.isEligible()) {
       JITScopDetection::ParamVec Params = SD.RequiredParams[R];
+      std::string buf;
+      raw_string_ostream os(buf);
+      os << "SCEV: [";
+      for (auto *SCEV : TrackedParams) {
+        SCEV->print(os);
+        os << ",";
+      }
+      os << "]";
+      console->error("R: {:s} - {:s}", R->getNameStr(), os.str());
       SetVector<Value *> In, Out;
       Extractor.findInputsOutputs(In, Out);
       for (auto *P : Params) {
@@ -717,6 +726,16 @@ static SetVector<Function *> extractCandidates(Function &F,
         std::set_intersection(
             In.begin(), In.end(), Values.begin(), Values.end(),
             std::inserter(TrackedParams, TrackedParams.end()));
+
+        std::string buf;
+        raw_string_ostream os(buf);
+        os << "Tracking: [";
+        for (Value *P : TrackedParams) {
+          P->print(os);
+          os << ",";
+        }
+        os << "]";
+        console->error("R: {:s} - {:s}", R->getNameStr(), os.str());
       }
 
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
@@ -814,7 +833,7 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
   for (auto *F : ME) {
     if (F->isDeclaration())
       continue;
-    console->info("Extracting: {:s}", F->getName().str());
+    console->info("Instrumenting: {:s}", F->getName().str());
 
     ValueToValueMapTy VMap;
     Module *M = F->getParent();
