@@ -257,7 +257,7 @@ public:
     auto *L = Expr->getLoop();
     if (R->contains(L) && (!Scope || !L->contains(Scope))) {
       DEBUG(dbgs() << "INVALID: AddRec out of a loop whose exit value is not "
-                "synthesizable");
+                      "synthesizable");
       return ValidatorResult(SCEVType::INVALID);
     }
 
