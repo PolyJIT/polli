@@ -178,28 +178,24 @@ Function &OptimizeForRuntime(Function &F) {
   legacy::PassManager PM = legacy::PassManager();
 
   Builder.populateModulePassManager(PM);
+
 #ifdef POLLI_ENABLE_BASE_POINTERS
   PM.add(polli::createBasePointersPass());
 #endif
-  PM.run(*M);
+
+  //PM.add(polli::createOpenMPTracerPass());
 
 #ifdef POLLI_ENABLE_PAPI
-  if (opt::havePapi()) {
-    legacy::PassManager MPM;
-    Builder.populateModulePassManager(MPM);
-    MPM.add(polli::createTraceMarkerPass());
-    MPM.run(*M);
-  }
+  if (opt::havePapi())
+    PM.add(polli::createTraceMarkerPass());
 #endif
 
 #ifdef POLLI_ENABLE_LIKWID
-  if (opt::haveLikwid()) {
-    legacy::PassManager MPM;
-    Builder.populateModulePassManager(MPM);
-    MPM.add(polli::createLikwidMarkerPass());
-    MPM.run(*M);
-  }
+  if (opt::haveLikwid())
+    PM.add(polli::createLikwidMarkerPass());
 #endif
+
+  PM.run(*M);
 
 #ifdef POLLI_STORE_OUTPUT
   DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
