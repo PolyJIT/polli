@@ -964,9 +964,9 @@ void JITScopDetection::findScops(Region &R) {
     removeCachedResults(R);
   } else {
     ValidRegions.insert(&R);
+    RequiredParams[&R] = Context.RequiredParams;
     ++ValidRegion;
     if (Context.requiresJIT) {
-      RequiredParams[&R] = Context.RequiredParams;
       ValidRuntimeRegions.insert(&R);
       ++JitRegion;
     }
@@ -1008,11 +1008,11 @@ void JITScopDetection::findScops(Region &R) {
     // We could expand the region. Check, if we require the JIT for it.
     const DetectionContext *ExpandedCtx = getDetectionContext(ExpandedR);
     if (ExpandedCtx->requiresJIT) {
-      RequiredParams[ExpandedR] = ExpandedCtx->RequiredParams;
       ValidRuntimeRegions.insert(ExpandedR);
       ++JitRegion;
     }
     ValidRegions.insert(ExpandedR);
+    RequiredParams[ExpandedR] = ExpandedCtx->RequiredParams;
     ++ValidRegion;
 //    removeCachedResults(*CurrentRegion);
 
