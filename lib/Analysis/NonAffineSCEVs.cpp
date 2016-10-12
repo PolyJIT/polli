@@ -268,14 +268,11 @@ public:
         return Result;
       }
 
-      // That will be polynomial, no no
-      const SCEV *StepRecurr = Expr->getStepRecurrence(SE);
-      if (isa<SCEVAddRecExpr>(StepRecurr))
-        return ValidatorResult(SCEVType::INVALID);
-
       if (Recurrence.isPARAM()) {
-        ValidatorResult Result(SCEVType::PARAM, StepRecurr);
+        ValidatorResult Result(SCEVType::PARAM, Expr);
         Result.addParamsFrom(Start);
+        Result.addParamsFrom(Recurrence);
+
         DEBUG(dbgs() << "VALID: AddRec within scop has parametrized"
                      << " recurrence part\n");
         return Result;
@@ -341,8 +338,7 @@ public:
       DEBUG(dbgs() << "INVALID: UnknownExpr references an instruction "
                 "within the region\n");
       DEBUG(dbgs() << *I << "\n");
-      //return ValidatorResult(SCEVType::INVALID);
-      return ValidatorResult(SCEVType::PARAM, S);
+      return ValidatorResult(SCEVType::INVALID);
     }
 
     return ValidatorResult(SCEVType::PARAM, S);
