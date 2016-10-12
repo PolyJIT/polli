@@ -112,6 +112,8 @@ public:
           if (CalledF->hasPersonalityFn())
             NewF->setPersonalityFn(CalledF->getPersonalityFn());
           VMap[CalledF] = NewF;
+          NewF->setLinkage(
+              GlobalValue::LinkageTypes::AvailableExternallyLinkage);
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
       }
