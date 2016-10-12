@@ -14,4 +14,10 @@
 namespace polli {
 llvm::ModulePass *createLikwidMarkerPass();
 llvm::ModulePass *createTraceMarkerPass();
+llvm::ModulePass *createOpenMPTracerPass();
+}
+
+extern "C" {
+  void pjit_trace_openmp_entry(uint64_t Id, const char *Name);
+  void pjit_trace_openmp_exit(uint64_t Id, const char *Name);
 }
