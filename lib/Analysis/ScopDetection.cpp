@@ -167,8 +167,9 @@ inline bool JITScopDetection::invalid(DetectionContext &Context, bool Assert,
     if (PollyTrackFailures)
       Log.report(RejectReason);
 
-    console->error("R: {:s} - {:s}",
-        Context.CurRegion.getNameStr(), RejectReason->getMessage());
+    console->error("\nR: {:s}\n"
+                   "    {:s}",
+                   Context.CurRegion.getNameStr(), RejectReason->getMessage());
     DEBUG(dbgs() << RejectReason->getMessage());
     DEBUG(dbgs() << "\n");
   } else {
