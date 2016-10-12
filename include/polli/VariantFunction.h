@@ -145,7 +145,6 @@ public:
   // key replaced.
   std::unique_ptr<llvm::Module> createVariant(const RunValueList &K,
                                               std::string &FnName);
-  std::unique_ptr<llvm::Module> createVariant(std::string &FnName);
 };
 
 using VariantFunctionTy = std::shared_ptr<VariantFunction>;

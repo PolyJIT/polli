@@ -220,55 +220,6 @@ public:
  * This creates a copy of the existing prototype function and substitutes
  * all uses of K's name with K's value.
  *
- * @param FnName the function name of the new variant inside the module.
- *
- * @return a copy of the base function, with the values of K substituted.
- */
-std::unique_ptr<Module> VariantFunction::createVariant(std::string &FnName) {
-  ValueToValueMapTy VMap;
-
-  /* Copy properties of our source module */
-  Module *M;
-  std::unique_ptr<Module> NewM;
-  static std::mutex Mutex;
-  {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    Function *F;
-
-    // Prepare a new module to hold our new function.
-    M = BaseF.getParent();
-    if (!M)
-      return std::unique_ptr<Module>(nullptr);
-
-    assert(M && "Function without parent module?!");
-    NewM = std::unique_ptr<Module>(
-        new Module(M->getModuleIdentifier(), M->getContext()));
-    NewM->setTargetTriple(M->getTargetTriple());
-    NewM->setDataLayout(M->getDataLayout());
-    NewM->setMaterializer(M->getMaterializer());
-    NewM->setModuleIdentifier(fmt::format("{}.{}-{:s}.ll",
-                                          M->getModuleIdentifier(),
-                                          BaseF.getName().str(), "prototype"));
-
-    // Perform parameter value substitution.
-    FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
-      Specializer(VMap, NewM.get());
-    Specializer.setSource(&BaseF);
-
-    F = &OptimizeForRuntime(*Specializer.start(true));
-    F->addFnAttr("polyjit-id",
-                 fmt::format("{:d}", polli::GetCandidateId(BaseF)));
-    FnName = F->getName().str();
-  }
-  return NewM;
-}
-
-/**
- * @brief Create a new variant of this function using the function key K.
- *
- * This creates a copy of the existing prototype function and substitutes
- * all uses of K's name with K's value.
- *
  * @param K the function key K we want to substitute in.
  * @param FnName the function name of the new variant inside the module.
  *
