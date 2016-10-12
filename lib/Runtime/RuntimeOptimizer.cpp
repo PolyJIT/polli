@@ -150,7 +150,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(polly::createCodegenCleanupPass());
 }
 
-static PassManagerBuilder createPMB() {
+PassManagerBuilder createPMB() {
   PassManagerBuilder Builder;
 
   Builder.VerifyInput = false;
@@ -161,14 +161,13 @@ static PassManagerBuilder createPMB() {
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 0;
 
-  Builder.addGlobalExtension(PassManagerBuilder::EP_VectorizerStart,
-                             registerPolly);
+  Builder.addExtension(PassManagerBuilder::EP_VectorizerStart, registerPolly);
 
   return Builder;
 }
 
 Function &OptimizeForRuntime(Function &F) {
-  static PassManagerBuilder Builder = createPMB();
+  PassManagerBuilder Builder = createPMB();
   Module *M = F.getParent();
 #ifdef POLLI_STORE_OUTPUT
   opt::GenerateOutput = true;
