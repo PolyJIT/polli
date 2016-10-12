@@ -474,8 +474,6 @@ std::vector<const SCEV *> getParamsInNonAffineExpr(const Region *R, Loop *Scope,
   ValidatorResult Result = Validator.visit(Expr);
   assert(Result.isValid() && "Requested parameters for an invalid SCEV!");
 
-  return Result.getParameters();
-
   std::vector<const SCEV *> Res;
   for (auto *P : Result.getParameters()) {
     Res.push_back(P);
