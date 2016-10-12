@@ -43,7 +43,7 @@ class ValidatorResult {
   SCEVType::TYPE Type;
 
   /// @brief The set of Parameters in the expression.
-  std::vector<const SCEV *> Parameters;
+  SmallPtrSet<const SCEV *, 2> Parameters;
 
 public:
   /// @brief The copy constructor
@@ -59,7 +59,7 @@ public:
 
   /// @brief Construct a result with a certain type and a single parameter.
   ValidatorResult(SCEVType::TYPE Type, const SCEV *Expr) : Type(Type) {
-    Parameters.push_back(Expr);
+    Parameters.insert(Expr);
   }
 
   /// @brief Get the type of the ValidatorResult.
@@ -81,12 +81,13 @@ public:
   bool isPARAM() { return Type == SCEVType::PARAM; }
 
   /// @brief Get the parameters of this validator result.
-  std::vector<const SCEV *> getParameters() { return Parameters; }
+  SmallPtrSet<const SCEV *, 2> &getParameters() { return Parameters; }
 
   /// @brief Add the parameters of Source to this result.
   void addParamsFrom(const ValidatorResult &Source) {
-    Parameters.insert(Parameters.end(), Source.Parameters.begin(),
-                      Source.Parameters.end());
+    for (auto *P : Source.Parameters) {
+      Parameters.insert(P);
+    }
   }
 
   /// @brief Merge a result.
@@ -474,5 +475,11 @@ std::vector<const SCEV *> getParamsInNonAffineExpr(const Region *R, Loop *Scope,
   assert(Result.isValid() && "Requested parameters for an invalid SCEV!");
 
   return Result.getParameters();
+
+  std::vector<const SCEV *> Res;
+  for (auto *P : Result.getParameters()) {
+    Res.push_back(P);
+  }
+  return Res;
 }
 }
