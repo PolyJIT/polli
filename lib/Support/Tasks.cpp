@@ -7,7 +7,6 @@ REGISTER_LOG(console, "tasks");
 
 namespace polli {
 TaskSystem::TaskSystem() {
-  console->error("started thread pool: {:d} workers", Count);
   for (unsigned n = 0; n < Count; ++n) {
     Threads.emplace_back([&, n] { run(n); });
   }

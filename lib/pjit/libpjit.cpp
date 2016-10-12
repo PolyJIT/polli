@@ -211,7 +211,7 @@ public:
 
       auto PrototypeM = LoadedModules[prototype];
       if (!PrototypeM)
-        console->critical("Parsing the prototype module at failed.");
+        console->critical("Parsing the prototype module failed!");
       assert(PrototypeM && "Parsing the prototype module failed!");
       cache_hit = false;
     }
@@ -223,18 +223,20 @@ public:
     if (CompiledModules.count(M.get()))
       return CompiledModules[M.get()];
 
+    DEBUG({
+    std::string buf;
+    raw_string_ostream os(buf);
+    M->print(os, nullptr);
+    console->error(os.str());
+    });
     for (GlobalValue &GV : M->globals()) {
-      if (GlobalVariable *GVar = dyn_cast<GlobalVariable>(&GV)) {
-        {
-          std::lock_guard<std::mutex> Lock(DLMutex);
-          dlerror();
-          void *Addr = dlsym(LibHandle, GVar->getName().str().c_str());
-          char *Error = dlerror();
-          console->error("dlerror: {:s}", Error);
-          if (Addr)
-            llvm::sys::DynamicLibrary::AddSymbol(GVar->getName(), Addr);
-        }
-      }
+      std::lock_guard<std::mutex> Lock(DLMutex);
+      dlerror();
+      void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
+      if (char *Error = dlerror())
+        console->error("dlerror: {:s}", Error);
+      if (Addr)
+        llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
     }
 
     auto Resolver = orc::createLambdaResolver(
@@ -268,14 +270,7 @@ public:
     std::string MangledName;
     raw_string_ostream MangledNameStream(MangledName);
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
-    orc::JITSymbol S = CompileLayer.findSymbol(MangledNameStream.str(), false);
-
-    if (!S.getAddress()) {
-      console->critical(
-          "symbol not found in already compiled objects {:s} {:x}", Name,
-          S.getAddress());
-    }
-    return S;
+    return CompileLayer.findSymbol(MangledNameStream.str(), false);
   }
 
   ~PolyJITEngine() {

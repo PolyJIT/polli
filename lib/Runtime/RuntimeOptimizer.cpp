@@ -138,11 +138,15 @@ char PollyReport::ID = 0;
 
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
+
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
+  DEBUG(PM.add(new PollyFnReport()));
   PM.add(polly::createScopInfoRegionPassPass());
+  DEBUG(PM.add(polly::createIslAstInfoPass()));
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
+  DEBUG(PM.add(new PollyReport()));
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
@@ -202,11 +206,12 @@ Function &OptimizeForRuntime(Function &F) {
   opt::GenerateOutput = false;
 #endif
 
-  //if (F.hasFnAttribute("polly-optimized")) {
-  //  console->error("fn got optimized by polly");
-  //} else {
-  //  console->error("fn did not get optimized by polly");
-  //}
+  DEBUG({
+    if (F.hasFnAttribute("polly-optimized"))
+      console->error("fn got optimized by polly");
+    else
+      console->error("fn did not get optimized by polly");
+  });
 
   return F;
 }

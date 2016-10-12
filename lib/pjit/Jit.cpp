@@ -23,7 +23,6 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 }
 
 void PolyJIT::setup() {
-  console->critical("init called.");
   papi_region_setup();
 }
 

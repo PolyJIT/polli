@@ -100,8 +100,6 @@ static void do_papi_thread_init_once() {
     } else {
       papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
       papi_thread_init = (ret == PAPI_OK);
-      console->error("new papi thread initialized (id: {:d})",
-                     papi_get_thread_id());
     }
   }
 }

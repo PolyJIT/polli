@@ -2,10 +2,13 @@
 
 #include "polli/FunctionCloner.h"
 #include "polli/RuntimeOptimizer.h"
+#include "polli/RuntimeValues.h"
 #include "polli/Utils.h"
 #include "polli/VariantFunction.h"
 #include "polli/Stats.h"
 #include "polli/log.h"
+
+#include "llvm/IR/Constants.h"
 
 #define DEBUG_TYPE "polyjit"
 
@@ -252,6 +255,41 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
                                           M->getModuleIdentifier(),
                                           BaseF.getName().str(), K.hash()));
 
+    DEBUG({
+      console->error(
+          "\n==============================================================="
+          "\n VariantFunction:: {:s}"
+          "\n===============================================================\n",
+          BaseF.getName().str());
+      std::string buf;
+      raw_string_ostream os(buf);
+      BaseF.getType()->print(os << "\nBaseT:");
+      os << "\n";
+      for (auto RV : K) {
+        Type *ArgTy = RV.Arg->getType();
+        RV.Arg->print(os);
+        os << " = ";
+
+        Constant *C = nullptr;
+        if (canSpecialize(RV)) {
+          if (ArgTy->isIntegerTy()) {
+            C = ConstantInt::get(ArgTy, *RV.value, /*isSigned=*/true);
+          } else if (ArgTy->isFloatTy()) {
+            C = llvm::ConstantFP::get(ArgTy, (double)*RV.value);
+          }
+        } else {
+          os << RV.value;
+        }
+
+        if (C)
+          C->print(os);
+
+        os << ", ";
+      }
+      os << "\n";
+      console->error("Create Variant {} Hash: {:d}:\n{:s}", K.str(), K.hash(),
+                     os.str());
+    });
     DEBUG(dbgs() << fmt::format("Create Variant for: {} Hash: {:d}\n", K.str(),
                                 K.hash()));
     // Perform parameter value substitution.

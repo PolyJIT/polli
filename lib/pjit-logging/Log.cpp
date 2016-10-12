@@ -28,7 +28,6 @@ static inline void setup(const std::string &name) {
         std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
     spdlog::register_logger(logger);
     logger->set_level(spdlog::level::trace);
-    logger->critical("registered.");
   }
 }
 }

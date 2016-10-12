@@ -724,33 +724,48 @@ static SetVector<Function *> extractCandidates(Function &F,
 
     if (Extractor.isEligible()) {
       JITScopDetection::ParamVec Params = SD.RequiredParams[R];
-      std::string buf;
-      raw_string_ostream os(buf);
-      os << "SCEV: [";
-      for (auto *SCEV : TrackedParams) {
-        SCEV->print(os);
-        os << ",";
-      }
-      os << "]";
-      console->error("R: {:s} - {:s}", R->getNameStr(), os.str());
+
       SetVector<Value *> In, Out;
       Extractor.findInputsOutputs(In, Out);
+      std::string buf;
+      raw_string_ostream os(buf);
+      DEBUG({
+        os << "\n===========================================================";
+        os << "\nExtract Region: " << R->getNameStr();
+        os << "\n===========================================================";
+        os << "\n Required Params:\n";
+        for (auto *SCEV : Params)
+          SCEV->print((os << "\n").indent(2) << ": ");
+        os << "\n-----------------------------------------------------------";
+        os << "\n In Values:\n";
+        for (auto *Val : In)
+          printOperands(Val, os);
+        os << "\n-----------------------------------------------------------";
+        os << "\n SCEV to Params:\n";
+      });
+
       for (auto *P : Params) {
         SetVector<Value *> Values = SCEVParamValueExtractor::extract(P, SE);
+        DEBUG({
+          for (auto *Val : Values)
+            printOperands(Val, os);
+        });
+
         std::set_intersection(
             In.begin(), In.end(), Values.begin(), Values.end(),
             std::inserter(TrackedParams, TrackedParams.end()));
-
-        std::string buf;
-        raw_string_ostream os(buf);
-        os << "Tracking: [";
-        for (Value *P : TrackedParams) {
-          P->print(os);
-          os << ",";
-        }
-        os << "]";
-        console->error("R: {:s} - {:s}", R->getNameStr(), os.str());
       }
+
+      DEBUG({
+        os << "\n---------------------------------------------------------";
+        os << "\n Tracking:\n";
+        for (Value *P : TrackedParams) {
+          P->print((os << "\n").indent(2) << "TP: ");
+        }
+        os << "\n=========================================================";
+        console->error(os.str());
+        os.flush();
+      });
 
       if (Function *ExtractedF = Extractor.extractCodeRegion()) {
         CallSite FunctionCall = findExtractedCallSite(*ExtractedF, F);
