@@ -1,4 +1,5 @@
 #include "polli/NonAffineSCEVs.h"
+#include "polli/log.h"
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Analysis/ScalarEvolution.h"
 #include "llvm/Analysis/ScalarEvolutionExpressions.h"
@@ -7,6 +8,10 @@ using namespace llvm;
 using namespace polli;
 
 #define DEBUG_TYPE "polli-scev-validator"
+
+namespace {
+  REGISTER_LOG(console, DEBUG_TYPE);
+}
 
 namespace polli {
 namespace SCEVType {
