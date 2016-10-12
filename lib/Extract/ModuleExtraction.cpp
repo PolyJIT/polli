@@ -685,6 +685,20 @@ static void PrepareRegionForExtraction(const Region *R, RegionInfo &RI, Dominato
   }
 }
 
+static void printOperands(Value *V, raw_ostream &os, int level = 0) {
+  if (Instruction *I = dyn_cast<Instruction>(V)) {
+    I->print((os << "\n").indent(level) << "> ");
+
+    if (!isa<PHINode>(I)) {
+      for (auto &Op : I->operands()) {
+        printOperands(Op.get(), os, level + 2);
+      }
+    }
+  } else {
+    V->print((os << "\n").indent(level) << "|= ");
+  }
+}
+
 /**
  * @brief Extract all regions marked for extraction into an own function and
  * mark it * as 'polyjit-jit-candidate'.
