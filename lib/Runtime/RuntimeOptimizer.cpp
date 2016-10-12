@@ -74,10 +74,6 @@ static PassManagerBuilder createPMB() {
   return Builder;
 }
 
-std::unique_ptr<Module> OptimizeForRuntime(std::unique_ptr<Module> M) {
-  return M;
-}
-
 Function &OptimizeForRuntime(Function &F) {
   static PassManagerBuilder Builder = createPMB();
   Module *M = F.getParent();
