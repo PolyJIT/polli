@@ -157,6 +157,8 @@ PassManagerBuilder createPMB() {
   Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
   polly::opt::PollyParallel = true;
+  polly::opt::DetectParallel = true;
+  polly::opt::UseContext = true;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 0;
