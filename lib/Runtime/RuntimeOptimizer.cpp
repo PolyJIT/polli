@@ -27,10 +27,15 @@
 #include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
 #include "polly/ScopDetection.h"
+#include "polly/ScopInfo.h"
+#include "polly/ScopPass.h"
+#include "polly/CodeGen/IslAst.h"
+#include "polly/ScheduleOptimizer.h"
 #include "polly/CodeGen/CodegenCleanup.h"
 #include "polly/CodeGen/CodeGeneration.h"
 #include "polly/Options.h"
 #include "polli/log.h"
+#include "polli/LikwidMarker.h"
 
 REGISTER_LOG(console, "optmize");
 
@@ -43,6 +48,94 @@ using namespace llvm::legacy;
 using namespace polly;
 
 namespace polli {
+class PollyFnReport : public llvm::FunctionPass {
+public:
+  static char ID;
+  explicit PollyFnReport() : llvm::FunctionPass(ID) {};
+
+  /// @name FunctionPass interface
+  //@{
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<polly::ScopDetection>();
+    AU.addRequired<llvm::RegionInfoPass>();
+    AU.setPreservesAll();
+  }
+
+  bool runOnFunction(llvm::Function &F) override {
+    const Module *M = F.getParent();
+    polly::ScopDetection &SD = getAnalysis<polly::ScopDetection>();
+    llvm::RegionInfo &RI = getAnalysis<llvm::RegionInfoPass>().getRegionInfo();
+    std::string buf;
+    raw_string_ostream os(buf);
+    os << "\n===============================================================";
+    os << "\n ScopDetection:: " << F.getName();
+    os << "\n===============================================================\n";
+    for (auto &R : *RI.getTopLevelRegion()) {
+      if (!R)
+        continue;
+      if (const RejectLog *L = SD.lookupRejectionLog(R.get()))
+        L->print(os << R->getNameStr() << "\n");
+      else
+        os << "No log found O.o\n";
+
+      os << "\n";
+    }
+    SD.print(os, M);
+    console->error(os.str());
+    return false;
+  }
+
+  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
+  //@}
+private:
+
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  PollyFnReport(const PollyFnReport &);
+  // DO NOT IMPLEMENT
+  const PollyFnReport &operator=(const PollyFnReport &);
+};
+
+class PollyReport : public polly::ScopPass {
+public:
+  static char ID;
+  explicit PollyReport() : polly::ScopPass(ID) {};
+
+  /// @name ScopPass interface
+  //@{
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<polly::ScopInfoRegionPass>();
+    AU.addRequired<polly::IslAstInfo>();
+    AU.setPreservesAll();
+  }
+
+  bool runOnScop(Scop &S) override {
+    IslAstInfo &AI = getAnalysis<IslAstInfo>();
+    std::string buf;
+    raw_string_ostream os(buf);
+    os << "\n==============================================================="
+          "\n IslAst"
+          "\n===============================================================\n";
+    AI.printScop(os, S);
+    console->error(os.str());
+    return false;
+  }
+
+  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
+  //@}
+
+private:
+
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  PollyReport(const PollyReport &);
+  // DO NOT IMPLEMENT
+  const PollyReport &operator=(const PollyReport &);
+};
+
+char PollyFnReport::ID = 0;
+char PollyReport::ID = 0;
+
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
   PM.add(polly::createCodePreparationPass());
