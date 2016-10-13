@@ -1090,8 +1090,8 @@ bool JITScopDetection::hasPossiblyDistributableLoop(
 bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
-  if (PollyProcessUnprofitable)
-    return true;
+  //if (PollyProcessUnprofitable)
+  //  return true;
 
   // We can probably not do a lot on scops that only write or only read
   // data.
@@ -1100,11 +1100,10 @@ bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
                                               &CurRegion);
 
   int NumLoops = countBeneficialLoops(&CurRegion);
-  int NumAffineLoops = NumLoops - Context.BoxedLoopsSet.size();
 
   // Scops with at least two loops may allow either loop fusion or tiling and
   // are consequently interesting to look at.
-  if (NumAffineLoops >= 2)
+  if (NumLoops >= 1)
     return true;
 
   // Scops that contain a loop with a non-trivial amount of computation per
@@ -1113,8 +1112,8 @@ bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   // per-iteration are performance-wise very fragile as any change to the
   // loop induction variables may affect performance. To not cause spurious
   // performance regressions, we do not consider such loops.
-  if (NumAffineLoops == 1 && hasSufficientCompute(Context, NumLoops))
-    return true;
+  //if (NumAffineLoops == 1 && hasSufficientCompute(Context, NumLoops))
+  //  return true;
 
   return invalid<polly::ReportUnprofitable>(Context, /*Assert=*/true,
                                             &CurRegion);

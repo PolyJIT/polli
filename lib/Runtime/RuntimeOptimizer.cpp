@@ -141,12 +141,12 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
 
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
-  DEBUG(PM.add(new PollyFnReport()));
+  PM.add(new PollyFnReport());
   PM.add(polly::createScopInfoRegionPassPass());
-  DEBUG(PM.add(polly::createIslAstInfoPass()));
+  PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
-  DEBUG(PM.add(new PollyReport()));
+  PM.add(new PollyReport());
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
@@ -163,6 +163,7 @@ PassManagerBuilder createPMB() {
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
   polly::opt::UseContext = true;
+  polly::opt::PollyParallelForce = true;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 0;
