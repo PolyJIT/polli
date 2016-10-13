@@ -113,7 +113,8 @@ public:
             NewF->setPersonalityFn(CalledF->getPersonalityFn());
           VMap[CalledF] = NewF;
           NewF->setLinkage(
-              GlobalValue::LinkageTypes::AvailableExternallyLinkage);
+              GlobalValue::LinkageTypes::WeakODRLinkage);
+          polli::log::console->error("Mapped: {:s}", NewF->getName().str());
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
       }
