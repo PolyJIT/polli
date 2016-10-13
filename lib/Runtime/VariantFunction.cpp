@@ -199,9 +199,9 @@ public:
     unsigned i = 0;
     for (Argument &Arg : From->args()) {
       auto P = SpecValues[i++];
-      if (!canSpecialize(P)) {
-        continue;
-      }
+      //if (!canSpecialize(P)) {
+      //  continue;
+      //}
 
       if (IntegerType *IntTy = dyn_cast<IntegerType>(Arg.getType())) {
         // Get a constant value for P.
