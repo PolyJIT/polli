@@ -30,6 +30,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/InstIterator.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
@@ -112,8 +113,9 @@ public:
           if (CalledF->hasPersonalityFn())
             NewF->setPersonalityFn(CalledF->getPersonalityFn());
           VMap[CalledF] = NewF;
-          NewF->setLinkage(
-              GlobalValue::LinkageTypes::WeakODRLinkage);
+
+          if (!isa<IntrinsicInst>(&I))
+            NewF->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
           polli::log::console->error("Mapped: {:s}", NewF->getName().str());
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
