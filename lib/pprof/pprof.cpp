@@ -30,9 +30,9 @@ Options getPprofOptionsFromEnv() {
   Opts.group = grp ? grp : "unknown";
   Opts.src_uri = uri ? uri : "unknown";
   Opts.command = cmd ? cmd : "unknown";
-  Opts.use_db = db ? (bool)stoi(db) : false;
+  Opts.use_db = db ? (bool)stoi(db) : true;
   Opts.use_csv = csv ? (bool)stoi(csv) : false;
-  Opts.use_file = file ? (bool)stoi(file) : true;
+  Opts.use_file = file ? (bool)stoi(file) : false;
   Opts.execute_atexit = exec ? (bool)stoi(exec) : true;
 
   return Opts;
