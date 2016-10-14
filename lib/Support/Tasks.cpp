@@ -1,5 +1,6 @@
 #include "polli/Tasks.h"
 #include "polli/log.h"
+#include "pprof/pprof.h"
 
 namespace {
 REGISTER_LOG(console, "tasks");
@@ -15,6 +16,7 @@ TaskSystem::TaskSystem() {
 void TaskSystem::run(unsigned i) {
   pthread_setname_np(pthread_self(),
                      fmt::format("pjit_worker_{:d}", i).c_str());
+  pprof::Options &Opts = *pprof::getOptions();
   while (true) {
     std::function<void()> F;
 
@@ -28,5 +30,6 @@ void TaskSystem::run(unsigned i) {
 
     F();
   }
+  pprof::papi_store_thread_events(Opts);
 }
 }

@@ -26,6 +26,12 @@ void PolyJIT::setup() {
   papi_region_setup();
 }
 
+void PolyJIT::tearDown() {
+  const pprof::Options &opts = *pprof::getOptions();
+  papi_region_exit(0, "STOP");
+  pprof::papi_store_thread_events(opts);
+}
+
 void PolyJIT::UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F) {
   PrefixToFnMap[Prefix] = F;
 }

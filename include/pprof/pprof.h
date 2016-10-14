@@ -149,6 +149,11 @@ struct Options {
   bool execute_atexit;
 };
 
+/**
+ * @brief Store the recorded events for this thread.
+ */
+void papi_store_thread_events(const Options &opts);
+
 Options *getOptions();
 Options getPprofOptionsFromEnv();
 

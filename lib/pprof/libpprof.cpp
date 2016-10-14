@@ -78,6 +78,12 @@ static uint64_t papi_get_thread_id() {
  * @brief Storage container for all PAPI region events.
  */
 Run<PPEvent> PapiEvents;
+
+void papi_store_thread_events(const Options &opts) {
+  thread::id tid = std::this_thread::get_id();
+  uint64_t id = papi_get_tid_map()[tid];
+  pgsql::StoreRun(id, papi_threaded_events()[tid], opts);
+}
 } // namespace pprof
 
 static __thread bool papi_thread_init = false;
@@ -188,19 +194,11 @@ void papi_atexit_handler(void) {
   if (!opts.execute_atexit)
     return;
 
-  papi_local_events()->push_back(PPEvent(0, RegionExit, "STOP"));
   uint64_t bytes = 0;
   for (auto elem : papi_threaded_events()) {
     bytes += elem.second.size() * sizeof(PPEvent);
   }
-  if (opts.use_db) {
-    for (auto KV : papi_get_tid_map()) {
-      thread::id tid = KV.first;
-      uint64_t id = KV.second;
-      pgsql::StoreRun(id, papi_threaded_events()[tid], opts);
-    }
 
-  }
   if (opts.use_file)
     file::StoreRun(PapiEvents, opts);
 

@@ -16,10 +16,14 @@ namespace polli {
 
 class PolyJIT {
   void setup();
+  void tearDown();
 
 public:
   explicit PolyJIT() : VariantFunctions(), CodeCache() { setup(); }
-  ~PolyJIT() { System.cancel_pending_jobs(); }
+  ~PolyJIT() {
+    System.cancel_pending_jobs();
+    tearDown();
+  }
 
   //@brief Shutdown the task system.
   void shutdown() {
