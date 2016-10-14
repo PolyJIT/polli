@@ -164,7 +164,7 @@ PassManagerBuilder createPMB() {
   polly::opt::DetectParallel = true;
   polly::opt::UseContext = true;
   polly::opt::PollyParallelForce = true;
-  polly::PollyProcessUnprofitable = true;
+  polly::PollyProcessUnprofitable = false;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 0;
