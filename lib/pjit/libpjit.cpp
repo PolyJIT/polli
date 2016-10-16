@@ -118,10 +118,9 @@ public:
     legacy::PassManager PM;
     MCContext *Ctx;
 
-    TM.setOptLevel(CodeGenOpt::None);
+    TM.setOptLevel(CodeGenOpt::Aggressive);
     if (TM.addPassesToEmitMC(PM, Ctx, ObjStream))
       llvm_unreachable("Target does not support MC emission.");
-    PM.add(llvm::createModuleDebugInfoPrinterPass());
     PM.run(M);
 
     std::unique_ptr<MemoryBuffer> ObjBuffer(
