@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string>
 #include <thread>
+#include <numeric>
 
 using namespace pqxx;
 
@@ -136,6 +137,43 @@ IdVector ReadAvailableRunIDs(std::string run_group) {
   return RunIDs;
 }
 
+struct EventGroup {
+  int32_t ID;
+  std::vector<Event> Events;
+};
+
+static Run<Event> AggregateGroupedRun(const Run<EventGroup> &GroupedEvents) {
+  Run<Event> NewRun;
+  for (auto &Group : GroupedEvents) {
+    Event Init = *Group.Events.begin();
+    Event Result = std::accumulate(
+        (Group.Events.begin()++), Group.Events.end(), Init,
+        [](const Event &LHS, const Event &RHS) -> Event {
+          return {LHS.ID, LHS.Type, LHS.Start, LHS.Duration + RHS.Duration,
+                   LHS.Name, LHS.TID};
+        });
+    NewRun.push_back(Result);
+  }
+  return NewRun;
+}
+
+static Run<EventGroup> GetGroupedRun(const Run<Event> &Events) {
+  Run<EventGroup> R;
+  std::unordered_map<uint64_t, EventGroup> Buckets;
+
+  for (auto &Ev : Events) {
+    int32_t id = Ev.ID;
+    if (!Buckets.count(id))
+        Buckets[id] = {id, {}};
+    Buckets[id].Events.emplace_back(Ev);
+  }
+
+  for (auto KV : Buckets)
+    R.emplace_back(KV.second);
+
+  return R;
+}
+
 static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
   Run<pprof::Event> SRun;
   SRun.ID = Events.ID;
@@ -215,6 +253,9 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
   }
 
   Run<pprof::Event> SimpleEvents = GetSimplifiedRun(Events);
+  Run<EventGroup> GroupedEvents = GetGroupedRun(SimpleEvents);
+  SimpleEvents = AggregateGroupedRun(GroupedEvents);
+
   int n = 500;
   size_t i;
   for (i = 0; i < SimpleEvents.size(); i += n) {
