@@ -247,12 +247,11 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
   polly::InvariantLoadsSetTy AccessILS;
   if (!polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE,
                            &AccessILS)) {
-    if (!isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, BaseAddress,
-                         &AccessILS))
+    if (!isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS))
       return false;
 
-    Context.RequiredParams = getParamsInNonAffineExpr(&Context.CurRegion, Scope,
-                                                      S, *SE, BaseAddress);
+    Context.RequiredParams =
+        getParamsInNonAffineExpr(&Context.CurRegion, Scope, S, *SE);
     Context.requiresJIT = true;
   }
 

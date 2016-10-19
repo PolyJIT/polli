@@ -128,13 +128,12 @@ private:
   const Region *R;
   Loop *Scope;
   ScalarEvolution &SE;
-  const Value *BaseAddress;
   polly::InvariantLoadsSetTy *ILS;
 
 public:
   NonAffSCEVValidator(const Region *R, Loop *Scope, ScalarEvolution &SE,
-                      const Value *BaseAddress, polly::InvariantLoadsSetTy *ILS)
-      : R(R), Scope(Scope), SE(SE), BaseAddress(BaseAddress), ILS(ILS) {}
+                      polly::InvariantLoadsSetTy *ILS)
+      : R(R), Scope(Scope), SE(SE), ILS(ILS) {}
 
   class ValidatorResult visitConstant(const SCEVConstant *Constant) {
     return ValidatorResult(SCEVType::INT);
@@ -434,14 +433,13 @@ public:
 };
 
 bool isNonAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
-                     ScalarEvolution &SE, const Value *BaseAddress,
-                     polly::InvariantLoadsSetTy *ILS) {
+                     ScalarEvolution &SE, polly::InvariantLoadsSetTy *ILS) {
   DEBUG(dbgs() << "\n");
   DEBUG(dbgs() << "Expr: " << *Expr << "\n");
   if (isa<SCEVCouldNotCompute>(Expr))
     return false;
 
-  NonAffSCEVValidator Validator(R, Scope, SE, BaseAddress, ILS);
+  NonAffSCEVValidator Validator(R, Scope, SE, ILS);
   DEBUG({
     dbgs() << "Region: " << R->getNameStr() << "\n";
     dbgs() << " -> ";
@@ -460,13 +458,12 @@ bool isNonAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
 
 std::vector<const SCEV *> getParamsInNonAffineExpr(const Region *R, Loop *Scope,
                                                    const SCEV *Expr,
-                                                   ScalarEvolution &SE,
-                                                   const Value *BaseAddress) {
+                                                   ScalarEvolution &SE) {
   if (isa<SCEVCouldNotCompute>(Expr))
     return std::vector<const SCEV *>();
 
   polly::InvariantLoadsSetTy ILS;
-  NonAffSCEVValidator Validator(R, Scope, SE, BaseAddress, &ILS);
+  NonAffSCEVValidator Validator(R, Scope, SE, &ILS);
   ValidatorResult Result = Validator.visit(Expr);
   assert(Result.isValid() && "Requested parameters for an invalid SCEV!");
 

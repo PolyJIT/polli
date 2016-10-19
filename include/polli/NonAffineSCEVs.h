@@ -40,12 +40,10 @@ class LoadInst;
 namespace polli {
 bool isNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
                      const llvm::SCEV *Expr, llvm::ScalarEvolution &SE,
-                     const llvm::Value *BaseAddress,
                      polly::InvariantLoadsSetTy *ILS);
 
 std::vector<const llvm::SCEV *>
 getParamsInNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
-                         const llvm::SCEV *Expr, llvm::ScalarEvolution &SE,
-                         const llvm::Value *BaseAddress);
+                         const llvm::SCEV *Expr, llvm::ScalarEvolution &SE);
 }
 #endif /* end of include guard: POLLI_NON_AFFINE_SCEVS_H */
