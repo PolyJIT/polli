@@ -827,6 +827,12 @@ bool JITScopDetection::isValidLoop(Loop *L, DetectionContext &Context) const {
     return true;
 
   const SCEV *LoopCount = SE->getBackedgeTakenCount(L);
+  if (polli::isNonAffineExpr(R, L, LoopCount, *SE, nullptr)) {
+    Context.RequiredParams =
+        getParamsInNonAffineExpr(R, L, LoopCount, *SE);
+    Context.requiresJIT = true;
+    return true;
+  }
   return invalid<polly::ReportLoopBound>(Context, /*Assert=*/true, L,
                                          LoopCount);
 }
