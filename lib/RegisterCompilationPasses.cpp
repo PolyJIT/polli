@@ -114,6 +114,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   if (!opt::Enabled)
     return;
 
+  polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createCodePreparationPass());
   PM.add(polli::createScopDetectionPass());
 
@@ -133,6 +134,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 }
 
 static llvm::RegisterStandardPasses
-    RegisterPolyJIT(llvm::PassManagerBuilder::EP_VectorizerStart,
+    RegisterPolyJIT(llvm::PassManagerBuilder::EP_EarlyAsPossible,
                     registerPolyJIT);
 } // namespace polli
