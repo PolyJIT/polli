@@ -96,6 +96,42 @@ private:
   const PollyFnReport &operator=(const PollyFnReport &);
 };
 
+class PollyScopReport : public llvm::FunctionPass {
+public:
+  static char ID;
+  explicit PollyScopReport() : llvm::FunctionPass(ID) {};
+
+  /// @name ScopPass interface
+  //@{
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<polly::ScopInfoWrapperPass>();
+    AU.setPreservesAll();
+  }
+
+  bool runOnFunction(Function &F) override {
+    ScopInfoWrapperPass &SI = getAnalysis<polly::ScopInfoWrapperPass>();
+    std::string buf;
+    raw_string_ostream os(buf);
+    os << "\n==============================================================="
+          "\n Modelling"
+          "\n===============================================================\n";
+    SI.print(os, F.getParent());
+    console->error(os.str());
+    return false;
+  }
+
+  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
+  //@}
+
+private:
+
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  PollyScopReport(const PollyScopReport &);
+  // DO NOT IMPLEMENT
+  const PollyScopReport &operator=(const PollyScopReport &);
+};
+
 class PollyReport : public polly::ScopPass {
 public:
   static char ID;
@@ -135,6 +171,7 @@ private:
 
 char PollyFnReport::ID = 0;
 char PollyReport::ID = 0;
+char PollyScopReport::ID = 0;
 
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
@@ -142,7 +179,8 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
   PM.add(new PollyFnReport());
-  PM.add(polly::createScopInfoRegionPassPass());
+  PM.add(polly::createScopInfoWrapperPassPass());
+  PM.add(new PollyScopReport());
   PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
