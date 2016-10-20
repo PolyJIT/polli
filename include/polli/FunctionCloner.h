@@ -114,8 +114,9 @@ public:
             NewF->setPersonalityFn(CalledF->getPersonalityFn());
           VMap[CalledF] = NewF;
 
-          if (!isa<IntrinsicInst>(&I))
-            NewF->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
+          if (isa<IntrinsicInst>(&I))
+            continue;
+          NewF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
           polli::log::console->error("Mapped: {:s}", NewF->getName().str());
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
