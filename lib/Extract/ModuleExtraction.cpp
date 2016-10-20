@@ -27,7 +27,6 @@ STATISTIC(Instrumented, "Number of instrumented functions");
 STATISTIC(Extracted, "Number of extracted SCoP functions");
 STATISTIC(NotEligible,
           "Number of SCoP candidates that are not eligible for extraction.");
-STATISTIC(MappedGlobals, "Number of global to argument redirections");
 STATISTIC(DuplicatePredsInPHI, "Number of functions that contain duplicate "
                                "predecessor lists in some PHI nodes.");
 REGISTER_LOG(console, "extract");
@@ -76,32 +75,6 @@ static std::string moduleToString(Module &M) {
 
   os.flush();
   return ModStr;
-}
-
-/**
- * @brief Get the number of globals we carry within this function signature.
- *
- * @param F The Function we want to cound the globals on.
- * @return size_t The number of globals we carry with this function signature.
- */
-static inline size_t getGlobalCount(Function *F) {
-  size_t n = 0;
-  if (F->hasFnAttribute("polyjit-global-count"))
-    if (!(std::stringstream(
-              F->getFnAttribute("polyjit-global-count").getValueAsString()) >>
-          n))
-      n = 0;
-  return n;
-}
-
-/**
- * @brief Get all globals variable used in this function.
- *
- * @param SrcF The function we collect globals from.
- * @return polli::GlobalList
- */
-static GlobalList getGVsUsedInFunction(Function &SrcF) {
-  return apply<GlobalList>(SrcF, selectGV);
 }
 
 using ArgListT = SmallVector<Type *, 4>;
@@ -234,7 +207,7 @@ struct InstrumentEndpoint {
 
     /* Prepare a stack array for the parameters. We will pass a pointer to
      * this array into our callback function. */
-    int argc = To->arg_size() + getGlobalCount(From);
+    int argc = To->arg_size();
     Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc);
     ArrayType *StackArrayT = ArrayType::get(Type::getInt8PtrTy(Ctx), argc);
     Value *Params = Builder.CreateAlloca(StackArrayT, Size1, "params");
@@ -257,25 +230,6 @@ struct InstrumentEndpoint {
       Builder.CreateStore(
           Builder.CreateBitCast(Slot, StackArrayT->getArrayElementType()),
           Dest);
-    }
-
-    // Append required global variables.
-    Function::arg_iterator GlobalArgs = From->arg_begin();
-    for (int j = 0; j < i; j++)
-      GlobalArgs++;
-    for (; i < argc; i++) {
-      StringRef Name = (GlobalArgs++)->getName();
-      if (GlobalVariable *GV =
-              M->getGlobalVariable(Name, /*AllowInternals*/ true)) {
-        /* Get the appropriate slot in the parameters array and store
-         * the stack slot in form of a i8*. */
-        Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i);
-        Value *Dest = Builder.CreateInBoundsGEP(Params, {Idx0, ArrIdx});
-
-        Builder.CreateStore(
-            Builder.CreateBitCast(GV, StackArrayT->getArrayElementType()),
-            Dest);
-      }
     }
 
     Value *PrefixData = polli::registerStatStruct(*To, To->getName());
