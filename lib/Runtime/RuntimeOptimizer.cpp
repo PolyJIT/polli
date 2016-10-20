@@ -201,8 +201,13 @@ PassManagerBuilder createPMB() {
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
   polly::opt::UseContext = true;
-  polly::opt::PollyParallelForce = true;
+  polly::opt::PollyParallelForce = false;
   polly::PollyProcessUnprofitable = false;
+  polly::opt::FusionStrategy = "max";
+  polly::opt::WholeComponent = true;
+  polly::opt::FirstLevelTiling = true;
+  polly::opt::SecondLevelTiling = true;
+  polly::opt::RegisterTiling = true;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   polly::PollyInvariantLoadHoisting = true;
   // We accept them blindly.
