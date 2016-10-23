@@ -44,10 +44,20 @@ bool CollectRegressionTests = false;
 
 bool DisableCoreFiles = true;
 char OptLevel = ' ';
-std::string TargetTriple = "";
-std::string MArch = "";
-std::string MCPU = "";
-std::vector<std::string> MAttrs;
+std::string TargetTriple = "x86-64_unknown-linux-gnu";
+std::string MArch = "x86-64";
+std::string MCPU  = "ivybridge";
+std::vector<std::string> MAttrs = {
+    "-sse4a",    "-avx512bw", "+cx16",     "-tbm",      "+xsave",  "-fma4",
+    "-avx512vl", "-prfchw",   "-bmi2",     "-adx",      "-xsavec", "+fsgsbase",
+    "+avx",      "-avx512cd", "-avx512pf", "-rtm",      "+popcnt", "-fma",
+    "-bmi",      "+aes",      "+rdrnd",    "-xsaves",   "+sse4.1", "+sse4.2",
+    "-avx2",     "-avx512er", "+sse",      "-lzcnt",    "+pclmul",  "-avx512f",
+    "+f16c",     "+sse3",     "+mmx",      "-pku",      "+cmov",   "-xop",
+    "-rdseed",   "-movbe",    "-hle",      "+xsaveopt", "-sha",    "+sse2",
+    "+sse3",     "-avx512dq"
+};
+
 llvm::Reloc::Model RelocModel = Reloc::PIC_;
 llvm::CodeModel::Model CModel = CodeModel::JITDefault;
 llvm::FloatABI::ABIType FloatABIForCalls = FloatABI::Default;

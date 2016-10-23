@@ -88,7 +88,7 @@ struct PPStringRegion {
 class PPEvent {
 public:
   PPEvent(int32_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
-      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_nsec()), DebugStr(dbgStr) {
+      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_usec()), DebugStr(dbgStr) {
   }
   explicit PPEvent(int32_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
@@ -109,7 +109,7 @@ public:
   /**
    * @brief Set the timestamp of this event to 'right now'
    */
-  void snapshot() { Timestamp = PAPI_get_real_nsec(); }
+  void snapshot() { Timestamp = PAPI_get_real_usec(); }
 private:
   int32_t ID;
   PPEventType EventTy;

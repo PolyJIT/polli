@@ -422,7 +422,7 @@ void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
   if (!FnStats)
     return;
   FnStats->NumCalls++;
-  FnStats->RegionEnter = PAPI_get_real_nsec();
+  FnStats->RegionEnter = PAPI_get_real_usec();
 }
 
 void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
@@ -430,7 +430,7 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
   if (!FnStats)
     return;
 
-  FnStats->RegionExit = PAPI_get_real_nsec();
+  FnStats->RegionExit = PAPI_get_real_usec();
   JitT Context = getOrCreateJIT();
   Context->async(TrackStatsChange, Context->FromPrefix((uint64_t)prefix),
                  *FnStats);
@@ -460,7 +460,7 @@ static inline bool should_use_variant(const Stats *S) {
  */
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
-  uint64_t start = PAPI_get_real_nsec();
+  uint64_t start = PAPI_get_real_usec();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   JitT Context = getOrCreateJIT();
 
@@ -478,7 +478,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   SPDLOG_DEBUG("libpjit", "FnIt: {0:d}", FnIt != Context->end());
 
   polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  FnStats->LookupTime = PAPI_get_real_nsec() - start;
+  FnStats->LookupTime = PAPI_get_real_usec() - start;
   if (!should_use_variant(FnStats))
     return false;
 

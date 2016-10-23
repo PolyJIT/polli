@@ -206,12 +206,16 @@ PassManagerBuilder createPMB() {
   polly::opt::FusionStrategy = "max";
   polly::opt::WholeComponent = true;
   polly::opt::FirstLevelTiling = true;
-  polly::opt::SecondLevelTiling = true;
+  polly::opt::SecondLevelTiling = false;
   polly::opt::RegisterTiling = true;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
-  polly::PollyInvariantLoadHoisting = true;
+  polly::PollyInvariantLoadHoisting = false;
   // We accept them blindly.
-  polly::ProfitabilityMinPerLoopInstructions = 0;
+  polly::ProfitabilityMinPerLoopInstructions = 1;
+
+  //FIXME: Tune it ..
+  polly::opt::FirstLevelDefaultTileSize = 200;
+  polly::opt::SecondLevelDefaultTileSize = 200;
 
   Builder.addExtension(PassManagerBuilder::EP_VectorizerStart, registerPolly);
 
