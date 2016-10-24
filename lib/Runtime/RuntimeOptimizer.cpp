@@ -181,8 +181,8 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(new PollyFnReport());
   PM.add(polly::createScopInfoWrapperPassPass());
   PM.add(new PollyScopReport());
-  PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createIslScheduleOptimizerPass());
+  PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createCodeGenerationPass());
   PM.add(new PollyReport());
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
