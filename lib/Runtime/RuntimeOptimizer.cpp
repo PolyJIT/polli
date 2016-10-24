@@ -179,7 +179,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
   PM.add(new PollyFnReport());
-  PM.add(polly::createScopInfoWrapperPassPass());
+  PM.add(polly::createScopInfoRegionPassPass());
   PM.add(new PollyScopReport());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createIslAstInfoPass());
@@ -189,7 +189,6 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
   PM.add(createBarrierNoopPass());
-  PM.add(polly::createCodegenCleanupPass());
 }
 
 PassManagerBuilder createPMB() {
@@ -200,14 +199,14 @@ PassManagerBuilder createPMB() {
   Builder.OptLevel = 3;
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
-  polly::opt::UseContext = true;
+  //polly::opt::UseContext = true;
   polly::opt::PollyParallelForce = false;
   polly::PollyProcessUnprofitable = false;
-  polly::opt::FusionStrategy = "max";
-  polly::opt::WholeComponent = true;
+  //polly::opt::FusionStrategy = "max";
+  //polly::opt::WholeComponent = true;
   polly::opt::FirstLevelTiling = true;
-  polly::opt::SecondLevelTiling = false;
-  polly::opt::RegisterTiling = true;
+  polly::opt::SecondLevelTiling = true;
+  //polly::opt::RegisterTiling = true;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   polly::PollyInvariantLoadHoisting = false;
   // We accept them blindly.
