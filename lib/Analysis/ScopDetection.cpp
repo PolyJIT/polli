@@ -250,8 +250,8 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
     if (!isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS))
       return false;
 
-    Context.RequiredParams =
-        getParamsInNonAffineExpr(&Context.CurRegion, Scope, S, *SE);
+    for (auto P : getParamsInNonAffineExpr(&Context.CurRegion, Scope, S, *SE))
+      Context.RequiredParams.push_back(P);
     Context.requiresJIT = true;
   }
 
@@ -828,8 +828,9 @@ bool JITScopDetection::isValidLoop(Loop *L, DetectionContext &Context) const {
 
   const SCEV *LoopCount = SE->getBackedgeTakenCount(L);
   if (polli::isNonAffineExpr(R, L, LoopCount, *SE, nullptr)) {
-    Context.RequiredParams =
-        getParamsInNonAffineExpr(R, L, LoopCount, *SE);
+    for (auto P :
+         getParamsInNonAffineExpr(&Context.CurRegion, L, LoopCount, *SE))
+      Context.RequiredParams.push_back(P);
     Context.requiresJIT = true;
     return true;
   }

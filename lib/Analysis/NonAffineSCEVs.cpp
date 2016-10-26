@@ -239,11 +239,6 @@ public:
   }
 
   class ValidatorResult visitAddRecExpr(const SCEVAddRecExpr *Expr) {
-    //if (!Expr->isAffine()) {
-    //  DEBUG(dbgs() << "INVALID: AddRec is not affine");
-    //  return ValidatorResult(SCEVType::INVALID);
-    //}
-
     ValidatorResult Start = visit(Expr->getStart());
     ValidatorResult Recurrence = visit(Expr->getStepRecurrence(SE));
 
@@ -268,7 +263,7 @@ public:
       }
 
       if (Recurrence.isPARAM()) {
-        ValidatorResult Result(SCEVType::PARAM, Expr);
+        ValidatorResult Result(SCEVType::IV);
         Result.addParamsFrom(Start);
         Result.addParamsFrom(Recurrence);
 

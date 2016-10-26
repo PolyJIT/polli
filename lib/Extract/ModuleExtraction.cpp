@@ -536,17 +536,19 @@ static SetVector<Function *> extractCandidates(Function &F,
         os << "\n SCEV to Params:\n";
       });
 
+      SetVector<Value *> ParamValues;
       for (auto *P : Params) {
         SetVector<Value *> Values = SCEVParamValueExtractor::extract(P, SE);
+        ParamValues.insert(Values.begin(), Values.end());
         DEBUG({
           for (auto *Val : Values)
             printOperands(Val, os);
         });
-
-        std::set_intersection(
-            In.begin(), In.end(), Values.begin(), Values.end(),
-            std::inserter(TrackedParams, TrackedParams.end()));
       }
+
+      for (auto *V : ParamValues)
+        if (In.count(V))
+          TrackedParams.insert(V);
 
       DEBUG({
         os << "\n---------------------------------------------------------";
