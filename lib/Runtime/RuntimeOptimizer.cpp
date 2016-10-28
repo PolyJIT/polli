@@ -77,6 +77,7 @@ public:
     const Loop *L, *SecondL;
     uint64_t NumThreads = polli::opt::getNumThreads();
     uint64_t NumAccesses = 0;
+    uint64_t MaxDimensions = 0;
     uint64_t TaskSize = 32;
 
     ConstantInt *FirstLevelTileSize =
@@ -88,6 +89,8 @@ public:
       L = nullptr;
       if (Stmt.getNumIterators() > 0)
         L = Stmt.getLoopForDimension(0);
+      MaxDimensions = (uint64_t)std::max((double)MaxDimensions,
+                                         (double)Stmt.getNumIterators());
       if (!L)
         continue;
 
@@ -120,8 +123,15 @@ public:
             static_cast<uint64_t>((double)TaskSize / NumAccesses));
       }
     }
-    polly::opt::FirstLevelDefaultTileSize =
-        FirstLevelTileSize->getLimitedValue();
+
+    if (polly::opt::FirstLevelTileSizes.empty()) {
+      polly::opt::FirstLevelTileSizes.addValue(
+          FirstLevelTileSize->getLimitedValue());
+      for (unsigned i=1; i < MaxDimensions; i++) {
+        polly::opt::FirstLevelTileSizes.addValue(
+            std::numeric_limits<int>::max());
+      }
+    }
     DEBUG({
       std::string buf;
       raw_string_ostream os(buf);
@@ -346,7 +356,7 @@ PassManagerBuilder createPMB() {
   polly::opt::SecondLevelTiling = true;
   polly::opt::RegisterTiling = false;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
-  polly::PollyInvariantLoadHoisting = false;
+  polly::PollyInvariantLoadHoisting = true;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 1;
 
