@@ -99,16 +99,18 @@ struct MainCreator {
       Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), i++);
 
       Type *ArgTy = Arg.getType();
+      std::string SlotName = fmt::format("polyjit.slot.{:d}_{:s}", i-1, Arg.getName().str());
+      std::string IdxName = fmt::format("polyjit.idx.{:d}_{:s}", i-1, Arg.getName().str());
       if (!ArgTy->isPointerTy()) {
         Value *ArrIdx = Builder.CreateInBoundsGEP(&ArgV, {IdxI});
         Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo()->getPointerTo());
-        Value *LoadSlot = Builder.CreateLoad(CastVal, "polyjit.param.slot");
-        Value *LoadVal = Builder.CreateLoad(LoadSlot, "polyjit.param.idx");
+        Value *LoadSlot = Builder.CreateLoad(CastVal, SlotName);
+        Value *LoadVal = Builder.CreateLoad(LoadSlot, IdxName);
         VMap[&Arg] = LoadVal;
       } else {
         Value *ArrIdx = Builder.CreateInBoundsGEP(&ArgV, {IdxI});
         Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo());
-        Value *LoadArr = Builder.CreateLoad(CastVal, "polyjit.param.idx");
+        Value *LoadArr = Builder.CreateLoad(CastVal, IdxName);
         VMap[&Arg] = LoadArr;
       }
     }

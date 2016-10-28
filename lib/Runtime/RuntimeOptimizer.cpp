@@ -174,8 +174,7 @@ public:
       if (const RejectLog *L = SD.lookupRejectionLog(R.get()))
         L->print(os << R->getNameStr() << "\n");
       else
-        os << "No log found O.o\n";
-
+        os << R->getNameStr() << " No log entry found.\n";
       os << "\n";
     }
     SD.print(os, M);
@@ -267,9 +266,48 @@ private:
   const PollyReport &operator=(const PollyReport &);
 };
 
+class PollyScheduleReport : public polly::ScopPass {
+public:
+  static char ID;
+  explicit PollyScheduleReport() : polly::ScopPass(ID) {};
+
+  /// @name ScopPass interface
+  //@{
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<polly::ScopInfoRegionPass>();
+    AU.addRequiredTransitive<polly::IslScheduleOptimizer>();
+    AU.setPreservesAll();
+  }
+
+  bool runOnScop(Scop &S) override {
+    polly::IslScheduleOptimizer &SO =
+        getAnalysis<polly::IslScheduleOptimizer>();
+    std::string buf;
+    raw_string_ostream os(buf);
+    os << "\n==============================================================="
+          "\n ScheduleReport"
+          "\n===============================================================\n";
+    SO.printScop(os, S);
+    console->error(os.str());
+    return false;
+  }
+
+  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
+  //@}
+
+private:
+
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  PollyScheduleReport(const PollyReport &);
+  // DO NOT IMPLEMENT
+  const PollyScheduleReport &operator=(const PollyReport &);
+};
+
 char PollyFnReport::ID = 0;
 char PollyReport::ID = 0;
 char PollyScopReport::ID = 0;
+char PollyScheduleReport::ID = 0;
 
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
