@@ -16,7 +16,7 @@ RunValueList runValues(const SpecializerRequest &Request) {
   POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
                              "polyjit.params.select");
   int i = 0;
-  RunValueList RunValues(boost::hash_value(Request.F->getName().str()));
+  RunValueList RunValues(boost::hash_value(Request.F));
 
   DEBUG(printArgs(*Request.F, Request.ParamC, Request.Params));
   for (const llvm::Argument &Arg : Request.F->args()) {
