@@ -48,6 +48,104 @@ using namespace llvm::legacy;
 using namespace polly;
 
 namespace polli {
+class TileSizeLearner : public polly::ScopPass {
+private:
+
+public:
+  static char ID;
+  explicit TileSizeLearner() : polly::ScopPass(ID) {};
+
+  /// @name ScopPass interface
+  //@{
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<polly::ScopInfoRegionPass>();
+    AU.addRequired<llvm::ScalarEvolutionWrapperPass>();
+    AU.setPreservesAll();
+  }
+
+  bool runOnScop(Scop &S) override {
+    DEBUG({
+      std::string buf;
+      raw_string_ostream os(buf);
+      os << "\n==============================================================="
+            "\n Learn TileSizes"
+            "\n==============================================================="
+            "\n";
+      console->debug(os.str());
+    });
+    ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
+    const Loop *L, *SecondL;
+    uint64_t NumThreads = polli::opt::getNumThreads();
+    uint64_t NumAccesses = 0;
+    uint64_t TaskSize = 32;
+
+    ConstantInt *FirstLevelTileSize =
+        ConstantInt::get(Type::getInt64Ty(SE.getContext()), TaskSize);
+    ConstantInt *SecondLevelTileSize =
+        ConstantInt::get(Type::getInt64Ty(SE.getContext()), 32);
+
+    for (auto &Stmt : S) {
+      L = nullptr;
+      if (Stmt.getNumIterators() > 0)
+        L = Stmt.getLoopForDimension(0);
+      if (!L)
+        continue;
+
+      /* First level */
+      {
+        auto *TripCount = SE.getBackedgeTakenCount(L);
+        if (const SCEVConstant *Constant = dyn_cast<SCEVConstant>(TripCount)) {
+          ConstantInt *CI = Constant->getValue();
+          uint64_t Cnt = static_cast<uint64_t>(
+              std::ceil((double)CI->getLimitedValue() / NumThreads));
+          uint64_t OldCnt = static_cast<uint64_t>(
+              std::ceil((double)FirstLevelTileSize->getLimitedValue()));
+
+          TaskSize = std::max(Cnt, OldCnt);
+          FirstLevelTileSize = ConstantInt::get(FirstLevelTileSize->getType(),
+                                                TaskSize);
+        }
+      }
+
+      /* Second level */
+      SecondL = nullptr;
+      if (Stmt.getNumIterators() > 1)
+        SecondL = Stmt.getLoopForDimension(1);
+      if (!SecondL)
+        continue;
+      {
+        NumAccesses += Stmt.size();
+        SecondLevelTileSize = ConstantInt::get(
+            FirstLevelTileSize->getType(),
+            static_cast<uint64_t>((double)TaskSize / NumAccesses));
+      }
+    }
+    polly::opt::FirstLevelDefaultTileSize =
+        FirstLevelTileSize->getLimitedValue();
+    DEBUG({
+      std::string buf;
+      raw_string_ostream os(buf);
+      os << " FirstLevelTileSize : " << *FirstLevelTileSize << " tile size.\n";
+      os << " SecondLevelTileSize : " << *SecondLevelTileSize
+         << " tile size.\n";
+      console->error(os.str());
+    });
+    return false;
+  }
+
+  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
+  //@}
+
+private:
+
+  //===--------------------------------------------------------------------===//
+  // DO NOT IMPLEMENT
+  TileSizeLearner(const TileSizeLearner &);
+  // DO NOT IMPLEMENT
+  const TileSizeLearner &operator=(const TileSizeLearner &);
+};
+char TileSizeLearner::ID = 0;
+
 class PollyFnReport : public llvm::FunctionPass {
 public:
   static char ID;
@@ -178,10 +276,12 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
 
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
-  PM.add(new PollyFnReport());
+  DEBUG(PM.add(new PollyFnReport()));
   PM.add(polly::createScopInfoRegionPassPass());
-  PM.add(new PollyScopReport());
+  DEBUG(PM.add(new PollyScopReport()));
+  PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
+  DEBUG(PM.add(new PollyScheduleReport()));
   PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createCodeGenerationPass());
   PM.add(new PollyReport());
@@ -199,22 +299,22 @@ PassManagerBuilder createPMB() {
   Builder.OptLevel = 3;
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
-  //polly::opt::UseContext = true;
+  polly::opt::UseContext = true;
   polly::opt::PollyParallelForce = false;
   polly::PollyProcessUnprofitable = false;
   //polly::opt::FusionStrategy = "max";
   //polly::opt::WholeComponent = true;
   polly::opt::FirstLevelTiling = true;
   polly::opt::SecondLevelTiling = true;
-  //polly::opt::RegisterTiling = true;
+  polly::opt::RegisterTiling = false;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
   polly::PollyInvariantLoadHoisting = false;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 1;
 
   //FIXME: Tune it ..
-  polly::opt::FirstLevelDefaultTileSize = 200;
-  polly::opt::SecondLevelDefaultTileSize = 200;
+  //polly::opt::FirstLevelDefaultTileSize = 1000;
+  //polly::opt::SecondLevelDefaultTileSize = 32;
 
   Builder.addExtension(PassManagerBuilder::EP_VectorizerStart, registerPolly);
 

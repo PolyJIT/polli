@@ -83,6 +83,14 @@ bool havePapi() {
 bool haveLikwid() {
   return std::getenv("LIKWID_MODE") != nullptr;
 }
+
+uint64_t getNumThreads() {
+  if (const char *NumThreadsStr = std::getenv("OMP_NUM_THREADS")) {
+    return std::atoi(NumThreadsStr);
+  }
+
+  return 0;
+}
 } // namespace opt
 } // namespace polli
 

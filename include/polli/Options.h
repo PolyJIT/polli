@@ -80,6 +80,11 @@ bool haveLikwid();
  * @return True, if we should enable PAPI base runtime instrumentation.
  */
 bool havePapi();
+
+/**
+ * Get the number of OpenMP-Threads available to us.
+ */
+uint64_t getNumThreads();
 }
 }
 #endif
