@@ -816,24 +816,24 @@ bool JITScopDetection::canUseISLTripCount(Loop *L,
 }
 
 bool JITScopDetection::isValidLoop(Loop *L, DetectionContext &Context) const {
-  if (canUseISLTripCount(L, Context))
-    return true;
-
   Region *R = RI->getRegionFor(L->getHeader());
   while (R != &Context.CurRegion && !R->contains(L))
     R = R->getParent();
 
-  if (addOverApproximatedRegion(R, Context))
-    return true;
-
   const SCEV *LoopCount = SE->getBackedgeTakenCount(L);
   if (polli::isNonAffineExpr(R, L, LoopCount, *SE, nullptr)) {
-    for (auto P :
-         getParamsInNonAffineExpr(&Context.CurRegion, L, LoopCount, *SE))
+    for (auto P : getParamsInNonAffineExpr(R, L, LoopCount, *SE))
       Context.RequiredParams.push_back(P);
     Context.requiresJIT = true;
     return true;
   }
+
+  if (canUseISLTripCount(L, Context))
+    return true;
+
+  if (addOverApproximatedRegion(R, Context))
+    return true;
+
   return invalid<polly::ReportLoopBound>(Context, /*Assert=*/true, L,
                                          LoopCount);
 }
