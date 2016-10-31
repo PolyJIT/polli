@@ -557,7 +557,7 @@ static SetVector<Function *> extractCandidates(Function &F,
           P->print((os << "\n").indent(2) << "TP: ");
         }
         os << "\n=========================================================";
-        console->error(os.str());
+        console->debug(os.str());
         os.flush();
       });
 

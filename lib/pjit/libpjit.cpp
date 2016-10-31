@@ -233,7 +233,7 @@ public:
       dlerror();
       void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
       if (char *Error = dlerror())
-        console->error("dlerror: {:s}", Error);
+        console->error("(dlsym) Could not locate the symbol: {:s}", Error);
       if (Addr)
         llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
     }
@@ -242,11 +242,15 @@ public:
         [&](const std::string &Name) {
           if (auto Sym = findSymbol(Name))
             return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
+
+          console->error("(dyld) Could not locate the symbol: {:s}", Name);
           return RuntimeDyld::SymbolInfo(nullptr);
         },
         [] (const std::string &S) {
           if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
             return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
+          console->error("(dyld) Could not locate the symbol in process: {:s}",
+                         S);
           return RuntimeDyld::SymbolInfo(nullptr);
         }
     );
