@@ -702,9 +702,6 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     InstCloner.setDominatorTree(&DT);
 
     Function *InstF = InstCloner.start(/* RemapCalls */ true);
-    InstF->addFnAttr(Attribute::OptimizeNone);
-    InstF->addFnAttr(Attribute::NoInline);
-
     InstrumentedFunctions.insert(InstF);
     Instrumented++;
   }
