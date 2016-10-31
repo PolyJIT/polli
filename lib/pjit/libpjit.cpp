@@ -449,6 +449,8 @@ static inline bool should_use_variant(const Stats *S) {
   return false;
 }
 
+void pjit_library_init();
+
 /**
  * @brief Runtime callback for PolyJIT.
  *
@@ -462,6 +464,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
   uint64_t start = PAPI_get_real_usec();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
+  pjit_library_init();
   JitT Context = getOrCreateJIT();
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
@@ -507,6 +510,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
  */
 bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
                             unsigned paramc, char **params) {
+  pjit_library_init();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   JitT Context = getOrCreateJIT();
 
@@ -521,9 +525,14 @@ bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
 }
 
 void pjit_library_init() {
+  static bool initialized = false;
+  if (initialized)
+    return;
+  console->debug("pjit initialized.");
   static StaticInitializer InitializeEverything;
   POLLI_TRACING_INIT;
   atexit(do_shutdown);
+  initialized = true;
 }
 } /* extern "C" */
 } /* polli */
