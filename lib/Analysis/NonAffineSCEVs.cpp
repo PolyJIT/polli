@@ -429,24 +429,23 @@ public:
 
 bool isNonAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
                      ScalarEvolution &SE, polly::InvariantLoadsSetTy *ILS) {
-  DEBUG(dbgs() << "\n");
-  DEBUG(dbgs() << "Expr: " << *Expr << "\n");
+  std::string buf;
+  raw_string_ostream os(buf);
+  os << "\n";
+  os << "Expr: " << *Expr << "\n";
   if (isa<SCEVCouldNotCompute>(Expr))
     return false;
 
   NonAffSCEVValidator Validator(R, Scope, SE, ILS);
-  DEBUG({
-    dbgs() << "Region: " << R->getNameStr() << "\n";
-    dbgs() << " -> ";
-  });
+  os << "Region: " << R->getNameStr() << "\n";
+  os << " -> ";
 
   ValidatorResult Result = Validator.visit(Expr);
 
-  DEBUG({
-    if (Result.isValid())
-      dbgs() << "VALID\n";
-    dbgs() << "\n";
-  });
+  if (Result.isValid())
+    os << "VALID\n";
+  os << "\n";
+  DEBUG(console->debug(os.str()));
 
   return Result.isValid();
 }

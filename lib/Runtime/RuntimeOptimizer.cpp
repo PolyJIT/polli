@@ -334,7 +334,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   DEBUG(PM.add(new PollyScheduleReport()));
   PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createCodeGenerationPass());
-  PM.add(new PollyReport());
+  DEBUG(PM.add(new PollyReport()));
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.

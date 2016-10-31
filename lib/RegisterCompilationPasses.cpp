@@ -33,6 +33,10 @@
 using namespace llvm;
 using namespace polli;
 
+namespace {
+  REGISTER_LOG(console, "register");
+}
+
 namespace polli {
 
 void initializePolliPasses(PassRegistry &Registry) {
@@ -60,6 +64,8 @@ struct InjectMain : public FunctionPass {
       BasicBlock &Entry = F.getEntryBlock();
       Builder.SetInsertPoint(Entry.getFirstNonPHI());
       Builder.CreateCall(PJMainFn);
+      console->debug("Found the main function in {:s}",
+                     M->getModuleIdentifier());
     }
 
     return IsMain;
