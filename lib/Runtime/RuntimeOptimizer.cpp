@@ -12,7 +12,7 @@
 // optimization should be executed, e.g. with Polly.
 //
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "polyjit"
+#define DEBUG_TYPE "runtime_optimizer"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Utils.h"
 #include "polli/BasePointers.h"
@@ -24,6 +24,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "polly/Canonicalization.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
 #include "polly/ScopDetection.h"
@@ -37,7 +38,7 @@
 #include "polli/log.h"
 #include "polli/LikwidMarker.h"
 
-REGISTER_LOG(console, "optmize");
+REGISTER_LOG(console, DEBUG_TYPE);
 
 namespace llvm {
 class Function;
@@ -322,6 +323,7 @@ char PollyScheduleReport::ID = 0;
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
 
+  polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionPass());
   DEBUG(PM.add(new PollyFnReport()));
@@ -359,12 +361,7 @@ PassManagerBuilder createPMB() {
   polly::PollyInvariantLoadHoisting = true;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 1;
-
-  //FIXME: Tune it ..
-  //polly::opt::FirstLevelDefaultTileSize = 1000;
-  //polly::opt::SecondLevelDefaultTileSize = 32;
-
-  Builder.addExtension(PassManagerBuilder::EP_VectorizerStart, registerPolly);
+  Builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible, registerPolly);
 
   return Builder;
 }
@@ -377,7 +374,8 @@ Function &OptimizeForRuntime(Function &F) {
 #endif
 
   legacy::PassManager PM = legacy::PassManager();
-
+  legacy::FunctionPassManager FPM = legacy::FunctionPassManager(M);
+  Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(PM);
 
 #ifdef POLLI_ENABLE_BASE_POINTERS
@@ -396,6 +394,10 @@ Function &OptimizeForRuntime(Function &F) {
     PM.add(polli::createLikwidMarkerPass());
 #endif
 
+  FPM.doInitialization();
+  for (auto &F : *M)
+    FPM.run(F);
+  FPM.doFinalization();
   PM.run(*M);
 
 #ifdef POLLI_STORE_OUTPUT
