@@ -167,11 +167,12 @@ inline bool JITScopDetection::invalid(DetectionContext &Context, bool Assert,
     if (PollyTrackFailures)
       Log.report(RejectReason);
 
-    console->error("\nR: {:s}\n"
-                   "    {:s}",
-                   Context.CurRegion.getNameStr(), RejectReason->getMessage());
-    DEBUG(dbgs() << RejectReason->getMessage());
-    DEBUG(dbgs() << "\n");
+    DEBUG({
+      console->debug("\nR: {:s}\n"
+                     "    {:s}",
+                     Context.CurRegion.getNameStr(),
+                     RejectReason->getMessage());
+    });
   } else {
     assert(!Assert && "Verification of detected scop failed");
   }
