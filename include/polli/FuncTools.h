@@ -7,7 +7,7 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
 namespace polli {
-using GlobalList = llvm::SetVector<const llvm::GlobalValue *>;
+using GlobalList = llvm::SetVector<llvm::GlobalValue *>;
 
 /**
  * @brief Collect all global variables used within this Instruction.
