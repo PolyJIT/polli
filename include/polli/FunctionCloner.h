@@ -131,12 +131,8 @@ public:
 
     GlobalList GVs = apply<GlobalList>(SrcF, selectGV);
     for (GlobalValue *GV : GVs) {
-      bool ShareWithMain =
-          GV->getLinkage() != GlobalValue::LinkageTypes::InternalLinkage;
-      if (!ShareWithMain) {
-        polli::log::console->debug("Not mapping: {:s}", GV->getName().str());
-        continue;
-      }
+      bool IsInternal =
+          GV->getLinkage() == GlobalValue::LinkageTypes::InternalLinkage;
 
       GlobalValue *NewGV = TgtM->getNamedGlobal(GV->getName());
       if (NewGV)
@@ -145,15 +141,25 @@ public:
       if (GlobalVariable *GVar = dyn_cast<GlobalVariable>(GV)) {
         GlobalVariable *NewGVar = cast<GlobalVariable>(
             TgtM->getOrInsertGlobal(GVar->getName(), GVar->getValueType()));
-        if (ShareWithMain) {
-          NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
-          if (NewGVar->getValueType()->isAggregateType()) {
-            NewGVar->setInitializer(
-                ConstantAggregateZero::get(GVar->getValueType()));
-          } else {
-            NewGVar->setInitializer(
-                Constant::getNullValue(GVar->getValueType()));
-          }
+
+        if (IsInternal) {
+          /* We need to change the visibility of the original symbol to
+           * external visible for the weak_odr linkage to work.
+           *
+           * To avoid name collisions we will rename the symbol before
+           * we remap it.
+           */
+          GV->setName(GV->getName() + "_" + TgtM->getModuleIdentifier());
+          GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
+        }
+
+        NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
+        if (NewGVar->getValueType()->isAggregateType()) {
+          NewGVar->setInitializer(
+              ConstantAggregateZero::get(GVar->getValueType()));
+        } else {
+          NewGVar->setInitializer(
+              Constant::getNullValue(GVar->getValueType()));
         }
 
         NewGVar->setAlignment(GVar->getAlignment());
