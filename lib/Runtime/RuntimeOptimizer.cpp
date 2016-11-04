@@ -358,6 +358,7 @@ PassManagerBuilder createPMB() {
   polly::opt::SecondLevelTiling = true;
   polly::opt::RegisterTiling = false;
   polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
+  polly::PollyAllowNonAffineSubRegions = false;
   polly::PollyInvariantLoadHoisting = true;
   // We accept them blindly.
   polly::ProfitabilityMinPerLoopInstructions = 1;
