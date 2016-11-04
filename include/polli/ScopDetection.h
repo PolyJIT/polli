@@ -524,7 +524,7 @@ public:
 
   /// @brief Verify if all valid Regions in this Function are still valid
   /// after some transformations.
-  void verifyAnalysis() const;
+  void verifyAnalysis() const override;
 
   /// @brief Verify if R is still a valid part of Scop after some
   /// transformations.
