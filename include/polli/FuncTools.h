@@ -4,6 +4,7 @@
 #include "llvm/IR/GlobalValue.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
 namespace polli {

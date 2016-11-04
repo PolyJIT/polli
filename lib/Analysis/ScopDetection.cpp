@@ -3,6 +3,7 @@
 #include "polly/CodeGen/CodeGeneration.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/Options.h"
+#include "polly/ScopDetection.h"
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/Support/SCEVValidator.h"
 #include "polly/Support/ScopLocation.h"
@@ -246,9 +247,13 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
                                 Value *BaseAddress) const {
 
   polly::InvariantLoadsSetTy AccessILS;
-  if (!polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE,
-                           &AccessILS)) {
-    if (!isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS))
+  bool isAffine =
+      polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS);
+
+  if (!isAffine) {
+    bool isValidNonAffine =
+        isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS);
+    if (!isValidNonAffine)
       return false;
 
     for (auto P : getParamsInNonAffineExpr(&Context.CurRegion, Scope, S, *SE))
