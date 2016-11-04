@@ -233,6 +233,9 @@ bool JITScopDetection::onlyValidRequiredInvariantLoads(
     polly::InvariantLoadsSetTy &RequiredILS, DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
+  if (!polly::PollyInvariantLoadHoisting && !RequiredILS.empty())
+    return false;
+
   for (LoadInst *Load : RequiredILS)
     if (!polly::isHoistableLoad(Load, CurRegion, *LI, *SE))
       return false;
