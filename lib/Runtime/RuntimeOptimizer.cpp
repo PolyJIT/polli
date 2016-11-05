@@ -352,8 +352,6 @@ PassManagerBuilder createPMB() {
   polly::opt::UseContext = true;
   polly::opt::PollyParallelForce = false;
   polly::PollyProcessUnprofitable = false;
-  //polly::opt::FusionStrategy = "max";
-  //polly::opt::WholeComponent = true;
   polly::opt::FusionStrategy = "max";
   polly::opt::WholeComponent = true;
   polly::opt::FirstLevelTiling = true;
