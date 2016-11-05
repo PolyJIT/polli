@@ -441,16 +441,17 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
 }
 
 static inline bool should_use_variant(const Stats *S) {
-  if (!S)
-    return true;
+  return true;
+  //if (!S)
+  //  return true;
 
-  if (S->NumCalls == 0)
-    return true;
+  //if (S->NumCalls == 0)
+  //  return true;
 
-  if (S->NumCalls > 0)
-    return (S->LastRuntime * 2) > S->LookupTime;
+  //if (S->NumCalls > 0)
+  //  return (S->LastRuntime * 2) > S->LookupTime;
 
-  return false;
+  //return false;
 }
 
 void pjit_library_init();
