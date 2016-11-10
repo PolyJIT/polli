@@ -91,6 +91,7 @@ uint64_t getNumThreads() {
 
   return 0;
 }
+
 } // namespace opt
 } // namespace polli
 

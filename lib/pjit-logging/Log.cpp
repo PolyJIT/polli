@@ -3,7 +3,16 @@
 #include "polli/log.h"
 #include "spdlog/spdlog.h"
 
+#include <cstdlib>
+
 namespace {
+static const char *getLogOutFile() {
+  if (const char *LogF = std::getenv("POLLI_LOG_FILE")) {
+    return LogF;
+  }
+  return "/tmp/.polyjit";
+}
+
 static inline std::vector<spdlog::sink_ptr> &global_init() {
   static bool init = false;
   static std::vector<spdlog::sink_ptr> sinks;
@@ -11,7 +20,7 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
     return sinks;
   init = true;
 
-  const char *LOG_FILENAME = "/tmp/.polyjit";
+  const char *LOG_FILENAME = getLogOutFile();
   const size_t LOG_SIZE = 1048576 * 100;
 
   spdlog::set_async_mode(1048576);
