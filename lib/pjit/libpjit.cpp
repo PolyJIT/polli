@@ -242,15 +242,11 @@ public:
         [&](const std::string &Name) {
           if (auto Sym = findSymbol(Name))
             return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
-
-          console->error("(dyld) Could not locate the symbol: {:s}", Name);
           return RuntimeDyld::SymbolInfo(nullptr);
         },
         [] (const std::string &S) {
           if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
             return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
-          console->error("(dyld) Could not locate the symbol in process: {:s}",
-                         S);
           return RuntimeDyld::SymbolInfo(nullptr);
         }
     );
@@ -386,10 +382,6 @@ public:
     StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
     // Make sure to initialize tracing before planting the atexit handler.
-    POLLI_TRACING_REGION_START(PJIT_REGION_MAIN, "polyjit.main");
-    SPDLOG_DEBUG("libpjit", "");
-    SPDLOG_DEBUG("libpjit", "StaticInitializer running.");
-
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     polly::initializePollyPasses(Registry);
     initializeCore(Registry);
@@ -421,38 +413,28 @@ public:
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  SPDLOG_DEBUG("libpjit", "ID: {0:x} IsVariant? {1}", (uint64_t)prefix,
-               is_variant);
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  if (!FnStats)
-    return;
-  FnStats->NumCalls++;
-  FnStats->RegionEnter = PAPI_get_real_usec();
+  JitT Context = getOrCreateJIT();
+  const Function *F = Context->FromPrefix((uint64_t)prefix);
+  Context->enter(GetCandidateId(*F), PAPI_get_real_usec());
 }
 
 void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  if (!FnStats)
-    return;
-
-  FnStats->RegionExit = PAPI_get_real_usec();
   JitT Context = getOrCreateJIT();
-  Context->async(TrackStatsChange, Context->FromPrefix((uint64_t)prefix),
-                 *FnStats);
+  const Function *F = Context->FromPrefix((uint64_t)prefix);
+  Context->exit(GetCandidateId(*F), PAPI_get_real_usec());
 }
 
 static inline bool should_use_variant(const Stats *S) {
-  return true;
-  //if (!S)
-  //  return true;
+  if (!S)
+    return true;
 
-  //if (S->NumCalls == 0)
-  //  return true;
+  if (S->NumCalls == 0)
+    return true;
 
   //if (S->NumCalls > 0)
   //  return (S->LastRuntime * 2) > S->LookupTime;
 
-  //return false;
+  return false;
 }
 
 void pjit_library_init();
@@ -468,7 +450,6 @@ void pjit_library_init();
  */
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
-  uint64_t start = PAPI_get_real_usec();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   pjit_library_init();
   JitT Context = getOrCreateJIT();
@@ -480,28 +461,15 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                                  (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
-  bool CacheHit = K.second;
-  if (!CacheHit)
-    FutureFn.wait();
+  FutureFn.wait();
+  Context->exit(1, PAPI_get_real_usec());
 
   auto FnIt = Context->find(Key);
-  SPDLOG_DEBUG("libpjit", "FnIt: {0:d}", FnIt != Context->end());
-
-  polli::Stats *FnStats = reinterpret_cast<polli::Stats *>(prefix);
-  FnStats->LookupTime = PAPI_get_real_usec() - start;
-  if (!should_use_variant(FnStats))
-    return false;
-
   if (FnIt != Context->end()) {
-    //polli::printArgs(*Request->F, paramc, params);
     pjit_trace_fnstats_entry(prefix, true);
-    SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
-    uint64_t ID = polli::GetCandidateId(*Request->F);
-    Context->enter(ID, PAPI_get_real_usec());
+    console->error("running: 0x{:x} {:d}, {:x}", FnIt->second, paramc, params);
     (FnIt->second)(paramc, params);
-    Context->exit(ID, PAPI_get_real_usec());
     pjit_trace_fnstats_exit(prefix, true);
-    FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
     return true;
   }
 
@@ -538,9 +506,7 @@ void pjit_library_init() {
   static bool initialized = false;
   if (initialized)
     return;
-  console->debug("pjit initialized.");
   static StaticInitializer InitializeEverything;
-  POLLI_TRACING_INIT;
   atexit(do_shutdown);
   initialized = true;
 }

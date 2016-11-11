@@ -163,8 +163,6 @@ void record_stats(uint64_t id, const char *dbg,
   PPEvent Exit(id, RegionExit, exit, dbg);
   papi_local_events()->push_back(Enter);
   papi_local_events()->push_back(Exit);
-  SPDLOG_DEBUG("libpprof", "record_stats({:d}): complete.",
-               papi_get_thread_id());
 }
 
 /**

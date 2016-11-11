@@ -24,21 +24,13 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 }
 
 void PolyJIT::setup() {
-  papi_region_setup();
   enter(0, PAPI_get_real_usec());
   Regions[0] = "START";
   Regions[1] = "CODEGEN";
-
 }
 
 void PolyJIT::tearDown() {
-  const pprof::Options &opts = *pprof::getOptions();
-  papi_region_exit(0, "STOP");
-  pprof::papi_store_thread_events(opts);
   exit(0, PAPI_get_real_usec());
-
-  //papi_region_exit(0, "STOP");
-
   polli::StoreRun(Events, Regions);
 }
 

@@ -66,22 +66,4 @@ static inline void printStats(const llvm::Function &F, const Stats &S) {
                F.getName().str(), (uint64_t)(&S), S.NumCalls, S.LookupTime,
                S.LastRuntime, (S.LookupTime * 100 / (double)S.LastRuntime));
 }
-
-uint64_t TrackStatsChange(const llvm::Function *F, Stats S) {
-  if (!F)
-    console->error("Function is a nullptr!");
-  assert(F && "Function argument is a nullptr!");
-
-  if (F->isDeclaration())
-    console->error("Function needs a definition for tracking.");
-  assert(!F->isDeclaration() && "Function needs to have a definition!");
-
-  S.LastRuntime = S.RegionExit - S.RegionEnter;
-  printStats(*F, S);
-
-  uint64_t id = GetCandidateId(*F);
-  SPDLOG_DEBUG("stats", "Candidate ID: {:d}", id);
-  record_stats(id, F->getName().str().c_str(), S.RegionEnter, S.RegionExit);
-  return id;
-}
 } // namespace polli
