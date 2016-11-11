@@ -18,6 +18,8 @@ class PolyJIT {
   void setup();
   void tearDown();
 
+  std::unordered_map<uint64_t, uint64_t> Events;
+  std::unordered_map<uint64_t, std::string> Regions;
 public:
   explicit PolyJIT() : VariantFunctions(), CodeCache() { setup(); }
   ~PolyJIT() {
@@ -29,6 +31,20 @@ public:
   void shutdown() {
     System.cancel_pending_jobs();
     System.wait_for_running_jobs();
+  }
+
+  void enter(uint64_t id, uint64_t time) {
+    if (!Events.count(id))
+        Events[id] = 0;
+    Events[id] -= time;
+  }
+
+  void exit(uint64_t id, uint64_t time) {
+    Events[id] += time;
+  }
+
+  void addRegion(const std::string Name, uint64_t id) {
+    Regions[id] = Name;
   }
 
   /**

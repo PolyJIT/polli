@@ -45,6 +45,7 @@ add_polli_library(pjit STATIC
   CodeGen.cpp
   Jit.cpp
   RunValues.cpp
+  Db.cpp
 )
 
 add_polli_library(pjit_shared SHARED
@@ -53,6 +54,7 @@ add_polli_library(pjit_shared SHARED
   CodeGen.cpp
   Jit.cpp
   RunValues.cpp
+  Db.cpp
 )
 
 add_dependencies(pjit PolyJIT_Runtime)

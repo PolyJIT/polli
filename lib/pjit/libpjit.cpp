@@ -350,6 +350,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 
   llvm::Function *F = Request->F;
   Context->UpdatePrefixMap(prefix, F);
+  Context->addRegion(Request->F->getName().str(), GetCandidateId(*Request->F));
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
   RunValueList Values = runValues(*Request);
   std::string FnName;
@@ -471,6 +472,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   pjit_library_init();
   JitT Context = getOrCreateJIT();
+  Context->enter(1, PAPI_get_real_usec());
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   CacheKey Key = K.first;
@@ -494,7 +496,10 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
     //polli::printArgs(*Request->F, paramc, params);
     pjit_trace_fnstats_entry(prefix, true);
     SPDLOG_DEBUG("libpjit", "call variant: {0:s}", Request->F->getName().str());
+    uint64_t ID = polli::GetCandidateId(*Request->F);
+    Context->enter(ID, PAPI_get_real_usec());
     (FnIt->second)(paramc, params);
+    Context->exit(ID, PAPI_get_real_usec());
     pjit_trace_fnstats_exit(prefix, true);
     FnStats->LastRuntime = FnStats->RegionExit - FnStats->RegionEnter;
     return true;
