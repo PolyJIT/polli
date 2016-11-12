@@ -139,10 +139,18 @@ public:
         continue;
 
       if (GlobalVariable *GVar = dyn_cast<GlobalVariable>(GV)) {
+        bool IsConstant = GVar->isConstant();
         GlobalVariable *NewGVar = cast<GlobalVariable>(
             TgtM->getOrInsertGlobal(GVar->getName(), GVar->getValueType()));
 
-        if (IsInternal) {
+        NewGVar->setConstant(IsConstant);
+        NewGVar->setUnnamedAddr(GVar->getUnnamedAddr());
+        if (IsConstant) {
+          NewGVar->setInitializer(GVar->getInitializer());
+          NewGVar->setLinkage(GVar->getLinkage());
+          NewGVar->setThreadLocalMode(GVar->getThreadLocalMode());
+          NewGVar->setVisibility(GVar->getVisibility());
+        } else if (IsInternal) {
           /* We need to change the visibility of the original symbol to
            * external visible for the weak_odr linkage to work.
            *
@@ -153,13 +161,15 @@ public:
           GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         }
 
-        NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
-        if (NewGVar->getValueType()->isAggregateType()) {
-          NewGVar->setInitializer(
-              ConstantAggregateZero::get(GVar->getValueType()));
-        } else {
-          NewGVar->setInitializer(
-              Constant::getNullValue(GVar->getValueType()));
+        if (!IsConstant) {
+          NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
+          if (NewGVar->getValueType()->isAggregateType()) {
+            NewGVar->setInitializer(
+                ConstantAggregateZero::get(GVar->getValueType()));
+          } else {
+            NewGVar->setInitializer(
+                Constant::getNullValue(GVar->getValueType()));
+          }
         }
 
         NewGVar->setAlignment(GVar->getAlignment());
