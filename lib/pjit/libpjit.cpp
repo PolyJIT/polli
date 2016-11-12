@@ -337,17 +337,22 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
                            CacheKey K, uint64_t prefix, JitT Context) {
-  if (Context->find(K) != Context->end())
+  if (Context->find(K) != Context->end()) {
+    /* CACHE_HIT */
+    Context->enter(3, 0);
+    Context->exit(3, 1);
     return;
+  }
+
+  /* VARIANTS */
+  Context->enter(2, 0);
+  Context->exit(2, 1);
 
   SPDLOG_DEBUG("libpjit", "{:s}: Create new Variant.", Request->F->getName().str());
   SPDLOG_DEBUG("libpjit", "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
-  llvm::Function *F = Request->F;
-  Context->UpdatePrefixMap(prefix, F);
-  Context->addRegion(Request->F->getName().str(), GetCandidateId(*Request->F));
-  VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(F);
+  VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(Request->F);
   RunValueList Values = runValues(*Request);
   std::string FnName;
 
@@ -456,6 +461,13 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   Context->enter(1, PAPI_get_real_usec());
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
+  if (!K.second) {
+    llvm::Function *F = Request->F;
+    Context->UpdatePrefixMap((uint64_t)prefix, F);
+    Context->addRegion(Request->F->getName().str(),
+                       GetCandidateId(*Request->F));
+  }
+
   CacheKey Key = K.first;
   auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, Key,
                                  (uint64_t)prefix, Context);
@@ -467,7 +479,6 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   auto FnIt = Context->find(Key);
   if (FnIt != Context->end()) {
     pjit_trace_fnstats_entry(prefix, true);
-    console->error("running: 0x{:x} {:d}, {:x}", FnIt->second, paramc, params);
     (FnIt->second)(paramc, params);
     pjit_trace_fnstats_exit(prefix, true);
     return true;
@@ -488,17 +499,18 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
  */
 bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
                             unsigned paramc, char **params) {
-  pjit_library_init();
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
+  pjit_library_init();
   JitT Context = getOrCreateJIT();
-
+  Context->enter(1, PAPI_get_real_usec());
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
-  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, K.first,
-                                 (uint64_t)prefix, Context);
-
-  // If it was not a cache-hit, wait until the first variant is ready.
-  if (!K.second)
-    FutureFn.wait();
+  if (!K.second) {
+    llvm::Function *F = Request->F;
+    Context->UpdatePrefixMap((uint64_t)prefix, F);
+    Context->addRegion(Request->F->getName().str(),
+                       GetCandidateId(*Request->F));
+  }
+  Context->exit(1, PAPI_get_real_usec());
   return false;
 }
 

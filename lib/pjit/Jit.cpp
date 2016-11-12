@@ -25,8 +25,14 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 
 void PolyJIT::setup() {
   enter(0, PAPI_get_real_usec());
+
+  /* CACHE_HIT */
+  enter(3, 0);
+
   Regions[0] = "START";
   Regions[1] = "CODEGEN";
+  Regions[2] = "VARIANTS";
+  Regions[3] = "CACHE_HIT";
 }
 
 void PolyJIT::tearDown() {
