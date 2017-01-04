@@ -18,37 +18,37 @@
 // regions before we perform any instrumentation.
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include <stddef.h>                     // for NULL
-#include <stdint.h>                     // for uint64_t
-#include <set>                          // for _Rb_tree_const_iterator, etc
-#include <string>                       // for allocator, string, etc
-#include <vector>                       // for vector
-#include "llvm/ADT/Statistic.h"         // for Statistic, STATISTIC
-#include "llvm/ADT/StringRef.h"         // for StringRef
-#include "llvm/ADT/ilist.h"             // for ilist_iterator
-#include "llvm/Analysis/RegionInfo.h"   // for Region, RegionInfo
-#include "llvm/IR/Argument.h"           // for Argument
-#include "llvm/IR/BasicBlock.h"         // for BasicBlock, etc
-#include "llvm/IR/CFG.h"                // for pred_iterator, PredIterator, etc
-#include "llvm/IR/Constant.h"           // for Constant
-#include "llvm/IR/Constants.h"          // for ConstantInt
-#include "llvm/IR/DerivedTypes.h"       // for IntegerType, PointerType
-#include "llvm/IR/Function.h"           // for Function, etc
-#include "llvm/IR/IRBuilder.h"          // for IRBuilder
-#include "llvm/IR/InstrTypes.h"         // for CastInst
-#include "llvm/IR/Instruction.h"        // for Instruction, etc
-#include "llvm/IR/Instructions.h"       // for CallInst, AllocaInst
-#include "llvm/IR/Module.h"             // for Module
-#include "llvm/IR/Type.h"               // for Type
-#include "llvm/PassAnalysisSupport.h"   // for Pass::getAnalysis, etc
-#include "llvm/PassSupport.h"           // for INITIALIZE_PASS_BEGIN, etc
-#include "llvm/Transforms/Utils/BasicBlockUtils.h" // for SplitEdge
-#include "papi.h"                       // for PAPI_VER_CURRENT
-#include "polli/InstrumentRegions.h"    // for PapiCScopProfiling, etc
-#include "polli/ScopDetection.h"        // for ScopDetection, etc
-#include "llvm/Support/Casting.h"       // for isa
-#include "llvm/Support/Debug.h"         // for dbgs, DEBUG
-#include "llvm/Support/raw_ostream.h"   // for raw_ostream, errs
+#include <stddef.h>
+#include <stdint.h>
+#include <set>
+#include <string>
+#include <vector>
+#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/ilist.h"
+#include "llvm/Analysis/RegionInfo.h"
+#include "llvm/IR/Argument.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/CFG.h"
+#include "llvm/IR/Constant.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/PassAnalysisSupport.h"
+#include "llvm/PassSupport.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "polli/InstrumentRegions.h"
+#include "polli/ScopDetection.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
+#include "papi.h"
 
 namespace llvm { class LLVMContext; }  // lines 49-49
 namespace llvm { class Value; }  // lines 50-50
