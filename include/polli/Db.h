@@ -22,7 +22,8 @@ struct Options {
   bool execute_atexit;
 };
 
-void StoreRun(const EventMapTy &Events, const RegionMapTy &Regions);
+void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
+              const RegionMapTy &Regions);
 }
 
 #endif /* end of include guard: POLLI_DB_H */
