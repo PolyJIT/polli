@@ -146,20 +146,22 @@ public:
             TgtM->getOrInsertGlobal(GVar->getName(), GVar->getValueType()));
 
         NewGVar->setConstant(IsConstant);
-        NewGVar->setUnnamedAddr(GVar->getUnnamedAddr());
-        if (IsConstant) {
+        NewGVar->setLinkage(GlobalValue::ExternalLinkage);
+        NewGVar->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
+
+        if (GVar->hasInitializer())
           NewGVar->setInitializer(GVar->getInitializer());
-          NewGVar->setLinkage(GVar->getLinkage());
-          NewGVar->setThreadLocalMode(GVar->getThreadLocalMode());
-          NewGVar->setVisibility(GVar->getVisibility());
-        } else if (IsInternal) {
+        NewGVar->setAlignment(GVar->getAlignment());
+        NewGVar->setThreadLocalMode(GVar->getThreadLocalMode());
+        NewGVar->setVisibility(GVar->getVisibility());
+
+        if (IsInternal) {
           /* We need to change the visibility of the original symbol to
            * external visible for the weak_odr linkage to work.
            *
            * To avoid name collisions we will rename the symbol before
            * we remap it.
            */
-          GV->setName(GV->getName() + "_" + TgtM->getModuleIdentifier());
 
           using namespace std::chrono;
           milliseconds ms = duration_cast<milliseconds>(
@@ -169,8 +171,12 @@ public:
           GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         }
 
+        if (IsConstant)
+          NewGVar->setLinkage(GVar->getLinkage());
+        else
+          NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakAnyLinkage);
+
         if (!IsConstant) {
-          NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
           if (NewGVar->getValueType()->isAggregateType()) {
             NewGVar->setInitializer(
                 ConstantAggregateZero::get(GVar->getValueType()));
@@ -179,8 +185,6 @@ public:
                 Constant::getNullValue(GVar->getValueType()));
           }
         }
-
-        NewGVar->setAlignment(GVar->getAlignment());
         VMap[GV] = NewGVar;
       }
     }
