@@ -9,6 +9,7 @@
 #include "polli/Utils.h"
 
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
