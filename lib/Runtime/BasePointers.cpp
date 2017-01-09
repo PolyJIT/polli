@@ -54,7 +54,7 @@ public:
   SubExpr(const Value *V, Ctx &C)
       : V(V), AccessRelation(UnionMap::empty(Space::alloc(C, 0, 0, 0))) {}
 
-  virtual void print(raw_ostream &OS, unsigned indent = 0) const {
+  void print(raw_ostream &OS, unsigned indent = 0) const {
     (OS << "\n").indent(indent) << "SubExpr: {";
     (OS << "\n").indent(indent + 2) << "V: "; V->print(OS);
     (OS << "\n").indent(indent + 2) << "A: " << AccessRelation.toStr();
