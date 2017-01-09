@@ -309,18 +309,18 @@ static JitT &getOrCreateJIT() {
   return JIT;
 }
 
-static inline void do_shutdown() {
-  // This forces the linker to keep the symbols around, if tracing is
-  // enabled.
-  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
-    POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
-    POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
-  }
-  getOrCreateJIT()->shutdown();
-
-  POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
-  POLLI_TRACING_FINALIZE;
-}
+//static inline void do_shutdown() {
+//  // This forces the linker to keep the symbols around, if tracing is
+//  // enabled.
+//  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
+//    POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
+//    POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
+//  }
+//  getOrCreateJIT()->shutdown();
+//
+//  POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
+//  POLLI_TRACING_FINALIZE;
+//}
 
 using MainFnT = std::function<void(int, char **)>;
 
@@ -503,7 +503,7 @@ void pjit_library_init() {
   if (initialized)
     return;
   static StaticInitializer InitializeEverything;
-  atexit(do_shutdown);
+  //atexit(do_shutdown);
   initialized = true;
 }
 } /* extern "C" */
