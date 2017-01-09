@@ -104,9 +104,7 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<T>();
-    // FIXME: We preserve everything, but LLVM will kill all passes that are
-    //       needed by the module extractor in our compilation pipeline.
-    // AU.setPreservesAll();
+    AU.setPreservesAll();
   }
 };
 
