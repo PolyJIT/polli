@@ -44,6 +44,8 @@
 #include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
+#include <chrono>
+
 using namespace llvm;
 
 namespace polli {
@@ -158,6 +160,12 @@ public:
            * we remap it.
            */
           GV->setName(GV->getName() + "_" + TgtM->getModuleIdentifier());
+
+          using namespace std::chrono;
+          milliseconds ms = duration_cast<milliseconds>(
+              system_clock::now().time_since_epoch());
+          GV->setName(GV->getName() + "_" + fmt::format("{:d}", ms.count()) +
+                      "_" + TgtM->getModuleIdentifier());
           GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         }
 
