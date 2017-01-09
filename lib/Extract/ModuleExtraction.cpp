@@ -603,9 +603,17 @@ static SetVector<Function *> extractCandidates(Function &F,
  * @param F The Function we extract all SCoPs from.
  * @return bool
  */
+
+static const std::set<std::string> Avoid {
+  "BZ2_hbMakeCodeLengths",
+  "BZ2_hbCreateDecodeTables",
+};
+
 bool ModuleExtractor::runOnFunction(Function &F) {
   RegionInfo &RI = getAnalysis<RegionInfoPass>().getRegionInfo();
 
+  if (Avoid.count(F.getName()))
+    return false;
   if (F.isDeclaration())
     return false;
   if (F.hasFnAttribute("polyjit-jit-candidate"))
