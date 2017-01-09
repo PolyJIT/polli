@@ -1036,7 +1036,6 @@ void JITScopDetection::findScops(Region &R) {
     ValidRegions.insert(ExpandedR);
     RequiredParams[ExpandedR] = ExpandedCtx->RequiredParams;
     ++ValidRegion;
-    //    removeCachedResults(*CurrentRegion);
 
     // Erase all (direct and indirect) children of ExpandedR from the valid
     // regions and update the number of valid regions.
