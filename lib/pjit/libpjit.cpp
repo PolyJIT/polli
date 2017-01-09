@@ -448,8 +448,9 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   Context->enter(1, PAPI_get_real_usec());
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
+  llvm::Function *F = Request->F;
+
   if (!K.second) {
-    llvm::Function *F = Request->F;
     Context->UpdatePrefixMap((uint64_t)prefix, F);
     Context->addRegion(Request->F->getName().str(),
                        GetCandidateId(*Request->F));
