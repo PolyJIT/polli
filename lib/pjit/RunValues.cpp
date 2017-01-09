@@ -36,8 +36,8 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
     if (i < argc) {
       RunValue<uint64_t *> V{reinterpret_cast<uint64_t **>(params)[i], &Arg};
       if (polli::canSpecialize(V)) {
-        llvm::dbgs() << fmt::format("{:s} [{:d}] -> {} ", Arg.getName().str(),
-                                    i, *V.value);
+        s << fmt::format("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
+                         *V.value);
       }
       llvm::Type *Ty = Arg.getType();
       if (Ty->isIntegerTy())
