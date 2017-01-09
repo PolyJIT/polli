@@ -37,7 +37,7 @@ void PolyJIT::setup() {
 
 void PolyJIT::tearDown() {
   exit(0, PAPI_get_real_usec());
-  polli::StoreRun(Events, Regions);
+  polli::StoreRun(Events, Entries, Regions);
 }
 
 void PolyJIT::UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F) {

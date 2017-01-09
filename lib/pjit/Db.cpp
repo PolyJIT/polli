@@ -168,7 +168,8 @@ struct Event {
   uint64_t Time;
 };
 
-void StoreRun(const EventMapTy &Events, const RegionMapTy &Regions) {
+void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
+              const RegionMapTy &Regions) {
   Options opts = getOptions();
   DbOptions Opts = getDBOptionsFromEnv();
 
@@ -185,7 +186,7 @@ void StoreRun(const EventMapTy &Events, const RegionMapTy &Regions) {
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
   std::string NEW_RUN_RESULT_SQL = "INSERT INTO regions (name, id, "
-                                   "duration, run_id) "
+                                   "duration, events, run_id) "
                                    "VALUES";
 
   pqxx::work w(*getDatabase());
@@ -213,8 +214,9 @@ void StoreRun(const EventMapTy &Events, const RegionMapTy &Regions) {
   for (auto KV : Events) {
     if (cnt > 0)
       vals << ",";
-    vals << fmt::format(" ('{:s}', {:d}, {:d}, {:d})",
-                        Regions.at(KV.first), KV.first, KV.second, run_id);
+    vals << fmt::format(" ('{:s}', {:d}, {:d}, {:d}, {:d})",
+                        Regions.at(KV.first), KV.first, KV.second,
+                        Entries.at(KV.first), run_id);
     cnt++;
   }
   vals << ";";
