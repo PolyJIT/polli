@@ -510,6 +510,7 @@ static SetVector<Function *> extractCandidates(Function &F,
     return Functions;
   }
 
+  unsigned Cnt = 0;
   for (const Region *R : SD) {
     PrepareRegionForExtraction(R, RI, DT);
     CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
@@ -576,7 +577,8 @@ static SetVector<Function *> extractCandidates(Function &F,
           fixSuccessorPHI(BB);
         }
         ExtractedF->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
-        ExtractedF->setName(F.getName() + ".pjit.scop");
+        ExtractedF->setName(F.getName() + "_" +
+                            fmt::format("{:d}", Cnt++) + ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
         Functions.insert(ExtractedF);
