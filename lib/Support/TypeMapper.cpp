@@ -256,4 +256,4 @@ Type *TypeMapTy::get(Type *Ty, SmallPtrSet<StructType *, 8> &Visited) {
   }
   }
 }
-} //end of namespace polli
+} // end of namespace polli

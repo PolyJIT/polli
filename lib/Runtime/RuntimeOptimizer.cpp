@@ -14,8 +14,8 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "runtime_optimizer"
 #include "polli/RuntimeOptimizer.h"
-#include "polli/Utils.h"
 #include "polli/BasePointers.h"
+#include "polli/Utils.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -24,19 +24,19 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "polli/LikwidMarker.h"
+#include "polli/log.h"
 #include "polly/Canonicalization.h"
+#include "polly/CodeGen/CodeGeneration.h"
+#include "polly/CodeGen/CodegenCleanup.h"
+#include "polly/CodeGen/IslAst.h"
 #include "polly/LinkAllPasses.h"
+#include "polly/Options.h"
 #include "polly/RegisterPasses.h"
+#include "polly/ScheduleOptimizer.h"
 #include "polly/ScopDetection.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
-#include "polly/CodeGen/IslAst.h"
-#include "polly/ScheduleOptimizer.h"
-#include "polly/CodeGen/CodegenCleanup.h"
-#include "polly/CodeGen/CodeGeneration.h"
-#include "polly/Options.h"
-#include "polli/log.h"
-#include "polli/LikwidMarker.h"
 
 REGISTER_LOG(console, DEBUG_TYPE);
 
@@ -51,10 +51,9 @@ using namespace polly;
 namespace polli {
 class TileSizeLearner : public polly::ScopPass {
 private:
-
 public:
   static char ID;
-  explicit TileSizeLearner() : polly::ScopPass(ID) {};
+  explicit TileSizeLearner() : polly::ScopPass(ID){};
 
   /// @name ScopPass interface
   //@{
@@ -106,8 +105,8 @@ public:
               std::ceil((double)FirstLevelTileSize->getLimitedValue()));
 
           TaskSize = std::max(Cnt, OldCnt);
-          FirstLevelTileSize = ConstantInt::get(FirstLevelTileSize->getType(),
-                                                TaskSize);
+          FirstLevelTileSize =
+              ConstantInt::get(FirstLevelTileSize->getType(), TaskSize);
         }
       }
 
@@ -128,7 +127,7 @@ public:
     if (polly::opt::FirstLevelTileSizes.empty()) {
       polly::opt::FirstLevelTileSizes.addValue(
           FirstLevelTileSize->getLimitedValue());
-      for (unsigned i=1; i < MaxDimensions; i++) {
+      for (unsigned i = 1; i < MaxDimensions; i++) {
         polly::opt::FirstLevelTileSizes.addValue(
             std::numeric_limits<int>::max());
       }
@@ -148,7 +147,6 @@ public:
   //@}
 
 private:
-
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   TileSizeLearner(const TileSizeLearner &);
@@ -160,7 +158,7 @@ char TileSizeLearner::ID = 0;
 class PollyFnReport : public llvm::FunctionPass {
 public:
   static char ID;
-  explicit PollyFnReport() : llvm::FunctionPass(ID) {};
+  explicit PollyFnReport() : llvm::FunctionPass(ID){};
 
   /// @name FunctionPass interface
   //@{
@@ -196,7 +194,6 @@ public:
   void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
   //@}
 private:
-
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   PollyFnReport(const PollyFnReport &);
@@ -207,7 +204,7 @@ private:
 class PollyScopReport : public llvm::FunctionPass {
 public:
   static char ID;
-  explicit PollyScopReport() : llvm::FunctionPass(ID) {};
+  explicit PollyScopReport() : llvm::FunctionPass(ID){};
 
   /// @name ScopPass interface
   //@{
@@ -232,7 +229,6 @@ public:
   //@}
 
 private:
-
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   PollyScopReport(const PollyScopReport &);
@@ -243,7 +239,7 @@ private:
 class PollyReport : public polly::ScopPass {
 public:
   static char ID;
-  explicit PollyReport() : polly::ScopPass(ID) {};
+  explicit PollyReport() : polly::ScopPass(ID){};
 
   /// @name ScopPass interface
   //@{
@@ -269,7 +265,6 @@ public:
   //@}
 
 private:
-
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   PollyReport(const PollyReport &);
@@ -280,7 +275,7 @@ private:
 class PollyScheduleReport : public polly::ScopPass {
 public:
   static char ID;
-  explicit PollyScheduleReport() : polly::ScopPass(ID) {};
+  explicit PollyScheduleReport() : polly::ScopPass(ID){};
 
   /// @name ScopPass interface
   //@{
@@ -307,7 +302,6 @@ public:
   //@}
 
 private:
-
   //===--------------------------------------------------------------------===//
   // DO NOT IMPLEMENT
   PollyScheduleReport(const PollyReport &);
@@ -383,7 +377,7 @@ Function &OptimizeForRuntime(Function &F) {
   PM.add(polli::createBasePointersPass());
 #endif
 
-  //PM.add(polli::createOpenMPTracerPass());
+// PM.add(polli::createOpenMPTracerPass());
 
 #ifdef POLLI_ENABLE_PAPI
   if (opt::havePapi())

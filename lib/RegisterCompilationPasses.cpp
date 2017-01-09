@@ -12,16 +12,16 @@
 // Register the compilation sequence required for the PolyJIT runtime support.
 //
 //===----------------------------------------------------------------------===//
+#include "polli/RegisterCompilationPasses.h"
 #include "polli/InstrumentRegions.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Options.h"
 #include "polli/PapiProfiling.h"
-#include "polli/RegisterCompilationPasses.h"
 #include "polli/log.h"
 
 #include "polly/Canonicalization.h"
-#include "polly/RegisterPasses.h"
 #include "polly/CodeGen/CodegenCleanup.h"
+#include "polly/RegisterPasses.h"
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/Transforms/IPO.h"
@@ -34,7 +34,7 @@ using namespace llvm;
 using namespace polli;
 
 namespace {
-  REGISTER_LOG(console, "register");
+REGISTER_LOG(console, "register");
 }
 
 namespace polli {
@@ -49,8 +49,7 @@ struct InjectMain : public FunctionPass {
   std::string PassName;
   static char ID;
 
-  InjectMain()
-      : FunctionPass(ID), PassName("PolyJIT - Main Injector") {}
+  InjectMain() : FunctionPass(ID), PassName("PolyJIT - Main Injector") {}
 
   bool runOnFunction(Function &F) override {
     bool IsMain = F.getName() == "main";

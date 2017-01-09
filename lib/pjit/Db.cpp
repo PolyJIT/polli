@@ -3,12 +3,12 @@
 #include <pqxx/pqxx>
 
 #include <ctime>
+#include <iostream>
+#include <numeric>
 #include <set>
 #include <stdlib.h>
 #include <string>
 #include <thread>
-#include <numeric>
-#include <iostream>
 
 using namespace pqxx;
 
@@ -62,7 +62,7 @@ class DBConnection {
 
   void connect() {
     std::string CONNECTION_FMT_STR =
-      "user={} port={} host={} dbname={} password={}";
+        "user={} port={} host={} dbname={} password={}";
     DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
         fmt::format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host,
@@ -73,13 +73,13 @@ class DBConnection {
       std::string SELECT_RUN =
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
-      std::string SELECT_SIMPLE_RUN =
-          "SELECT id,type,start,duration,name,tid FROM benchbuild_events WHERE run_id=$1 ORDER BY "
-          "start;";
+      std::string SELECT_SIMPLE_RUN = "SELECT id,type,start,duration,name,tid "
+                                      "FROM benchbuild_events WHERE run_id=$1 "
+                                      "ORDER BY "
+                                      "start;";
       std::string DELETE_SIMPLE_RUN =
           "DELETE FROM benchbuild_events WHERE run_id=$1";
-      std::string SELECT_RUN_IDs =
-          "SELECT id FROM run WHERE run_group = $1;";
+      std::string SELECT_RUN_IDs = "SELECT id FROM run WHERE run_group = $1;";
       std::string SELECT_RUN_GROUPS =
           "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
 
@@ -114,7 +114,7 @@ public:
   }
 };
 
-static DBConnection& getDatabase() {
+static DBConnection &getDatabase() {
   static DBConnection DB;
   return DB;
 }

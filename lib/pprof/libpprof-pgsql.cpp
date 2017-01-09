@@ -4,11 +4,11 @@
 #include <pqxx/pqxx>
 
 #include <ctime>
+#include <numeric>
 #include <set>
 #include <stdlib.h>
 #include <string>
 #include <thread>
-#include <numeric>
 
 using namespace pqxx;
 
@@ -53,7 +53,7 @@ class DBConnection {
 
   void connect() {
     std::string CONNECTION_FMT_STR =
-      "user={} port={} host={} dbname={} password={}";
+        "user={} port={} host={} dbname={} password={}";
     DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
         fmt::format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host,
@@ -64,13 +64,13 @@ class DBConnection {
       std::string SELECT_RUN =
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
-      std::string SELECT_SIMPLE_RUN =
-          "SELECT id,type,start,duration,name,tid FROM benchbuild_events WHERE run_id=$1 ORDER BY "
-          "start;";
+      std::string SELECT_SIMPLE_RUN = "SELECT id,type,start,duration,name,tid "
+                                      "FROM benchbuild_events WHERE run_id=$1 "
+                                      "ORDER BY "
+                                      "start;";
       std::string DELETE_SIMPLE_RUN =
           "DELETE FROM benchbuild_events WHERE run_id=$1";
-      std::string SELECT_RUN_IDs =
-          "SELECT id FROM run WHERE run_group = $1;";
+      std::string SELECT_RUN_IDs = "SELECT id FROM run WHERE run_group = $1;";
       std::string SELECT_RUN_GROUPS =
           "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
 
@@ -105,7 +105,7 @@ public:
   }
 };
 
-static DBConnection& getDatabase() {
+static DBConnection &getDatabase() {
   static DBConnection DB;
   return DB;
 }
@@ -149,8 +149,8 @@ static Run<Event> AggregateGroupedRun(const Run<EventGroup> &GroupedEvents) {
     Event Result = std::accumulate(
         (Group.Events.begin()++), Group.Events.end(), Init,
         [](const Event &LHS, const Event &RHS) -> Event {
-          return {LHS.ID, LHS.Type, LHS.Start, LHS.Duration + RHS.Duration,
-                   LHS.Name, LHS.TID};
+          return {LHS.ID,   LHS.Type, LHS.Start, LHS.Duration + RHS.Duration,
+                  LHS.Name, LHS.TID};
         });
     NewRun.push_back(Result);
   }
@@ -164,7 +164,7 @@ static Run<EventGroup> GetGroupedRun(const Run<Event> &Events) {
   for (auto &Ev : Events) {
     int32_t id = Ev.ID;
     if (!Buckets.count(id))
-        Buckets[id] = {id, {}};
+      Buckets[id] = {id, {}};
     Buckets[id].Events.emplace_back(Ev);
   }
 
@@ -188,8 +188,7 @@ static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
     case RegionEnter:
       PPEvent &S = *I;
       PPEvent &E = *getMatchingExit(I, IE);
-      const pprof::Event Ev =
-          pprof::simplify(S, E, Start->timestamp());
+      const pprof::Event Ev = pprof::simplify(S, E, Start->timestamp());
       SRun.push_back(Ev);
       break;
     }
@@ -260,7 +259,8 @@ void StoreRun(const uint64_t tid, Run<PPEvent> &Events,
   size_t i;
   for (i = 0; i < SimpleEvents.size(); i += n) {
     std::stringstream vals;
-    for (size_t j = i; j < std::min(SimpleEvents.size(), (size_t)(n + i)); j++) {
+    for (size_t j = i; j < std::min(SimpleEvents.size(), (size_t)(n + i));
+         j++) {
       pprof::Event &Ev = SimpleEvents[j];
       Ev.TID = tid;
 
@@ -291,7 +291,7 @@ Run<pprof::Event> ReadSimpleRun(uint32_t run_id) {
 
   Events.ID = run_id;
   for (auto elem : r) {
-    //id, start, duration, name
+    // id, start, duration, name
     int32_t ev_id = elem[0].as<int32_t>();
     uint16_t ev_ty = elem[1].as<uint16_t>();
     uint64_t ev_start = elem[2].as<uint64_t>();

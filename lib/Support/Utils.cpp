@@ -15,9 +15,9 @@
 #include "llvm/Analysis/PostDominators.h"
 
 #include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/Verifier.h"          // for createVerifierPass
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/Verifier.h" // for createVerifierPass
 
 using namespace llvm;
 using namespace llvm::legacy;
@@ -95,4 +95,3 @@ void removeFunctionFromDomTree(Function *F, DominatorTree &DT) {
     DT.eraseNode(BB);
 }
 }
-

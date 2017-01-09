@@ -1,8 +1,8 @@
 #include "polli/FuncTools.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/IR/Instruction.h"
-#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -75,4 +75,3 @@ void constantExprToInstruction(Instruction &I, InstrList &Converted,
   }
 }
 }
-

@@ -21,7 +21,7 @@
 #include "llvm/Support/Debug.h"
 
 namespace {
-  REGISTER_LOG(console, DEBUG_TYPE);
+REGISTER_LOG(console, DEBUG_TYPE);
 }
 
 namespace polli {
@@ -380,12 +380,12 @@ ModulePass *createOpenMPTracerPass() { return new OpenMPTracer(); }
 } // namespace polli
 
 extern "C" {
-  void pjit_trace_openmp_entry(uint64_t Id, const char *Name) {
-    console->error("Enter OpenMP {:d} - {:s}", Id, Name);
-  }
-  void pjit_trace_openmp_exit(uint64_t Id, const char *Name) {
-    console->error("Exit OpenMP {:d} - {:s}", Id, Name);
-  }
+void pjit_trace_openmp_entry(uint64_t Id, const char *Name) {
+  console->error("Enter OpenMP {:d} - {:s}", Id, Name);
+}
+void pjit_trace_openmp_exit(uint64_t Id, const char *Name) {
+  console->error("Exit OpenMP {:d} - {:s}", Id, Name);
+}
 }
 
 static RegisterPass<LikwidMarker>
@@ -393,8 +393,8 @@ static RegisterPass<LikwidMarker>
       false, false);
 
 static RegisterPass<TraceMarker>
-    Y("polli-trace", "PolyJIT - Mark parallel regions with trace calls.",
-      false, false);
+    Y("polli-trace", "PolyJIT - Mark parallel regions with trace calls.", false,
+      false);
 
 static RegisterPass<OpenMPTracer>
     Z("polli-trace-openmp", "PolyJIT - Trace openmp functions with polli.",

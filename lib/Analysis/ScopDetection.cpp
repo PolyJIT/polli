@@ -27,7 +27,7 @@ using namespace polli;
 #define DEBUG_TYPE "polyjit"
 
 namespace {
-  REGISTER_LOG(console, DEBUG_TYPE);
+REGISTER_LOG(console, DEBUG_TYPE);
 }
 
 namespace polli {
@@ -83,7 +83,6 @@ static cl::opt<bool>
                     cl::Hidden, cl::init(false), cl::ZeroOrMore,
                     cl::cat(PollyCategory));
 
-
 static cl::opt<bool, true>
     TrackFailures("polli-detect-track-failures",
                   cl::desc("Track failure strings in detecting scop regions"),
@@ -109,8 +108,7 @@ static const unsigned MIN_LOOP_TRIP_COUNT = 8;
 
 STATISTIC(ValidRegion,
           "Number of regions that are a valid Scop at compile time.");
-STATISTIC(JitRegion,
-          "Number of jitable SCoPs");
+STATISTIC(JitRegion, "Number of jitable SCoPs");
 
 namespace polli {
 class DiagnosticScopFound : public DiagnosticInfo {
@@ -189,8 +187,8 @@ bool JITScopDetection::isMaxRegionInScop(const Region &R, bool Verify) const {
   if (Verify) {
     DetectionContextMap.erase(polly::getBBPairForRegion(&R));
     const auto &It = DetectionContextMap.insert(std::make_pair(
-      polly::getBBPairForRegion(&R),
-      DetectionContext(const_cast<Region &>(R), *AA, false /*verifying*/)));
+        polly::getBBPairForRegion(&R),
+        DetectionContext(const_cast<Region &>(R), *AA, false /*verifying*/)));
     DetectionContext &Context = It.first->second;
     return isValidRegion(Context);
   }
@@ -264,8 +262,8 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
       Context.RequiredParams.push_back(P);
     Context.requiresJIT = true;
   } else {
-    for (auto P : polly::getParamsInAffineExpr(&Context.CurRegion, Scope, S,
-                                               *SE))
+    for (auto P :
+         polly::getParamsInAffineExpr(&Context.CurRegion, Scope, S, *SE))
       Context.RequiredParams.push_back(P);
   }
 
@@ -322,7 +320,8 @@ bool JITScopDetection::isValidBranch(BasicBlock &BB, BranchInst *BI,
   // Are both operands of the ICmp affine?
   if (isa<UndefValue>(ICmp->getOperand(0)) ||
       isa<UndefValue>(ICmp->getOperand(1)))
-    return invalid<polly::ReportUndefOperand>(Context, /*Assert=*/true, &BB, ICmp);
+    return invalid<polly::ReportUndefOperand>(Context, /*Assert=*/true, &BB,
+                                              ICmp);
 
   Loop *L = LI->getLoopFor(ICmp->getParent());
   const SCEV *LHS = SE->getSCEVAtScope(ICmp->getOperand(0), L);
@@ -1034,7 +1033,7 @@ void JITScopDetection::findScops(Region &R) {
     ValidRegions.insert(ExpandedR);
     RequiredParams[ExpandedR] = ExpandedCtx->RequiredParams;
     ++ValidRegion;
-//    removeCachedResults(*CurrentRegion);
+    //    removeCachedResults(*CurrentRegion);
 
     // Erase all (direct and indirect) children of ExpandedR from the valid
     // regions and update the number of valid regions.
@@ -1110,7 +1109,7 @@ bool JITScopDetection::hasPossiblyDistributableLoop(
 bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
-  //if (PollyProcessUnprofitable)
+  // if (PollyProcessUnprofitable)
   //  return true;
 
   // We can probably not do a lot on scops that only write or only read
@@ -1132,7 +1131,7 @@ bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   // per-iteration are performance-wise very fragile as any change to the
   // loop induction variables may affect performance. To not cause spurious
   // performance regressions, we do not consider such loops.
-  //if (NumAffineLoops == 1 && hasSufficientCompute(Context, NumLoops))
+  // if (NumAffineLoops == 1 && hasSufficientCompute(Context, NumLoops))
   //  return true;
 
   return invalid<polly::ReportUnprofitable>(Context, /*Assert=*/true,
@@ -1338,7 +1337,8 @@ JITScopDetection::getDetectionContext(const Region *R) const {
   return &DCMIt->second;
 }
 
-const polly::RejectLog *JITScopDetection::lookupRejectionLog(const Region *R) const {
+const polly::RejectLog *
+JITScopDetection::lookupRejectionLog(const Region *R) const {
   const DetectionContext *DC = getDetectionContext(R);
   return DC ? &DC->Log : nullptr;
 }
@@ -1381,7 +1381,7 @@ void JITScopDetection::print(raw_ostream &OS, const Module *) const {
       continue;
     const ParamVec &L = RequiredParams.at(R);
     OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
-                           R->getNameStr(), L.size());
+                                R->getNameStr(), L.size());
     unsigned j = 0;
     for (const SCEV *S : L) {
       OS.indent(4) << fmt::format("{:d} - ", j);

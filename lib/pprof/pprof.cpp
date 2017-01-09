@@ -1,9 +1,9 @@
 #include "pprof/pprof.h"
 
 #include <fstream>
-#include <sstream>
 #include <iostream>
 #include <memory>
+#include <sstream>
 
 #include <assert.h>
 #include <stdlib.h>
@@ -38,7 +38,6 @@ Options getPprofOptionsFromEnv() {
   return Opts;
 }
 
-
 /**
  * @brief Combines 2 profiling events into one.
  *
@@ -65,25 +64,25 @@ getMatchingExit(Run<PPEvent>::iterator It, const Run<PPEvent>::iterator &End) {
   while (It != End) {
     PPEventType T = It->event();
     if (It->id() == Cur->id()) {
-      switch(Cur->event()) {
-        case RegionEnter:
-          if (T == RegionExit) {
-            return It;
-          }
-          break;
-        case ScopEnter:
-          if (T == ScopExit) {
-            return It;
-          }
-          break;
-        default:
-          break;
+      switch (Cur->event()) {
+      case RegionEnter:
+        if (T == RegionExit) {
+          return It;
+        }
+        break;
+      case ScopEnter:
+        if (T == ScopExit) {
+          return It;
+        }
+        break;
+      default:
+        break;
       }
     }
     ++It;
   }
 
-  //FIXME: Record an error event, this should not happen.
+  // FIXME: Record an error event, this should not happen.
   static_assert("BUG: No matching Exit to this Entry", "");
   return Cur;
 }

@@ -3,9 +3,9 @@
 #include "polli/FunctionCloner.h"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/RuntimeValues.h"
+#include "polli/Stats.h"
 #include "polli/Utils.h"
 #include "polli/VariantFunction.h"
-#include "polli/Stats.h"
 #include "polli/log.h"
 
 #include "llvm/IR/Constants.h"
@@ -89,7 +89,6 @@ struct MainCreator {
     Function::arg_iterator TgtArg = TgtF->arg_begin();
     Argument &ArgV = *++TgtArg;
 
-
     ArgV.setName("argv");
 
     // Unpack params. Allocate space on the stack and store the pointers.
@@ -99,11 +98,14 @@ struct MainCreator {
       Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), i++);
 
       Type *ArgTy = Arg.getType();
-      std::string SlotName = fmt::format("polyjit.slot.{:d}_{:s}", i-1, Arg.getName().str());
-      std::string IdxName = fmt::format("polyjit.idx.{:d}_{:s}", i-1, Arg.getName().str());
+      std::string SlotName =
+          fmt::format("polyjit.slot.{:d}_{:s}", i - 1, Arg.getName().str());
+      std::string IdxName =
+          fmt::format("polyjit.idx.{:d}_{:s}", i - 1, Arg.getName().str());
       if (!ArgTy->isPointerTy()) {
         Value *ArrIdx = Builder.CreateInBoundsGEP(&ArgV, {IdxI});
-        Value *CastVal = Builder.CreateBitCast(ArrIdx, ArgTy->getPointerTo()->getPointerTo());
+        Value *CastVal = Builder.CreateBitCast(
+            ArrIdx, ArgTy->getPointerTo()->getPointerTo());
         Value *LoadSlot = Builder.CreateLoad(CastVal, SlotName);
         Value *LoadVal = Builder.CreateLoad(LoadSlot, IdxName);
         VMap[&Arg] = LoadVal;
@@ -307,7 +309,7 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
 
     if (!BaseF.hasFnAttribute("polyjit-id"))
       console->critical("{:s} has no polyjit-id. Tracking will not work.",
-                  BaseF.getName().str());
+                        BaseF.getName().str());
     Function *NewF = Specializer.start(true);
     F = &OptimizeForRuntime(*NewF);
     F->addFnAttr("polyjit-id",

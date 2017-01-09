@@ -1,9 +1,9 @@
 #include "polli/Stats.h"
 #include "polli/log.h"
 
+#include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/TypeBuilder.h"
-#include "llvm/IR/Function.h"
 
 #include "polli/Jit.h"
 #include "pprof/pprof.h"
@@ -31,8 +31,9 @@ public:
     LAST_RUNTIME,
     JUMP_INTO_JIT,
     REGION_ENTER,
-    REGION_EXIT };
+    REGION_EXIT
   };
+};
 } // namespace llvm
 
 namespace polli {
@@ -50,8 +51,7 @@ uint64_t GetCandidateId(const Function &F) {
   uint64_t n = 0;
   std::string name_tag = "polyjit-id";
   if (F.hasFnAttribute(name_tag))
-    if (!(std::stringstream(
-              F.getFnAttribute(name_tag).getValueAsString()) >>
+    if (!(std::stringstream(F.getFnAttribute(name_tag).getValueAsString()) >>
           n))
       n = 0;
 

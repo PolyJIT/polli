@@ -1,25 +1,25 @@
-#include "polli/FunctionCloner.h"
-#include "polli/ScopDetection.h"
-#include "polli/ModuleExtractor.h"
 #include "polli/FuncTools.h"
-#include "polli/Schema.h"
-#include "polli/Stats.h"
-#include "polli/log.h"
+#include "polli/FunctionCloner.h"
+#include "polli/ModuleExtractor.h"
 #include "polli/Options.h"
+#include "polli/Schema.h"
+#include "polli/ScopDetection.h"
+#include "polli/Stats.h"
 #include "polli/Utils.h"
+#include "polli/log.h"
 
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Bitcode/BitcodeWriterPass.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
+#include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
-#include "llvm/Transforms/Utils/CodeExtractor.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/CodeExtractor.h"
 
 using namespace llvm;
 #define DEBUG_TYPE "polyjit"
@@ -256,7 +256,7 @@ struct InstrumentEndpoint {
 
     // Just hand the args from the function down to the source function.
     SmallVector<Value *, 3> ToArgs;
-    for (auto &Arg: To->args()) {
+    for (auto &Arg : To->args()) {
       ToArgs.push_back(&Arg);
     }
 
@@ -305,7 +305,7 @@ static void clearFunctionLocalMetadata(Function *F) {
   }
 
   for (auto *I : DeleteInsts) {
-      I->removeFromParent();
+    I->removeFromParent();
   }
 }
 
@@ -322,9 +322,7 @@ struct SCEVParamValueExtractor
     return SPVE.ParamValues;
   }
 
-  const SCEV *visitConstant(const SCEVConstant *S) {
-    return S;
-  }
+  const SCEV *visitConstant(const SCEVConstant *S) { return S; }
 
   const SCEV *visitTruncateExpr(const SCEVTruncateExpr *S) {
     visit(S->getOperand());
@@ -427,7 +425,6 @@ static bool hasDuplicatePredsInPHI(Function &F) {
   return false;
 }
 
-
 static void fixSuccessorPHI(BasicBlock *BB) {
   if (!BB)
     return;
@@ -439,9 +436,9 @@ static void fixSuccessorPHI(BasicBlock *BB) {
         SetVector<BasicBlock *> IncomingEdges;
         SmallVector<int, 2> MarkedIndices;
         for (unsigned i = 0; i < n; i++) {
-          BasicBlock *Pred = PHI->getIncomingBlock(n-(i+1));
+          BasicBlock *Pred = PHI->getIncomingBlock(n - (i + 1));
           if (!IncomingEdges.insert(Pred))
-            MarkedIndices.push_back(n-(i+1));
+            MarkedIndices.push_back(n - (i + 1));
         }
         for (int j : MarkedIndices) {
           PHI->removeIncomingValue(j);
@@ -451,12 +448,13 @@ static void fixSuccessorPHI(BasicBlock *BB) {
   }
 }
 
-static void PrepareRegionForExtraction(const Region *R, RegionInfo &RI, DominatorTree &DT) {
+static void PrepareRegionForExtraction(const Region *R, RegionInfo &RI,
+                                       DominatorTree &DT) {
   // This region lacks a single-exit edge.
   if (!R->getExitingBlock()) {
     BasicBlock *Exit = R->getExit();
     SmallVector<BasicBlock *, 4> ExitPreds;
-    for (auto *PredBB: predecessors(Exit)) {
+    for (auto *PredBB : predecessors(Exit)) {
       if (R->contains(PredBB))
         ExitPreds.push_back(PredBB);
     }
@@ -496,11 +494,9 @@ static void printOperands(Value *V, raw_ostream &os, int level = 0) {
  * @brief Extract all regions marked for extraction into an own function and
  * mark it * as 'polyjit-jit-candidate'.
  */
-static SetVector<Function *> extractCandidates(Function &F,
-                                               JITScopDetection &SD,
-                                               ScalarEvolution &SE,
-                                               DominatorTree &DT,
-                                               RegionInfo &RI) {
+static SetVector<Function *>
+extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
+                  DominatorTree &DT, RegionInfo &RI) {
   SetVector<Function *> Functions;
   std::set<Value *> TrackedParams;
   LLVMContext &Ctx = F.getContext();
@@ -578,8 +574,8 @@ static SetVector<Function *> extractCandidates(Function &F,
           fixSuccessorPHI(BB);
         }
         ExtractedF->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
-        ExtractedF->setName(F.getName() + "_" +
-                            fmt::format("{:d}", Cnt++) + ".pjit.scop");
+        ExtractedF->setName(F.getName() + "_" + fmt::format("{:d}", Cnt++) +
+                            ".pjit.scop");
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
         Functions.insert(ExtractedF);
@@ -607,9 +603,8 @@ static SetVector<Function *> extractCandidates(Function &F,
  * @return bool
  */
 
-static const std::set<std::string> Avoid {
-  "BZ2_hbMakeCodeLengths",
-  "BZ2_hbCreateDecodeTables",
+static const std::set<std::string> Avoid{
+    "BZ2_hbMakeCodeLengths", "BZ2_hbCreateDecodeTables",
 };
 
 bool ModuleExtractor::runOnFunction(Function &F) {

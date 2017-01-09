@@ -4,26 +4,26 @@
 #include "polli/AliasCheckCodeGen.h"
 #include "polli/Utils.h"
 
+#include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
 #include "llvm/PassSupport.h"
-#include "llvm/IR/Instructions.h"
 
 #include "polly/ScopDetection.h"
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
 
-#include "isl/Format.h"
 #include "isl/DimType.h"
+#include "isl/Format.h"
 
-#include "isl/Set.hpp"
 #include "isl/Map.hpp"
 #include "isl/PwAff.hpp"
+#include "isl/Set.hpp"
 
-#include "isl/Printer.hpp"
-#include "isl/AstExpr.hpp"
 #include "isl/AstBuild.hpp"
+#include "isl/AstExpr.hpp"
 #include "isl/Id.hpp"
+#include "isl/Printer.hpp"
 #include "isl/Space.hpp"
 
 using namespace llvm;
@@ -32,8 +32,8 @@ using namespace polly;
 
 char AliasCheckGenerator::ID = 0;
 static RegisterPass<AliasCheckGenerator>
-AliasCheckGenPass("polli-codegen-aliascheck",
-                  "Polli - Create run-time alias checks");
+    AliasCheckGenPass("polli-codegen-aliascheck",
+                      "Polli - Create run-time alias checks");
 
 AliasCheckGenerator::AliasCheckGenerator()
     : ScopPass(ID), ScopDetectionExtension() {}

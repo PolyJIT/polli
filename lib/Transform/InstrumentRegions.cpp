@@ -18,11 +18,9 @@
 // regions before we perform any instrumentation.
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include <stddef.h>
-#include <stdint.h>
-#include <set>
-#include <string>
-#include <vector>
+#include "polli/InstrumentRegions.h"
+#include "papi.h"
+#include "polli/ScopDetection.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/ilist.h"
@@ -42,16 +40,22 @@
 #include "llvm/IR/Type.h"
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "polli/InstrumentRegions.h"
-#include "polli/ScopDetection.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "papi.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include <set>
+#include <stddef.h>
+#include <stdint.h>
+#include <string>
+#include <vector>
 
-namespace llvm { class LLVMContext; }  // lines 49-49
-namespace llvm { class Value; }  // lines 50-50
+namespace llvm {
+class LLVMContext;
+} // lines 49-49
+namespace llvm {
+class Value;
+} // lines 50-50
 
 using namespace llvm;
 using namespace polli;
@@ -69,8 +73,8 @@ STATISTIC(MoreExits, "Number of regions with more than one exit edge");
  * @param id ID we pass to the library to identify the event again.
  * @param dbgStr a free debug string that gets passed into libpprof.
  */
-static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M, uint64_t id,
-                                std::string dbgStr = "") {
+static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M,
+                                uint64_t id, std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
@@ -93,8 +97,8 @@ static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M, uint64_t i
  * @param id ID we pass to the library to identify the event again.
  * @param dbgStr a free debug string that gets passed into libpprof.
  */
-static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M, uint64_t id,
-                               std::string dbgStr = "") {
+static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M,
+                               uint64_t id, std::string dbgStr = "") {
   LLVMContext &Context = M->getContext();
   IRBuilder<> Builder(Context);
   std::vector<Value *> Args(2);
@@ -124,9 +128,8 @@ void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
       M->getOrInsertFunction("papi_region_enter", Builder.getVoidTy(),
                              Type::getInt64Ty(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
-  Builder.CreateCall(
-      PapiScopEnterFn,
-      ConstantInt::get(Type::getInt64Ty(Context), id, false));
+  Builder.CreateCall(PapiScopEnterFn,
+                     ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
 /**
@@ -143,9 +146,8 @@ void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
   Constant *PapiScopEnterFn = M->getOrInsertFunction(
       "papi_region_exit", Builder.getVoidTy(), Type::getInt64Ty(Context), NULL);
   Builder.SetInsertPoint(InsertBefore);
-  Builder.CreateCall(
-      PapiScopEnterFn,
-      ConstantInt::get(Type::getInt64Ty(Context), id, false));
+  Builder.CreateCall(PapiScopEnterFn,
+                     ConstantInt::get(Type::getInt64Ty(Context), id, false));
 }
 
 /**
@@ -182,9 +184,9 @@ static void InsertProfilingInitCall(Function *MainFn) {
     ++InsertPos;
 
   Type *ArgVTy = PointerType::getUnqual(Type::getInt8PtrTy(Context));
-  Constant *PapiSetup =
-      M.getOrInsertFunction("papi_region_setup", Type::getVoidTy(Context),
-                            IntegerType::getInt32Ty(Context), ArgVTy, (Type *)nullptr);
+  Constant *PapiSetup = M.getOrInsertFunction(
+      "papi_region_setup", Type::getVoidTy(Context),
+      IntegerType::getInt32Ty(Context), ArgVTy, (Type *)nullptr);
 
   std::vector<Value *> Args(2);
   Args[0] = Constant::getNullValue(Type::getInt32Ty(Context));
@@ -215,9 +217,9 @@ static void InsertProfilingInitCall(Function *MainFn) {
     if (!AI->getType()->isIntegerTy(32)) {
       Instruction::CastOps opcode =
           CastInst::getCastOpcode(&*AI, true, Type::getInt32Ty(Context), true);
-      InitCall->setArgOperand(
-          0, CastInst::Create(opcode, &*AI, Type::getInt32Ty(Context),
-                              "argc.cast", InitCall));
+      InitCall->setArgOperand(0, CastInst::Create(opcode, &*AI,
+                                                  Type::getInt32Ty(Context),
+                                                  "argc.cast", InitCall));
     } else
       InitCall->setArgOperand(0, &*AI);
   case 0:
@@ -260,7 +262,7 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
   SD = &getAnalysis<polli::JITScopDetection>();
   RI = &getAnalysis<RegionInfoPass>();
 
-  for (const auto & elem : *SD) {
+  for (const auto &elem : *SD) {
     if (processRegion(elem))
       ++InstrumentedRegions;
   }
@@ -309,19 +311,17 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
   }
 
   if (EntrySplits.size() > 1) {
-    DEBUG(dbgs() << "Entries: ";
-    for (auto &Entry : EntrySplits) {
+    DEBUG(dbgs() << "Entries: "; for (auto &Entry
+                                      : EntrySplits) {
       dbgs() << Entry->getName().str() << " ; ";
-    }
-    dbgs() << "\n");
+    } dbgs() << "\n");
     ++MoreEntries;
   }
   if (ExitSplits.size() > 1) {
-    DEBUG(dbgs() << "Exits: ";
-    for (auto &Exit : ExitSplits) {
+    DEBUG(dbgs() << "Exits: "; for (auto &Exit
+                                    : ExitSplits) {
       dbgs() << Exit->getName().str() << " ; ";
-    }
-    dbgs() << "\n");
+    } dbgs() << "\n");
     ++MoreExits;
   }
   /* Use the curent Region-Exit, we will chose an appropriate place
@@ -389,10 +389,10 @@ char PapiCScopProfilingInit::ID = 0;
 INITIALIZE_PASS_BEGIN(PapiCScopProfilingInit, "pprof-init",
                       "PAPI CScop Profiling (Initialization)", false, false);
 INITIALIZE_PASS_END(PapiCScopProfilingInit, "pprof-init",
-                      "PAPI CScop Profiling (Initialization)", false, false)
+                    "PAPI CScop Profiling (Initialization)", false, false)
 
 INITIALIZE_PASS_BEGIN(PapiCScopProfiling, "pprof-caddy", "PAPI CScop Profiling",
                       false, false);
 INITIALIZE_PASS_DEPENDENCY(JITScopDetection);
-INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy",
-                      "PAPI CScop Profiling", false, false)
+INITIALIZE_PASS_END(PapiCScopProfiling, "pprof-caddy", "PAPI CScop Profiling",
+                    false, false)

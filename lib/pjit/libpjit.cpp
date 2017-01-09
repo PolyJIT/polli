@@ -15,28 +15,28 @@
 //===----------------------------------------------------------------------===//
 #include <likwid.h>
 
-#include <stdlib.h>
-#include <cstdlib>
 #include <atomic>
-#include <vector>
 #include <condition_variable>
+#include <cstdlib>
 #include <deque>
 #include <memory>
+#include <stdlib.h>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/ADT/APInt.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
-#include "llvm/IR/Mangler.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/TargetSelect.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
-#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
+#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/IR/Mangler.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
 
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/LinkAllPasses.h"
@@ -45,16 +45,16 @@
 #include "polli/Caching.h"
 #include "polli/Jit.h"
 #include "polli/Options.h"
-#include "polli/RuntimeValues.h"
-#include "polli/RuntimeOptimizer.h"
+#include "polli/Options.h"
 #include "polli/RunValues.h"
+#include "polli/RuntimeOptimizer.h"
+#include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
 #include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
+#include "polli/log.h"
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
-#include "polli/log.h"
-#include "polli/Options.h"
 
 #include <dlfcn.h>
 
@@ -100,7 +100,6 @@ static inline void set_options_from_environment() {
 }
 
 } // end of anonymous namespace
-
 
 namespace polli {
 /// @brief Simple compile functor: Takes a single IR module and returns an
@@ -204,7 +203,7 @@ public:
       } else {
         std::string FileName = Err.getFilename().str();
         console->critical("{:s}:{:d}:{:d} {:s}", FileName, Err.getLineNo(),
-                        Err.getColumnNo(), Err.getMessage().str());
+                          Err.getColumnNo(), Err.getMessage().str());
         console->critical("{0}", prototype);
       }
 
@@ -223,10 +222,10 @@ public:
       return CompiledModules[M.get()];
 
     DEBUG({
-    std::string buf;
-    raw_string_ostream os(buf);
-    M->print(os, nullptr);
-    console->error(os.str());
+      std::string buf;
+      raw_string_ostream os(buf);
+      M->print(os, nullptr);
+      console->error(os.str());
     });
     for (GlobalValue &GV : M->globals()) {
       std::lock_guard<std::mutex> Lock(DLMutex);
@@ -244,12 +243,11 @@ public:
             return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
           return RuntimeDyld::SymbolInfo(nullptr);
         },
-        [] (const std::string &S) {
+        [](const std::string &S) {
           if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
             return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
           return RuntimeDyld::SymbolInfo(nullptr);
-        }
-    );
+        });
 
     std::vector<std::unique_ptr<Module>> MS;
     MS.push_back(std::move(M));
@@ -261,9 +259,7 @@ public:
     return MH;
   }
 
-  void removeModule(ModuleHandleT H) {
-    CompileLayer.removeModuleSet(H);
-  }
+  void removeModule(ModuleHandleT H) { CompileLayer.removeModuleSet(H); }
 
   orc::JITSymbol findSymbol(const std::string &Name) {
     std::string MangledName;
@@ -298,7 +294,8 @@ static PolyJITEngine &getOrCreateEngine() {
 }
 
 static inline Function &getPrototype(const char *function, bool &cache_hit) {
-  POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
+  POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE,
+                             "polyjit.prototype.get");
   Module &M = getOrCreateEngine().getModule(function, cache_hit);
   Function &F = getFunction(M);
   POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
@@ -348,7 +345,8 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   Context->enter(2, 0);
   Context->exit(2, 1);
 
-  SPDLOG_DEBUG("libpjit", "{:s}: Create new Variant.", Request->F->getName().str());
+  SPDLOG_DEBUG("libpjit", "{:s}: Create new Variant.",
+               Request->F->getName().str());
   SPDLOG_DEBUG("libpjit", "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
@@ -412,9 +410,7 @@ public:
 
   ~StaticInitializer() {}
 };
-
 }
-
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
@@ -512,4 +508,3 @@ void pjit_library_init() {
 }
 } /* extern "C" */
 } /* polli */
-

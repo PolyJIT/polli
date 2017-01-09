@@ -17,8 +17,8 @@
 #include "polli/BasePointers.h"
 #include "polli/log.h"
 
-#include "polly/Support/SCEVAffinator.h"
 #include "polly/ScopInfo.h"
+#include "polly/Support/SCEVAffinator.h"
 
 #include "llvm/IR/Dominators.h"
 
@@ -56,7 +56,8 @@ public:
 
   void print(raw_ostream &OS, unsigned indent = 0) const {
     (OS << "\n").indent(indent) << "SubExpr: {";
-    (OS << "\n").indent(indent + 2) << "V: "; V->print(OS);
+    (OS << "\n").indent(indent + 2) << "V: ";
+    V->print(OS);
     (OS << "\n").indent(indent + 2) << "A: " << AccessRelation.toStr();
     for (auto &Op : Operands) {
       Op->print(OS, indent + 2);
@@ -83,12 +84,10 @@ struct InstructionStmt {
 
   void print(raw_ostream &OS, unsigned indent = 0) {
     (OS << "\n").indent(indent) << "Inst: ";
-    (OS << "\n").indent(indent)
-        << fmt::format("{:s}\n", Schedule.toStr());
+    (OS << "\n").indent(indent) << fmt::format("{:s}\n", Schedule.toStr());
     SubEx->print(OS);
   }
 };
-
 
 struct InstructionScop {
   Ctx C;
@@ -102,9 +101,7 @@ struct InstructionScop {
       : C(Ctx(Parent.getIslCtx())), Parent(Parent), Schedule(), LI(LI), SE(SE) {
     buildScop();
   }
-  ~InstructionScop() {
-    C.Give();
-  }
+  ~InstructionScop() { C.Give(); }
 
   void print(raw_ostream &OS, unsigned indent = 0) {
     OS.indent(indent) << "Schedule {\n";
@@ -116,6 +113,7 @@ struct InstructionScop {
     }
     OS << "\n}\n";
   }
+
 private:
   using ValueToSubExprMap = std::map<Value *, SubExprPtr>;
 
@@ -132,7 +130,7 @@ private:
     if (isa<LoadInst>(V) || isa<StoreInst>(V)) {
       Instruction *I = dyn_cast<Instruction>(V);
       if (MemoryAccess *Acc = S.getArrayAccessOrNULLFor(I)) {
-        UnionMap Access =  UnionMap::fromMap(Map(C, Acc->getAccessRelation()));
+        UnionMap Access = UnionMap::fromMap(Map(C, Acc->getAccessRelation()));
         ValToSubExpr[V] = std::make_shared<SubExpr>(V, Access);
       }
     }
@@ -184,7 +182,8 @@ private:
 
 bool BasePointers::runOnScop(Scop &S) {
   DT = &getAnalysis<llvm::DominatorTreeWrapperPass>().getDomTree();
-  ScalarEvolution *SE = &getAnalysis<llvm::ScalarEvolutionWrapperPass>().getSE();
+  ScalarEvolution *SE =
+      &getAnalysis<llvm::ScalarEvolutionWrapperPass>().getSE();
   LoopInfo *LI = &getAnalysis<llvm::LoopInfoWrapperPass>().getLoopInfo();
 
   InstructionScop IS(S, *LI, *SE);

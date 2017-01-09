@@ -5,22 +5,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <map>
-#include <unordered_map>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <pthread.h>
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <sys/stat.h>
 
-#include "pprof/pgsql.h"
-#include "pprof/file.h"
 #include "polli/log.h"
+#include "pprof/file.h"
+#include "pprof/pgsql.h"
 
 #include "spdlog/spdlog.h"
 
@@ -36,7 +36,7 @@ Options *getOptions() {
 }
 
 using RunMap = std::map<const thread::id, Run<PPEvent>>;
-static inline RunMap& papi_threaded_events() {
+static inline RunMap &papi_threaded_events() {
   static RunMap PapiThreadedEvents;
   return PapiThreadedEvents;
 }
@@ -50,7 +50,7 @@ static inline Run<PPEvent> *papi_local_events(Run<PPEvent> *Evs = nullptr) {
 
 using TIDMapT = std::map<thread::id, uint64_t>;
 static uint64_t TID = 0;
-static inline TIDMapT& papi_get_tid_map() {
+static inline TIDMapT &papi_get_tid_map() {
   static std::map<thread::id, uint64_t> TIDMap;
   return TIDMap;
 }
@@ -156,8 +156,7 @@ void papi_region_enter(uint64_t id, const char *dbg) {
 /**
  * @brief Partially record polli::Stats objects as papi events.
  */
-void record_stats(uint64_t id, const char *dbg,
-                  uint64_t enter, uint64_t exit) {
+void record_stats(uint64_t id, const char *dbg, uint64_t enter, uint64_t exit) {
   do_papi_thread_init_once();
   PPEvent Enter(id, RegionEnter, enter, dbg);
   PPEvent Exit(id, RegionExit, exit, dbg);

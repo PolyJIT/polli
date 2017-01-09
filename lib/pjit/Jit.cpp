@@ -1,7 +1,7 @@
 #include "polli/Jit.h"
+#include "polli/Db.h"
 #include "polli/log.h"
 #include "pprof/pprof.h"
-#include "polli/Db.h"
 
 #include "llvm/IR/Function.h"
 

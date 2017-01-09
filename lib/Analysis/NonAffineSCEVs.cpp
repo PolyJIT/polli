@@ -10,7 +10,7 @@ using namespace polli;
 #define DEBUG_TYPE "polli-scev-validator"
 
 namespace {
-  REGISTER_LOG(console, DEBUG_TYPE);
+REGISTER_LOG(console, DEBUG_TYPE);
 }
 
 namespace polli {
@@ -273,7 +273,7 @@ public:
       }
 
       DEBUG(dbgs() << "INVALID: AddRec within scop has non-int"
-                "recurrence part");
+                      "recurrence part");
       return ValidatorResult(SCEVType::INVALID);
     }
 
@@ -330,7 +330,7 @@ public:
   ValidatorResult visitGenericInst(Instruction *I, const SCEV *S) {
     if (R->contains(I)) {
       DEBUG(dbgs() << "INVALID: UnknownExpr references an instruction "
-                "within the region\n");
+                      "within the region\n");
       DEBUG(dbgs() << *I << "\n");
       return ValidatorResult(SCEVType::INVALID);
     }

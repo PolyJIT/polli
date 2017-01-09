@@ -19,13 +19,9 @@ TracerTy getOrCreateActiveTracer() {
 #ifdef __cplusplus
 extern "C" {
 #endif
-void polliTracingInit() {
-  polli::getOrCreateActiveTracer()->init();
-}
+void polliTracingInit() { polli::getOrCreateActiveTracer()->init(); }
 
-void polliTracingFinalize() {
-  polli::getOrCreateActiveTracer()->finalize();
-}
+void polliTracingFinalize() { polli::getOrCreateActiveTracer()->finalize(); }
 
 void polliTracingRegionStart(uint64_t Id, const char *Name) {
   polli::getOrCreateActiveTracer()->regionStart(Id, Name);

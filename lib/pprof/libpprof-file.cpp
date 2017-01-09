@@ -40,8 +40,8 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   ofstream out(Opts.profile, ios_base::out | ios_base::app);
 
   // Build global string table
-  //const char *str;
-  //for (auto &event : Events) {
+  // const char *str;
+  // for (auto &event : Events) {
   //  str = event.userString();
   //  if (!str)
   //    str = "UNDEF";
@@ -80,8 +80,7 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   }
 }
 
-static bool ReadRun(std::unique_ptr<std::ifstream> &in,
-                    Run<PPEvent> &Events,
+static bool ReadRun(std::unique_ptr<std::ifstream> &in, Run<PPEvent> &Events,
                     std::map<uint32_t, PPStringRegion> &Regions) {
   PPStringRegion StartR;
 
@@ -113,8 +112,8 @@ static bool ReadRun(std::unique_ptr<std::ifstream> &in,
 
 std::unique_ptr<ifstream> ifs;
 
-bool ReadRun(Run<PPEvent> &Events,
-             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
+bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
+             const Options &opt) {
   FileOptions FileOpts = getFileOptions();
   bool gotValidRun = false;
 

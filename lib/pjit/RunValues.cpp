@@ -1,6 +1,6 @@
-#include "pprof/Tracing.h"
 #include "polli/RunValues.h"
 #include "polli/log.h"
+#include "pprof/Tracing.h"
 
 #include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
