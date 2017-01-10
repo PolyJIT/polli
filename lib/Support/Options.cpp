@@ -35,6 +35,7 @@ bool EnableJitable;
 bool DisableRecompile;
 bool DisableExecution;
 bool DisablePreopt;
+bool DisableSpecialization;
 bool AnalyzeIR = false;
 bool AnalyseOnly;
 std::string ReportFilename;
@@ -90,6 +91,11 @@ uint64_t getNumThreads() {
   }
 
   return 0;
+}
+
+void loadOptionsFromEnv() {
+  DisableSpecialization =
+      std::getenv("POLLI_DISABLE_SEPECIALIZATION") != nullptr;
 }
 
 } // namespace opt

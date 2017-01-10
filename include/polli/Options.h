@@ -34,6 +34,7 @@ extern bool InstrumentRegions;
 extern bool EnableJitable;
 extern bool DisableRecompile;
 extern bool DisableExecution;
+extern bool DisableSpecialization;
 extern bool AnalyzeIR;
 extern char OptLevel;
 extern bool CollectRegressionTests;
@@ -80,6 +81,8 @@ bool haveLikwid();
  * @return True, if we should enable PAPI base runtime instrumentation.
  */
 bool havePapi();
+
+void loadOptionsFromEnv();
 
 /**
  * Get the number of OpenMP-Threads available to us.

@@ -1,5 +1,6 @@
 #include "polli/Jit.h"
 #include "polli/Db.h"
+#include "polli/Options.h"
 #include "polli/log.h"
 #include "pprof/pprof.h"
 
@@ -33,6 +34,8 @@ void PolyJIT::setup() {
   Regions[1] = "CODEGEN";
   Regions[2] = "VARIANTS";
   Regions[3] = "CACHE_HIT";
+
+  opt::loadOptionsFromEnv();
 }
 
 void PolyJIT::tearDown() {
