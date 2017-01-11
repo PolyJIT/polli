@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/Utils.h"
+#include "polli/log.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/PostDominators.h"
 
@@ -22,6 +23,8 @@
 using namespace llvm;
 using namespace llvm::legacy;
 using namespace polli;
+
+REGISTER_LOG(console, "utils");
 
 SmallVector<char, 255> *DefaultDir;
 
@@ -84,8 +87,13 @@ namespace polli {
  * function from it, to avoid further problems with wrong dominance
  * information.
  */
-void removeFunctionFromDomTree(Function *F, DominatorTree &DT) {
-  DomTreeNode *N = DT.getNode(&F->getEntryBlock());
+void removeFunctionFromDomTree(Function &F, DominatorTree &DT) {
+  DomTreeNode *N = DT.getNode(&F.getEntryBlock());
+  if (!N) {
+    console->debug("Entry block of ({:s}) not found in given dominator tree.",
+                   F.getName().str());
+    return;
+  }
   std::vector<BasicBlock *> Nodes;
 
   for (po_iterator<DomTreeNode *> I = po_begin(N), E = po_end(N); I != E; ++I)

@@ -68,6 +68,6 @@ void StoreModules(ManagedModules &Modules);
 llvm::raw_ostream &report(const size_t Indent = 0);
 
 namespace polli {
-void removeFunctionFromDomTree(llvm::Function *F, llvm::DominatorTree &DT);
+void removeFunctionFromDomTree(llvm::Function &F, llvm::DominatorTree &DT);
 }
 #endif // POLLI_UTILS_H
