@@ -237,7 +237,7 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
   }
 
   auto Specializer = std::make_unique<
-      FunctionCloner<MainCreator, IgnoreSource, IgnoreTarget>>();
+      FunctionCloner<MainCreator, IgnoreSource, ConnectTarget>>();
   console->debug("Cloner without Specializer.");
   return Specializer;
 }
