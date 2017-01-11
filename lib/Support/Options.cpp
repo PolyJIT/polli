@@ -95,7 +95,7 @@ uint64_t getNumThreads() {
 
 void loadOptionsFromEnv() {
   DisableSpecialization =
-      std::getenv("POLLI_DISABLE_SEPECIALIZATION") != nullptr;
+      std::getenv("POLLI_DISABLE_SPECIALIZATION") != nullptr;
 }
 
 } // namespace opt
