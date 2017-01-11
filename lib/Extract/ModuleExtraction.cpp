@@ -101,8 +101,11 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   DEBUG(dbgs() << fmt::format("Source to Prototype -> {:s}\n",
                               F.getName().str()));
   // First create a new prototype function.
-  ExtractFunction Cloner(VMap, &M);
-  Function *Proto = Cloner.setSource(&F).start(true);
+  ExtractFunction Cloner;
+  Cloner.setTargetModule(&M);
+  Cloner.setSource(&F);
+
+  Function *Proto = Cloner.start(VMap, /*RemapCalls=*/true);
   Proto->addFnAttr("polyjit-id", fmt::format("{:d}", i++));
   return Proto;
 }
@@ -701,13 +704,14 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     // tries to detect that again.
     collectRegressionTest(FromName, ModStr);
 
-    InstrumentingFunctionCloner InstCloner(VMap, M);
+    InstrumentingFunctionCloner InstCloner;
     InstCloner.setSource(ProtoF);
     InstCloner.setPrototype(Prototype);
     InstCloner.setFallback(F);
     InstCloner.setDominatorTree(&DT);
+    InstCloner.setTargetModule(M);
 
-    Function *InstF = InstCloner.start(/* RemapCalls */ true);
+    Function *InstF = InstCloner.start(VMap, /*RemapCalls=*/true);
     InstrumentedFunctions.insert(InstF);
     Instrumented++;
   }

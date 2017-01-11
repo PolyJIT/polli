@@ -220,6 +220,28 @@ public:
   }
 };
 
+static std::unique_ptr<FunctionClonerBase>
+createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
+  if (!polli::opt::DisableSpecialization) {
+    // Perform parameter value substitution.
+    auto Specializer = std::make_unique<FunctionCloner<
+        MainCreator, IgnoreSource, SpecializeEndpoint<RunValue<uint64_t *>>>>();
+
+    /* Perform a parameter specialization by taking the unchanged base
+     * function
+     * and substitute all known parameter values.
+     */
+    Specializer->setParameters(K);
+    console->debug("Cloner with Specializer.");
+    return Specializer;
+  }
+
+  auto Specializer = std::make_unique<
+      FunctionCloner<MainCreator, IgnoreSource, IgnoreTarget>>();
+  console->debug("Cloner without Specializer.");
+  return Specializer;
+}
+
 /**
  * @brief Create a new variant of this function using the function key K.
  *
@@ -236,86 +258,72 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
-  Module *M;
   std::unique_ptr<Module> NewM;
-  static std::mutex Mutex;
-  {
-    std::lock_guard<std::mutex> Lock(Mutex);
-    Function *F;
+  Function *F;
 
-    // Prepare a new module to hold our new function.
-    M = BaseF.getParent();
-    if (!M)
-      return std::unique_ptr<Module>(nullptr);
+  // Prepare a new module to hold our new function.
+  Module *M = BaseF.getParent();
+  if (!M)
+    return std::unique_ptr<Module>(nullptr);
 
-    assert(M && "Function without parent module?!");
-    NewM = std::unique_ptr<Module>(
-        new Module(M->getModuleIdentifier(), M->getContext()));
-    NewM->setTargetTriple(M->getTargetTriple());
-    NewM->setDataLayout(M->getDataLayout());
-    NewM->setMaterializer(M->getMaterializer());
-    NewM->setModuleIdentifier(fmt::format("{}.{}-{:d}.ll",
-                                          M->getModuleIdentifier(),
-                                          BaseF.getName().str(), K.hash()));
+  assert(M && "Function without parent module?!");
+  NewM = std::unique_ptr<Module>(
+      new Module(M->getModuleIdentifier(), M->getContext()));
+  NewM->setTargetTriple(M->getTargetTriple());
+  NewM->setDataLayout(M->getDataLayout());
+  NewM->setMaterializer(M->getMaterializer());
+  NewM->setModuleIdentifier(fmt::format("{}.{}-{:d}.ll",
+                                        M->getModuleIdentifier(),
+                                        BaseF.getName().str(), K.hash()));
 
-    DEBUG({
-      console->error(
-          "\n==============================================================="
-          "\n VariantFunction:: {:s}"
-          "\n===============================================================\n",
-          BaseF.getName().str());
-      std::string buf;
-      raw_string_ostream os(buf);
-      BaseF.getType()->print(os << "\nBaseT:");
-      os << "\n";
-      for (auto RV : K) {
-        Type *ArgTy = RV.Arg->getType();
-        RV.Arg->print(os);
-        os << " = ";
+  DEBUG({
+    console->error(
+        "\n==============================================================="
+        "\n VariantFunction:: {:s}"
+        "\n===============================================================\n",
+        BaseF.getName().str());
+    std::string buf;
+    raw_string_ostream os(buf);
+    BaseF.getType()->print(os << "\nBaseT:");
+    os << "\n";
+    for (auto RV : K) {
+      Type *ArgTy = RV.Arg->getType();
+      RV.Arg->print(os);
+      os << " = ";
 
-        Constant *C = nullptr;
-        if (canSpecialize(RV)) {
-          if (ArgTy->isIntegerTy()) {
-            C = ConstantInt::get(ArgTy, *RV.value, /*isSigned=*/true);
-          } else if (ArgTy->isFloatTy()) {
-            C = llvm::ConstantFP::get(ArgTy, (double)*RV.value);
-          }
-        } else {
-          os << RV.value;
+      Constant *C = nullptr;
+      if (canSpecialize(RV)) {
+        if (ArgTy->isIntegerTy()) {
+          C = ConstantInt::get(ArgTy, *RV.value, /*isSigned=*/true);
+        } else if (ArgTy->isFloatTy()) {
+          C = llvm::ConstantFP::get(ArgTy, (double)*RV.value);
         }
-
-        if (C)
-          C->print(os);
-
-        os << ", ";
+      } else {
+        os << RV.value;
       }
-      os << "\n";
-      console->error("Create Variant {} Hash: {:d}:\n{:s}", K.str(), K.hash(),
-                     os.str());
-    });
-    DEBUG(dbgs() << fmt::format("Create Variant for: {} Hash: {:d}\n", K.str(),
-                                K.hash()));
-    // Perform parameter value substitution.
-    FunctionCloner<MainCreator, IgnoreSource,
-                   SpecializeEndpoint<RunValue<uint64_t *>>>
-        Specializer(VMap, NewM.get());
 
-    /* Perform a parameter specialization by taking the unchanged base
-     * function
-     * and substitute all known parameter values.
-     */
-    Specializer.setParameters(K);
-    Specializer.setSource(&BaseF);
+      if (C)
+        C->print(os);
 
-    if (!BaseF.hasFnAttribute("polyjit-id"))
-      console->critical("{:s} has no polyjit-id. Tracking will not work.",
-                        BaseF.getName().str());
-    Function *NewF = Specializer.start(true);
-    F = &OptimizeForRuntime(*NewF);
-    F->addFnAttr("polyjit-id",
-                 fmt::format("{:d}", polli::GetCandidateId(BaseF)));
-    FnName = F->getName().str();
-  }
+      os << ", ";
+    }
+    os << "\n";
+    console->error("Create Variant {} Hash: {:d}:\n{:s}", K.str(), K.hash(),
+                   os.str());
+  });
+
+  auto Specializer = createCloner(K, VMap);
+  Specializer->setTargetModule(NewM.get());
+  Specializer->setSource(&BaseF);
+
+  if (!BaseF.hasFnAttribute("polyjit-id"))
+    console->critical("{:s} has no polyjit-id. Tracking will not work.",
+                      BaseF.getName().str());
+  Function *NewF = Specializer->start(VMap, /*RemapCalls=*/true);
+  F = &OptimizeForRuntime(*NewF);
+  F->addFnAttr("polyjit-id", fmt::format("{:d}", polli::GetCandidateId(BaseF)));
+  FnName = F->getName().str();
+
   return NewM;
 }
 } // namespace polli

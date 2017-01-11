@@ -53,7 +53,6 @@ namespace log {
 REGISTER_LOG(console, "cloner");
 }
 
-
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
   std::string buffer;
   llvm::raw_string_ostream s(buffer);
@@ -80,25 +79,93 @@ static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
   verifyFn(Prefix + "Verify Target ", TgtF);
 }
 
+class FunctionClonerBase {
+public:
+  FunctionClonerBase()
+      : ToM(nullptr), DT(nullptr), From(nullptr), To(nullptr) {}
+
+  auto setTargetModule(Module *M) -> void {
+    ToM = M;
+  }
+
+  auto setSource(Function *F) -> void {
+    From = F;
+  }
+
+  auto setDominatorTree(DominatorTree *_DT) -> void {
+    DT = _DT;
+  }
+
+  virtual Function *start(ValueToValueMapTy &VMap,
+                          bool RemapCalls = false,
+                          bool RemapGlobals = true) = 0;
+
+protected:
+  Module *ToM;
+  DominatorTree *DT;
+  Function *From;
+  Function *To;
+};
+
 template <class OnCreate, class SourceAfterClone, class TargetAfterClone>
-class FunctionCloner : public OnCreate,
+class FunctionCloner : public FunctionClonerBase,
+                       public OnCreate,
                        public SourceAfterClone,
                        public TargetAfterClone {
 public:
-  explicit FunctionCloner(
-      ValueToValueMapTy &map, Module *m = NULL)
-      : VMap(map), ToM(m), From(nullptr), To(nullptr) {}
+  FunctionCloner() : FunctionClonerBase() {}
 
-  void setTarget(Function *F) { To = F; }
-  FunctionCloner &setSource(Function *F) {
-    From = F;
-    return *this;
+  /* Clone the source function into the target function.
+   * If target function does not exist, create one in
+   * target module.
+   * If target module does not exist, create the target
+   * function in the source module. */
+  Function *start(ValueToValueMapTy &VMap,
+                  bool RemapCalls = false,
+                  bool RemapGlobals = true) {
+    using namespace std::placeholders;
+    if (!ToM)
+      ToM = From->getParent();
+
+    if (!To)
+      To = OnCreate::Create(From, ToM);
+    OnCreate::MapArguments(VMap, From, To);
+
+    // Prepare the source function.
+    // We need to substitute all instructions that use ConstantExpressions.
+    InstrList L = apply<InstrList>(
+        *From, std::bind(constantExprToInstruction, _1, _2, std::ref(VMap)));
+
+    /* Copy function body ExtractedF over to ClonedF */
+    SmallVector<ReturnInst *, 8> Returns;
+
+    DEBUG(polli::verifyFunctions("\t>> ", From, To));
+
+    // Collect all calls for remapping.
+    if (RemapCalls)
+      mapCalls(*From, ToM, VMap);
+
+    if (RemapGlobals)
+      mapGlobals(*From, ToM, VMap);
+
+    ClonedCodeInfo CI;
+    CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns, "",
+                      &CI);
+
+    SourceAfterClone::Apply(From, To, VMap);
+    TargetAfterClone::Apply(From, To, VMap);
+
+    if (DT)
+      polli::removeFunctionFromDomTree(*To, *DT);
+
+    DEBUG(polli::verifyFunctions("\t<< ", From, To));
+
+    // Store function mapping for the linker.
+    VMap[From] = To;
+    return To;
   }
 
-  void setDominatorTree(DominatorTree *DT) {
-    this->DT = DT;
-  }
-
+private:
   void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
     if (SrcF.getParent() == TgtM)
       return;
@@ -125,8 +192,7 @@ public:
     }
   }
 
-  void mapGlobals(Function &SrcF, Module *TgtM,
-                  ValueToValueMapTy &VMap) const {
+  void mapGlobals(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
     Module *SrcM = SrcF.getParent();
     if (SrcM == TgtM)
       return;
@@ -189,70 +255,13 @@ public:
       }
     }
   }
-
-  /* Clone the source function into the target function.
-   * If target function does not exist, create one in
-   * target module.
-   * If target module does not exist, create the target
-   * function in the source module. */
-  Function *start(bool RemapCalls = false, DominatorTree *DT = nullptr,
-                  bool RemapGlobals = true) {
-    using namespace std::placeholders;
-    if (!ToM)
-      ToM = From->getParent();
-
-    if (!To)
-      To = OnCreate::Create(From, ToM);
-    OnCreate::MapArguments(VMap, From, To);
-
-    // Prepare the source function.
-    // We need to substitute all instructions that use ConstantExpressions.
-    InstrList L = apply<InstrList>(
-        *From, std::bind(constantExprToInstruction, _1, _2, std::ref(VMap)));
-
-    /* Copy function body ExtractedF over to ClonedF */
-    SmallVector<ReturnInst *, 8> Returns;
-
-    DEBUG(polli::verifyFunctions("\t>> ", From, To));
-
-    // Collect all calls for remapping.
-    if (RemapCalls)
-      mapCalls(*From, ToM, VMap);
-
-    if (RemapGlobals)
-      mapGlobals(*From, ToM, VMap);
-
-    ClonedCodeInfo CI;
-    CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns,
-                      "", &CI);
-
-    SourceAfterClone::Apply(From, To, VMap);
-    TargetAfterClone::Apply(From, To, VMap);
-
-    if (DT)
-      polli::removeFunctionFromDomTree(To, *DT);
-
-    DEBUG(polli::verifyFunctions("\t<< ", From, To));
-
-    // Store function mapping for the linker.
-    VMap[From] = To;
-    return To;
-  }
-
-private:
-  ValueToValueMapTy &VMap;
-  Module *ToM;
-  DominatorTree *DT;
-  Function *From;
-  Function *To;
 };
 
 /*
  * Cloning policies.
  */
 struct CopyCreator {
-  void MapArguments(ValueToValueMapTy &VMap, Function *SrcF,
-                           Function *TgtF) {
+  void MapArguments(ValueToValueMapTy &VMap, Function *SrcF, Function *TgtF) {
     Function::arg_iterator NewArg = TgtF->arg_begin();
     for (Function::const_arg_iterator Arg = SrcF->arg_begin(),
                                       AE = SrcF->arg_end();
@@ -284,7 +293,7 @@ struct IgnoreTarget {
 };
 
 struct ConnectTarget {
-  void Apply(Function *From, Function *To, ValueToValueMapTy &VMap){
+  void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
     /* We have to connect the function entry block to the entry block of the
      * target function unconditionally. This way, CreationPolicies can
      * modifiy the function entry.
