@@ -1,13 +1,15 @@
 #ifndef PPRINT_H
 #define PPRINT_H
 #include <inttypes.h>
-#include <papi.h>
 #include <pthread.h>
 
 #include <assert.h>
-#include <memory>
 #include <vector>
 #include <string>
+// FIXME: Annoying header order requirement because of libpapi: ffsll
+#include <papi.h>
+
+#include <memory>
 
 extern "C" {
 /**
@@ -110,6 +112,7 @@ public:
    * @brief Set the timestamp of this event to 'right now'
    */
   void snapshot() { Timestamp = PAPI_get_real_usec(); }
+
 private:
   int32_t ID;
   PPEventType EventTy;
@@ -165,8 +168,8 @@ struct Event {
   std::string Name;
   pthread_t TID;
 
-  Event(int32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
-        uint64_t D = 0, std::string N = "", uint64_t TID = pthread_self())
+  Event(int32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0, uint64_t D = 0,
+        std::string N = "", uint64_t TID = pthread_self())
       : ID(ID), Type(T), Start(S), Duration(D), Name(N), TID(TID) {}
 };
 

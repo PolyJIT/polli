@@ -1,7 +1,6 @@
 #include "pprof/pprof.h"
 
 #include <inttypes.h>
-#include <papi.h>
 #include <stdio.h>
 #include <stdlib.h>
 
