@@ -309,7 +309,7 @@ static JitT &getOrCreateJIT() {
   return JIT;
 }
 
-//static inline void do_shutdown() {
+// static inline void do_shutdown() {
 //  // This forces the linker to keep the symbols around, if tracing is
 //  // enabled.
 //  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
@@ -416,13 +416,13 @@ extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
   JitT Context = getOrCreateJIT();
   const Function *F = Context->FromPrefix((uint64_t)prefix);
-  Context->enter(GetCandidateId(*F), PAPI_get_real_usec());
+  Context->enter(GetCandidateId(*F), papi::PAPI_get_real_usec());
 }
 
 void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
   JitT Context = getOrCreateJIT();
   const Function *F = Context->FromPrefix((uint64_t)prefix);
-  Context->exit(GetCandidateId(*F), PAPI_get_real_usec());
+  Context->exit(GetCandidateId(*F), papi::PAPI_get_real_usec());
 }
 
 void pjit_library_init();
@@ -441,7 +441,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   pjit_library_init();
   JitT Context = getOrCreateJIT();
-  Context->enter(1, PAPI_get_real_usec());
+  Context->enter(1, papi::PAPI_get_real_usec());
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   llvm::Function *F = Request->F;
@@ -458,7 +458,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 
   // If it was not a cache-hit, wait until the first variant is ready.
   FutureFn.wait();
-  Context->exit(1, PAPI_get_real_usec());
+  Context->exit(1, papi::PAPI_get_real_usec());
 
   auto FnIt = Context->find(Key);
   if (FnIt != Context->end()) {
@@ -486,7 +486,7 @@ bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
   pjit_library_init();
   JitT Context = getOrCreateJIT();
-  Context->enter(1, PAPI_get_real_usec());
+  Context->enter(1, papi::PAPI_get_real_usec());
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   if (!K.second) {
     llvm::Function *F = Request->F;
@@ -494,7 +494,7 @@ bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
     Context->addRegion(Request->F->getName().str(),
                        GetCandidateId(*Request->F));
   }
-  Context->exit(1, PAPI_get_real_usec());
+  Context->exit(1, papi::PAPI_get_real_usec());
   return false;
 }
 
@@ -503,7 +503,7 @@ void pjit_library_init() {
   if (initialized)
     return;
   static StaticInitializer InitializeEverything;
-  //atexit(do_shutdown);
+  // atexit(do_shutdown);
   initialized = true;
 }
 } /* extern "C" */

@@ -23,6 +23,10 @@
 
 #include "spdlog/spdlog.h"
 
+namespace papi {
+#include <papi.h>
+}
+
 using namespace pprof;
 namespace spd = spdlog;
 
@@ -92,14 +96,14 @@ static void do_papi_thread_init_once() {
     if (!papi_init)
       papi_region_setup();
 
-    int ret = PAPI_thread_init(papi_get_thread_id);
+    int ret = papi::PAPI_thread_init(papi_get_thread_id);
     if (ret != PAPI_OK) {
       if (ret == PAPI_ENOINIT) {
-        PAPI_library_init(PAPI_VER_CURRENT);
+        papi::PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
       } else {
         console->error("PAPI_thread_init() = {:d}", ret);
-        console->error("{:s}", PAPI_strerror(ret));
+        console->error("{:s}", papi::PAPI_strerror(ret));
         exit(ret);
       }
     } else {
@@ -198,7 +202,7 @@ void papi_atexit_handler(void) {
   if (opts.use_file)
     file::StoreRun(PapiEvents, opts);
 
-  PAPI_shutdown();
+  papi::PAPI_shutdown();
 }
 
 /**
@@ -209,10 +213,10 @@ void papi_atexit_handler(void) {
  * @return void
  */
 void papi_region_setup() {
-  int init = PAPI_library_init(PAPI_VER_CURRENT);
+  int init = papi::PAPI_library_init(PAPI_VER_CURRENT);
   if (init != PAPI_VER_CURRENT) {
     console->error("[ERROR] PAPI_library_init = {:d}", init);
-    console->error("[ERROR] {:s}", PAPI_strerror(init));
+    console->error("[ERROR] {:s}", papi::PAPI_strerror(init));
   }
 
   papi_init = true;

@@ -6,8 +6,11 @@
 #include <assert.h>
 #include <vector>
 #include <string>
-// FIXME: Annoying header order requirement because of libpapi: ffsll
+
+// FIXME: Mask All symbols included bypapi inside  this C++ namespace
+namespace papi {
 #include <papi.h>
+}
 
 #include <memory>
 
@@ -90,8 +93,8 @@ struct PPStringRegion {
 class PPEvent {
 public:
   PPEvent(int32_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
-      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_usec()), DebugStr(dbgStr) {
-  }
+      : ID(ID), EventTy(Ty), Timestamp(papi::PAPI_get_real_usec()),
+        DebugStr(dbgStr) {}
   explicit PPEvent(int32_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(Timestamp), DebugStr(dbgStr) {}
@@ -111,7 +114,7 @@ public:
   /**
    * @brief Set the timestamp of this event to 'right now'
    */
-  void snapshot() { Timestamp = PAPI_get_real_usec(); }
+  void snapshot() { Timestamp = papi::PAPI_get_real_usec(); }
 
 private:
   int32_t ID;

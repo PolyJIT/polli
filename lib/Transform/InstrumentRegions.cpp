@@ -19,7 +19,6 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/InstrumentRegions.h"
-#include "papi.h"
 #include "polli/ScopDetection.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringRef.h"
@@ -50,6 +49,10 @@
 #include <string>
 #include <vector>
 
+namespace papi {
+#include "papi.h"
+}
+
 namespace llvm {
 class LLVMContext;
 } // lines 49-49
@@ -60,6 +63,7 @@ class Value;
 using namespace llvm;
 using namespace polli;
 using namespace polly;
+using namespace papi;
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 STATISTIC(MoreEntries, "Number of regions with more than one entry edge");

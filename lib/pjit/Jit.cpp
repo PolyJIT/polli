@@ -5,6 +5,9 @@
 #include "pprof/pprof.h"
 
 #include "llvm/IR/Function.h"
+namespace papi {
+#include <papi.h>
+}
 
 using namespace llvm;
 
@@ -25,7 +28,7 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 }
 
 void PolyJIT::setup() {
-  enter(0, PAPI_get_real_usec());
+  enter(0, papi::PAPI_get_real_usec());
 
   /* CACHE_HIT */
   enter(3, 0);
@@ -39,7 +42,7 @@ void PolyJIT::setup() {
 }
 
 void PolyJIT::tearDown() {
-  exit(0, PAPI_get_real_usec());
+  exit(0, papi::PAPI_get_real_usec());
   polli::StoreRun(Events, Entries, Regions);
 }
 
