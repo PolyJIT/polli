@@ -84,20 +84,15 @@ public:
   FunctionClonerBase()
       : ToM(nullptr), DT(nullptr), From(nullptr), To(nullptr) {}
 
-  auto setTargetModule(Module *M) -> void {
-    ToM = M;
-  }
+  auto setTargetModule(Module *M) -> void { ToM = M; }
 
-  auto setSource(Function *F) -> void {
-    From = F;
-  }
+  auto setSource(Function *F) -> void { From = F; }
 
-  auto setDominatorTree(DominatorTree *_DT) -> void {
-    DT = _DT;
-  }
+  auto setDominatorTree(DominatorTree *_DT) -> void { DT = _DT; }
 
-  virtual Function *start(ValueToValueMapTy &VMap,
-                          bool RemapCalls = false,
+  virtual ~FunctionClonerBase() = default;
+
+  virtual Function *start(ValueToValueMapTy &VMap, bool RemapCalls = false,
                           bool RemapGlobals = true) = 0;
 
 protected:
@@ -120,8 +115,7 @@ public:
    * target module.
    * If target module does not exist, create the target
    * function in the source module. */
-  Function *start(ValueToValueMapTy &VMap,
-                  bool RemapCalls = false,
+  Function *start(ValueToValueMapTy &VMap, bool RemapCalls = false,
                   bool RemapGlobals = true) {
     using namespace std::placeholders;
     if (!ToM)
