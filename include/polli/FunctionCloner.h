@@ -28,6 +28,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -219,6 +220,10 @@ private:
           /* We need to change the visibility of the original symbol to
            * external visible for the weak_odr linkage to work.
            *
+           * Example:
+           *   Global variable declared static:
+           *   static int A[10];
+           *
            * To avoid name collisions we will rename the symbol before
            * we remap it.
            */
@@ -226,11 +231,11 @@ private:
           using namespace std::chrono;
           milliseconds ms = duration_cast<milliseconds>(
               system_clock::now().time_since_epoch());
-          GV->setName(GV->getName() + "_" + fmt::format("{:d}", ms.count()) +
-                      "_" + TgtM->getModuleIdentifier());
+          GV->setName(GV->getName() + "_POLYJIT_GLOBAL_" + fmt::format("{:d}", ms.count()));
           GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         }
 
+        NewGVar->setName(GV->getName());
         if (IsConstant)
           NewGVar->setLinkage(GVar->getLinkage());
         else
