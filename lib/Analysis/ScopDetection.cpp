@@ -1111,8 +1111,8 @@ bool JITScopDetection::hasPossiblyDistributableLoop(
 bool JITScopDetection::isProfitableRegion(DetectionContext &Context) const {
   Region &CurRegion = Context.CurRegion;
 
-  // if (PollyProcessUnprofitable)
-  //  return true;
+  if (PollyProcessUnprofitable)
+    return true;
 
   // We can probably not do a lot on scops that only write or only read
   // data.
