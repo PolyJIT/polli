@@ -85,7 +85,7 @@ static StackTracePtr StackTrace;
 static Function &getFunction(Module &M) {
   for (Function &F : M) {
     if (F.hasFnAttribute("polyjit-jit-candidate")) {
-      SPDLOG_DEBUG("libpjit", "fn-jit-candidate: {:s}", F.getName().str());
+      SPDLOG_DEBUG(console, "fn-jit-candidate: {:s}", F.getName().str());
       return F;
     }
   }
@@ -145,7 +145,7 @@ class PolySectionMemoryManager : public SectionMemoryManager {
     uint8_t *ptr = SectionMemoryManager::allocateCodeSection(
         Size, Alignment, SectionID, SectionName);
     SPDLOG_DEBUG(
-        "libpjit", "cs @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s}",
+        console, "cs @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s}",
         (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str());
     return ptr;
   }
@@ -155,7 +155,7 @@ class PolySectionMemoryManager : public SectionMemoryManager {
                                bool isReadOnly) override {
     uint8_t *ptr = SectionMemoryManager::allocateDataSection(
         Size, Alignment, SectionID, SectionName, isReadOnly);
-    SPDLOG_DEBUG(
+    SPDLOG_DEBUG(console,
         "ds @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s} ro: {:d}",
         (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str(),
         isReadOnly);
@@ -345,9 +345,11 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   Context->enter(2, 0);
   Context->exit(2, 1);
 
-  SPDLOG_DEBUG("libpjit", "{:s}: Create new Variant.",
+  SPDLOG_DEBUG(console, "{:s}: Create new Variant.",
                Request->F->getName().str());
-  SPDLOG_DEBUG("libpjit", "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
+  SPDLOG_DEBUG(console, "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
+  console->debug("{:s}: Create new Variant.", Request->F->getName().str());
+  console->debug("Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(Request->F);
@@ -362,7 +364,8 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   DEBUG(printRunValues(Values));
 
   orc::JITSymbol FPtr = EE.findSymbol(FnName);
-  SPDLOG_DEBUG("libpjit", "fn ptr: 0x{:x}", FPtr.getAddress());
+  SPDLOG_DEBUG(console, "fn ptr: 0x{:x}", FPtr.getAddress());
+  console->debug("fn ptr: 0x{:x}", FPtr.getAddress());
   assert(FPtr && "Specializer returned nullptr.");
   if (!Context
            ->insert(std::make_pair(
