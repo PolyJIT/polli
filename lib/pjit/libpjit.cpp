@@ -348,8 +348,6 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   SPDLOG_DEBUG(console, "{:s}: Create new Variant.",
                Request->F->getName().str());
   SPDLOG_DEBUG(console, "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
-  console->debug("{:s}: Create new Variant.", Request->F->getName().str());
-  console->debug("Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
   VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(Request->F);
@@ -365,7 +363,6 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 
   orc::JITSymbol FPtr = EE.findSymbol(FnName);
   SPDLOG_DEBUG(console, "fn ptr: 0x{:x}", FPtr.getAddress());
-  console->debug("fn ptr: 0x{:x}", FPtr.getAddress());
   assert(FPtr && "Specializer returned nullptr.");
   if (!Context
            ->insert(std::make_pair(
