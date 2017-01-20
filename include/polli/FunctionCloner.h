@@ -236,10 +236,11 @@ private:
         }
 
         NewGVar->setName(GV->getName());
+
         if (IsConstant)
           NewGVar->setLinkage(GVar->getLinkage());
         else
-          NewGVar->setLinkage(GlobalValue::LinkageTypes::WeakAnyLinkage);
+          NewGVar->setLinkage(GlobalValue::LinkageTypes::AvailableExternallyLinkage);
 
         if (!IsConstant) {
           if (NewGVar->getValueType()->isAggregateType()) {
