@@ -172,6 +172,8 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
   Options opts = getOptions();
   DbOptions Opts = getDBOptionsFromEnv();
+  if (!opts.use_db)
+    return;
 
   std::string SEARCH_PROJECT_SQL =
       "SELECT name FROM project WHERE name = '{}';";
