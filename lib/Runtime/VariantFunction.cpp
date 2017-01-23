@@ -232,13 +232,11 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
      * and substitute all known parameter values.
      */
     Specializer->setParameters(K);
-    console->debug("Cloner with Specializer.");
     return Specializer;
   }
 
   auto Specializer = std::make_unique<
       FunctionCloner<MainCreator, IgnoreSource, ConnectTarget>>();
-  console->debug("Cloner without Specializer.");
   return Specializer;
 }
 
