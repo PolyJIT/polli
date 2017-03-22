@@ -1,5 +1,4 @@
 add_polli_library(PolyJIT_Transform STATIC
-#  AliasCheckCodeGen.cpp
   InstrumentRegions.cpp
   )
 
