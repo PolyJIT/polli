@@ -24,7 +24,7 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
     const size_t LOG_SIZE = 1048576 * 100;
     spdlog::set_async_mode(1048576);
     sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-        LOG_FILENAME, "log", LOG_SIZE, 5, true));
+        std::string(LOG_FILENAME), LOG_SIZE, 5));
   } else {
     sinks.push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());
   }
