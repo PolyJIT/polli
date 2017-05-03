@@ -199,8 +199,12 @@ void papi_atexit_handler(void) {
     bytes += elem.second.size() * sizeof(PPEvent);
   }
 
-  if (opts.use_file)
-    file::StoreRun(PapiEvents, opts);
+  if (opts.use_file) {
+    papi_local_events()->push_back(PPEvent(0, RegionExit, "STOP"));
+    for (auto elem : papi_threaded_events()) {
+      file::StoreRun(elem.second, opts);
+    }
+  }
 
   papi::PAPI_shutdown();
 }

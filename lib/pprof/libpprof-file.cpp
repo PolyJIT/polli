@@ -3,10 +3,10 @@
 
 #include <ctime>
 #include <stdlib.h>
-#include <string>
 
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <map>
 
 namespace pprof {
@@ -38,32 +38,6 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
 
   FileOptions Opts = getFileOptions();
   ofstream out(Opts.profile, ios_base::out | ios_base::app);
-
-  // Build global string table
-  // const char *str;
-  // for (auto &event : Events) {
-  //  str = event.userString();
-  //  if (!str)
-  //    str = "UNDEF";
-  //  switch (event.event()) {
-  //  case ScopEnter:
-  //  case RegionEnter:
-  //    PPStrings[event->ID].Entry = str;
-  //    break;
-  //  case ScopExit:
-  //  case RegionExit:
-  //    PPStrings[event->ID].Exit = str;
-  //    break;
-  //  default:
-  //    break;
-  //  }
-
-  //  PPStrings[event->ID].ID = event->ID;
-  //}
-
-  // Append String table
-  for (auto &dbg : PPStrings)
-    out << dbg.second;
 
   // Append Events
   for (auto &event : Events)
