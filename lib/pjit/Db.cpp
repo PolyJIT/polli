@@ -227,4 +227,40 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
   vals.flush();
   w.commit();
 }
+
+namespace tracing {
+TraceData &setup() {
+  static TraceData T;
+  return T;
+}
+
+void enter_region(uint64_t id, const char *name) {
+  TraceData &D = setup();
+  uint64_t time = papi::PAPI_get_real_usec();
+    if (!D.Events.count(id))
+        D.Events[id] = 0;
+    if (!D.Entries.count(id))
+        D.Entries[id] = 0;
+    if (!D.Regions.count(id))
+      D.Regions[id] = name;
+    D.Events[id] -= time;
+    D.Entries[id] += 1;
+}
+
+void exit_region(uint64_t id) {
+  TraceData &D = setup();
+  uint64_t time = papi::PAPI_get_real_usec();
+  D.Events[id] += time;
+}
+
+void submit_results() {
+  TraceData &D = setup();
+  polli::StoreRun(D.Events, D.Entries, D.Regions);
+}
+
+void setup_tracing() {
+  papi::PAPI_library_init(PAPI_VER_CURRENT);
+  atexit(submit_results);
+}
+}
 }

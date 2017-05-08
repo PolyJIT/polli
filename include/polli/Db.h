@@ -4,6 +4,10 @@
 #include <unordered_map>
 #include <string>
 
+namespace papi {
+#include <papi.h>
+}
+
 using EventMapTy = std::unordered_map<uint64_t, uint64_t>;
 using RegionMapTy = std::unordered_map<uint64_t, std::string>;
 
@@ -24,6 +28,21 @@ struct Options {
 
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions);
+
+namespace tracing {
+struct TraceData {
+  std::unordered_map<uint64_t, uint64_t> Events;
+  std::unordered_map<uint64_t, uint64_t> Entries;
+  std::unordered_map<uint64_t, std::string> Regions;
+};
+
+TraceData &setup();
+void enter_region(uint64_t id, const char *name);
+void exit_region(uint64_t id);
+void submit_results();
+void setup_tracing();
+
+}
 }
 
 #endif /* end of include guard: POLLI_DB_H */
