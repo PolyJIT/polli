@@ -34,8 +34,8 @@ add_definitions( ${LLVM_DEFINITIONS} )
 
 ## Find Polly
 find_package(Polly REQUIRED)
-include_directories (${POLLY_INCLUDE_DIR} )
-link_directories( ${POLLY_LINK_DIR} )
+include_directories (${POLLY_INCLUDE_DIRS} )
+link_directories( ${POLLY_LIBRARY_DIRS} )
 add_definitions( ${POLLY_DEFINITIONS} )
 
 # Get the system librarys that will link into LLVM.
