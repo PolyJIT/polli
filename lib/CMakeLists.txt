@@ -10,6 +10,7 @@ add_subdirectory(pjit)
 add_subdirectory(pjit-logging)
 
 set(POLLI_LINK_LIBS
+  Polly
   PolyJIT_Analysis
   PolyJIT_Extract
   PolyJIT_Persist
