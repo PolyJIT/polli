@@ -1,3 +1,4 @@
+#include "polli/Options.h"
 #include "polli/ScopDetection.h"
 #include "polli/NonAffineSCEVs.h"
 #include "polly/CodeGen/CodeGeneration.h"
@@ -44,7 +45,7 @@ static cl::opt<int> ProfitabilityMinPerLoopInstructions(
     "polli-detect-profitability-min-per-loop-insts",
     cl::desc("The minimal number of per-loop instructions before a single loop "
              "region is considered profitable"),
-    cl::Hidden, cl::ValueRequired, cl::init(100000000), cl::cat(PollyCategory));
+    cl::Hidden, cl::ValueRequired, cl::init(100000000), cl::cat(PolliCategory));
 
 bool PollyProcessUnprofitable;
 static cl::opt<bool, true> XPollyProcessUnprofitable(
@@ -52,53 +53,53 @@ static cl::opt<bool, true> XPollyProcessUnprofitable(
     cl::desc(
         "Process scops that are unlikely to benefit from Polly optimizations."),
     cl::location(polli::PollyProcessUnprofitable), cl::init(false),
-    cl::ZeroOrMore, cl::cat(PollyCategory));
+    cl::ZeroOrMore, cl::cat(PolliCategory));
 
 static cl::opt<std::string> OnlyFunction(
     "polli-only-func",
     cl::desc("Only run on functions that contain a certain string"),
     cl::value_desc("string"), cl::ValueRequired, cl::init(""),
-    cl::cat(PollyCategory));
+    cl::cat(PolliCategory));
 
 static cl::opt<std::string> OnlyRegion(
     "polli-only-region",
     cl::desc("Only run on certain regions (The provided identifier must "
              "appear in the name of the region's entry block"),
     cl::value_desc("identifier"), cl::ValueRequired, cl::init(""),
-    cl::cat(PollyCategory));
+    cl::cat(PolliCategory));
 
 static cl::opt<bool>
     ReportLevel("polli-report",
                 cl::desc("Print information about the activities of Polly"),
-                cl::init(false), cl::ZeroOrMore, cl::cat(PollyCategory));
+                cl::init(false), cl::ZeroOrMore, cl::cat(PolliCategory));
 
 static cl::opt<bool> AllowDifferentTypes(
     "polli-allow-differing-element-types",
     cl::desc("Allow different element types for array accesses"), cl::Hidden,
-    cl::init(true), cl::ZeroOrMore, cl::cat(PollyCategory));
+    cl::init(true), cl::ZeroOrMore, cl::cat(PolliCategory));
 
 static cl::opt<bool>
     AllowModrefCall("polli-allow-modref-calls",
                     cl::desc("Allow functions with known modref behavior"),
                     cl::Hidden, cl::init(false), cl::ZeroOrMore,
-                    cl::cat(PollyCategory));
+                    cl::cat(PolliCategory));
 
 static cl::opt<bool, true>
     TrackFailures("polli-detect-track-failures",
                   cl::desc("Track failure strings in detecting scop regions"),
                   cl::location(polli::PollyTrackFailures), cl::Hidden,
-                  cl::ZeroOrMore, cl::init(true), cl::cat(PollyCategory));
+                  cl::ZeroOrMore, cl::init(true), cl::cat(PolliCategory));
 
 static cl::opt<bool> KeepGoing("polli-detect-keep-going",
                                cl::desc("Do not fail on the first error."),
                                cl::Hidden, cl::ZeroOrMore, cl::init(false),
-                               cl::cat(PollyCategory));
+                               cl::cat(PolliCategory));
 
 static cl::opt<bool>
     VerifyScops("polli-detect-verify",
                 cl::desc("Verify the detected SCoPs after each transformation"),
                 cl::Hidden, cl::init(false), cl::ZeroOrMore,
-                cl::cat(PollyCategory));
+                cl::cat(PolliCategory));
 
 /// @brief The minimal trip count under which loops are considered unprofitable.
 static const unsigned MIN_LOOP_TRIP_COUNT = 8;
