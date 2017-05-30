@@ -33,6 +33,7 @@
 #include <thread>
 #include <vector>
 #include <deque>
+#include <functional>
 
 namespace polli {
 using LockT = std::unique_lock<std::mutex>;
