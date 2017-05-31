@@ -30,6 +30,7 @@
 #include "polly/CodeGen/CodeGeneration.h"
 #include "polly/CodeGen/CodegenCleanup.h"
 #include "polly/CodeGen/IslAst.h"
+#include "polly/Support/GICHelper.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/Options.h"
 #include "polly/RegisterPasses.h"
@@ -257,6 +258,8 @@ public:
           "\n IslAst"
           "\n===============================================================\n";
     AI.printScop(os, S);
+    std::string ST = polly::stringFromIslObj(S.getScheduleTree());
+    os << "\n" << ST << "\n";
     console->error(os.str());
     return false;
   }
