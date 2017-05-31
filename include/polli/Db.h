@@ -29,6 +29,10 @@ struct Options {
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions);
 
+void StoreTransformedScop(const std::string &FnName,
+                          const std::string &IslAstStr,
+                          const std::string &ScheduleTreeStr);
+
 namespace tracing {
 struct TraceData {
   std::unordered_map<uint64_t, uint64_t> Events;

@@ -16,6 +16,7 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/BasePointers.h"
 #include "polli/Utils.h"
+#include "polli/Db.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -237,6 +238,40 @@ private:
   const PollyScopReport &operator=(const PollyScopReport &);
 };
 
+class DBExport : public polly::ScopPass {
+public:
+  static char ID;
+  explicit DBExport() : polly::ScopPass(ID) {};
+
+  /// @name ScopPass interface
+  //@{
+  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
+    AU.addRequired<polly::ScopInfoRegionPass>();
+    AU.addRequired<polly::IslScheduleOptimizer>();
+    AU.addRequired<polly::IslAstInfo>();
+    AU.setPreservesAll();
+  }
+
+  bool runOnScop(Scop &S) override {
+    IslAstInfo &AI = getAnalysis<IslAstInfo>();
+    std::string buf, IslAstrStr, ScheduleTreeStr;
+    raw_string_ostream os(buf);
+    AI.printScop(os, S);
+
+    IslAstrStr = os.str();
+    ScheduleTreeStr = polly::stringFromIslObj(S.getScheduleTree());
+
+    StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
+                         ScheduleTreeStr);
+
+    console->error(os.str());
+    return false;
+  }
+
+  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
+  //@}
+};
+
 class PollyReport : public polly::ScopPass {
 public:
   static char ID;
@@ -316,6 +351,7 @@ char PollyFnReport::ID = 0;
 char PollyReport::ID = 0;
 char PollyScopReport::ID = 0;
 char PollyScheduleReport::ID = 0;
+char DBExport::ID = 0;
 
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
@@ -332,6 +368,7 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(polly::createIslAstInfoPass());
   PM.add(polly::createCodeGenerationPass());
   DEBUG(PM.add(new PollyReport()));
+  PM.add(new DBExport());
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.

@@ -168,12 +168,9 @@ struct Event {
   uint64_t Time;
 };
 
-void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
-              const RegionMapTy &Regions) {
+static uint64_t PrepareRun(pqxx::work &w) {
   Options opts = getOptions();
   DbOptions Opts = getDBOptionsFromEnv();
-  if (!opts.use_db)
-    return;
 
   std::string SEARCH_PROJECT_SQL =
       "SELECT name FROM project WHERE name = '{}';";
@@ -187,11 +184,7 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
       "project_name, experiment_name, run_group, experiment_group) "
       "VALUES (TIMESTAMP '{}', '{}', "
       "'{}', '{}', '{}', '{}') RETURNING id;";
-  std::string NEW_RUN_RESULT_SQL = "INSERT INTO regions (name, id, "
-                                   "duration, events, run_id) "
-                                   "VALUES";
 
-  pqxx::work w(*getDatabase());
   pqxx::result project_exists =
       submit(fmt::format(SEARCH_PROJECT_SQL, opts.project), w);
 
@@ -211,6 +204,23 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
     run_id = Opts.run_id;
   }
 
+  return run_id;
+}
+
+void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
+              const RegionMapTy &Regions) {
+  Options opts = getOptions();
+  if (!opts.use_db)
+    return;
+
+  DbOptions Opts = getDBOptionsFromEnv();
+  pqxx::work w(*getDatabase());
+  uint64_t run_id = PrepareRun(w);
+
+  std::string NEW_RUN_RESULT_SQL = "INSERT INTO regions (name, id, "
+                                   "duration, events, run_id) "
+                                   "VALUES";
+
   int cnt = 0;
   std::stringstream vals;
   for (auto KV : Events) {
@@ -225,6 +235,27 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
   submit(NEW_RUN_RESULT_SQL + vals.str(), w);
   vals.clear();
   vals.flush();
+  w.commit();
+}
+
+void StoreTransformedScop(const std::string &FnName,
+                          const std::string &IslAstStr,
+                          const std::string &ScheduleTreeStr) {
+  Options opts = getOptions();
+  if (!opts.use_db)
+    return;
+
+  DbOptions Opts = getDBOptionsFromEnv();
+  pqxx::work w(*getDatabase());
+  uint64_t run_id = PrepareRun(w);
+
+  std::string SCHEDULE_SQL = "INSERT INTO schedules (function, schedule, "
+                             "run_id) VALUES ('{:s}', '{:s}', {:d});";
+  std::string AST_SQL =
+      "INSERT INTO isl_asts (function, ast, run_id) VALUES ('{:s}', '{:s}', {:d});";
+
+  submit(fmt::format(SCHEDULE_SQL, FnName, ScheduleTreeStr, run_id), w);
+  submit(fmt::format(AST_SQL, FnName, IslAstStr, run_id), w);
   w.commit();
 }
 
