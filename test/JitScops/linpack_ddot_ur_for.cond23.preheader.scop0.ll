@@ -1,15 +1,7 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polly-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect-scops -jitable -analyze < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 regions require runtime support:
 ; CHECK:   0 region for.cond23.preheader => for.end34.exitStub requires 0 params
-; CHECK:     7 reasons can be fixed at run time:
-; CHECK:       0 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem"
-; CHECK:       1 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem"
-; CHECK:       2 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem", "dx"
-; CHECK:       3 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem", "dx", "dy"
-; CHECK:       4 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem", "dx", "dy"
-; CHECK:       5 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem", "dx", "dy"
-; CHECK:       6 - Possible aliasing: "dtemp.1.lcssa.reg2mem", "dtemp.16.reg2mem", "dx", "dy"
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

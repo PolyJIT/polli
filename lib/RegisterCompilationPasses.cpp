@@ -12,53 +12,70 @@
 // Register the compilation sequence required for the PolyJIT runtime support.
 //
 //===----------------------------------------------------------------------===//
-#define DEBUG_TYPE "polyjit"
 #include "polli/RegisterCompilationPasses.h"
 #include "polli/InstrumentRegions.h"
 #include "polli/ModuleExtractor.h"
+#include "polli/Options.h"
+#include "polli/PapiProfiling.h"
+#include "polli/log.h"
 
 #include "polly/Canonicalization.h"
+#include "polly/CodeGen/CodegenCleanup.h"
 #include "polly/RegisterPasses.h"
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Scalar.h"
 
-#include "polli/Options.h"
-#include "polli/JitScopDetection.h"
-#include "polli/PapiProfiling.h"
-#include "polli/ScopMapper.h"
-#include "polli/ModuleExtractor.h"
-
-#include "cppformat/format.h"
+#define DEBUG_TYPE "polyjit"
 
 using namespace llvm;
 using namespace polli;
 
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
+namespace {
+REGISTER_LOG(console, "register");
+}
 
 namespace polli {
 
 void initializePolliPasses(PassRegistry &Registry) {
   initializePapiCScopProfilingPass(Registry);
   initializePapiCScopProfilingInitPass(Registry);
+  initializeJITScopDetectionPass(Registry);
 }
 
-static void printConfig() {
-  errs() << fmt::format("PolyJIT - Config:\n");
-  errs() << fmt::format(" polyjit.jitable: {}\n", opt::EnableJitable);
-  errs() << fmt::format(" polyjit.recompile: {}\n", !opt::DisableRecompile);
-  errs() << fmt::format(" polyjit.execute: {}\n", !opt::DisableExecution);
-  errs() << fmt::format(" polyjit.instrument: {}\n", opt::InstrumentRegions);
-  errs() << fmt::format(" polly.delinearize: {}\n", polly::PollyDelinearize);
-  errs() << fmt::format(" polly.aliaschecks: {}\n",
-                        polly::PollyUseRuntimeAliasChecks);
-  errs() << fmt::format(" polyjit.collect-regression: {}\n",
-                        opt::CollectRegressionTests);
-}
+struct InjectMain : public FunctionPass {
+  std::string PassName;
+  static char ID;
+
+  InjectMain() : FunctionPass(ID), PassName("PolyJIT - Main Injector") {}
+
+  bool runOnFunction(Function &F) override {
+    bool IsMain = F.getName() == "main";
+
+    if (IsMain) {
+      Module *M = F.getParent();
+      LLVMContext &Ctx = M->getContext();
+      IRBuilder<> Builder(Ctx);
+      Function *PJMainFn = cast<Function>(M->getOrInsertFunction(
+          "pjit_library_init", Type::getVoidTy(Ctx), NULL));
+      BasicBlock &Entry = F.getEntryBlock();
+      Builder.SetInsertPoint(Entry.getFirstNonPHI());
+      Builder.CreateCall(PJMainFn);
+      console->debug("Found the main function in {:s}",
+                     M->getModuleIdentifier());
+    }
+
+    return IsMain;
+  }
+
+  const char *getPassName() const override { return PassName.c_str(); }
+
+  void getAnalysisUsage(AnalysisUsage &AU) const override {
+    AU.setPreservesAll();
+  }
+};
 
 /**
  * @brief Copy of opt's FunctionPassPrinter.
@@ -87,50 +104,39 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<T>();
-    // FIXME: We preserve everything, but LLVM will kill all passes that are
-    //       needed by the module extractor in our compilation pipeline.
-    // AU.setPreservesAll();
+    AU.setPreservesAll();
   }
 };
 
-template <> char FunctionPassPrinter<JitScopDetection>::ID = 0;
+template <> char FunctionPassPrinter<JITScopDetection>::ID = 0;
 template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
+char InjectMain::ID = 0;
 
 static void registerPolyJIT(const llvm::PassManagerBuilder &,
                             llvm::legacy::PassManagerBase &PM) {
   if (!opt::Enabled)
     return;
 
-  if (polly::PollyDelinearize && opt::EnableJitable)
-    polly::PollyDelinearize = false;
-
-  if (polly::PollyUseRuntimeAliasChecks && opt::EnableJitable)
-    polly::PollyUseRuntimeAliasChecks = false;
-
-  DEBUG(printConfig());
-
   polly::registerCanonicalicationPasses(PM);
-  registerPollyPasses(PM);
+  PM.add(polly::createCodePreparationPass());
+  PM.add(polli::createScopDetectionPass());
 
-  // Schedule us inbetween detection and polly's codegen.
-  PM.add(new JitScopDetection(opt::EnableJitable));
   if (opt::AnalyzeIR)
-    PM.add(new FunctionPassPrinter<JitScopDetection>(outs()));
+    PM.add(new FunctionPassPrinter<polli::JITScopDetection>(outs()));
 
   if (opt::InstrumentRegions) {
     PM.add(new PapiCScopProfiling());
     return;
   }
 
-  if (!opt::DisableRecompile) {
-    PM.add(new ScopMapper());
-    PM.add(new ModuleExtractor());
-    if (opt::AnalyzeIR)
-      PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
-  }
+  PM.add(new ModuleExtractor());
+  PM.add(new ModuleInstrumentation());
+  if (opt::AnalyzeIR)
+    PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
+  PM.add(new InjectMain());
 }
 
 static llvm::RegisterStandardPasses
-    RegisterPolyJIT(llvm::PassManagerBuilder::EP_LoopOptimizerEnd,
+    RegisterPolyJIT(llvm::PassManagerBuilder::EP_EarlyAsPossible,
                     registerPolyJIT);
 } // namespace polli

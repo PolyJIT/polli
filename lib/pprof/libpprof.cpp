@@ -1,26 +1,36 @@
 #include "pprof/pprof.h"
 
 #include <inttypes.h>
-#include <papi.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <map>
-#include <unordered_map>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <pthread.h>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 #include <sys/stat.h>
 
-#include "pprof/pgsql.h"
+#include "polli/log.h"
 #include "pprof/file.h"
+#include "pprof/pgsql.h"
+
+#include "spdlog/spdlog.h"
+
+namespace papi {
+#include <papi.h>
+}
 
 using namespace pprof;
+namespace spd = spdlog;
+
+REGISTER_LOG(console, "libpprof");
 
 namespace pprof {
 Options *getOptions() {
@@ -28,29 +38,78 @@ Options *getOptions() {
   return &opts;
 }
 
-using RunMap = std::unordered_map<pthread_t, Run<PPEvent>>;
-static RunMap PapiThreadedEvents;
-static __thread Run<PPEvent> *PapiLocalEvents;
+using RunMap = std::map<const thread::id, Run<PPEvent>>;
+static inline RunMap &papi_threaded_events() {
+  static RunMap PapiThreadedEvents;
+  return PapiThreadedEvents;
+}
+
+static inline Run<PPEvent> *papi_local_events(Run<PPEvent> *Evs = nullptr) {
+  static __thread Run<PPEvent> *PapiLocalEvents;
+  if (Evs != nullptr)
+    PapiLocalEvents = Evs;
+  return PapiLocalEvents;
+}
+
+using TIDMapT = std::map<thread::id, uint64_t>;
+static uint64_t TID = 0;
+static inline TIDMapT &papi_get_tid_map() {
+  static std::map<thread::id, uint64_t> TIDMap;
+  return TIDMap;
+}
+
+/**
+ * @brief Get a unique thread id of type uint64_t
+ *
+ * thread_id and pthread_t should be treated opaque, so
+ * we track a simple integer for each thread_id we encounter.
+ *
+ * @return a unique thread_id of type uint64_t.
+ */
+static uint64_t papi_get_thread_id() {
+  thread::id sTID = std::this_thread::get_id();
+  TIDMapT &TIDMap = papi_get_tid_map();
+
+  if (TIDMap.find(sTID) != TIDMap.end())
+    return TIDMap.at(sTID);
+
+  TIDMap[sTID] = TID++;
+  return TIDMap[sTID];
+}
 
 /**
  * @brief Storage container for all PAPI region events.
  */
 Run<PPEvent> PapiEvents;
+
+void papi_store_thread_events(const Options &opts) {
+  thread::id tid = std::this_thread::get_id();
+  uint64_t id = papi_get_tid_map()[tid];
+  pgsql::StoreRun(id, papi_threaded_events()[tid], opts);
+}
 } // namespace pprof
 
 static __thread bool papi_thread_init = false;
 static bool papi_init = false;
-static inline void do_papi_thread_init_once() {
+static void do_papi_thread_init_once() {
   if (!papi_thread_init) {
     if (!papi_init)
       papi_region_setup();
-    int ret = PAPI_thread_init(pthread_self);
+
+    int ret = papi::PAPI_thread_init(papi_get_thread_id);
     if (ret != PAPI_OK) {
-      fprintf(stderr, "PAPI_thread_init() failed\n");
-      exit(ret);
+      if (ret == PAPI_ENOINIT) {
+        papi::PAPI_library_init(PAPI_VER_CURRENT);
+        do_papi_thread_init_once();
+      } else {
+        console->error("PAPI_thread_init() = {:d}", ret);
+        console->error("{:s}", papi::PAPI_strerror(ret));
+        exit(ret);
+      }
+    } else {
+      papi_local_events(&papi_threaded_events()[std::this_thread::get_id()]);
+      papi_thread_init = (ret == PAPI_OK);
     }
-    PapiLocalEvents = &PapiThreadedEvents[pthread_self()];
-    papi_thread_init = (ret == PAPI_OK);
   }
 }
 
@@ -68,7 +127,7 @@ void papi_region_enter_scop(uint64_t id, const char *dbg) {
   do_papi_thread_init_once();
   PPEvent Ev(id, ScopEnter, dbg);
   Ev.snapshot();
-  PapiLocalEvents->push_back(Ev);
+  papi_local_events()->push_back(Ev);
 }
 
 /**
@@ -81,7 +140,7 @@ void papi_region_enter_scop(uint64_t id, const char *dbg) {
 void papi_region_exit_scop(uint64_t id, const char *dbg) {
   PPEvent Ev(id, ScopExit, dbg);
   Ev.snapshot();
-  PapiLocalEvents->push_back(Ev);
+  papi_local_events()->push_back(Ev);
 }
 
 /**
@@ -94,7 +153,18 @@ void papi_region_enter(uint64_t id, const char *dbg) {
   do_papi_thread_init_once();
   PPEvent Ev(id, RegionEnter, dbg);
   Ev.snapshot();
-  PapiLocalEvents->push_back(Ev);
+  papi_local_events()->push_back(Ev);
+}
+
+/**
+ * @brief Partially record polli::Stats objects as papi events.
+ */
+void record_stats(uint64_t id, const char *dbg, uint64_t enter, uint64_t exit) {
+  do_papi_thread_init_once();
+  PPEvent Enter(id, RegionEnter, enter, dbg);
+  PPEvent Exit(id, RegionExit, exit, dbg);
+  papi_local_events()->push_back(Enter);
+  papi_local_events()->push_back(Exit);
 }
 
 /**
@@ -106,7 +176,7 @@ void papi_region_enter(uint64_t id, const char *dbg) {
 void papi_region_exit(uint64_t id, const char *dbg) {
   PPEvent Ev(id, RegionExit, dbg);
   Ev.snapshot();
-  PapiLocalEvents->push_back(Ev);
+  papi_local_events()->push_back(Ev);
 }
 
 /**
@@ -124,24 +194,19 @@ void papi_atexit_handler(void) {
   if (!opts.execute_atexit)
     return;
 
-  PapiLocalEvents->push_back(PPEvent(0, RegionExit, "STOP"));
   uint64_t bytes = 0;
-  for (auto elem : PapiThreadedEvents) {
+  for (auto elem : papi_threaded_events()) {
     bytes += elem.second.size() * sizeof(PPEvent);
   }
-  fprintf(stderr, "libpprof: I required %f MB storage.\n",
-          bytes / (double)(1024 * 1024));
 
-  if (opts.use_db) {
-    for (auto elem : PapiThreadedEvents) {
-      pgsql::StoreRun(elem.first, elem.second, opts);
+  if (opts.use_file) {
+    papi_local_events()->push_back(PPEvent(0, RegionExit, "STOP"));
+    for (auto elem : papi_threaded_events()) {
+      file::StoreRun(elem.second, opts);
     }
   }
-  if (opts.use_file)
-    file::StoreRun(PapiEvents, opts);
 
-  PapiLocalEvents->clear();
-  PAPI_shutdown();
+  papi::PAPI_shutdown();
 }
 
 /**
@@ -152,24 +217,22 @@ void papi_atexit_handler(void) {
  * @return void
  */
 void papi_region_setup() {
-  int init = PAPI_library_init(PAPI_VER_CURRENT);
-  if (init != PAPI_VER_CURRENT && init > 0)
-    fprintf(stderr, "ERROR(PPROF): PAPI_library_init: Version mismatch\n");
+  int init = papi::PAPI_library_init(PAPI_VER_CURRENT);
+  if (init != PAPI_VER_CURRENT) {
+    console->error("[ERROR] PAPI_library_init = {:d}", init);
+    console->error("[ERROR] {:s}", papi::PAPI_strerror(init));
+  }
 
   papi_init = true;
   do_papi_thread_init_once();
-  papi_init = false;
 
-  init = PAPI_is_initialized();
-  if (init != PAPI_LOW_LEVEL_INITED)
-    fprintf(stderr, "ERROR(PPROF): PAPI_library_init failed!\n");
+  SPDLOG_DEBUG("libpprof", "papi_region_setup from thread: {:d}",
+               papi_get_thread_id());
 
-  int err = atexit(papi_atexit_handler);
-  if (err)
-    fprintf(stderr, "ERROR(PAPI-Prof): Failed to setup atexit handler (%d).\n",
-            err);
-  //PapiEvents.push_back(PPEvent(0, RegionEnter, "START"));
-  PapiLocalEvents->push_back(PPEvent(0, RegionEnter, "START"));
+  if (int err = atexit(papi_atexit_handler))
+    console->error("Failed to setup papi_atexit_handler ({:d}).", err);
+
+  papi_local_events()->push_back(PPEvent(0, RegionEnter, "START"));
   papi_init = true;
 }
 }

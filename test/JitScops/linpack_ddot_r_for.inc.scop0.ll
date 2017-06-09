@@ -1,14 +1,9 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polly-process-unprofitable -polly-delinearize=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polli-detect-scops -jitable -analyze < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 regions require runtime support:
-; CHECK:   0 region for.inc => for.cond.return.loopexit1_crit_edge.exitStub requires 4 params
-; CHECK:     0 - (8 * %2)
-; CHECK:     0 - %3
+; CHECK:   0 region for.inc => for.cond.return.loopexit1_crit_edge.exitStub requires 2 params
 ; CHECK:     0 - (8 * %0)
 ; CHECK:     0 - %1
-; CHECK:     2 reasons can be fixed at run time:
-; CHECK:       0 - Non affine access function: {(8 * %3),+,(8 * %2)}<%for.inc>
-; CHECK:       1 - Non affine access function: {(8 * %1),+,(8 * %0)}<%for.inc>
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

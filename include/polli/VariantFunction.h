@@ -119,68 +119,13 @@ struct Param {
 
 typedef ParamVector<Param> FunctionKey;
 
-struct Stats {
-  // PAPI_flops(...)
-  float RealTime;
-  float ProcTime;
-  float MFLOPS;
-
-  long long flpops;
-  // PAPI_flops(...)
-
-  // libpprof
-  long long ExecCount;
-
-  explicit Stats()
-      : RealTime(0.0f), ProcTime(0.0f), MFLOPS(0.0f), flpops(0), ExecCount(0) {}
-
-  Stats(const Stats &Other)
-      : RealTime(Other.RealTime), ProcTime(Other.ProcTime),
-        MFLOPS(Other.MFLOPS), flpops(Other.flpops), ExecCount(Other.ExecCount) {
-  }
-  Stats &operator=(const Stats &Other) {
-    if (this != &Other) {
-      RealTime = Other.RealTime;
-      ProcTime = Other.ProcTime;
-      MFLOPS = Other.MFLOPS;
-      flpops = Other.flpops;
-      ExecCount = Other.ExecCount;
-    }
-    return *this;
-  }
-};
-
 class VariantFunction {
 private:
-  using VariantsT = std::unordered_map<size_t, llvm::Function *>;
-
-  // @brief Track various stats about this function;
-  Stats S;
-
   // @brief Our base function to create new variants from.
   llvm::Function &BaseF;
 
-  // @brief Our source function. This is the function that contained
-  // the call to our JIT environment.
-  llvm::Function &SourceF;
-
-  // @brief All variants of our base function, indexed by key.
-  //
-  // We index the variants with the key we form from our specialzed param
-  // vector.
-  VariantsT Variants;
-
-  // @brief Create a new function variant with they values included in the
-  // key replaced.
-  llvm::Function *createVariant(const RunValueList &K);
-
 protected:
   llvm::Function &getBaseFunction() const { return BaseF; }
-  llvm::Function &getSourceFunction() const { return SourceF; }
-
-  VariantsT getVariants() const {
-    return Variants;
-  }
 
 public:
   /**
@@ -194,49 +139,17 @@ public:
    * @param BaseF
    * @param SourceF
    */
-  explicit VariantFunction(llvm::Function &BaseF, llvm::Function &SourceF)
-      : BaseF(BaseF), SourceF(SourceF) {}
+  explicit VariantFunction(llvm::Function &BaseF) : BaseF(BaseF) {}
 
-  /**
-   * @brief Print header for variant functions.
-   *
-   * @param OS
-   */
-  static void printHeader(llvm::raw_ostream &OS);
-
-  /**
-   * @brief Print statistics about this variant function.
-   *
-   * @param OS
-   */
-  void print(llvm::raw_ostream &OS);
-
-  /**
-   * @brief Return a reference to our statistics.
-   *
-   * @return
-   */
-  Stats &stats() { return S; }
-
-  /**
-   * @brief Return or create a new variant for this function with a given key
-   *
-   * @param K
-   *
-   * @return
-   */
-  llvm::Function *getOrCreateVariant(const RunValueList &K);
-
-  ~VariantFunction() { Variants.clear(); }
-  /**  @} */
-private:
-  void printVariants(llvm::raw_ostream &OS);
-
+  // @brief Create a new function variant with they values included in the
+  // key replaced.
+  std::unique_ptr<llvm::Module> createVariant(const RunValueList &K,
+                                              std::string &FnName);
 };
 
 using VariantFunctionTy = std::shared_ptr<VariantFunction>;
 using VariantFunctionMapTy =
-    std::unordered_map<llvm::Function *, std::shared_ptr<VariantFunction>>;
+    std::unordered_map<llvm::Function *, VariantFunctionTy>;
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out,

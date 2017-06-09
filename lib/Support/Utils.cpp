@@ -11,29 +11,20 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
 #include "polli/Utils.h"
-#include "polli/Options.h"
+#include "polli/log.h"
+#include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/PostDominators.h"
 
-#include "llvm/ADT/SmallVector.h"      // for SmallVector
-#include "llvm/ADT/Twine.h"            // for Twine
 #include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/Module.h"            // for Module
-#include "llvm/IR/Verifier.h"          // for createVerifierPass
 #include "llvm/IR/IRPrintingPasses.h"
-#include <string>                      // for string
-#include <utility>                     // for pair
 #include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Pass.h"                   // for FunctionPass
-#include "llvm/Support/CommandLine.h"    // for initializer, desc, init, etc
-#include "llvm/Support/Debug.h"          // for dbgs, DEBUG
-#include "llvm/Support/FileSystem.h"     // for OpenFlags::F_RW
-#include "llvm/Support/ToolOutputFile.h" // for tool_output_file
-#include "llvm/Support/raw_ostream.h"    // for raw_ostream
-
-#include <cxxabi.h>
+#include "llvm/IR/Verifier.h" // for createVerifierPass
 
 using namespace llvm;
 using namespace llvm::legacy;
 using namespace polli;
+
+REGISTER_LOG(console, "utils");
 
 SmallVector<char, 255> *DefaultDir;
 
@@ -73,7 +64,7 @@ void StoreModule(Module &M, const Twine &Name) {
   // Somewhere we don't fetch all symbols during extraction.
   llvm::StripDebugInfo(M);
 
-  PassManager PM;
+  llvm::legacy::PassManager PM;
   PM.add(llvm::createVerifierPass());
   PM.add(createPrintModulePass(Out->os()));
   PM.run(M);
@@ -87,4 +78,28 @@ void StoreModules(ManagedModules &Modules) {
     ModulePtrT M = (Modules_MI).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
+}
+
+namespace polli {
+/* @brief Remove the given function from the dominator tree.
+ *
+ * If we have a DominatorTree available, we can remove the extracted
+ * function from it, to avoid further problems with wrong dominance
+ * information.
+ */
+void removeFunctionFromDomTree(Function &F, DominatorTree &DT) {
+  DomTreeNode *N = DT.getNode(&F.getEntryBlock());
+  if (!N) {
+    console->debug("Entry block of ({:s}) not found in given dominator tree.",
+                   F.getName().str());
+    return;
+  }
+  std::vector<BasicBlock *> Nodes;
+
+  for (po_iterator<DomTreeNode *> I = po_begin(N), E = po_end(N); I != E; ++I)
+    Nodes.push_back(I->getBlock());
+
+  for (BasicBlock *BB : Nodes)
+    DT.eraseNode(BB);
+}
 }

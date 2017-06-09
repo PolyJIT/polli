@@ -1,3 +1,4 @@
+#include "polli/log.h"
 #include "pprof/pprof.h"
 #include "pprof/file.h"
 #include "pprof/pgsql.h"
@@ -15,13 +16,8 @@
 
 #include <assert.h>
 #include <memory>
-#include <stdexcept>
-
-#include <cppformat/format.h>
 
 using namespace llvm;
-using namespace fmt;
-
 static std::map<uint32_t, uint64_t> PPDurations;
 
 static uint64_t getTimeInSCoPs(const pprof::Run<PPEvent> &Events) {

@@ -1,10 +1,6 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polly-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect -jitable -polly-detect-keep-going -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect-scops -jitable -analyze < %s 2>&1 | FileCheck %s
 
 ;CHECK: 1 regions require runtime support:
-;CHECK:   0 region for.cond28.preheader => for.end41.loopexit requires 0 params
-;CHECK:     2 reasons can be fixed at run time:
-;CHECK:       0 - Possible aliasing: "dy", "dx"
-;CHECK:       1 - Possible aliasing: "dy", "dx"
 
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-unknown-linux-gnu"

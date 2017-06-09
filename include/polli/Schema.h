@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 #ifndef POLLI_SCHEMA_H
 #define POLLI_SCHEMA_H
+#include "polli/log.h"
 #include "pprof/pprof.h"
 #include "pprof/pgsql.h"
 #include "llvm/IR/Module.h"
-#include "cppformat/format.h"
 #include <pqxx/pqxx>
 #include <string>
 

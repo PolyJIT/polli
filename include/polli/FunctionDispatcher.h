@@ -19,6 +19,7 @@
 
 #include "llvm/Support/Debug.h"
 #include <memory>
+#include <mutex>
 
 using namespace polli;
 
@@ -256,67 +257,5 @@ public:
   void setAliasSet(AliasSet &Aliases);
 
   void Apply(Function *TgtF, Function *SrcF, ValueToValueMapTy &VMap);
-};
-
-/**
- * @brief Reroute calls to a different version
- *
- * Implement a function dispatch to reroute calls to parametrized
- * functions to their possible - semintically equivalent - specializations.
- */
-class FunctionDispatcher {
-  FunctionDispatcher(const FunctionDispatcher &);
-  const FunctionDispatcher &
-  operator=(const FunctionDispatcher &);
-
-  // Map instrumented functions to uninstrumented functions. Used to resolve
-  // to the uninstrumented function when coming from the JIT callback function.
-  FunctionNameToFunctionMapTy FMap;
-
-  VariantFunctionMapTy VariantFunctions;
-
-public:
-  explicit FunctionDispatcher() {}
-
-  /**
-   * @brief Set up a mapping between an uninstrumented and an instrumented
-   *        function.
-   *
-   * @param F Source function
-   * @param MapTo Target function
-   */
-  void setPrototypeMapping(Function *F, Function *MapTo) {
-    FMap.insert(std::make_pair(F->getName().str(), MapTo));
-    //assert(Result.second && "Tried to overwrite mapping.");
-  }
-
-  /**
-   * @brief Access variant functions
-   *
-   * @return A map of variant functions.
-   */
-  const VariantFunctionMapTy &functions() {
-    return VariantFunctions;
-  }
-
-  /**
-   * @brief Get or Create a new variant function for the given Function.
-   *
-   * @param F The function we get or create the variant function for.
-   *
-   * @return A variant function for function F
-   */
-  VariantFunctionTy getOrCreateVariantFunction(Function *F) {
-    // We have already specialized this function at least once.
-    if (VariantFunctions.count(F))
-      return VariantFunctions.at(F);
-
-    // Create a variant function & specialize a new variant, based on key.
-    VariantFunctionTy VarFun =
-        std::make_shared<VariantFunction>(*F, *(FMap[F->getName()]));
-
-    VariantFunctions.insert(std::make_pair(F, VarFun));
-    return VarFun;
-  }
 };
 #endif

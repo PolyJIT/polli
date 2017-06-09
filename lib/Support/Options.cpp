@@ -35,6 +35,7 @@ bool EnableJitable;
 bool DisableRecompile;
 bool DisableExecution;
 bool DisablePreopt;
+bool DisableSpecialization;
 bool AnalyzeIR = false;
 bool AnalyseOnly;
 std::string ReportFilename;
@@ -44,11 +45,25 @@ bool CollectRegressionTests = false;
 
 bool DisableCoreFiles = true;
 char OptLevel = ' ';
-std::string TargetTriple = "";
+std::string TargetTriple = "x86-64_unknown-linux-gnu";
+// std::string MArch = "x86-64";
+// std::string MCPU  = "ivybridge";
 std::string MArch = "";
 std::string MCPU = "";
 std::vector<std::string> MAttrs;
-llvm::Reloc::Model RelocModel = Reloc::Default;
+// std::vector<std::string> MAttrs = {
+//    "-sse4a",    "-avx512bw", "+cx16",     "-tbm",      "+xsave",  "-fma4",
+//    "-avx512vl", "-prfchw",   "-bmi2",     "-adx",      "-xsavec",
+//    "+fsgsbase",
+//    "+avx",      "-avx512cd", "-avx512pf", "-rtm",      "+popcnt", "-fma",
+//    "-bmi",      "+aes",      "+rdrnd",    "-xsaves",   "+sse4.1", "+sse4.2",
+//    "-avx2",     "-avx512er", "+sse",      "-lzcnt",    "+pclmul", "-avx512f",
+//    "+f16c",     "+sse3",     "+mmx",      "-pku",      "+cmov",   "-xop",
+//    "-rdseed",   "-movbe",    "-hle",      "+xsaveopt", "-sha",    "+sse2",
+//    "+sse3",     "-avx512dq"
+//};
+
+llvm::Reloc::Model RelocModel = Reloc::PIC_;
 llvm::CodeModel::Model CModel = CodeModel::JITDefault;
 llvm::FloatABI::ABIType FloatABIForCalls = FloatABI::Default;
 bool GenerateSoftFloatCalls = false;
@@ -62,24 +77,27 @@ bool EmitEnv = false;
  *
  * @return True, if we should enable PAPI base runtime instrumentation.
  */
-bool havePapi() {
-  return std::getenv("POLLI_ENABLE_PAPI") != nullptr;
-}
-
+bool havePapi() { return std::getenv("POLLI_ENABLE_PAPI") != nullptr; }
 /**
  * @brief Check, if we have likwid support at run-time.
  *
  * @return bool
  */
-bool haveLikwid() {
-  if (EmitEnv) {
-    for (char **current = environ; *current; current++) {
-      dbgs() << *current << "\n";
-    }
+bool haveLikwid() { return std::getenv("LIKWID_MODE") != nullptr; }
+
+uint64_t getNumThreads() {
+  if (const char *NumThreadsStr = std::getenv("OMP_NUM_THREADS")) {
+    return std::atoi(NumThreadsStr);
   }
 
-  return std::getenv("LIKWID_MODE") != nullptr;
+  return 0;
 }
+
+void loadOptionsFromEnv() {
+  DisableSpecialization =
+      std::getenv("POLLI_DISABLE_SPECIALIZATION") != nullptr;
+}
+
 } // namespace opt
 } // namespace polli
 

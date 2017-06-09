@@ -1,7 +1,14 @@
 macro(add_polli_executable name)
   set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
   set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
-  add_llvm_executable( ${name} ${ARGN} )
+  add_executable( ${name} ${ARGN} )
+
+  if(POLLI_LINK_LIBS)
+    foreach(lib ${POLLI_LINK_LIBS})
+      target_link_libraries(${name} LINK_PRIVATE ${lib})
+    endforeach(lib)
+  endif(POLLI_LINK_LIBS)
+
   set_target_properties(${name} PROPERTIES FOLDER "Polli executables")
   install (TARGETS ${name}
     RUNTIME DESTINATION bin
@@ -58,6 +65,7 @@ macro(add_polli_library name)
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
   set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${name})
+  set_output_directory(${name} LIBRARY_DIR ${POLLI_LIBRARY_OUTPUT_INTDIR})
 endmacro(add_polli_library)
 
 macro(add_polli_loadable_module name)

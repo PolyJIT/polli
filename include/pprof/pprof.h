@@ -1,13 +1,18 @@
 #ifndef PPRINT_H
 #define PPRINT_H
 #include <inttypes.h>
-#include <papi.h>
 #include <pthread.h>
 
 #include <assert.h>
-#include <memory>
 #include <vector>
 #include <string>
+
+// FIXME: Mask All symbols included bypapi inside  this C++ namespace
+namespace papi {
+#include <papi.h>
+}
+
+#include <memory>
 
 extern "C" {
 /**
@@ -47,6 +52,11 @@ void papi_region_enter(uint64_t id, const char *dbg);
 void papi_region_exit(uint64_t id, const char *dbg);
 
 /**
+ * @brief Partially record polli::Stats objects as papi events.
+ */
+void record_stats(uint64_t id, const char *dbg, uint64_t enter, uint64_t exit);
+
+/**
  * @brief Setup the atexit handler
  */
 void papi_atexit_handler(void);
@@ -82,10 +92,10 @@ struct PPStringRegion {
 
 class PPEvent {
 public:
-  PPEvent(uint64_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
-      : ID(ID), EventTy(Ty), Timestamp(PAPI_get_real_nsec()), DebugStr(dbgStr) {
-  }
-  explicit PPEvent(uint64_t ID, PPEventType Ty, long long int Timestamp,
+  PPEvent(int32_t ID = 0, PPEventType Ty = Unknown, const char *dbgStr = "")
+      : ID(ID), EventTy(Ty), Timestamp(papi::PAPI_get_real_usec()),
+        DebugStr(dbgStr) {}
+  explicit PPEvent(int32_t ID, PPEventType Ty, long long int Timestamp,
                    const char *dbgStr = "")
       : ID(ID), EventTy(Ty), Timestamp(Timestamp), DebugStr(dbgStr) {}
 
@@ -96,7 +106,7 @@ public:
     EventTy = (PPEventType)std::stoi(R.Exit);
   }
 
-  uint32_t id() const { return ID; }
+  int32_t id() const { return ID; }
   PPEventType event() const { return EventTy; }
   long long int timestamp() const { return Timestamp; }
   std::string userString() const { return DebugStr; }
@@ -104,9 +114,10 @@ public:
   /**
    * @brief Set the timestamp of this event to 'right now'
    */
-  void snapshot() { Timestamp = PAPI_get_real_nsec(); }
+  void snapshot() { Timestamp = papi::PAPI_get_real_usec(); }
+
 private:
-  uint32_t ID;
+  int32_t ID;
   PPEventType EventTy;
   long long int Timestamp;
   std::string DebugStr;
@@ -144,19 +155,24 @@ struct Options {
   bool execute_atexit;
 };
 
+/**
+ * @brief Store the recorded events for this thread.
+ */
+void papi_store_thread_events(const Options &opts);
+
 Options *getOptions();
 Options getPprofOptionsFromEnv();
 
 struct Event {
-  uint32_t ID;
+  int32_t ID;
   PPEventType Type;
   uint64_t Start;
   uint64_t Duration;
   std::string Name;
   pthread_t TID;
 
-  Event(uint32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0,
-        uint64_t D = 0, std::string N = "", uint64_t TID = pthread_self())
+  Event(int32_t ID = 0, PPEventType T = Unknown, uint64_t S = 0, uint64_t D = 0,
+        std::string N = "", uint64_t TID = pthread_self())
       : ID(ID), Type(T), Start(S), Duration(D), Name(N), TID(TID) {}
 };
 

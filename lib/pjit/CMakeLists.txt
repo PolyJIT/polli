@@ -13,8 +13,7 @@ set(LLVM_LINK_COMPONENTS
   Instrumentation
   IPO
   Linker
-  MC
-  MCJIT
+  OrcJIT
   native
   objcarcopts
   RuntimeDyld
@@ -27,17 +26,36 @@ set(LLVM_LINK_COMPONENTS
 )
 
 set(POLLI_LINK_LIBS
-  Polly
   PolyJIT_Runtime
   PolyJIT_Support
+  Polly
   likwid
   pthread
   pfm
   papi
-  pprof
+  pqxx
+  pjit-logging
+  boost_system
+  boost_thread
 )
 
-set(SHARED_LIBRARY On)
-add_polli_library(pjit SHARED
+add_polli_library(pjit STATIC
   libpjit.cpp
+  BlockingMap.cpp
+  CodeGen.cpp
+  Jit.cpp
+  RunValues.cpp
+  Db.cpp
 )
+
+add_polli_library(pjit_shared SHARED
+  libpjit.cpp
+  BlockingMap.cpp
+  CodeGen.cpp
+  Jit.cpp
+  RunValues.cpp
+  Db.cpp
+)
+
+add_dependencies(pjit PolyJIT_Runtime)
+set_target_properties(pjit_shared PROPERTIES OUTPUT_NAME pjit)

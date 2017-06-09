@@ -1,13 +1,11 @@
 set(SHARED_LIBRARY ${POLLI_BUILD_SHARED_LIB})
 set(POLLI_SOURCES
+  Tracing.cpp
   pprof.cpp
   libpprof.cpp
   libpprof-pgsql.cpp
   libpprof-file.cpp
 )
-
-# for pqxx
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
 
 add_polli_library(pprof
   ${POLLI_SOURCES}
@@ -18,6 +16,7 @@ target_link_libraries(pprof
   papi
   pqxx
   pthread
+  pjit-logging
 )
 
 set_target_properties(pprof

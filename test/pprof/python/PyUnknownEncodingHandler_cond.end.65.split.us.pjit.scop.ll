@@ -1,7 +1,6 @@
+; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli -polli-process-unprofitable  -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
-; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli -polly-only-scop-detection -polly-process-unprofitable -polly-delinearize=false -polly-detect-keep-going -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
-
-; CHECK: 1 polyjit          - Number of jitable SCoPs
+; CHECK: 2 polyjit          - Number of jitable SCoPs
 
 ; ModuleID = '/local/hdd/pjtest/pj-collect/python/Python-3.4.3/Modules/pyexpat.c.PyUnknownEncodingHandler_cond.end.65.split.us.pjit.scop.prototype'
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

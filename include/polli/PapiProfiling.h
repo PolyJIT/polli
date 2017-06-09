@@ -4,7 +4,6 @@
 #include "llvm/Pass.h"
 #include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
-#include "polli/JitScopDetection.h"
 
 #include "polly/ScopDetection.h"
 #include "polly/Support/ScopHelper.h"

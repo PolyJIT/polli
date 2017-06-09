@@ -1,5 +1,5 @@
-// RUN: %clang -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polly-process-unprofitable -mllvm -polli -mllvm -jitable -mllvm -polly-detect-keep-going %s -o %t -lpjit
-// RUN: %t 2>&1 | FileCheck %s
+// RUN: %clang -rdynamic -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polli-process-unprofitable -mllvm -polli -mllvm -jitable %s -o %t %pjit
+// RUN: env BB_USE_DATABASE=0 %t 2>&1 | FileCheck %s
 #include <stdio.h>
 
 static int A[10];

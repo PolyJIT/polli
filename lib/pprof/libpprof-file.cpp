@@ -1,14 +1,12 @@
-#include "pprof/file.h"
 #include "pprof/pprof.h"
+#include "pprof/file.h"
 
 #include <ctime>
 #include <stdlib.h>
-#include <string>
-
-#include <cppformat/format.h>
 
 #include <fstream>
 #include <iostream>
+#include <string>
 #include <map>
 
 namespace pprof {
@@ -41,32 +39,6 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   FileOptions Opts = getFileOptions();
   ofstream out(Opts.profile, ios_base::out | ios_base::app);
 
-  // Build global string table
-  //const char *str;
-  //for (auto &event : Events) {
-  //  str = event.userString();
-  //  if (!str)
-  //    str = "UNDEF";
-  //  switch (event.event()) {
-  //  case ScopEnter:
-  //  case RegionEnter:
-  //    PPStrings[event->ID].Entry = str;
-  //    break;
-  //  case ScopExit:
-  //  case RegionExit:
-  //    PPStrings[event->ID].Exit = str;
-  //    break;
-  //  default:
-  //    break;
-  //  }
-
-  //  PPStrings[event->ID].ID = event->ID;
-  //}
-
-  // Append String table
-  for (auto &dbg : PPStrings)
-    out << dbg.second;
-
   // Append Events
   for (auto &event : Events)
     out << event;
@@ -82,8 +54,7 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
   }
 }
 
-static bool ReadRun(std::unique_ptr<std::ifstream> &in,
-                    Run<PPEvent> &Events,
+static bool ReadRun(std::unique_ptr<std::ifstream> &in, Run<PPEvent> &Events,
                     std::map<uint32_t, PPStringRegion> &Regions) {
   PPStringRegion StartR;
 
@@ -115,8 +86,8 @@ static bool ReadRun(std::unique_ptr<std::ifstream> &in,
 
 std::unique_ptr<ifstream> ifs;
 
-bool ReadRun(Run<PPEvent> &Events,
-             std::map<uint32_t, PPStringRegion> &Regions, const Options &opt) {
+bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
+             const Options &opt) {
   FileOptions FileOpts = getFileOptions();
   bool gotValidRun = false;
 

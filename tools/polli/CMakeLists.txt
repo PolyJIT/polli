@@ -8,7 +8,7 @@ set(LLVM_LINK_COMPONENTS
   IRReader
   Interpreter
   linker
-  MCJIT
+  #MCJIT
   native
   SelectionDAG
   Support

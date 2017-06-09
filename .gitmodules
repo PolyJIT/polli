@@ -4,3 +4,9 @@
 [submodule "external/cppformat"]
 	path = external/cppformat
 	url = https://github.com/cppformat/cppformat
+[submodule "external/catch"]
+	path = external/catch
+	url = https://github.com/philsquared/Catch
+[submodule "external/isl-cpp"]
+	path = external/isl
+	url = https://github.com/simbuerg/isl-cpp.git

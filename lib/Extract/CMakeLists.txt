@@ -1,3 +1,3 @@
-add_library(PolyJIT_Extract STATIC
+add_polli_library(PolyJIT_Extract STATIC
   ModuleExtraction.cpp 
 )

@@ -1,5 +1,5 @@
-// RUN: %clang -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polly-process-unprofitable -mllvm -polli -mllvm -jitable -mllvm -polly-detect-keep-going %s -mllvm -polli-analyze -o %t -lpjit 2>&1 | FileCheck %s -check-prefix=STATIC
-// RUN: %t 2>&1 | FileCheck %s
+// RUN: %clang -rdynamic -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polli-process-unprofitable -mllvm -polli -mllvm -jitable %s -mllvm -polli-analyze -o %t %pjit 2>&1 | FileCheck %s -check-prefix=STATIC
+// RUN: env BB_USE_DATABASE=0 %t 2>&1 | FileCheck %s
 #include <stdio.h>
 
 typedef struct {
@@ -48,12 +48,8 @@ int main(int argc, char **argv) {
 }
 
 // STATIC: 1 regions require runtime support:
-// STATIC:   0 region for.body => for.cond.cleanup requires 2 params
-// STATIC:     0 - (4 * (sext i32 %n to i64))
-// STATIC:     0 - (4 * (sext i32 %n to i64))
-// STATIC:     2 reasons can be fixed at run time:
-// STATIC:       0 - Non affine access function: {4,+,(4 * (sext i32 %n to i64))}<nsw><%for.body>
-// STATIC:       1 - Non affine access function: {4,+,(4 * (sext i32 %n to i64))}<nsw><%for.body>
+// STATIC:   0 region for.body => for.end requires 2 params
+// STATIC:     0 - %n
 
 // CHECK: A: 1 1 1 1 1 0 0 0 0 0
 // CHECK: B: 1 1 1 1 1 0 0 0 0 0

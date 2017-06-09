@@ -1,5 +1,4 @@
-// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polly-only-scop-detection -mllvm -polly-process-unprofitable -mllvm -polly-detect-keep-going -o /dev/null -x c++ %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
-
+// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polli-process-unprofitable -o /dev/stderr %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
 // Check that we can handle a single global variable during compilation.
 
 static int A[10240];
@@ -16,21 +15,18 @@ int main(int argc, char **argv) {
 
   return A[0];
 }
+// CHECK: @A = weak local_unnamed_addr global [10240 x i32] zeroinitializer, align 16
 
 // CHECK: polyjit.entry:
-// CHECK-NEXT:   %params = alloca [3 x i8*]
-// CHECK-NEXT:   %2 = alloca i32
-// CHECK-NEXT:   store volatile i32 %0, i32* %2
-// CHECK-NEXT:   %3 = getelementptr [3 x i8*], [3 x i8*]* %params, i32 0, i32 0
-// CHECK-NEXT:   %4 = bitcast i32* %2 to i8*
-// CHECK-NEXT:   store i8* %4, i8** %3
-// CHECK-NEXT:   %5 = alloca i64
-// CHECK-NEXT:   store volatile i64 %1, i64* %5
-// CHECK-NEXT:   %6 = getelementptr [3 x i8*], [3 x i8*]* %params, i32 0, i32 1
-// CHECK-NEXT:   %7 = bitcast i64* %5 to i8*
-// CHECK-NEXT:   store i8* %7, i8** %6
-// CHECK-NEXT:   %8 = getelementptr [3 x i8*], [3 x i8*]* %params, i32 0, i32 2
-// CHECK-NEXT:   store i8* bitcast ([10240 x i32]* @_ZL1A to i8*), i8** %8
-// CHECK-NEXT:   %9 = bitcast [3 x i8*]* %params to i8*
-// CHECK-NEXT:   %10 = call i1 @pjit_main(i8* getelementptr inbounds ([1449 x i8], [1449 x i8]* @_Z4testi_for.body.pjit.scop.prototype, i32 0, i32 0), i32 3, i8* %9)
-// CHECK-NEXT:     br i1 %10, label %polyjit.ready, label %polyjit.not.ready
+// CHECK-NEXT:   %params = alloca [2 x i8*], align 8
+// CHECK-NEXT:   %1 = alloca i32, align 4
+// CHECK-NEXT:   store volatile i32 %n, i32* %1, align 4
+// CHECK-NEXT:   %2 = bitcast [2 x i8*]* %params to i32**
+// CHECK-NEXT:   store i32* %1, i32** %2, align 8
+// CHECK-NEXT:   %3 = alloca i64, align 8
+// CHECK-NEXT:   store volatile i64 %0, i64* %3, align 8
+// CHECK-NEXT:   %4 = getelementptr [2 x i8*], [2 x i8*]* %params, i64 0, i64 1
+// CHECK-NEXT:   %5 = bitcast i8** %4 to i64**
+// CHECK-NEXT:   store i64* %3, i64** %5, align 8
+// CHECK-NEXT:   %6 = bitcast [2 x i8*]* %params to i8*
+// CHECK-NEXT:   %7 = call i1 @pjit_main(i8* getelementptr inbounds ([1624 x i8], [1624 x i8]* @test_0.pjit.scop.prototype, i64 0, i64 0), i64* getelementptr inbounds ({ i64, i64, i64, i1, i64, i64 }, { i64, i64, i64, i1, i64, i64 }* @polyjit.stats.test_0.pjit.scop.1, i64 0, i32 0), i32 2, i8* %6) #3

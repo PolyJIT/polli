@@ -14,11 +14,11 @@
 #ifndef POLLI_OPTIONS_H
 #define POLLI_OPTIONS_H
 
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/CodeGen.h"
-#include "llvm/Target/TargetOptions.h"
-
 #include <string>
+#include <vector>
+#include "llvm/Support/CodeGen.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Target/TargetOptions.h"
 
 extern llvm::cl::OptionCategory PolliCategory;
 
@@ -34,6 +34,7 @@ extern bool InstrumentRegions;
 extern bool EnableJitable;
 extern bool DisableRecompile;
 extern bool DisableExecution;
+extern bool DisableSpecialization;
 extern bool AnalyzeIR;
 extern char OptLevel;
 extern bool CollectRegressionTests;
@@ -80,6 +81,13 @@ bool haveLikwid();
  * @return True, if we should enable PAPI base runtime instrumentation.
  */
 bool havePapi();
+
+void loadOptionsFromEnv();
+
+/**
+ * Get the number of OpenMP-Threads available to us.
+ */
+uint64_t getNumThreads();
 }
 }
 #endif
