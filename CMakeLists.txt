@@ -134,7 +134,8 @@ include_directories(BEFORE ${PQXX_INCLUDE_DIR})
 get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
 link_directories(${PQXX_LIBDIR})
 
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system thread)
+set(BOOST_MIN_VERSION "1.58.0")
+find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS system thread)
 include_directories(BEFORE ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
