@@ -24,6 +24,34 @@ struct DbOptions {
   std::string exp_uuid;
 };
 
+static Options getOptions() {
+  Options Opts;
+
+  const char *exp = std::getenv("BB_EXPERIMENT");
+  const char *prj = std::getenv("BB_PROJECT");
+  const char *dom = std::getenv("BB_DOMAIN");
+  const char *grp = std::getenv("BB_GROUP");
+  const char *uri = std::getenv("BB_SRC_URI");
+  const char *cmd = std::getenv("BB_CMD");
+  const char *db = std::getenv("BB_USE_DATABASE");
+  const char *csv = std::getenv("BB_USE_CSV");
+  const char *file = std::getenv("BB_USE_FILE");
+  const char *exec = std::getenv("BB_ENABLE");
+
+  Opts.experiment = exp ? exp : "unknown";
+  Opts.project = prj ? prj : "unknown";
+  Opts.domain = dom ? dom : "unknown";
+  Opts.group = grp ? grp : "unknown";
+  Opts.src_uri = uri ? uri : "unknown";
+  Opts.command = cmd ? cmd : "unknown";
+  Opts.use_db = db ? (bool)std::stoi(db) : true;
+  Opts.use_csv = csv ? (bool)std::stoi(csv) : false;
+  Opts.use_file = file ? (bool)std::stoi(file) : false;
+  Opts.execute_atexit = exec ? (bool)std::stoi(exec) : true;
+
+  return Opts;
+}
+
 static DbOptions getDBOptionsFromEnv() {
   DbOptions Opts;
 
@@ -61,12 +89,16 @@ class DBConnection {
   std::unique_ptr<pqxx::connection> c;
 
   void connect() {
+    DbOptions DbOpts = getDBOptionsFromEnv();
+    Options Opts = getOptions();
+    if (Opts.use_db)
+      return;
+
     std::string CONNECTION_FMT_STR =
         "user={} port={} host={} dbname={} password={}";
-    DbOptions Opts = getDBOptionsFromEnv();
     std::string connection_str =
-        fmt::format(CONNECTION_FMT_STR, Opts.user, Opts.port, Opts.host,
-                    Opts.name, Opts.pass);
+        fmt::format(CONNECTION_FMT_STR, DbOpts.user, DbOpts.port, DbOpts.host,
+                    DbOpts.name, DbOpts.pass);
 
     c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
     if (c) {
@@ -92,7 +124,9 @@ class DBConnection {
   }
 
 public:
-  DBConnection() { connect(); }
+  DBConnection() {
+    connect();
+  }
 
   pqxx::connection &operator->() {
     if (c)
@@ -132,34 +166,6 @@ static pqxx::result submit(const std::string &Query,
     throw e;
   }
   return res;
-}
-
-static Options getOptions() {
-  Options Opts;
-
-  const char *exp = std::getenv("BB_EXPERIMENT");
-  const char *prj = std::getenv("BB_PROJECT");
-  const char *dom = std::getenv("BB_DOMAIN");
-  const char *grp = std::getenv("BB_GROUP");
-  const char *uri = std::getenv("BB_SRC_URI");
-  const char *cmd = std::getenv("BB_CMD");
-  const char *db = std::getenv("BB_USE_DATABASE");
-  const char *csv = std::getenv("BB_USE_CSV");
-  const char *file = std::getenv("BB_USE_FILE");
-  const char *exec = std::getenv("BB_ENABLE");
-
-  Opts.experiment = exp ? exp : "unknown";
-  Opts.project = prj ? prj : "unknown";
-  Opts.domain = dom ? dom : "unknown";
-  Opts.group = grp ? grp : "unknown";
-  Opts.src_uri = uri ? uri : "unknown";
-  Opts.command = cmd ? cmd : "unknown";
-  Opts.use_db = db ? (bool)std::stoi(db) : true;
-  Opts.use_csv = csv ? (bool)std::stoi(csv) : false;
-  Opts.use_file = file ? (bool)std::stoi(file) : false;
-  Opts.execute_atexit = exec ? (bool)std::stoi(exec) : true;
-
-  return Opts;
 }
 
 struct Event {

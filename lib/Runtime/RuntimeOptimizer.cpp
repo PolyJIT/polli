@@ -261,8 +261,8 @@ public:
     IslAstrStr = os.str();
     ScheduleTreeStr = polly::stringFromIslObj(S.getScheduleTree());
 
-    StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
-                         ScheduleTreeStr);
+    //StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
+    //                     ScheduleTreeStr);
 
     console->error(os.str());
     return false;
