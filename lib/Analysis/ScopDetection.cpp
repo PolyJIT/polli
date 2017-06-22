@@ -408,8 +408,6 @@ bool JITScopDetection::isValidCallInst(CallInst &CI,
       Context.HasUnknownAccess = true;
       Context.AST.add(&CI);
       return true;
-    case llvm::FMRB_DoesNotReadMemory:
-      return false;
     case llvm::FMRB_OnlyReadsArgumentPointees:
     case llvm::FMRB_OnlyAccessesArgumentPointees:
       for (const auto &Arg : CI.arg_operands()) {
@@ -433,6 +431,10 @@ bool JITScopDetection::isValidCallInst(CallInst &CI,
 
       Context.AST.add(&CI);
       return true;
+    case FMRB_OnlyAccessesInaccessibleMem:
+    case FMRB_OnlyAccessesInaccessibleOrArgMem:
+    case llvm::FMRB_DoesNotReadMemory:
+      return false;
     }
   }
 
