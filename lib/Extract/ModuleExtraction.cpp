@@ -176,15 +176,15 @@ struct InstrumentEndpoint {
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
         CallbackName, Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
         Type::getInt64PtrTy(Ctx), Type::getInt32Ty(Ctx),
-        Type::getInt8PtrTy(Ctx), NULL));
+        Type::getInt8PtrTy(Ctx)));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
     Function *TraceFnStatsEntry = cast<Function>(M->getOrInsertFunction(
         "pjit_trace_fnstats_entry", Type::getVoidTy(Ctx),
-        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx), NULL));
+        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx)));
     Function *TraceFnStatsExit = cast<Function>(M->getOrInsertFunction(
         "pjit_trace_fnstats_exit", Type::getVoidTy(Ctx),
-        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx), NULL));
+        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx)));
 
     To->deleteBody();
     To->setLinkage(GlobalValue::WeakAnyLinkage);
@@ -226,8 +226,8 @@ struct InstrumentEndpoint {
         Slot = &Arg;
       } else {
         /* Allocate a slot on the stack for the i'th argument and store it */
-        Slot = Builder.CreateAlloca(Arg.getType(), Size1);
-        Builder.CreateStore(&Arg, Slot, "pjit.stack.param");
+        Slot = Builder.CreateAlloca(Arg.getType(), Size1, "pjit.stack.param");
+        Builder.CreateStore(&Arg, Slot);
       }
 
       Value *Dest = Builder.CreateGEP(Params, {Idx0, ArrIdx});
@@ -513,13 +513,14 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
   unsigned Cnt = 0;
   for (const Region *R : SD) {
     PrepareRegionForExtraction(R, RI, DT);
-    CodeExtractor Extractor(DT, *(R->getNode()), /*AggregateArgs*/ false);
+    SmallVector<BasicBlock *, 8> RegionBlocks(R->blocks());
+    CodeExtractor Extractor(RegionBlocks, &DT, /*AggregateArgs*/ false);
 
     if (Extractor.isEligible()) {
       JITScopDetection::ParamVec Params = SD.RequiredParams[R];
 
       SetVector<Value *> In, Out;
-      Extractor.findInputsOutputs(In, Out);
+      Extractor.findInputsOutputs(In, Out, {});
       std::string buf;
       raw_string_ostream os(buf);
       DEBUG({
@@ -571,7 +572,7 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
           for (Use &U : I->operands()) {
             Value *Operand = U.get();
             if (TrackedParams.count(Operand))
-              Arg->addAttr(AttributeSet::get(Ctx, 0, Builder));
+              Arg->addAttr(ParamAttr);
             Arg++;
           }
           fixSuccessorPHI(BB);

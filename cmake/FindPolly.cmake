@@ -5,6 +5,14 @@ FIND_PATH(POLLY_INCLUDE_DIRS polly/LinkAllPasses.h
     ${POLLY_INSTALL_ROOT}/include/
     ${POLLY_INSTALL_ROOT}/tools/polly/include/
 )
+FIND_PATH(POLLY_ISL_INCLUDE_DIRS isl-noexceptions.h
+  PATHS
+    ${POLLY_INSTALL_ROOT}/include/polly
+    ${POLLY_INSTALL_ROOT}/tools/polly/include/polly/
+)
+
+message(${POLLY_INCLUDE_DIRS})
+
 FIND_LIBRARY(POLLY_LIBRARY lib
   NAMES
     libPolly.so

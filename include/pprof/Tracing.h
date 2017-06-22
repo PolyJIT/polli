@@ -3,7 +3,6 @@
 
 #include "pprof/pprof.h"
 #include "pprof/Config.h"
-#include "polli/Options.h"
 
 #include <memory>
 

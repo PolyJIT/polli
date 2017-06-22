@@ -59,7 +59,7 @@ struct InjectMain : public FunctionPass {
       LLVMContext &Ctx = M->getContext();
       IRBuilder<> Builder(Ctx);
       Function *PJMainFn = cast<Function>(M->getOrInsertFunction(
-          "pjit_library_init", Type::getVoidTy(Ctx), NULL));
+          "pjit_library_init", Type::getVoidTy(Ctx)));
       BasicBlock &Entry = F.getEntryBlock();
       Builder.SetInsertPoint(Entry.getFirstNonPHI());
       Builder.CreateCall(PJMainFn);
@@ -70,7 +70,7 @@ struct InjectMain : public FunctionPass {
     return IsMain;
   }
 
-  const char *getPassName() const override { return PassName.c_str(); }
+  StringRef getPassName() const override { return PassName.c_str(); }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.setPreservesAll();
@@ -95,12 +95,12 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
     P = &getAnalysis<T>();
 
     Out << fmt::format("Printing analysis '{:s}' for function '{:s}':\n",
-                       P->getPassName(), F.getName().str());
+                       P->getPassName().str(), F.getName().str());
     P->print(Out, F.getParent());
     return true;
   }
 
-  const char *getPassName() const override { return PassName.c_str(); }
+  StringRef getPassName() const override { return PassName.c_str(); }
 
   void getAnalysisUsage(AnalysisUsage &AU) const override {
     AU.addRequired<T>();

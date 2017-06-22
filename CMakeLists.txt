@@ -35,6 +35,7 @@ add_definitions( ${LLVM_DEFINITIONS} )
 ## Find Polly
 find_package(Polly REQUIRED)
 include_directories (${POLLY_INCLUDE_DIRS} )
+include_directories (${POLLY_ISL_INCLUDE_DIRS} )
 link_directories( ${POLLY_LIBRARY_DIRS} )
 add_definitions( ${POLLY_DEFINITIONS} )
 

@@ -29,6 +29,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
+#include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
@@ -96,7 +97,6 @@ static Function &getFunction(Module &M) {
 
 static inline void set_options_from_environment() {
   opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
-  opt::EmitJitDebugInfo = std::getenv("POLLI_EMIT_JIT_DEBUG_INFO") != nullptr;
 }
 
 } // end of anonymous namespace
@@ -238,15 +238,15 @@ public:
     }
 
     auto Resolver = orc::createLambdaResolver(
-        [&](const std::string &Name) {
+        [&](const std::string &Name) -> JITSymbol {
           if (auto Sym = findSymbol(Name))
-            return RuntimeDyld::SymbolInfo(Sym.getAddress(), Sym.getFlags());
-          return RuntimeDyld::SymbolInfo(nullptr);
+            return Sym;
+          return JITSymbol(nullptr);
         },
         [](const std::string &S) {
           if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
-            return RuntimeDyld::SymbolInfo(SymAddr, JITSymbolFlags::Exported);
-          return RuntimeDyld::SymbolInfo(nullptr);
+            return JITSymbol(SymAddr, JITSymbolFlags::Exported);
+          return JITSymbol(nullptr);
         });
 
     std::vector<std::unique_ptr<Module>> MS;
@@ -261,7 +261,7 @@ public:
 
   void removeModule(ModuleHandleT H) { CompileLayer.removeModuleSet(H); }
 
-  orc::JITSymbol findSymbol(const std::string &Name) {
+  JITSymbol findSymbol(const std::string &Name) {
     std::string MangledName;
     raw_string_ostream MangledNameStream(MangledName);
     Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
@@ -361,7 +361,7 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   EE.addModule(std::move(Variant));
   DEBUG(printRunValues(Values));
 
-  orc::JITSymbol FPtr = EE.findSymbol(FnName);
+  llvm::JITSymbol FPtr = EE.findSymbol(FnName);
   SPDLOG_DEBUG(console, "fn ptr: 0x{:x}", FPtr.getAddress());
   assert(FPtr && "Specializer returned nullptr.");
   if (!Context
@@ -398,7 +398,6 @@ public:
     initializeTarget(Registry);
     initializeCodeGenPreparePass(Registry);
     initializeAtomicExpandPass(Registry);
-    initializeRewriteSymbolsPass(Registry);
 
     InitializeNativeTarget();
     InitializeNativeTargetAsmPrinter();

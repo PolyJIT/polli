@@ -84,7 +84,7 @@ static void PapiRegionEnterSCoP(Instruction *InsertBefore, Module *M,
   std::vector<Value *> Args(2);
   Constant *PapiScopEnterFn = M->getOrInsertFunction(
       "papi_region_enter_scop", Builder.getVoidTy(), Type::getInt64Ty(Context),
-      Builder.getInt8PtrTy(), NULL);
+      Builder.getInt8PtrTy());
 
   Builder.SetInsertPoint(InsertBefore);
   Args[0] = ConstantInt::get(Type::getInt64Ty(Context), id, false);
@@ -108,7 +108,7 @@ static void PapiRegionExitSCoP(Instruction *InsertBefore, Module *M,
   std::vector<Value *> Args(2);
   Constant *PapiScopExitFn = M->getOrInsertFunction(
       "papi_region_exit_scop", Builder.getVoidTy(), Type::getInt64Ty(Context),
-      Builder.getInt8PtrTy(), NULL);
+      Builder.getInt8PtrTy());
 
   Builder.SetInsertPoint(InsertBefore);
   Args[0] = ConstantInt::get(Type::getInt64Ty(Context), id, false);
@@ -130,7 +130,7 @@ void PapiRegionEnter(Instruction *InsertBefore, Module *M, uint64_t id) {
 
   Constant *PapiScopEnterFn =
       M->getOrInsertFunction("papi_region_enter", Builder.getVoidTy(),
-                             Type::getInt64Ty(Context), NULL);
+                             Type::getInt64Ty(Context));
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(PapiScopEnterFn,
                      ConstantInt::get(Type::getInt64Ty(Context), id, false));
@@ -148,7 +148,7 @@ void PapiRegionExit(Instruction *InsertBefore, Module *M, uint64_t id) {
   IRBuilder<> Builder(Context);
 
   Constant *PapiScopEnterFn = M->getOrInsertFunction(
-      "papi_region_exit", Builder.getVoidTy(), Type::getInt64Ty(Context), NULL);
+      "papi_region_exit", Builder.getVoidTy(), Type::getInt64Ty(Context));
   Builder.SetInsertPoint(InsertBefore);
   Builder.CreateCall(PapiScopEnterFn,
                      ConstantInt::get(Type::getInt64Ty(Context), id, false));
@@ -164,7 +164,7 @@ static void PapiCreateInit(Function *F) {
   Module *M = F->getParent();
   IRBuilder<> Builder(Context);
   Constant *PapiLibInitFn = M->getOrInsertFunction(
-      "PAPI_library_init", Builder.getInt32Ty(), Builder.getInt32Ty(), NULL);
+      "PAPI_library_init", Builder.getInt32Ty(), Builder.getInt32Ty());
 
   Instruction *Insert = &*(F->getEntryBlock().getFirstInsertionPt());
   Builder.SetInsertPoint(Insert);

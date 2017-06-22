@@ -1,39 +1,106 @@
-add_subdirectory(Analysis)
-add_subdirectory(Extract)
-add_subdirectory(Persist)
-add_subdirectory(Runtime)
-add_subdirectory(Support)
-add_subdirectory(Transform)
+set(POLYJIT_COMPILETIME_SOURCES
+  Analysis/NonAffineSCEVs.cpp
+  Analysis/ScopDetection.cpp
+  Extract/ModuleExtraction.cpp
+  Persist/Schema.cpp
+  Support/Tasks.cpp
+  Support/FuncTools.cpp
+  Support/Options.cpp
+  Support/Stats.cpp
+  Support/Utils.cpp
+  Support/TypeMapper.cpp
+  Transform/InstrumentRegions.cpp
+  RegisterCompilationPasses.cpp
+  PolyJIT.cpp
+)
 
-add_subdirectory(pprof)
-add_subdirectory(pjit)
-add_subdirectory(pjit-logging)
+set(POLYJIT_RUNTIME_SOURCES
+  pjit/libpjit.cpp
+  pjit/BlockingMap.cpp
+  pjit/CodeGen.cpp
+  pjit/Jit.cpp
+  pjit/RunValues.cpp
+  pjit/Db.cpp
+  Runtime/LikwidMarker.cpp
+  Runtime/RuntimeOptimizer.cpp
+  Runtime/VariantFunction.cpp
+  Support/Tasks.cpp
+  Support/FuncTools.cpp
+  Support/Options.cpp
+  Support/Stats.cpp
+  Support/Utils.cpp
+  Support/TypeMapper.cpp
+  pjit-logging/Log.cpp
+)
+
+set(POLYJIT_PPROF_SOURCES
+  pprof/Tracing.cpp
+  pprof/pprof.cpp
+  pprof/libpprof.cpp
+  pprof/libpprof-pgsql.cpp
+  pprof/libpprof-file.cpp
+)
+
+set(LLVM_LINK_COMPONENTS
+  ${LLVM_TARGETS_TO_BUILD}
+  Analysis
+  AsmParser
+  BitReader
+  BitWriter
+  CodeGen
+  Core
+  ExecutionEngine
+  IRReader
+  Interpreter
+  InstCombine
+  Instrumentation
+  IPO
+  Linker
+  OrcJIT
+  native
+  objcarcopts
+  RuntimeDyld
+  ScalarOpts
+  SelectionDAG
+  Support
+  Target
+  TransformUtils
+  Vectorize
+)
 
 set(POLLI_LINK_LIBS
   Polly
-  PolyJIT_Analysis
-  PolyJIT_Extract
-  PolyJIT_Persist
-  PolyJIT_Runtime
-  PolyJIT_Support
-  PolyJIT_Transform
-  pjit-logging
+  likwid
+  pthread
+  pfm
+  papi
+  pqxx
+  boost_system
+  boost_thread
+)
+
+add_polli_library(pjit SHARED
+  ${POLYJIT_RUNTIME_SOURCES}
+)
+
+set(POLLI_LINK_LIBS
+  papi
+)
+
+add_polli_library(pprof SHARED
+  ${POLYJIT_PPROF_SOURCES}
+)
+
+set(POLLI_LINK_LIBS
+  Polly
   likwid
   pthread
   pqxx
   boost_system
 )
 
-#if(NOT LINK_POLLY_INTO_TOOLS)
-#  set(POLLI_LINK_LIBS
-#    Polly
-#    ${POLLI_LINK_LIBS}
-#  )
-#endif(NOT LINK_POLLY_INTO_TOOLS)
-
 add_polli_loadable_module(LLVMPolyJIT
-  RegisterCompilationPasses.cpp
-  PolyJIT.cpp
+  ${POLYJIT_COMPILETIME_SOURCES}
 )
 
 set_target_properties(LLVMPolyJIT

@@ -150,7 +150,7 @@ struct MainCreator {
     PointerType *PtoArr = Type::getInt8PtrTy(Ctx)->getPointerTo();
 
     Function *F = cast<Function>(TgtM->getOrInsertFunction(
-        SrcF->getName(), RetType, Type::getInt32Ty(Ctx), PtoArr, NULL));
+        SrcF->getName(), RetType, Type::getInt32Ty(Ctx), PtoArr));
 
     F->setLinkage(SrcF->getLinkage());
     return F;

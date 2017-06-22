@@ -21,8 +21,7 @@ public:
                            TypeBuilder<types::i<64>, xcompile>::get(Context),
                            TypeBuilder<types::i<1>, xcompile>::get(Context),
                            TypeBuilder<types::i<64>, xcompile>::get(Context),
-                           TypeBuilder<types::i<64>, xcompile>::get(Context),
-                           nullptr);
+                           TypeBuilder<types::i<64>, xcompile>::get(Context));
   }
 
   enum Fields {

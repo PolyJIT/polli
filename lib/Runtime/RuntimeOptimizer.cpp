@@ -14,7 +14,6 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "runtime_optimizer"
 #include "polli/RuntimeOptimizer.h"
-#include "polli/BasePointers.h"
 #include "polli/Utils.h"
 #include "polli/Db.h"
 
@@ -165,14 +164,16 @@ public:
   /// @name FunctionPass interface
   //@{
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-    AU.addRequired<polly::ScopDetection>();
+    AU.addRequired<polly::ScopDetectionWrapperPass>();
     AU.addRequired<llvm::RegionInfoPass>();
     AU.setPreservesAll();
   }
 
   bool runOnFunction(llvm::Function &F) override {
     const Module *M = F.getParent();
-    polly::ScopDetection &SD = getAnalysis<polly::ScopDetection>();
+    polly::ScopDetectionWrapperPass &SDWP =
+        getAnalysis<polly::ScopDetectionWrapperPass>();
+    polly::ScopDetection &SD = SDWP.getSD();
     llvm::RegionInfo &RI = getAnalysis<llvm::RegionInfoPass>().getRegionInfo();
     std::string buf;
     raw_string_ostream os(buf);
@@ -188,7 +189,7 @@ public:
         os << R->getNameStr() << " No log entry found.\n";
       os << "\n";
     }
-    SD.print(os, M);
+    SDWP.print(os, M);
     console->error(os.str());
     return false;
   }
@@ -248,12 +249,12 @@ public:
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
     AU.addRequired<polly::ScopInfoRegionPass>();
     AU.addRequired<polly::IslScheduleOptimizer>();
-    AU.addRequired<polly::IslAstInfo>();
+    AU.addRequired<polly::IslAstInfoWrapperPass>();
     AU.setPreservesAll();
   }
 
   bool runOnScop(Scop &S) override {
-    IslAstInfo &AI = getAnalysis<IslAstInfo>();
+    IslAstInfoWrapperPass &AI = getAnalysis<IslAstInfoWrapperPass>();
     std::string buf, IslAstrStr, ScheduleTreeStr;
     raw_string_ostream os(buf);
     AI.printScop(os, S);
@@ -281,18 +282,18 @@ public:
   //@{
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
     AU.addRequired<polly::ScopInfoRegionPass>();
-    AU.addRequired<polly::IslAstInfo>();
+    AU.addRequired<polly::IslAstInfoWrapperPass>();
     AU.setPreservesAll();
   }
 
   bool runOnScop(Scop &S) override {
-    IslAstInfo &AI = getAnalysis<IslAstInfo>();
+    auto &AIWP = getAnalysis<IslAstInfoWrapperPass>();
     std::string buf;
     raw_string_ostream os(buf);
     os << "\n==============================================================="
           "\n IslAst"
           "\n===============================================================\n";
-    AI.printScop(os, S);
+    AIWP.printScop(os, S);
     std::string ST = polly::stringFromIslObj(S.getScheduleTree());
     os << "\n" << ST << "\n";
     console->error(os.str());
@@ -358,14 +359,14 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
 
   polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createCodePreparationPass());
-  PM.add(polly::createScopDetectionPass());
+  PM.add(polly::createScopDetectionWrapperPassPass());
   DEBUG(PM.add(new PollyFnReport()));
   PM.add(polly::createScopInfoRegionPassPass());
   DEBUG(PM.add(new PollyScopReport()));
   PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
   DEBUG(PM.add(new PollyScheduleReport()));
-  PM.add(polly::createIslAstInfoPass());
+  PM.add(polly::createIslAstInfoWrapperPassPass());
   PM.add(polly::createCodeGenerationPass());
   DEBUG(PM.add(new PollyReport()));
   PM.add(new DBExport());
@@ -412,10 +413,6 @@ Function &OptimizeForRuntime(Function &F) {
   legacy::FunctionPassManager FPM = legacy::FunctionPassManager(M);
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(PM);
-
-#ifdef POLLI_ENABLE_BASE_POINTERS
-  PM.add(polli::createBasePointersPass());
-#endif
 
 // PM.add(polli::createOpenMPTracerPass());
 

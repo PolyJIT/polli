@@ -1,4 +1,5 @@
 #include "pprof/Tracing.h"
+#include "polli/Options.h"
 
 #ifdef POLLI_ENABLE_TRACING
 namespace polli {

@@ -3,8 +3,6 @@
 #include "pprof/file.h"
 #include "pprof/pgsql.h"
 
-#include "llvm/Support/CommandLine.h"
-
 #include <map>
 #include <string>
 #include <vector>
@@ -17,7 +15,6 @@
 #include <assert.h>
 #include <memory>
 
-using namespace llvm;
 static std::map<uint32_t, uint64_t> PPDurations;
 
 static uint64_t getTimeInSCoPs(const pprof::Run<PPEvent> &Events) {

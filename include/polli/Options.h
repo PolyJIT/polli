@@ -44,16 +44,7 @@ extern std::string MArch;
 extern std::string MCPU;
 extern std::vector<std::string> MAttrs;
 
-extern llvm::Reloc::Model RelocModel;
-extern llvm::CodeModel::Model CModel;
-
-extern bool EnableJITExceptionHandling;
 extern bool GenerateSoftFloatCalls;
-
-extern llvm::FloatABI::ABIType FloatABIForCalls;
-
-extern bool EmitJitDebugInfo;
-extern bool EmitJitDebugInfoToDisk;
 
 extern bool AnalyseOnly;
 extern std::string ReportFilename;

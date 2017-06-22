@@ -237,7 +237,7 @@ bool JITScopDetection::onlyValidRequiredInvariantLoads(
     return false;
 
   for (LoadInst *Load : RequiredILS)
-    if (!polly::isHoistableLoad(Load, CurRegion, *LI, *SE))
+    if (!polly::isHoistableLoad(Load, CurRegion, *LI, *SE, *DT))
       return false;
 
   Context.RequiredILS.insert(RequiredILS.begin(), RequiredILS.end());
@@ -731,7 +731,7 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
       Instruction *Inst = dyn_cast<Instruction>(Ptr.getValue());
       if (Inst && Context.CurRegion.contains(Inst)) {
         auto *Load = dyn_cast<LoadInst>(Inst);
-        if (Load && polly::isHoistableLoad(Load, Context.CurRegion, *LI, *SE)) {
+        if (Load && polly::isHoistableLoad(Load, Context.CurRegion, *LI, *SE, *DT)) {
           Context.RequiredILS.insert(Load);
           continue;
         }

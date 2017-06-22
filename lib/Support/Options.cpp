@@ -63,13 +63,6 @@ std::vector<std::string> MAttrs;
 //    "+sse3",     "-avx512dq"
 //};
 
-llvm::Reloc::Model RelocModel = Reloc::PIC_;
-llvm::CodeModel::Model CModel = CodeModel::JITDefault;
-llvm::FloatABI::ABIType FloatABIForCalls = FloatABI::Default;
-bool GenerateSoftFloatCalls = false;
-bool EnableJITExceptionHandling = false;
-bool EmitJitDebugInfo = false;
-bool EmitJitDebugInfoToDisk = false;
 bool EmitEnv = false;
 
 /**
