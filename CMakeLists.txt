@@ -104,9 +104,6 @@ endif()
 
 include("polli_macros")
 
-find_package(Isl REQUIRED)
-include_directories(${ISL_INCLUDE_DIR})
-
 find_package(Papi REQUIRED)
 add_library(papi UNKNOWN IMPORTED)
 set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
@@ -158,10 +155,6 @@ add_custom_target(headers SOURCES ${PolliHeaderFiles} ${PprofHeaderFiles})
 
 install(DIRECTORY include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY external/isl DESTINATION include/isl
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
   )
 
 install(DIRECTORY external/catch/include DESTINATION include
