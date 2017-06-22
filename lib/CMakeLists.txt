@@ -10,6 +10,7 @@ set(POLYJIT_COMPILETIME_SOURCES
   Support/Utils.cpp
   Support/TypeMapper.cpp
   Transform/InstrumentRegions.cpp
+  pjit-logging/Log.cpp
   RegisterCompilationPasses.cpp
   PolyJIT.cpp
 )
