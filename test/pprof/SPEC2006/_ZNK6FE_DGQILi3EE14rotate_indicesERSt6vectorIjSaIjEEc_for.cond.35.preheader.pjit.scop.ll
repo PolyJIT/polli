@@ -1,7 +1,7 @@
 
 ; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli  -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
-; CHECK: 1 polyjit          - Number of jitable SCoPs
+; CHECK: 1 regions require runtime support:
 
 ; ModuleID = '/local/hdd/pjtest/pj-collect/SPEC2006/speccpu2006/benchspec/CPU2006/447.dealII/src/fe_dgq.cc._ZNK6FE_DGQILi3EE14rotate_indicesERSt6vectorIjSaIjEEc_for.cond.35.preheader.pjit.scop.prototype'
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

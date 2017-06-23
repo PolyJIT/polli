@@ -48,8 +48,8 @@ int main(int argc, char **argv) {
 }
 
 // STATIC: 1 regions require runtime support:
-// STATIC:   0 region for.body => for.end requires 2 params
-// STATIC:     0 - %n
+// STATIC:   0 region {{.*}} => {{.*}} requires 2 params
+// STATIC:     0 - {{.*}}
 
 // CHECK: A: 1 1 1 1 1 0 0 0 0 0
 // CHECK: B: 1 1 1 1 1 0 0 0 0 0

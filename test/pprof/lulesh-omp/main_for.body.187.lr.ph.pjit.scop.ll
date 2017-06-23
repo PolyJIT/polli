@@ -1,7 +1,7 @@
 
 ; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli  -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
-; CHECK: 1 polyjit          - Number of jitable SCoPs
+; CHECK: 1 regions require runtime support:
 
 ; ModuleID = 'LULESH_OMP.cc.main_for.body.187.lr.ph.pjit.scop.prototype'
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"

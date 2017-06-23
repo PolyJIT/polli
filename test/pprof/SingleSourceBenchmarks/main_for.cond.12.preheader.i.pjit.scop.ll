@@ -1,7 +1,7 @@
 
 ; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli  -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
-; CHECK: 1 polyjit          - Number of jitable SCoPs
+; CHECK: 1 regions require runtime support:
 
 ; ModuleID = '/local/hdd/pjtest/pj-collect/SingleSourceBenchmarks/test-suite/SingleSource/Benchmarks/Polybench/linear-algebra/kernels/syr2k/syr2k.c.main_for.cond.12.preheader.i.pjit.scop.prototype'
 target datalayout = "e-m:e-i64:64-f80:128-n8:16:32:64-S128"
