@@ -29,12 +29,14 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
-#include "llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
@@ -165,7 +167,7 @@ class PolySectionMemoryManager : public SectionMemoryManager {
 
 class PolyJITEngine {
 public:
-  using ObjLayerT = orc::ObjectLinkingLayer<>;
+  using ObjLayerT = orc::RTDyldObjectLinkingLayer<>;
   using CompileLayerT = orc::IRCompileLayer<ObjLayerT>;
   using ModuleHandleT = CompileLayerT::ModuleSetHandleT;
   using UniqueModule = std::unique_ptr<Module>;
