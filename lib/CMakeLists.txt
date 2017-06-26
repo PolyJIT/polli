@@ -73,7 +73,6 @@ set(POLLI_LINK_LIBS
   Polly
   likwid
   pthread
-  pfm
   papi
   pqxx
   boost_system
