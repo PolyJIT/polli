@@ -358,7 +358,6 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
 
   polly::registerCanonicalicationPasses(PM);
-  PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionWrapperPassPass());
   DEBUG(PM.add(new PollyFnReport()));
   PM.add(polly::createScopInfoRegionPassPass());
@@ -366,7 +365,6 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
   DEBUG(PM.add(new PollyScheduleReport()));
-  PM.add(polly::createIslAstInfoWrapperPassPass());
   PM.add(polly::createCodeGenerationPass());
   DEBUG(PM.add(new PollyReport()));
   PM.add(new DBExport());
