@@ -197,8 +197,7 @@ static uint64_t PrepareRun(pqxx::work &w) {
 
   if (project_exists.affected_rows() == 0)
     submit(fmt::format(NEW_PROJECT_SQL, opts.project, opts.project,
-                       opts.src_uri, opts.domain, opts.group),
-           w);
+                       opts.src_uri, opts.domain, opts.group), w);
 
   uint64_t run_id = 0;
   if (!Opts.run_id) {
