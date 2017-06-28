@@ -85,13 +85,18 @@ std::string now() {
   return std::string(buf);
 }
 
+static bool enable_tracking() {
+  Options opts = getOptions();
+  return opts.use_db && opts.execute_atexit;
+}
+
 class DBConnection {
   std::unique_ptr<pqxx::connection> c;
 
   void connect() {
     DbOptions DbOpts = getDBOptionsFromEnv();
     Options Opts = getOptions();
-    if (Opts.use_db)
+    if (!enable_tracking())
       return;
 
     std::string CONNECTION_FMT_STR =
@@ -124,10 +129,6 @@ class DBConnection {
   }
 
 public:
-  DBConnection() {
-    connect();
-  }
-
   pqxx::connection &operator->() {
     if (c)
       return *c;
@@ -148,9 +149,9 @@ public:
   }
 };
 
-static DBConnection &getDatabase() {
+static pqxx::connection &getDatabase() {
   static DBConnection DB;
-  return DB;
+  return *DB;
 }
 
 static pqxx::result submit(const std::string &Query,
@@ -213,11 +214,6 @@ static uint64_t PrepareRun(pqxx::work &w) {
   return run_id;
 }
 
-static bool enable_tracking() {
-  Options opts = getOptions();
-  return opts.use_db && opts.execute_atexit;
-}
-
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
   Options opts = getOptions();
@@ -225,7 +221,8 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
     return;
 
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::work w(*getDatabase());
+  pqxx::connection &DB = getDatabase();
+  pqxx::work w(DB);
   uint64_t run_id = PrepareRun(w);
 
   std::string NEW_RUN_RESULT_SQL = "INSERT INTO regions (name, id, "
@@ -256,7 +253,8 @@ void StoreTransformedScop(const std::string &FnName,
     return;
 
   DbOptions Opts = getDBOptionsFromEnv();
-  pqxx::work w(*getDatabase());
+  pqxx::connection &DB = getDatabase();
+  pqxx::work w(DB);
   uint64_t run_id = PrepareRun(w);
 
   std::string SCHEDULE_SQL = "INSERT INTO schedules (function, schedule, "
