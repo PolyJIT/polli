@@ -213,10 +213,15 @@ static uint64_t PrepareRun(pqxx::work &w) {
   return run_id;
 }
 
+static bool enable_tracking() {
+  Options opts = getOptions();
+  return opts.use_db && opts.execute_atexit;
+}
+
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
   Options opts = getOptions();
-  if (!opts.use_db)
+  if (!enable_tracking())
     return;
 
   DbOptions Opts = getDBOptionsFromEnv();
@@ -247,8 +252,7 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
 void StoreTransformedScop(const std::string &FnName,
                           const std::string &IslAstStr,
                           const std::string &ScheduleTreeStr) {
-  Options opts = getOptions();
-  if (!opts.use_db)
+  if (!enable_tracking())
     return;
 
   DbOptions Opts = getDBOptionsFromEnv();
