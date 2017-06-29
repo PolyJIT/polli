@@ -64,7 +64,7 @@ namespace {
 
     void PprofScop::getAnalysisUsage(AnalysisUsage &usage) const {
         usage.setPreservesAll();
-        usage.addRequiredTransitive<ScopDetection>();
+        usage.addRequiredTransitive<ScopDetectionWrapperPass>();
     }
 
     size_t PprofScop::generateHash(Module *&module){
@@ -75,7 +75,7 @@ namespace {
     }
 
     void PprofScop::insertSetupTracingFunction(Function *mainFunction){
-        Module * module = mainFunction->getParent();
+        Module *module = mainFunction->getParent();
         LLVMContext &context = module->getContext();
         IRBuilder<> builder(context);
         Instruction *insertInstruction = mainFunction->getEntryBlock().getFirstNonPHIOrDbgOrLifetime();
@@ -189,25 +189,25 @@ namespace {
 
     bool PprofScop::runOnFunction(Function &function) {
         bool gotInstrumented = false;
-        if(ScopDetection *scopDetection = getAnalysisIfAvailable<ScopDetection>()){
-            for(ScopDetection::const_iterator it = scopDetection->begin(); it != scopDetection->end(); it++){
-                if(const Region *region = (*it)->getParent()){
-                    instrumentedCounter++;
+        ScopDetection &scopDetection = getAnalysis<ScopDetectionWrapperPass>().getSD();
+        //errs() << "scopDetection: " << &scopDetection << "\n";
+        getAnalysis<ScopDetectionWrapperPass>().print(errs(), function.getParent());
+        for(const Region *region : scopDetection){
+            errs() << "Region: " << region->getNameStr() << "\n";
+            if(const Region *parent = region){
+                instrumentedCounter++;
 
-                    BasicBlock *entryBlock = region->getEntry();
-                    SmallVector<BasicBlock*, 0> exitBlocks;
-                    exitBlocks.push_back(region->getExit());
-                    pair<SmallVector<BasicBlock*, 0>, SmallVector<BasicBlock*, 0>> splits;
-                    splits.first = splitPredecessors(region, entryBlock, true);
-                    splits.second = splitPredecessors(region, exitBlocks, false);
-                    instrumentSplitBlocks(splits);
-                    gotInstrumented = true;
-                } else {
-                    nonInstrumentedCounter++;
-                }
+                BasicBlock *entryBlock = parent->getEntry();
+                SmallVector<BasicBlock*, 0> exitBlocks;
+                exitBlocks.push_back(parent->getExit());
+                pair<SmallVector<BasicBlock*, 0>, SmallVector<BasicBlock*, 0>> splits;
+                splits.first = splitPredecessors(parent, entryBlock, true);
+                splits.second = splitPredecessors(parent, exitBlocks, false);
+                instrumentSplitBlocks(splits);
+                gotInstrumented = true;
+            } else {
+                nonInstrumentedCounter++;
             }
-        } else {
-            errs() << "analysis not available\n";
         }
         return gotInstrumented;
     }
