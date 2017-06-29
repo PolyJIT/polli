@@ -51,7 +51,6 @@ using namespace polly;
 
 namespace polli {
 class TileSizeLearner : public polly::ScopPass {
-private:
 public:
   static char ID;
   explicit TileSizeLearner() : polly::ScopPass(ID){};
@@ -59,8 +58,8 @@ public:
   /// @name ScopPass interface
   //@{
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-    AU.addRequired<polly::ScopInfoRegionPass>();
     AU.addRequired<llvm::ScalarEvolutionWrapperPass>();
+    ScopPass::getAnalysisUsage(AU);
     AU.setPreservesAll();
   }
 
@@ -146,13 +145,6 @@ public:
 
   void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
   //@}
-
-private:
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  TileSizeLearner(const TileSizeLearner &);
-  // DO NOT IMPLEMENT
-  const TileSizeLearner &operator=(const TileSizeLearner &);
 };
 char TileSizeLearner::ID = 0;
 
@@ -247,8 +239,7 @@ public:
   /// @name ScopPass interface
   //@{
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-    AU.addRequired<polly::ScopInfoRegionPass>();
-    AU.addRequired<polly::IslScheduleOptimizer>();
+    ScopPass::getAnalysisUsage(AU);
     AU.addRequired<polly::IslAstInfoWrapperPass>();
     AU.setPreservesAll();
   }
@@ -262,8 +253,8 @@ public:
     IslAstrStr = os.str();
     ScheduleTreeStr = polly::stringFromIslObj(S.getScheduleTree());
 
-    //StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
-    //                     ScheduleTreeStr);
+    StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
+                         ScheduleTreeStr);
 
     console->error(os.str());
     return false;
@@ -281,7 +272,7 @@ public:
   /// @name ScopPass interface
   //@{
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-    AU.addRequired<polly::ScopInfoRegionPass>();
+    ScopPass::getAnalysisUsage(AU);
     AU.addRequired<polly::IslAstInfoWrapperPass>();
     AU.setPreservesAll();
   }
@@ -302,13 +293,6 @@ public:
 
   void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
   //@}
-
-private:
-  //===--------------------------------------------------------------------===//
-  // DO NOT IMPLEMENT
-  PollyReport(const PollyReport &);
-  // DO NOT IMPLEMENT
-  const PollyReport &operator=(const PollyReport &);
 };
 
 class PollyScheduleReport : public polly::ScopPass {
@@ -319,8 +303,8 @@ public:
   /// @name ScopPass interface
   //@{
   void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-    AU.addRequired<polly::ScopInfoRegionPass>();
-    AU.addRequiredTransitive<polly::IslScheduleOptimizer>();
+    ScopPass::getAnalysisUsage(AU);
+    AU.addRequired<polly::IslScheduleOptimizer>();
     AU.setPreservesAll();
   }
 
@@ -359,15 +343,16 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
 
   polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionWrapperPassPass());
-  DEBUG(PM.add(new PollyFnReport()));
   PM.add(polly::createScopInfoRegionPassPass());
-  DEBUG(PM.add(new PollyScopReport()));
   PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
-  DEBUG(PM.add(new PollyScheduleReport()));
-  PM.add(polly::createCodeGenerationPass());
-  DEBUG(PM.add(new PollyReport()));
+  PM.add(new PollyScheduleReport());
   PM.add(new DBExport());
+  //PM.add(new PollyReport());
+  PM.add(polly::createCodeGenerationPass());
+  PM.add(new PollyScopReport());
+  PM.add(new PollyFnReport());
+
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
