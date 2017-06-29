@@ -249,9 +249,11 @@ public:
     std::string buf, IslAstrStr, ScheduleTreeStr;
     raw_string_ostream os(buf);
     AI.printScop(os, S);
-
     IslAstrStr = os.str();
-    ScheduleTreeStr = polly::stringFromIslObj(S.getScheduleTree());
+
+    isl_schedule *s_tree = S.getScheduleTree();
+    ScheduleTreeStr = polly::stringFromIslObj(s_tree);
+    isl_schedule_free(s_tree);
 
     StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
                          ScheduleTreeStr);
@@ -285,7 +287,11 @@ public:
           "\n IslAst"
           "\n===============================================================\n";
     AIWP.printScop(os, S);
-    std::string ST = polly::stringFromIslObj(S.getScheduleTree());
+
+    isl_schedule *s_tree = S.getScheduleTree();
+    std::string ST = polly::stringFromIslObj(s_tree);
+    isl_schedule_free(s_tree);
+
     os << "\n" << ST << "\n";
     console->error(os.str());
     return false;
