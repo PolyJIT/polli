@@ -65,6 +65,7 @@ namespace {
     void PprofScop::getAnalysisUsage(AnalysisUsage &usage) const {
         usage.setPreservesAll();
         usage.addRequiredTransitive<ScopDetectionWrapperPass>();
+        usage.addRequiredTransitive<ScopInfoWrapperPass>();
     }
 
     size_t PprofScop::generateHash(Module *&module){
@@ -189,11 +190,22 @@ namespace {
 
     bool PprofScop::runOnFunction(Function &function) {
         bool gotInstrumented = false;
-        ScopDetection &scopDetection = getAnalysis<ScopDetectionWrapperPass>().getSD();
-        //errs() << "scopDetection: " << &scopDetection << "\n";
-        getAnalysis<ScopDetectionWrapperPass>().print(errs(), function.getParent());
-        for(const Region *region : scopDetection){
-            errs() << "Region: " << region->getNameStr() << "\n";
+        const ScopDetectionWrapperPass &scopDetectionWrapperPass = getAnalysis<ScopDetectionWrapperPass>();
+        scopDetectionWrapperPass.print(errs(), function.getParent());
+        const ScopDetection &scopDetection = scopDetectionWrapperPass.getSD();
+
+        const ScopInfoWrapperPass &scopInfoWrapperPass = getAnalysis<ScopInfoWrapperPass>();
+        scopInfoWrapperPass.print(errs());
+        const ScopInfo *scopInfo = scopInfoWrapperPass.getSI();
+
+        //scopDetection.getRI()->viewOnly();
+        //for(const Region *region : scopDetection){
+        //for(const detail::DenseMapPair<Region*, unique_ptr<Scop>> denseMapPair : *scopInfo){
+        for(DenseMap<Region*, unique_ptr<Scop>>::const_iterator it = scopInfo->begin(); it != scopInfo->end(); it++){
+            const Region *region = it->getFirst();
+            errs() << it->getSecond()->getNameStr() << '\n';
+            errs() << "Region: " << region->getNameStr() << '\n';
+            errs() << scopDetection.regionIsInvalidBecause(region) << '\n';
             if(const Region *parent = region){
                 instrumentedCounter++;
 
@@ -230,7 +242,7 @@ namespace {
     }
 }
 
-static RegisterPass<PprofScop> XX("pprof", "pprof using ScopDetection");
+static RegisterPass<PprofScop> XX("profileScopDetection", "profile using ScopDetection");
 
 static void registerPprofScop(const PassManagerBuilder &builder, legacy::PassManagerBase &managerBase){
     polly::registerCanonicalicationPasses(managerBase);

@@ -13,7 +13,7 @@ set(POLYJIT_COMPILETIME_SOURCES
   pjit-logging/Log.cpp
   RegisterCompilationPasses.cpp
   PolyJIT.cpp
-  pprofScopPass.cpp
+  profileScopDetectionPass.cpp
 )
 
 set(POLYJIT_RUNTIME_SOURCES
