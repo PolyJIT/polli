@@ -4,30 +4,42 @@
 #include "spdlog/spdlog.h"
 
 #include <cstdlib>
+#include <unistd.h>
 
 namespace {
-static const char *getLogOutFile() {
-  if (const char *LogF = std::getenv("POLLI_LOG_FILE")) {
-    return LogF;
+static bool use_file_log = false;
+
+static void loadOptionsFromEnv() {
+  if (const char *use_file_log_str = std::getenv("POLLI_ENABLE_FILE_LOG")) {
+    use_file_log = (bool)std::stoi(use_file_log_str);
   }
-  return nullptr;
+}
+
+static std::string &getLogOutFile() {
+  static __pid_t pid = getpid();
+  static std::string logFile = fmt::format("./polyjit.{:d}.log", pid);
+  return logFile;
 }
 
 static inline std::vector<spdlog::sink_ptr> &global_init() {
   static bool init = false;
   static std::vector<spdlog::sink_ptr> sinks;
+
   if (init)
     return sinks;
+
+  loadOptionsFromEnv();
   init = true;
 
-  if (const char *LOG_FILENAME = getLogOutFile()) {
+  if (use_file_log) {
     const size_t LOG_SIZE = 1048576 * 100;
     spdlog::set_async_mode(1048576);
-    sinks.push_back(std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
-        std::string(LOG_FILENAME), LOG_SIZE, 5));
+    sinks.push_back(std::make_shared<spdlog::sinks::simple_file_sink_mt>(
+        getLogOutFile(), true));
   } else {
     sinks.push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());
   }
+
   return sinks;
 }
 
