@@ -4,6 +4,7 @@
 #include "llvm/Pass.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "polli/Options.h"
 #include "polli/RegisterCompilationPasses.h"
 #include "polly/Canonicalization.h"
 #include "polly/LinkAllPasses.h"
@@ -16,6 +17,7 @@
 using namespace llvm;
 using namespace std;
 using namespace polly;
+using namespace polli;
 
 namespace {
 
@@ -234,12 +236,20 @@ namespace {
     }
 }
 
+//Register for opt
 static RegisterPass<ProfileScopDetection> ProfileScopDetectionRegister("profileScopDetection", "profile using ScopDetection");
 
+//Register for clang
 static void registerProfileScopDetection(const PassManagerBuilder &, legacy::PassManagerBase &PM){
-    polly::registerCanonicalicationPasses(PM);
-    PM.add(polly::createScopDetectionWrapperPassPass());
-    PM.add(new ProfileScopDetection());
+    if(opt::Enabled){
+        registerCanonicalicationPasses(PM);
+        PM.add(createScopDetectionWrapperPassPass());
+        PM.add(new ProfileScopDetection());
+    }
 }
 
 static RegisterStandardPasses registeredProfileScopDetectionPass(PassManagerBuilder::EP_EarlyAsPossible, registerProfileScopDetection);
+
+//Register for clang opt
+static cl::opt<bool, true> ProfileScopDetectionEnabled("profileScopDetection", cl::desc("profile using ScopDetection"),
+        cl::ZeroOrMore, cl::location(opt::Enabled), cl::init(false), cl::cat(PolliCategory));
