@@ -5,6 +5,14 @@ cmake_minimum_required(VERSION 3.2)
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+include_directories(AFTER
+  ${POLLI_SOURCE_DIR}/external/spdlog/include
+  ${POLLI_SOURCE_DIR}/external/catch/include
+  ${POLLI_SOURCE_DIR}/external/
+  ${POLLI_SOURCE_DIR}/include/
+  ${POLLI_BINARY_DIR}/include/
+)
+
 # Add path for polli custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 
@@ -28,9 +36,9 @@ find_package(LLVM REQUIRED PATHS
 
 include(AddLLVM)
 
-include_directories(${LLVM_INCLUDE_DIRS} )
-link_directories( ${LLVM_LIBRARY_DIRS} )
-add_definitions( ${LLVM_DEFINITIONS} )
+include_directories(${LLVM_INCLUDE_DIRS})
+link_directories(${LLVM_LIBRARY_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
 
 ## Find Polly
 find_package(Polly REQUIRED)
@@ -166,14 +174,6 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
   PATTERN "CMakeFiles" EXCLUDE
   PATTERN ".svn" EXCLUDE
   )
-
-include_directories(AFTER
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/spdlog/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/catch/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/external/
-  ${CMAKE_CURRENT_SOURCE_DIR}/include/
-  ${CMAKE_CURRENT_BINARY_DIR}/include/
-)
 
 set(POLLI_BINARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
 set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
