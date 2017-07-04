@@ -1,14 +1,16 @@
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "polli/RegisterCompilationPasses.h"
+#include "polly/Canonicalization.h"
+#include "polly/LinkAllPasses.h"
+#include "polly/RegisterPasses.h"
+#include "polly/ScopInfo.h"
+
 #include <algorithm>
-#include <llvm/IR/BasicBlock.h>
-#include <llvm/IR/IRBuilder.h>
-#include <llvm/IR/Module.h>
-#include <llvm/Pass.h>
-#include <llvm/Transforms/IPO/PassManagerBuilder.h>
-#include <llvm/Transforms/Utils/BasicBlockUtils.h>
-#include <polli/RegisterCompilationPasses.h>
-#include <polly/Canonicalization.h>
-#include <polly/RegisterPasses.h>
-#include <polly/ScopInfo.h>
 #include <sstream>
 
 using namespace llvm;
@@ -18,21 +20,21 @@ using namespace polly;
 namespace {
 
     struct PProfID{
-        PProfID(ConstantInt *globalID, size_t moduleID){
+        PProfID(ConstantInt *globalID, size_t MID){
             this->globalID = globalID;
-            this->moduleID = moduleID;
+            this->MID = MID;
         }
         ConstantInt *globalID;
-        size_t moduleID;
+        size_t MID;
     };
 
-    class PprofScop : public FunctionPass {
+    class ProfileScopDetection : public FunctionPass {
         public:
             static char ID;
-            explicit PprofScop() : FunctionPass(ID) {}
+            explicit ProfileScopDetection() : FunctionPass(ID) {}
 
         private:
-            static int loopID;
+            static int LoopID;
             static int instrumentedCounter;
             static int nonInstrumentedCounter;
             static bool calledSetup;
@@ -44,9 +46,9 @@ namespace {
             static void insertSetupTracingFunction(Function*);
             static void insertEnterRegionFunction(Module*&, Instruction*, PProfID&);
             static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
-            static SmallVector<BasicBlock*, 0> splitPredecessors(const Region*, BasicBlock*, bool);
-            static SmallVector<BasicBlock*, 0> splitPredecessors(const Region*, SmallVector<BasicBlock*, 0>&, bool );
-            static void instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 0>, SmallVector<BasicBlock*, 0>>&);
+            static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, BasicBlock*, bool);
+            static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, SmallVector<BasicBlock*, 1>&, bool );
+            static void instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>>&);
 
         public:
             void getAnalysisUsage(AnalysisUsage&) const override;
@@ -55,83 +57,82 @@ namespace {
             bool doFinalization(Module&) override;
     };
 
-    char PprofScop::ID = 0;
-    int PprofScop::loopID = 0;
-    int PprofScop::instrumentedCounter = 0;
-    int PprofScop::nonInstrumentedCounter = 0;
-    bool PprofScop::calledSetup = false;
-    list<string> PprofScop::instrumentedToplevelRegions = list<string>();
+    char ProfileScopDetection::ID = 0;
+    int ProfileScopDetection::LoopID = 0;
+    int ProfileScopDetection::instrumentedCounter = 0;
+    int ProfileScopDetection::nonInstrumentedCounter = 0;
+    bool ProfileScopDetection::calledSetup = false;
+    list<string> ProfileScopDetection::instrumentedToplevelRegions = list<string>();
 
-    void PprofScop::getAnalysisUsage(AnalysisUsage &usage) const {
+    void ProfileScopDetection::getAnalysisUsage(AnalysisUsage &usage) const {
         usage.setPreservesAll();
-        usage.addRequiredTransitive<ScopDetectionWrapperPass>();
-        usage.addRequiredTransitive<ScopInfoWrapperPass>();
+        usage.addRequired<ScopDetectionWrapperPass>();
     }
 
-    size_t PprofScop::generateHash(Module *&module){
-        loopID++;
+    size_t ProfileScopDetection::generateHash(Module *&M){
+        LoopID++;
         hash<string> stringhashFn;
-        string hashstring = module->getName().str() + "::Loop" + to_string(loopID);
+        string hashstring = M->getName().str() + "::Loop" + to_string(LoopID);
         return stringhashFn(hashstring)/10000000000; //FIXME Avoid dividing hash
     }
 
-    void PprofScop::insertSetupTracingFunction(Function *mainFunction){
-        Module *module = mainFunction->getParent();
-        LLVMContext &context = module->getContext();
+    void ProfileScopDetection::insertSetupTracingFunction(Function *Main){
+        Module *M = Main->getParent();
+        LLVMContext &context = M->getContext();
         IRBuilder<> builder(context);
-        Instruction *insertInstruction = mainFunction->getEntryBlock().getFirstNonPHIOrDbgOrLifetime();
+        Instruction *insertInstruction = Main->getEntryBlock().getFirstNonPHIOrDbgOrLifetime();
         builder.SetInsertPoint(insertInstruction);
 
         Type *voidty = Type::getVoidTy(context);
 
         //void setup_tracing()
-        FunctionType *functionType = FunctionType::get(voidty, false);
-        Constant *function = module->getOrInsertFunction("setup_tracing", functionType);
-        builder.CreateCall(function, {});
+        FunctionType *FType = FunctionType::get(voidty, false);
+        Constant *F = M->getOrInsertFunction("setup_tracing", FType);
+        builder.CreateCall(F, {});
     }
 
-    void PprofScop::insertEnterRegionFunction(Module *&module, Instruction *insertPosition, PProfID &pprofID){
-        LLVMContext &context = module->getContext();
+    void ProfileScopDetection::insertEnterRegionFunction(Module *&M, Instruction *insertPosition, PProfID &pprofID){
+        LLVMContext &context = M->getContext();
         Type *voidty = Type::getVoidTy(context);
         Type *int64Ty = Type::getInt64Ty(context);
         Type *charPtrTy = Type::getInt8PtrTy(context);
         IRBuilder<> builder(context);
         builder.SetInsertPoint(insertPosition);
 
-        //void enter_region(uint64_t, const char*)
+        //void enter_R(uint64_t, const char*)
         SmallVector<Value*, 2> arguments;
         arguments.push_back(pprofID.globalID);
         ostringstream name;
-        name << module->getName().data() << "::" << insertPosition->getFunction()->getName().data() << " "
-            << pprofID.moduleID;
+        name << M->getName().data() << "::" << insertPosition->getFunction()->getName().data() << " "
+            << pprofID.MID;
         errs() << name.str() << '\n';
         arguments.push_back(builder.CreateGlobalStringPtr(name.str()));
-        FunctionType *functionType = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
-        Constant *function = module->getOrInsertFunction("enter_region", functionType);
-        builder.CreateCall(function, arguments);
+        FunctionType *FType = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
+        Constant *F = M->getOrInsertFunction("enter_R", FType);
+        builder.CreateCall(F, arguments);
     }
 
-    void PprofScop::insertExitRegionFunction(Module *&module, Instruction *insertPosition, PProfID &pprofID){
-        LLVMContext &context = module->getContext();
+    void ProfileScopDetection::insertExitRegionFunction(Module *&M, Instruction *insertPosition, PProfID &pprofID){
+        LLVMContext &context = M->getContext();
         Type *voidty = Type::getVoidTy(context);
         Type *int64Ty = Type::getInt64Ty(context);
         IRBuilder<> builder(context);
         builder.SetInsertPoint(insertPosition);
 
-        //void exit_region(uint64_t)
+        //void exit_R(uint64_t)
         SmallVector<Value*, 1> arguments;
         arguments.push_back(pprofID.globalID);
-        FunctionType *functionType = FunctionType::get(voidty, {int64Ty}, false);
-        Constant *function = module->getOrInsertFunction("exit_region", functionType);
-        builder.CreateCall(function, arguments);
+        FunctionType *FType = FunctionType::get(voidty, {int64Ty}, false);
+        Constant *F = M->getOrInsertFunction("exit_R", FType);
+        builder.CreateCall(F, arguments);
     }
 
-    SmallVector<BasicBlock*, 0> PprofScop::splitPredecessors(const Region *region, BasicBlock *block, bool isEntry){
-        SmallVector<BasicBlock*, 0> splitBlocks;
+    SmallVector<BasicBlock*, 1> ProfileScopDetection::splitPredecessors(const Region *R, BasicBlock *block, bool isEntry){
+        SmallVector<BasicBlock*, 1> splitBlocks;
         //TODO Why is there a comma instead of using it directly in condition?
         for(pred_iterator it = pred_begin(block), end = pred_end(block); it != end; it++){
             BasicBlock *predecessor = *it;
-            if(isEntry != region->contains(predecessor)){
+            if(isEntry != R->contains(predecessor)){
                 BasicBlock *splitBlock = SplitEdge(predecessor, block);
                 if(splitBlock != nullptr){
                     splitBlocks.push_back(splitBlock);
@@ -141,25 +142,25 @@ namespace {
         return splitBlocks;
     }
 
-    SmallVector<BasicBlock*, 0> PprofScop::splitPredecessors(const Region *region, SmallVector<BasicBlock*, 0> &blocks,
+    SmallVector<BasicBlock*, 1> ProfileScopDetection::splitPredecessors(const Region *R, SmallVector<BasicBlock*, 1> &blocks,
             bool isEntry){
-        SmallVector<BasicBlock*, 0> splits;
+        SmallVector<BasicBlock*, 1> Splits;
         for(BasicBlock *block : blocks){
-            SmallVector<BasicBlock*, 0> newSplits = splitPredecessors(region, block, isEntry);
-            splits.insert(splits.end(), newSplits.begin(), newSplits.end());
+            SmallVector<BasicBlock*, 1> newSplits = splitPredecessors(R, block, isEntry);
+            Splits.insert(Splits.end(), newSplits.begin(), newSplits.end());
         }
-        return splits;
+        return Splits;
     }
 
-    void PprofScop::instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 0>, SmallVector<BasicBlock*, 0>> &splits){
-        Module *module = splits.first.front()->getModule();
-        Type *int64Ty = Type::getInt64Ty(module->getContext());
+    void ProfileScopDetection::instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> &Splits){
+        Module *M = Splits.first.front()->getModule();
+        Type *int64Ty = Type::getInt64Ty(M->getContext());
         //FIXME According to docs ConstantInt::get(...) returns a ConstantInt, but clang complains...
-        PProfID pprofID((ConstantInt*) ConstantInt::get(int64Ty, generateHash(module), false), loopID);;
+        PProfID pprofID((ConstantInt*) ConstantInt::get(int64Ty, generateHash(M), false), LoopID);;
 
-        for(BasicBlock *split : splits.first){
-            BasicBlock::iterator insertPosition = split->getFirstNonPHIOrDbgOrLifetime()->getIterator();
-            if(split->isLandingPad()){
+        for(BasicBlock *BB : Splits.first){
+            BasicBlock::iterator insertPosition = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
+            if(BB->isLandingPad()){
                 insertPosition++;
             }
             while(isa<AllocaInst>(insertPosition)){
@@ -169,53 +170,44 @@ namespace {
             while(isa<CallInst>(insertPosition)){
                 insertPosition++;
             }
-            insertEnterRegionFunction(module, &*insertPosition, pprofID);
+            insertEnterRegionFunction(M, &*insertPosition, pprofID);
         }
 
-        for(BasicBlock *split : splits.second){
-            BasicBlock::iterator insertPosition = split->getFirstNonPHIOrDbgOrLifetime()->getIterator();
-            if(split->isLandingPad()){
+        for(BasicBlock *BB : Splits.second){
+            BasicBlock::iterator insertPosition = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
+            if(BB->isLandingPad()){
                 insertPosition++;
             }
             while(isa<AllocaInst>(insertPosition)){
                 insertPosition++;
             }
-            insertExitRegionFunction(module, &*insertPosition, pprofID);
+            insertExitRegionFunction(M, &*insertPosition, pprofID);
         }
     }
 
-    bool PprofScop::doInitialization(Module &module) {
+    bool ProfileScopDetection::doInitialization(Module &) {
         return false;
     }
 
-    bool PprofScop::runOnFunction(Function &function) {
+    bool ProfileScopDetection::runOnFunction(Function &F) {
         bool gotInstrumented = false;
-        const ScopDetectionWrapperPass &scopDetectionWrapperPass = getAnalysis<ScopDetectionWrapperPass>();
-        scopDetectionWrapperPass.print(errs(), function.getParent());
-        const ScopDetection &scopDetection = scopDetectionWrapperPass.getSD();
+        const ScopDetectionWrapperPass &SDWP = getAnalysis<ScopDetectionWrapperPass>();
+        SDWP.print(errs(), F.getParent());
+        const ScopDetection &SD = SDWP.getSD();
 
-        const ScopInfoWrapperPass &scopInfoWrapperPass = getAnalysis<ScopInfoWrapperPass>();
-        scopInfoWrapperPass.print(errs());
-        const ScopInfo *scopInfo = scopInfoWrapperPass.getSI();
-
-        //scopDetection.getRI()->viewOnly();
-        //for(const Region *region : scopDetection){
-        //for(const detail::DenseMapPair<Region*, unique_ptr<Scop>> denseMapPair : *scopInfo){
-        for(DenseMap<Region*, unique_ptr<Scop>>::const_iterator it = scopInfo->begin(); it != scopInfo->end(); it++){
-            const Region *region = it->getFirst();
-            errs() << it->getSecond()->getNameStr() << '\n';
-            errs() << "Region: " << region->getNameStr() << '\n';
-            errs() << scopDetection.regionIsInvalidBecause(region) << '\n';
-            if(const Region *parent = region){
+        for(const Region *R : SD){
+            errs() << "Region: " << R->getNameStr() << '\n';
+            if(const Region *Parent = R->getParent()){
                 instrumentedCounter++;
+                errs() << SD.regionIsInvalidBecause(Parent) << '\n';
 
-                BasicBlock *entryBlock = parent->getEntry();
-                SmallVector<BasicBlock*, 0> exitBlocks;
-                exitBlocks.push_back(parent->getExit());
-                pair<SmallVector<BasicBlock*, 0>, SmallVector<BasicBlock*, 0>> splits;
-                splits.first = splitPredecessors(parent, entryBlock, true);
-                splits.second = splitPredecessors(parent, exitBlocks, false);
-                instrumentSplitBlocks(splits);
+                BasicBlock *EntryBB = Parent->getEntry();
+                SmallVector<BasicBlock*, 1> ExitBBs;
+                ExitBBs.push_back(Parent->getExit());
+                pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> Splits;
+                Splits.first = splitPredecessors(Parent, EntryBB, true);
+                Splits.second = splitPredecessors(Parent, ExitBBs, false);
+                instrumentSplitBlocks(Splits);
                 gotInstrumented = true;
             } else {
                 nonInstrumentedCounter++;
@@ -224,15 +216,15 @@ namespace {
         return gotInstrumented;
     }
 
-    bool PprofScop::doFinalization(Module &module) {
+    bool ProfileScopDetection::doFinalization(Module &M) {
         errs() << "Instrumented SCoPs: " << instrumentedCounter << '\n';
         errs() << "Not instrumented SCoPs: " << nonInstrumentedCounter << '\n';
 
         bool insertedSetupTracing = false;
         if(!calledSetup && instrumentedCounter > 0){
-            Function *mainFunction = module.getFunction("main");
-            if(mainFunction != nullptr){
-                insertSetupTracingFunction(mainFunction);
+            Function *Main = M.getFunction("main");
+            if(Main != nullptr){
+                insertSetupTracingFunction(Main);
                 insertedSetupTracing = true;
                 calledSetup = true;
             }
@@ -242,11 +234,12 @@ namespace {
     }
 }
 
-static RegisterPass<PprofScop> XX("profileScopDetection", "profile using ScopDetection");
+static RegisterPass<ProfileScopDetection> ProfileScopDetectionRegister("profileScopDetection", "profile using ScopDetection");
 
-static void registerPprofScop(const PassManagerBuilder &builder, legacy::PassManagerBase &managerBase){
-    polly::registerCanonicalicationPasses(managerBase);
-    managerBase.add(new PprofScop());
+static void registerProfileScopDetection(const PassManagerBuilder &, legacy::PassManagerBase &PM){
+    polly::registerCanonicalicationPasses(PM);
+    PM.add(polly::createScopDetectionWrapperPassPass());
+    PM.add(new ProfileScopDetection());
 }
 
-static RegisterStandardPasses registeredPprofScopPass(PassManagerBuilder::EP_EarlyAsPossible, registerPprofScop);
+static RegisterStandardPasses registeredProfileScopDetectionPass(PassManagerBuilder::EP_EarlyAsPossible, registerProfileScopDetection);
