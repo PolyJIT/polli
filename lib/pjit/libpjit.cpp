@@ -39,6 +39,7 @@
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetSelect.h"
 
 #include "llvm/IRReader/IRReader.h"
@@ -47,7 +48,6 @@
 
 #include "polli/Caching.h"
 #include "polli/Jit.h"
-#include "polli/Options.h"
 #include "polli/Options.h"
 #include "polli/RunValues.h"
 #include "polli/RuntimeOptimizer.h"
@@ -98,7 +98,7 @@ static Function &getFunction(Module &M) {
 }
 
 static inline void set_options_from_environment() {
-  opt::DisableRecompile = std::getenv("POLLI_DISABLE_RECOMPILATION") != nullptr;
+  cl::ParseEnvironmentOptions("libpjit", "PJIT_ARGS", "");
 }
 
 } // end of anonymous namespace
@@ -174,9 +174,9 @@ public:
 
   PolyJITEngine()
       : TM(EngineBuilder()
-               .setMArch(polli::opt::MArch)
-               .setMCPU(polli::opt::MCPU)
-               .setMAttrs(polli::opt::MAttrs)
+               .setMArch(opt::runtime::MArch)
+               .setMCPU(opt::runtime::MCPU)
+               .setMAttrs(opt::runtime::MAttrs)
                .selectTarget()),
         DL(TM->createDataLayout()),
         CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)),

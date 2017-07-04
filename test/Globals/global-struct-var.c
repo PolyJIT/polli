@@ -1,4 +1,4 @@
-// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -jitable -mllvm -polli-process-unprofitable -o /dev/stderr %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
+// RUN: %clang_cc1 -emit-llvm -O2 -load LLVMPolyJIT.so -mllvm -polli -mllvm -polli-process-unprofitable -o /dev/stderr %s -mllvm -polli-analyze -mllvm -stats 2>&1 | FileCheck %s
 
 // Check that we can handle a single global variable during compilation.
 

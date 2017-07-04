@@ -1,4 +1,4 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect-scops -jitable -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polly-use-runtime-alias-checks=false -polli-detect-scops -polli -analyze < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 regions require runtime support:
 ; CHECK:   0 region for.cond23.preheader => for.end34.exitStub requires 3 params

@@ -1,4 +1,4 @@
-; RUN: opt -load LLVMPolyJIT.so -O3 -jitable -polli -polli-process-unprofitable -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
+; RUN: opt -load LLVMPolyJIT.so -O3  -polli -polli-process-unprofitable -no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 regions require runtime support:
 

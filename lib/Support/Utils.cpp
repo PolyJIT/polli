@@ -42,7 +42,7 @@ void initializeOutputDir() {
 }
 
 void StoreModule(Module &M, const Twine &Name) {
-  if (!opt::GenerateOutput)
+  if (!opt::runtime::GenerateOutput)
     return;
 
   if (!DirReady)

@@ -24,53 +24,94 @@
 
 using namespace llvm;
 
+llvm::cl::OptionCategory PolliCategory("PolyJIT Options",
+                                       "Configure options of PolyJIT");
 llvm::cl::OptionCategory
-    PolliCategory("Polli Options", "Configure the runtime options of polli");
+    PolyJIT_Runtime("libpjit Options", "Configure runtime options of libpjit "
+                                       "(Use environment variable: PJIT_ARGS");
+llvm::cl::OptionCategory
+    PolyJIT_Compiletime("LLVMPolyJIT Options",
+                        "Configure compile-time options of PolyJIT ");
 
 namespace polli {
-
 namespace opt {
-bool InstrumentRegions;
-bool EnableJitable;
 bool DisableRecompile;
-bool DisableExecution;
-bool DisablePreopt;
-bool DisableSpecialization;
-bool AnalyzeIR = false;
-bool AnalyseOnly;
-std::string ReportFilename;
-bool GenerateOutput;
-bool Enabled;
-bool CollectRegressionTests = false;
+static cl::opt<bool, true> DisableRecompileX(
+    "no-recompilation", cl::desc("Disable recompilation of SCoPs"),
+    cl::location(DisableRecompile), cl::init(false), cl::cat(PolliCategory));
 
 bool DisableCoreFiles = true;
+static cl::opt<bool, true>
+    DisableCoreFilesX("disable-core-files", cl::Hidden,
+                      cl::desc("Disable emission of core files if possible"),
+                      cl::location(DisableCoreFiles), cl::init(false),
+                      cl::cat(PolliCategory));
+
+namespace runtime {
+
 char OptLevel = ' ';
-std::string TargetTriple = "x86-64_unknown-linux-gnu";
-// std::string MArch = "x86-64";
-// std::string MCPU  = "ivybridge";
 std::string MArch = "";
 std::string MCPU = "";
 std::vector<std::string> MAttrs;
-// std::vector<std::string> MAttrs = {
-//    "-sse4a",    "-avx512bw", "+cx16",     "-tbm",      "+xsave",  "-fma4",
-//    "-avx512vl", "-prfchw",   "-bmi2",     "-adx",      "-xsavec",
-//    "+fsgsbase",
-//    "+avx",      "-avx512cd", "-avx512pf", "-rtm",      "+popcnt", "-fma",
-//    "-bmi",      "+aes",      "+rdrnd",    "-xsaves",   "+sse4.1", "+sse4.2",
-//    "-avx2",     "-avx512er", "+sse",      "-lzcnt",    "+pclmul", "-avx512f",
-//    "+f16c",     "+sse3",     "+mmx",      "-pku",      "+cmov",   "-xop",
-//    "-rdseed",   "-movbe",    "-hle",      "+xsaveopt", "-sha",    "+sse2",
-//    "+sse3",     "-avx512dq"
-//};
+std::string TargetTriple = "x86-64_unknown-linux-gnu";
 
-bool EmitEnv = false;
+bool DisableExecution;
+static cl::opt<bool, true> DisableExecutionX(
+    "pjit-no-execution",
+    cl::desc("Disable execution just produce all intermediate files"),
+    cl::location(DisableExecution), cl::init(false), cl::cat(PolyJIT_Runtime));
 
-/**
- * @brief Check, if we should perform PAPI based runtime instrumentation.
- *
- * @return True, if we should enable PAPI base runtime instrumentation.
- */
-bool havePapi() { return std::getenv("POLLI_ENABLE_PAPI") != nullptr; }
+bool DisableSpecialization;
+static cl::opt<bool, true>
+    DisableSpecializationX("pjit-no-specialization",
+                           cl::desc("Disable specialziation"),
+                           cl::location(DisableSpecialization), cl::init(false),
+                           cl::cat(PolyJIT_Runtime));
+
+bool GenerateOutput;
+static cl::opt<bool, true> GenerateOutputX(
+    "polli-debug-ir",
+    cl::desc("Store all IR files inside a unique subdirectory."),
+    cl::location(GenerateOutput), cl::init(false), cl::cat(PolyJIT_Runtime));
+
+bool EnablePapi;
+static cl::opt<bool, true> EnablePapiX(
+    "pjit-enable-papi",
+    cl::desc("Enable PAPI tracing"),
+    cl::location(EnablePapi), cl::init(false), cl::cat(PolyJIT_Runtime));
+} // namespace runtime
+
+namespace compiletime {
+
+bool InstrumentRegions;
+static cl::opt<bool, true>
+    InstrumentRegionsX("instrument", cl::desc("Enable instrumenting of SCoPs"),
+                       cl::location(InstrumentRegions), cl::init(false),
+                       cl::cat(PolyJIT_Compiletime));
+
+bool AnalyzeIR;
+static cl::opt<bool, true>
+    AnalyzeIRX("polli-analyze",
+               cl::desc("Throw in a bunch of function printers for "
+                        "PolyJIT's static compilation passes."),
+               cl::location(AnalyzeIR), cl::init(false),
+               cl::cat(PolyJIT_Compiletime));
+
+bool CollectRegressionTests = false;
+static cl::opt<bool, true> PolliCollectX(
+    "polli-collect-modules",
+    cl::desc("Collect Modules in the database for regression testing."),
+    cl::ZeroOrMore, cl::location(CollectRegressionTests),
+    cl::init(false), cl::cat(PolyJIT_Compiletime));
+
+bool Enabled;
+static cl::opt<bool, true> EnabledX(
+    "polli",
+    cl::desc("Enable PolyJIT"),
+    cl::location(Enabled), cl::init(false), cl::cat(PolyJIT_Compiletime));
+
+} // namespace compiletime
+
 /**
  * @brief Check, if we have likwid support at run-time.
  *
@@ -86,74 +127,5 @@ uint64_t getNumThreads() {
   return 0;
 }
 
-void loadOptionsFromEnv() {
-  DisableSpecialization =
-      std::getenv("POLLI_DISABLE_SPECIALIZATION") != nullptr;
-}
-
 } // namespace opt
 } // namespace polli
-
-using namespace polli;
-using namespace polli::opt;
-
-static cl::opt<bool, true> EmitEnvX("polli-emit-env",
-                                    cl::desc("Emit environment."),
-                                    cl::location(EmitEnv), cl::init(false),
-                                    cl::cat(PolliCategory));
-
-static cl::opt<bool, true>
-    InstrumentRegionsX("instrument", cl::desc("Enable instrumenting of SCoPs"),
-                       cl::location(InstrumentRegions), cl::init(false),
-                       cl::cat(PolliCategory));
-
-static cl::opt<bool, true> EnableJitableX("jitable",
-                                          cl::desc("Enable JIT extensions."),
-                                          cl::location(EnableJitable),
-                                          cl::init(false),
-                                          cl::cat(PolliCategory));
-
-static cl::opt<bool, true> DisablePreoptX(
-    "disable-preopt", cl::desc("Disable polly's canonicalization"),
-    cl::location(DisablePreopt), cl::init(false), cl::cat(PolliCategory));
-
-static cl::opt<bool, true> DisableRecompileX(
-    "no-recompilation", cl::desc("Disable recompilation of SCoPs"),
-    cl::location(DisableRecompile), cl::init(false), cl::cat(PolliCategory));
-
-static cl::opt<bool, true> DisableExecutionX(
-    "no-execution",
-    cl::desc("Disable execution just produce all intermediate files"),
-    cl::location(DisableExecution), cl::init(false), cl::cat(PolliCategory));
-
-static cl::opt<bool, true> AnalyzeIRX(
-    "polli-analyze", cl::desc("Throw in a bunch of function printers for "
-                              "PolyJIT's static compilation passes."),
-    cl::location(AnalyzeIR), cl::init(false), cl::cat(PolliCategory));
-
-static cl::opt<bool, true> GenerateOutputX(
-    "polli-debug-ir",
-    cl::desc("Store all IR files inside a unique subdirectory."),
-    cl::location(GenerateOutput), cl::init(false), cl::cat(PolliCategory));
-
-static cl::opt<std::string, true>
-    ReportFilenameX("polli-report-file",
-                    cl::desc("Name of the report file to generate."),
-                    cl::location(ReportFilename), cl::init("polli.report"),
-                    cl::cat(PolliCategory));
-
-static cl::opt<bool, true>
-    DisableCoreFilesX("disable-core-files", cl::Hidden,
-                      cl::desc("Disable emission of core files if possible"),
-                      cl::location(DisableCoreFiles));
-
-static cl::opt<bool, true>
-    PolliEnabledX("polli", cl::desc("Enable the polli JIT compiler"),
-                  cl::ZeroOrMore, cl::location(polli::opt::Enabled),
-                  cl::init(false), cl::cat(PolliCategory));
-
-static cl::opt<bool, true> PolliCollectX(
-    "polli-collect-modules",
-    cl::desc("Collect Modules in the database for regression testing."),
-    cl::ZeroOrMore, cl::location(polli::opt::CollectRegressionTests),
-    cl::init(false), cl::cat(PolliCategory));

@@ -22,6 +22,8 @@
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 
 using namespace llvm;
+using namespace polli;
+
 #define DEBUG_TYPE "polyjit"
 
 STATISTIC(Instrumented, "Number of instrumented functions");
@@ -170,7 +172,7 @@ struct InstrumentEndpoint {
 
     LLVMContext &Ctx = M->getContext();
     std::string CallbackName = "pjit_main";
-    if (polli::opt::DisableRecompile)
+    if (opt::DisableRecompile)
       CallbackName = "pjit_main_no_recompile";
 
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
@@ -285,7 +287,7 @@ private:
 
 static inline void collectRegressionTest(const std::string Name,
                                          const std::string &ModStr) {
-  if (!opt::CollectRegressionTests) {
+  if (!opt::compiletime::CollectRegressionTests) {
     return;
   }
   using namespace db;

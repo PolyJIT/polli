@@ -1,4 +1,4 @@
-; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polli-detect-scops -jitable -analyze < %s 2>&1 | FileCheck %s
+; RUN: opt -S -load LLVMPolyJIT.so -polli-process-unprofitable -polli-detect-scops -polli -analyze < %s 2>&1 | FileCheck %s
 
 ; CHECK: 1 regions require runtime support:
 ; CHECK:   0 region {{.*}} => {{.*}} requires 8 params

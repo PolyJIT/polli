@@ -222,7 +222,7 @@ public:
 
 static std::unique_ptr<FunctionClonerBase>
 createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
-  if (!polli::opt::DisableSpecialization) {
+  if (!opt::runtime::DisableSpecialization) {
     // Perform parameter value substitution.
     auto Specializer = std::make_unique<FunctionCloner<
         MainCreator, IgnoreSource, SpecializeEndpoint<RunValue<uint64_t *>>>>();

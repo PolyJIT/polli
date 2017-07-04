@@ -114,24 +114,24 @@ char InjectMain::ID = 0;
 
 static void registerPolyJIT(const llvm::PassManagerBuilder &,
                             llvm::legacy::PassManagerBase &PM) {
-  if (!opt::Enabled)
+  if (!opt::compiletime::Enabled)
     return;
 
   polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createCodePreparationPass());
   PM.add(polli::createScopDetectionPass());
 
-  if (opt::AnalyzeIR)
+  if (opt::compiletime::AnalyzeIR)
     PM.add(new FunctionPassPrinter<polli::JITScopDetection>(outs()));
 
-  if (opt::InstrumentRegions) {
+  if (opt::compiletime::InstrumentRegions) {
     PM.add(new PapiCScopProfiling());
     return;
   }
 
   PM.add(new ModuleExtractor());
   PM.add(new ModuleInstrumentation());
-  if (opt::AnalyzeIR)
+  if (opt::compiletime::AnalyzeIR)
     PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
   PM.add(new InjectMain());
 }

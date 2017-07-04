@@ -14,50 +14,43 @@
 #ifndef POLLI_OPTIONS_H
 #define POLLI_OPTIONS_H
 
-#include <string>
-#include <vector>
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetOptions.h"
 
+#include <string>
+#include <vector>
+
 extern llvm::cl::OptionCategory PolliCategory;
+extern llvm::cl::OptionCategory PolyJIT_Runtime;
+extern llvm::cl::OptionCategory PolyJIT_Compiletime;
 
 namespace polli {
-
 namespace opt {
+extern bool DisableRecompile;
+extern bool DisableCoreFiles;
 extern std::string EntryFunc;
 extern std::string FakeArgv0;
 
-extern bool DisableCoreFiles;
-
-extern bool InstrumentRegions;
-extern bool EnableJitable;
-extern bool DisableRecompile;
-extern bool DisableExecution;
-extern bool DisableSpecialization;
-extern bool AnalyzeIR;
+namespace runtime {
 extern char OptLevel;
-extern bool CollectRegressionTests;
-
 extern std::string TargetTriple;
 extern std::string MArch;
 extern std::string MCPU;
 extern std::vector<std::string> MAttrs;
 
-extern bool GenerateSoftFloatCalls;
-
-extern bool AnalyseOnly;
-extern std::string ReportFilename;
-
-extern bool DisablePreopt;
+extern bool DisableExecution;
+extern bool DisableSpecialization;
+extern bool EnablePapi;
 extern bool GenerateOutput;
+}
 
-/**
- * @brief Should PolyJIT be enabled?
- *
- * This pushes PolyJIT's static passes into the compilation pipeline.
- */
+namespace compiletime {
 extern bool Enabled;
+extern bool InstrumentRegions;
+extern bool AnalyzeIR;
+extern bool CollectRegressionTests;
+}
 
 /**
  * @brief Check, if we're wrapped in a likwid binary, e.g., likwid-perfctr.
@@ -65,15 +58,6 @@ extern bool Enabled;
  * @return bool
  */
 bool haveLikwid();
-
-/**
- * @brief Check, if we should perform PAPI based runtime instrumentation.
- *
- * @return True, if we should enable PAPI base runtime instrumentation.
- */
-bool havePapi();
-
-void loadOptionsFromEnv();
 
 /**
  * Get the number of OpenMP-Threads available to us.
