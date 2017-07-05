@@ -24,7 +24,6 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
   init = true;
 
   if (polli::opt::EnableLogFile) {
-    const size_t LOG_SIZE = 1048576 * 100;
     spdlog::set_async_mode(1048576);
     sinks.push_back(std::make_shared<spdlog::sinks::simple_file_sink_mt>(
         getLogOutFile(), true));

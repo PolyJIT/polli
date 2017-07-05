@@ -14,8 +14,8 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "runtime_optimizer"
 #include "polli/RuntimeOptimizer.h"
-#include "polli/Utils.h"
 #include "polli/Db.h"
+#include "polli/Utils.h"
 
 #include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/RegionInfo.h"
@@ -30,7 +30,6 @@
 #include "polly/CodeGen/CodeGeneration.h"
 #include "polly/CodeGen/CodegenCleanup.h"
 #include "polly/CodeGen/IslAst.h"
-#include "polly/Support/GICHelper.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/Options.h"
 #include "polly/RegisterPasses.h"
@@ -38,6 +37,7 @@
 #include "polly/ScopDetection.h"
 #include "polly/ScopInfo.h"
 #include "polly/ScopPass.h"
+#include "polly/Support/GICHelper.h"
 
 REGISTER_LOG(console, DEBUG_TYPE);
 
@@ -234,7 +234,7 @@ private:
 class DBExport : public polly::ScopPass {
 public:
   static char ID;
-  explicit DBExport() : polly::ScopPass(ID) {};
+  explicit DBExport() : polly::ScopPass(ID){};
 
   /// @name ScopPass interface
   //@{
@@ -346,23 +346,59 @@ char DBExport::ID = 0;
 
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
-
   polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionWrapperPassPass());
   PM.add(polly::createScopInfoRegionPassPass());
   PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
-  PM.add(new PollyScheduleReport());
-  PM.add(new DBExport());
-  //PM.add(new PollyReport());
   PM.add(polly::createCodeGenerationPass());
-  PM.add(new PollyScopReport());
-  PM.add(new PollyFnReport());
 
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
   PM.add(createBarrierNoopPass());
+}
+
+static void registerPollyWithDiagnostics(const llvm::PassManagerBuilder &Builder,
+                          llvm::legacy::PassManagerBase &PM) {
+  polly::registerCanonicalicationPasses(PM);
+  PM.add(polly::createScopDetectionWrapperPassPass());
+  PM.add(polly::createScopInfoRegionPassPass());
+  PM.add(new TileSizeLearner());
+  PM.add(polly::createIslScheduleOptimizerPass());
+
+  if (opt::runtime::EnableScheduleReport)
+    PM.add(new PollyScheduleReport());
+  if (opt::runtime::EnableDatabaseExport)
+    PM.add(new DBExport());
+  if (opt::runtime::EnableASTReport)
+    PM.add(new PollyReport());
+
+  PM.add(polly::createCodeGenerationPass());
+
+  if (opt::runtime::EnableScopReport)
+    PM.add(new PollyScopReport());
+  if (opt::runtime::EnableFunctionReport)
+    PM.add(new PollyFnReport());
+
+  // FIXME: This dummy ModulePass keeps some programs from miscompiling,
+  // probably some not correctly preserved analyses. It acts as a barrier to
+  // force all analysis results to be recomputed.
+  PM.add(createBarrierNoopPass());
+}
+
+using PipelineFunc = std::function<void(const llvm::PassManagerBuilder &, llvm::legacy::PassManagerBase &)>;
+static PipelineFunc ActivePipeline = registerPolly;
+
+void SetOptimizationPipeline(PipelineType Choice) {
+  switch(Choice) {
+    case RELEASE:
+      ActivePipeline = registerPolly;
+      break;
+    case DEBUG:
+      ActivePipeline = registerPollyWithDiagnostics;
+      break;
+  }
 }
 
 PassManagerBuilder createPMB() {

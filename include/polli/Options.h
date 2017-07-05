@@ -26,6 +26,11 @@ extern llvm::cl::OptionCategory PolyJIT_Runtime;
 extern llvm::cl::OptionCategory PolyJIT_Compiletime;
 
 namespace polli {
+enum PipelineType {
+    RELEASE,
+    DEBUG
+};
+
 namespace opt {
 extern bool EnableLogFile;
 extern bool DisableRecompile;
@@ -43,7 +48,14 @@ extern std::vector<std::string> MAttrs;
 extern bool DisableExecution;
 extern bool DisableSpecialization;
 extern bool EnablePapi;
+extern bool EnableDatabaseExport;
 extern bool GenerateOutput;
+extern bool EnableScheduleReport;
+extern bool EnableScopReport;
+extern bool EnableFunctionReport;
+extern bool EnableASTReport;
+
+extern PipelineType PipelineChoice;
 }
 
 namespace compiletime {
@@ -52,6 +64,9 @@ extern bool InstrumentRegions;
 extern bool AnalyzeIR;
 extern bool CollectRegressionTests;
 }
+
+
+void ValidateOptions();
 
 /**
  * @brief Check, if we're wrapped in a likwid binary, e.g., likwid-perfctr.

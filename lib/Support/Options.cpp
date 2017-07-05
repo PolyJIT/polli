@@ -37,24 +37,33 @@ namespace polli {
 namespace opt {
 bool DisableRecompile;
 static cl::opt<bool, true> DisableRecompileX(
-    "no-recompilation", cl::desc("Disable recompilation of SCoPs"),
+    "polli-no-recompilation", cl::desc("Disable recompilation of SCoPs"),
     cl::location(DisableRecompile), cl::init(false), cl::cat(PolliCategory));
 
 bool DisableCoreFiles = true;
 static cl::opt<bool, true>
-    DisableCoreFilesX("disable-core-files",
+    DisableCoreFilesX("polli-disable-core-files",
                       cl::desc("Disable emission of core files if possible"),
                       cl::location(DisableCoreFiles), cl::init(false),
                       cl::cat(PolliCategory));
 
 bool EnableLogFile;
-static cl::opt<bool, true>
-    EnableLogFileX("polli-enable-log",
-                   cl::desc("Enable logging to file instead of stderr"),
-                   cl::location(EnableLogFile), cl::init(false),
-                   cl::cat(PolliCategory));
+static cl::opt<bool, true> EnableLogFileX(
+    "polli-enable-log", cl::desc("Enable logging to file instead of stderr"),
+    cl::location(EnableLogFile), cl::init(false), cl::cat(PolliCategory));
 
 namespace runtime {
+PipelineType PipelineChoice;
+static cl::opt<PipelineType> PipelineChoiceX(
+    "polli-optimizer",
+    cl::desc("Which optimization pipeline should be enabled?"),
+    cl::values(
+        clEnumValN(RELEASE, "release",
+                   "Enable the default 'release' pipeline. No debug output"),
+        clEnumValN(DEBUG, "debug", "Enable the debug pipeline. Additional "
+                                   "configuration determines the amoun of "
+                                   "debug output you get.")),
+    cl::Hidden, cl::init(RELEASE), cl::ZeroOrMore, cl::cat(PolyJIT_Runtime));
 
 char OptLevel = ' ';
 std::string MArch = "";
@@ -64,13 +73,13 @@ std::string TargetTriple = "x86-64_unknown-linux-gnu";
 
 bool DisableExecution;
 static cl::opt<bool, true> DisableExecutionX(
-    "pjit-no-execution",
+    "polli-no-execution",
     cl::desc("Disable execution just produce all intermediate files"),
     cl::location(DisableExecution), cl::init(false), cl::cat(PolyJIT_Runtime));
 
 bool DisableSpecialization;
 static cl::opt<bool, true>
-    DisableSpecializationX("pjit-no-specialization",
+    DisableSpecializationX("polli-no-specialization",
                            cl::desc("Disable specialziation"),
                            cl::location(DisableSpecialization), cl::init(false),
                            cl::cat(PolyJIT_Runtime));
@@ -82,42 +91,82 @@ static cl::opt<bool, true> GenerateOutputX(
     cl::location(GenerateOutput), cl::init(false), cl::cat(PolyJIT_Runtime));
 
 bool EnablePapi;
-static cl::opt<bool, true> EnablePapiX(
-    "pjit-enable-papi",
-    cl::desc("Enable PAPI tracing"),
-    cl::location(EnablePapi), cl::init(false), cl::cat(PolyJIT_Runtime));
+static cl::opt<bool, true> EnablePapiX("polli-papi",
+                                       cl::desc("Enable PAPI tracing"),
+                                       cl::location(EnablePapi),
+                                       cl::init(false),
+                                       cl::cat(PolyJIT_Runtime));
+
+bool EnableDatabaseExport;
+static cl::opt<bool, true>
+    EnableDatabaseExportX("polli-database-export",
+                          cl::desc("Enable export of debug information to a "
+                                   "configured database connection."),
+                          cl::location(EnableDatabaseExport), cl::init(false),
+                          cl::cat(PolyJIT_Runtime));
+
+bool EnableScheduleReport;
+static cl::opt<bool, true>
+    EnableScheduleReportX("polli-schedule-report",
+                          cl::desc("Print optimized schedule information"),
+                          cl::location(EnableScheduleReport), cl::init(false),
+                          cl::cat(PolyJIT_Runtime));
+
+bool EnableScopReport;
+static cl::opt<bool, true> EnableScopReportX(
+    "polli-scop-report", cl::desc("Print optimized scop information"),
+    cl::location(EnableScopReport), cl::init(false), cl::cat(PolyJIT_Runtime));
+
+bool EnableFunctionReport;
+static cl::opt<bool, true>
+    EnableFunctionReportX("polli-function-report",
+                          cl::desc("Print optimized function information"),
+                          cl::location(EnableFunctionReport), cl::init(false),
+                          cl::cat(PolyJIT_Runtime));
+
+bool EnableASTReport;
+static cl::opt<bool, true> EnableASTReportX(
+    "polli-ast-report", cl::desc("Print optimized isl-ast information"),
+    cl::location(EnableASTReport), cl::init(false), cl::cat(PolyJIT_Runtime));
 } // namespace runtime
 
 namespace compiletime {
 
 bool InstrumentRegions;
 static cl::opt<bool, true>
-    InstrumentRegionsX("instrument", cl::desc("Enable instrumenting of SCoPs"),
+    InstrumentRegionsX("polli-instrument",
+                       cl::desc("Enable instrumenting of SCoPs"),
                        cl::location(InstrumentRegions), cl::init(false),
                        cl::cat(PolyJIT_Compiletime));
 
 bool AnalyzeIR;
-static cl::opt<bool, true>
-    AnalyzeIRX("polli-analyze",
-               cl::desc("Throw in a bunch of function printers for "
-                        "PolyJIT's static compilation passes."),
-               cl::location(AnalyzeIR), cl::init(false),
-               cl::cat(PolyJIT_Compiletime));
+static cl::opt<bool, true> AnalyzeIRX(
+    "polli-analyze", cl::desc("Throw in a bunch of function printers for "
+                              "PolyJIT's static compilation passes."),
+    cl::location(AnalyzeIR), cl::init(false), cl::cat(PolyJIT_Compiletime));
 
 bool CollectRegressionTests = false;
 static cl::opt<bool, true> PolliCollectX(
     "polli-collect-modules",
     cl::desc("Collect Modules in the database for regression testing."),
-    cl::ZeroOrMore, cl::location(CollectRegressionTests),
-    cl::init(false), cl::cat(PolyJIT_Compiletime));
+    cl::ZeroOrMore, cl::location(CollectRegressionTests), cl::init(false),
+    cl::cat(PolyJIT_Compiletime));
 
 bool Enabled;
-static cl::opt<bool, true> EnabledX(
-    "polli",
-    cl::desc("Enable PolyJIT"),
-    cl::location(Enabled), cl::init(false), cl::cat(PolyJIT_Compiletime));
+static cl::opt<bool, true> EnabledX("polli", cl::desc("Enable PolyJIT"),
+                                    cl::location(Enabled), cl::init(false),
+                                    cl::cat(PolyJIT_Compiletime));
 
 } // namespace compiletime
+
+void ValidateOptions() {
+  using namespace runtime;
+  if (EnableScheduleReport || EnableScopReport || EnableFunctionReport ||
+      EnableASTReport || EnableDatabaseExport) {
+    PipelineChoice = DEBUG;
+
+  }
+}
 
 /**
  * @brief Check, if we have likwid support at run-time.

@@ -14,12 +14,14 @@
 //===----------------------------------------------------------------------===//
 #ifndef RUNTIMEOPTIMIZER_H
 #define RUNTIMEOPTIMIZER_H
+#include "polli/Options.h"
 
 #include "llvm/IR/Function.h"
 
 using namespace llvm;
 
 namespace polli {
+void SetOptimizationPipeline(PipelineType Choice);
 
 /// @brief Optimize a function during the runtime of the program.
 //
