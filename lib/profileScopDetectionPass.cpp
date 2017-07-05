@@ -50,7 +50,7 @@ namespace {
             static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
             static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, BasicBlock*, bool);
             static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, SmallVector<BasicBlock*, 1>&, bool );
-            static void instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>>&);
+            static bool instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>>&);
 
         public:
             void getAnalysisUsage(AnalysisUsage&) const override;
@@ -131,13 +131,19 @@ namespace {
 
     SmallVector<BasicBlock*, 1> ProfileScopDetection::splitPredecessors(const Region *R, BasicBlock *block, bool isEntry){
         SmallVector<BasicBlock*, 1> splitBlocks;
-        //TODO Why is there a comma instead of using it directly in condition?
-        for(pred_iterator it = pred_begin(block), end = pred_end(block); it != end; it++){
-            BasicBlock *predecessor = *it;
-            if(isEntry != R->contains(predecessor)){
-                BasicBlock *splitBlock = SplitEdge(predecessor, block);
-                if(splitBlock != nullptr){
-                    splitBlocks.push_back(splitBlock);
+        if(block){
+            errs() << "splitPredecessors: " << block << '\n';
+            //TODO May insert warning for nullptr
+            //TODO Why is there a comma instead of using it directly in condition?
+            errs() << "pred_empty: " << pred_empty(block) << '\n';
+            for(pred_iterator it = pred_begin(block), end = pred_end(block); it != end; it++){
+                BasicBlock *predecessor = *it;
+                if(isEntry != R->contains(predecessor)){
+                    BasicBlock *splitBlock = SplitEdge(predecessor, block);
+                    errs() << "splitBlock: " << splitBlock << '\n';
+                    if(splitBlock != nullptr){
+                        splitBlocks.push_back(splitBlock);
+                    }
                 }
             }
         }
@@ -154,8 +160,15 @@ namespace {
         return Splits;
     }
 
-    void ProfileScopDetection::instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> &Splits){
-        Module *M = Splits.first.front()->getModule();
+    bool ProfileScopDetection::instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> &Splits){
+        Module *M;
+        if(!Splits.first.empty()){
+            M = Splits.first.front()->getModule();
+        } else if(!Splits.second.empty()){
+            M = Splits.second.front()->getModule();
+        } else {
+            return false;
+        }
         Type *int64Ty = Type::getInt64Ty(M->getContext());
         //FIXME According to docs ConstantInt::get(...) returns a ConstantInt, but clang complains...
         PProfID pprofID((ConstantInt*) ConstantInt::get(int64Ty, generateHash(M), false), LoopID);;
@@ -185,6 +198,8 @@ namespace {
             }
             insertExitRegionFunction(M, &*insertPosition, pprofID);
         }
+
+        return true;
     }
 
     bool ProfileScopDetection::doInitialization(Module &) {
@@ -194,23 +209,29 @@ namespace {
     bool ProfileScopDetection::runOnFunction(Function &F) {
         bool gotInstrumented = false;
         const ScopDetectionWrapperPass &SDWP = getAnalysis<ScopDetectionWrapperPass>();
-        SDWP.print(errs(), F.getParent());
         const ScopDetection &SD = SDWP.getSD();
 
         for(const Region *R : SD){
             errs() << "Region: " << R->getNameStr() << '\n';
             if(const Region *Parent = R->getParent()){
-                instrumentedCounter++;
-                errs() << SD.regionIsInvalidBecause(Parent) << '\n';
+                errs() << "Invalid because of: " << SD.regionIsInvalidBecause(Parent) << '\n';
 
                 BasicBlock *EntryBB = Parent->getEntry();
-                SmallVector<BasicBlock*, 1> ExitBBs;
-                ExitBBs.push_back(Parent->getExit());
+                BasicBlock *ExitBB = Parent->getExit();
                 pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> Splits;
+
+                errs() << "EntryBB: " << EntryBB << '\n';
                 Splits.first = splitPredecessors(Parent, EntryBB, true);
-                Splits.second = splitPredecessors(Parent, ExitBBs, false);
-                instrumentSplitBlocks(Splits);
-                gotInstrumented = true;
+                errs() << "Splits.first.empty(): " << Splits.first.empty() << '\n';
+
+                errs() << "ExitBB: " << ExitBB << '\n';
+                Splits.second = splitPredecessors(Parent, ExitBB, false);
+                errs() << "Splits.second.empty(): " << Splits.second.empty() << '\n';
+
+                if(instrumentSplitBlocks(Splits)){
+                    instrumentedCounter++;
+                    gotInstrumented = true;
+                }
             } else {
                 nonInstrumentedCounter++;
             }
