@@ -42,10 +42,17 @@ static cl::opt<bool, true> DisableRecompileX(
 
 bool DisableCoreFiles = true;
 static cl::opt<bool, true>
-    DisableCoreFilesX("disable-core-files", cl::Hidden,
+    DisableCoreFilesX("disable-core-files",
                       cl::desc("Disable emission of core files if possible"),
                       cl::location(DisableCoreFiles), cl::init(false),
                       cl::cat(PolliCategory));
+
+bool EnableLogFile;
+static cl::opt<bool, true>
+    EnableLogFileX("polli-enable-log",
+                   cl::desc("Enable logging to file instead of stderr"),
+                   cl::location(EnableLogFile), cl::init(false),
+                   cl::cat(PolliCategory));
 
 namespace runtime {
 

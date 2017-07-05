@@ -1,5 +1,6 @@
 #include <vector>
 
+#include "polli/Options.h"
 #include "polli/log.h"
 #include "spdlog/spdlog.h"
 
@@ -7,14 +8,6 @@
 #include <unistd.h>
 
 namespace {
-static bool use_file_log = false;
-
-static void loadOptionsFromEnv() {
-  if (const char *use_file_log_str = std::getenv("POLLI_ENABLE_FILE_LOG")) {
-    use_file_log = (bool)std::stoi(use_file_log_str);
-  }
-}
-
 static std::string &getLogOutFile() {
   static __pid_t pid = getpid();
   static std::string logFile = fmt::format("./polyjit.{:d}.log", pid);
@@ -28,10 +21,9 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
   if (init)
     return sinks;
 
-  loadOptionsFromEnv();
   init = true;
 
-  if (use_file_log) {
+  if (polli::opt::EnableLogFile) {
     const size_t LOG_SIZE = 1048576 * 100;
     spdlog::set_async_mode(1048576);
     sinks.push_back(std::make_shared<spdlog::sinks::simple_file_sink_mt>(

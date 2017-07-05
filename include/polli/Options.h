@@ -27,6 +27,7 @@ extern llvm::cl::OptionCategory PolyJIT_Compiletime;
 
 namespace polli {
 namespace opt {
+extern bool EnableLogFile;
 extern bool DisableRecompile;
 extern bool DisableCoreFiles;
 extern std::string EntryFunc;

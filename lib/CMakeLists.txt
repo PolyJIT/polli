@@ -22,6 +22,7 @@ set(POLYJIT_RUNTIME_SOURCES
   pjit/Jit.cpp
   pjit/RunValues.cpp
   pjit/Db.cpp
+  pjit-logging/Log.cpp
   Runtime/LikwidMarker.cpp
   Runtime/RuntimeOptimizer.cpp
   Runtime/VariantFunction.cpp
@@ -31,7 +32,6 @@ set(POLYJIT_RUNTIME_SOURCES
   Support/Stats.cpp
   Support/Utils.cpp
   Support/TypeMapper.cpp
-  pjit-logging/Log.cpp
 )
 
 set(POLYJIT_PPROF_SOURCES
