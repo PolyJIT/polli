@@ -237,7 +237,7 @@ namespace {
 }
 
 //Register for opt
-static RegisterPass<ProfileScopDetection> ProfileScopDetectionRegister("profileScopDetection", "profile using ScopDetection");
+//static RegisterPass<ProfileScopDetection> ProfileScopDetectionRegister("profileScopDetection", "profile using ScopDetection");
 
 //Register for clang
 static void registerProfileScopDetection(const PassManagerBuilder &, legacy::PassManagerBase &PM){
