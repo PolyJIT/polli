@@ -13,18 +13,25 @@ using RegionMapTy = std::unordered_map<uint64_t, std::string>;
 
 
 namespace polli {
-struct Options {
-  std::string experiment;
-  std::string project;
-  std::string domain;
-  std::string group;
-  std::string src_uri;
-  std::string command;
-  bool use_db;
-  bool use_csv;
-  bool use_file;
-  bool execute_atexit;
-};
+namespace opt {
+extern std::string Experiment;
+extern std::string ExperimentUUID;
+extern std::string Project;
+extern std::string Domain;
+extern std::string Group;
+extern std::string SourceUri;
+extern std::string Argv0;
+extern bool EnableDatabase;
+extern bool ExecuteAtExit;
+
+extern std::string DbHost;
+extern int DbPort;
+extern std::string DbUsername;
+extern std::string DbPassword;
+extern std::string DbName;
+extern std::string RunGroupUUID;
+extern int RunID;
+}
 
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions);

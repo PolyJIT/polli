@@ -1,5 +1,7 @@
 #include "polli/Db.h"
+#include "polli/Options.h"
 #include "polli/log.h"
+#include "llvm/Support/CommandLine.h"
 #include <pqxx/pqxx>
 
 #include <ctime>
@@ -11,69 +13,102 @@
 #include <thread>
 
 using namespace pqxx;
+using namespace llvm;
 
 namespace polli {
-struct DbOptions {
-  std::string host;
-  int port;
-  std::string user;
-  std::string pass;
-  std::string name;
-  uint64_t run_id;
-  std::string uuid;
-  std::string exp_uuid;
-};
+namespace opt {
+std::string Experiment;
+static cl::opt<std::string, true>
+    ExperimentX("polli-db-experiment",
+                cl::desc("Name of the experiment we are running under."),
+                cl::location(Experiment), cl::init("unknown"),
+                cl::cat(PolyJIT_Runtime));
 
-static Options getOptions() {
-  Options Opts;
+std::string ExperimentUUID;
+static cl::opt<std::string, true>
+    ExperimentUUIDX("polli-db-experiment-uuid", cl::desc("Experiment UUID."),
+                    cl::location(ExperimentUUID),
+                    cl::init("00000000-0000-0000-0000-000000000000"),
+                    cl::cat(PolyJIT_Runtime));
 
-  const char *exp = std::getenv("BB_EXPERIMENT");
-  const char *prj = std::getenv("BB_PROJECT");
-  const char *dom = std::getenv("BB_DOMAIN");
-  const char *grp = std::getenv("BB_GROUP");
-  const char *uri = std::getenv("BB_SRC_URI");
-  const char *cmd = std::getenv("BB_CMD");
-  const char *db = std::getenv("BB_USE_DATABASE");
-  const char *csv = std::getenv("BB_USE_CSV");
-  const char *file = std::getenv("BB_USE_FILE");
-  const char *exec = std::getenv("BB_ENABLE");
+std::string Project;
+static cl::opt<std::string, true>
+    ProjectX("polli-db-project", cl::desc("The project we are running under."),
+             cl::location(Project), cl::init("unknown"),
+             cl::cat(PolyJIT_Runtime));
 
-  Opts.experiment = exp ? exp : "unknown";
-  Opts.project = prj ? prj : "unknown";
-  Opts.domain = dom ? dom : "unknown";
-  Opts.group = grp ? grp : "unknown";
-  Opts.src_uri = uri ? uri : "unknown";
-  Opts.command = cmd ? cmd : "unknown";
-  Opts.use_db = db ? (bool)std::stoi(db) : true;
-  Opts.use_csv = csv ? (bool)std::stoi(csv) : false;
-  Opts.use_file = file ? (bool)std::stoi(file) : false;
-  Opts.execute_atexit = exec ? (bool)std::stoi(exec) : true;
+std::string Domain;
+static cl::opt<std::string, true>
+    DomainX("polli-db-domain", cl::desc("The domain we are running under."),
+            cl::location(Domain), cl::init("unknown"),
+            cl::cat(PolyJIT_Runtime));
 
-  return Opts;
-}
+std::string Group;
+static cl::opt<std::string, true>
+    GroupX("polli-db-group", cl::desc("The group we are running under."),
+           cl::location(Group), cl::init("unknown"), cl::cat(PolyJIT_Runtime));
 
-static DbOptions getDBOptionsFromEnv() {
-  DbOptions Opts;
+std::string SourceUri;
+static cl::opt<std::string, true> SourceUriX(
+    "polli-db-src-uri", cl::desc("The src_uri we are running under."),
+    cl::location(SourceUri), cl::init("unknown"), cl::cat(PolyJIT_Runtime));
 
-  const char *host = std::getenv("BB_DB_HOST");
-  const char *user = std::getenv("BB_DB_USER");
-  const char *pass = std::getenv("BB_DB_PASS");
-  const char *name = std::getenv("BB_DB_NAME");
-  const char *port = std::getenv("BB_DB_PORT");
-  const char *run_id = std::getenv("BB_DB_RUN_ID");
-  const char *uuid = std::getenv("BB_DB_RUN_GROUP");
-  const char *exp_uuid = std::getenv("BB_EXPERIMENT_ID");
+std::string Argv0;
+static cl::opt<std::string, true>
+    Argv0X("polli-db-argv", cl::desc("The command we are executing."),
+           cl::location(SourceUri), cl::init("unknown"),
+           cl::cat(PolyJIT_Runtime));
 
-  Opts.host = host ? host : "localhost";
-  Opts.port = port ? std::stoi(port) : 5432;
-  Opts.name = name ? name : "pprof";
-  Opts.user = user ? user : "pprof";
-  Opts.pass = pass ? pass : "pprof";
-  Opts.run_id = run_id ? std::stoi(run_id) : 0;
-  Opts.uuid = uuid ? uuid : "00000000-0000-0000-0000-000000000000";
-  Opts.exp_uuid = exp_uuid ? exp_uuid : "00000000-0000-0000-0000-000000000000";
+bool EnableDatabase;
+static cl::opt<bool, true> EnableDatabaseX(
+    "polli-db-enable", cl::desc("Enable database communication."),
+    cl::location(EnableDatabase), cl::init(false), cl::cat(PolyJIT_Runtime));
 
-  return Opts;
+bool ExecuteAtExit;
+static cl::opt<bool, true> ExecuteAtExitX(
+    "polli-db-execute-atexit", cl::desc("Enable execution of atexit handler."),
+    cl::location(ExecuteAtExit), cl::init(false), cl::cat(PolyJIT_Runtime));
+
+std::string DbHost;
+static cl::opt<std::string, true>
+    DbHostX("polli-db-host", cl::desc("DB Hostname"), cl::location(DbHost),
+            cl::init("localhost"), cl::cat(PolyJIT_Runtime));
+
+int DbPort;
+static cl::opt<int, true> DbPortX("polli-db-port", cl::desc("DB Port"),
+                                  cl::location(DbPort), cl::init(5432),
+                                  cl::cat(PolyJIT_Runtime));
+
+std::string DbUsername;
+static cl::opt<std::string, true> DbUsernameX("polli-db-username",
+                                              cl::desc("DB Username"),
+                                              cl::location(DbUsername),
+                                              cl::init("benchbuild"),
+                                              cl::cat(PolyJIT_Runtime));
+
+std::string DbPassword;
+static cl::opt<std::string, true> DbPasswordX("polli-db-password",
+                                              cl::desc("DB Password"),
+                                              cl::location(DbPassword),
+                                              cl::init("benchbuild"),
+                                              cl::cat(PolyJIT_Runtime));
+std::string DbName;
+static cl::opt<std::string, true> DbNameX("polli-db-name", cl::desc("DB Name"),
+                                          cl::location(DbName),
+                                          cl::init("benchbuild"),
+                                          cl::cat(PolyJIT_Runtime));
+
+std::string RunGroupUUID;
+static cl::opt<std::string, true>
+    DbRunGroupUUIDX("polli-db-run-group", cl::desc("DB RunGroup (UUID)"),
+                    cl::location(RunGroupUUID), cl::init(""),
+                    cl::cat(PolyJIT_Runtime));
+
+int RunID;
+static cl::opt<int, true> DbRunIdX("polli-db-run-id",
+                                   cl::desc("DB RunGroup (UUID)"),
+                                   cl::location(RunID), cl::init(0),
+                                   cl::cat(PolyJIT_Runtime));
 }
 
 std::string now() {
@@ -86,24 +121,20 @@ std::string now() {
 }
 
 static bool enable_tracking() {
-  Options opts = getOptions();
-  return opts.use_db && opts.execute_atexit;
+  return opt::EnableDatabase && opt::ExecuteAtExit;
 }
 
 class DBConnection {
   std::unique_ptr<pqxx::connection> c;
 
   void connect() {
-    DbOptions DbOpts = getDBOptionsFromEnv();
-    Options Opts = getOptions();
     if (!enable_tracking())
       return;
 
     std::string CONNECTION_FMT_STR =
         "user={} port={} host={} dbname={} password={}";
-    std::string connection_str =
-        fmt::format(CONNECTION_FMT_STR, DbOpts.user, DbOpts.port, DbOpts.host,
-                    DbOpts.name, DbOpts.pass);
+    std::string connection_str = fmt::format(CONNECTION_FMT_STR, opt::DbUsername, opt::DbPort,
+                                             opt::DbHost, opt::DbName, opt::DbPassword);
 
     c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
     if (c) {
@@ -176,9 +207,6 @@ struct Event {
 };
 
 static uint64_t PrepareRun(pqxx::work &w) {
-  Options opts = getOptions();
-  DbOptions Opts = getDBOptionsFromEnv();
-
   std::string SEARCH_PROJECT_SQL =
       "SELECT name FROM project WHERE name = '{}';";
 
@@ -193,21 +221,22 @@ static uint64_t PrepareRun(pqxx::work &w) {
       "'{}', '{}', '{}', '{}') RETURNING id;";
 
   pqxx::result project_exists =
-      submit(fmt::format(SEARCH_PROJECT_SQL, opts.project), w);
+      submit(fmt::format(SEARCH_PROJECT_SQL, opt::Project), w);
 
   if (project_exists.affected_rows() == 0)
-    submit(fmt::format(NEW_PROJECT_SQL, opts.project, opts.project,
-                       opts.src_uri, opts.domain, opts.group), w);
+    submit(fmt::format(NEW_PROJECT_SQL, opt::Project, opt::Project,
+                       opt::SourceUri, opt::Domain, opt::Group),
+           w);
 
   uint64_t run_id = 0;
-  if (!Opts.run_id) {
-    pqxx::result r =
-        submit(fmt::format(NEW_RUN_SQL, now(), opts.command, opts.project,
-                           opts.experiment, Opts.uuid, Opts.exp_uuid),
-               w);
+  if (!opt::RunID) {
+    pqxx::result r = submit(fmt::format(NEW_RUN_SQL, now(), opt::Argv0,
+                                        opt::Project, opt::Experiment,
+                                        opt::RunGroupUUID, opt::ExperimentUUID),
+                            w);
     r[0]["id"].to(run_id);
   } else {
-    run_id = Opts.run_id;
+    run_id = opt::RunID;
   }
 
   return run_id;
@@ -215,11 +244,9 @@ static uint64_t PrepareRun(pqxx::work &w) {
 
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
-  Options opts = getOptions();
   if (!enable_tracking())
     return;
 
-  DbOptions Opts = getDBOptionsFromEnv();
   pqxx::connection &DB = getDatabase();
   pqxx::work w(DB);
   uint64_t run_id = PrepareRun(w);
@@ -251,15 +278,14 @@ void StoreTransformedScop(const std::string &FnName,
   if (!enable_tracking())
     return;
 
-  DbOptions Opts = getDBOptionsFromEnv();
   pqxx::connection &DB = getDatabase();
   pqxx::work w(DB);
   uint64_t run_id = PrepareRun(w);
 
   std::string SCHEDULE_SQL = "INSERT INTO schedules (function, schedule, "
                              "run_id) VALUES ('{:s}', '{:s}', {:d});";
-  std::string AST_SQL =
-      "INSERT INTO isl_asts (function, ast, run_id) VALUES ('{:s}', '{:s}', {:d});";
+  std::string AST_SQL = "INSERT INTO isl_asts (function, ast, run_id) VALUES "
+                        "('{:s}', '{:s}', {:d});";
 
   submit(fmt::format(SCHEDULE_SQL, FnName, ScheduleTreeStr, run_id), w);
   submit(fmt::format(AST_SQL, FnName, IslAstStr, run_id), w);
@@ -275,14 +301,14 @@ TraceData &setup() {
 void enter_region(uint64_t id, const char *name) {
   TraceData &D = setup();
   uint64_t time = papi::PAPI_get_real_usec();
-    if (!D.Events.count(id))
-        D.Events[id] = 0;
-    if (!D.Entries.count(id))
-        D.Entries[id] = 0;
-    if (!D.Regions.count(id))
-      D.Regions[id] = name;
-    D.Events[id] -= time;
-    D.Entries[id] += 1;
+  if (!D.Events.count(id))
+    D.Events[id] = 0;
+  if (!D.Entries.count(id))
+    D.Entries[id] = 0;
+  if (!D.Regions.count(id))
+    D.Regions[id] = name;
+  D.Events[id] -= time;
+  D.Entries[id] += 1;
 }
 
 void exit_region(uint64_t id) {
