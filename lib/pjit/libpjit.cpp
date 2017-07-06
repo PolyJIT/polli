@@ -458,7 +458,8 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                                  (uint64_t)prefix, Context);
 
   // If it was not a cache-hit, wait until the first variant is ready.
-  FutureFn.wait();
+  if (!K.second)
+    FutureFn.wait();
   Context->exit(1, papi::PAPI_get_real_usec());
 
   auto FnIt = Context->find(Key);
