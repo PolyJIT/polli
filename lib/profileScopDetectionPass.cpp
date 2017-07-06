@@ -214,27 +214,9 @@ namespace {
         for(const Region *R : SD){
             bool gotInstrumented = false;
             if(const Region *Parent = R->getParent()){
-                //errs() << "isTopLevelRegion: " << Parent->isTopLevelRegion() << '\n';
-                errs() << *Parent << " is invalid because of: " << SD.regionIsInvalidBecause(Parent) << '\n';
+                if(!Parent->isTopLevelRegion()){
+                    errs() << *Parent << " is invalid because of: " << SD.regionIsInvalidBecause(Parent) << '\n';
 
-                if(Parent->isTopLevelRegion()){
-                    Module *M = F.getParent();
-                    PProfID pprofID = generatePProfID(M);
-
-                    BasicBlock *EntryBB = Parent->getEntry();
-                    //errs() << "TopLevelRegion EntryBB: " << EntryBB << '\n';
-                    insertEnterRegionFunction(M, getInsertPosition(EntryBB, true), pprofID);
-
-                    BasicBlock *ExitingBB = Parent->getExitingBlock();
-                    if(!ExitingBB){
-                        errs() << "TopLevelRegions have no exiting block. Currently they can't be instrumented.\n";
-                        nonInstrumentedCounter++;
-                        continue;
-                    }
-                    //errs() << "TopLevelRegion ExitingBB: " << ExitingBB << '\n';
-                    //TODO Think about BasicBlock::getTerminatingMustTailCall()
-                    insertExitRegionFunction(M, ExitingBB->getTerminator(), pprofID);
-                } else {
                     BasicBlock *EntryBB = Parent->getEntry();
                     BasicBlock *ExitBB = Parent->getExit();
 
