@@ -33,12 +33,16 @@ extern std::string RunGroupUUID;
 extern int RunID;
 }
 
+namespace db {
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions);
 
 void StoreTransformedScop(const std::string &FnName,
                           const std::string &IslAstStr,
                           const std::string &ScheduleTreeStr);
+
+void ValidateOptions();
+}
 
 namespace tracing {
 struct TraceData {

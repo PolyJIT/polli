@@ -255,8 +255,8 @@ public:
     ScheduleTreeStr = polly::stringFromIslObj(s_tree);
     isl_schedule_free(s_tree);
 
-    StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
-                         ScheduleTreeStr);
+    db::StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
+                             ScheduleTreeStr);
 
     console->error(os.str());
     return false;

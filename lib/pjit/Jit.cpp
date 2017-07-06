@@ -41,11 +41,12 @@ void PolyJIT::setup() {
 
   SetOptimizationPipeline(opt::runtime::PipelineChoice);
   opt::ValidateOptions();
+  db::ValidateOptions();
 }
 
 void PolyJIT::tearDown() {
   exit(0, papi::PAPI_get_real_usec());
-  polli::StoreRun(Events, Entries, Regions);
+  db::StoreRun(Events, Entries, Regions);
 }
 
 void PolyJIT::UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F) {

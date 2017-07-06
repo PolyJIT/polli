@@ -133,8 +133,9 @@ class DBConnection {
 
     std::string CONNECTION_FMT_STR =
         "user={} port={} host={} dbname={} password={}";
-    std::string connection_str = fmt::format(CONNECTION_FMT_STR, opt::DbUsername, opt::DbPort,
-                                             opt::DbHost, opt::DbName, opt::DbPassword);
+    std::string connection_str =
+        fmt::format(CONNECTION_FMT_STR, opt::DbUsername, opt::DbPort,
+                    opt::DbHost, opt::DbName, opt::DbPassword);
 
     c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
     if (c) {
@@ -242,6 +243,17 @@ static uint64_t PrepareRun(pqxx::work &w) {
   return run_id;
 }
 
+namespace db {
+void ValidateOptions() {
+  // This needs to be supported via environment variable too
+  // because there is no way for the tool 'benchbuild' to provide
+  // the run_id as program argument for now.
+  if (opt::RunID == 0) {
+    if (const char *run_id = std::getenv("BB_DB_RUN_ID")) {
+      opt::RunID = run_id ? std::stoi(run_id) : 0;
+    }
+  }
+}
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
   if (!enable_tracking())
@@ -291,6 +303,7 @@ void StoreTransformedScop(const std::string &FnName,
   submit(fmt::format(AST_SQL, FnName, IslAstStr, run_id), w);
   w.commit();
 }
+}
 
 namespace tracing {
 TraceData &setup() {
@@ -319,7 +332,7 @@ void exit_region(uint64_t id) {
 
 void submit_results() {
   TraceData &D = setup();
-  polli::StoreRun(D.Events, D.Entries, D.Regions);
+  polli::db::StoreRun(D.Events, D.Entries, D.Regions);
 }
 
 void setup_tracing() {
