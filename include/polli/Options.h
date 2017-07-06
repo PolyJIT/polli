@@ -17,6 +17,7 @@
 #include "llvm/Support/CodeGen.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetOptions.h"
+#include "spdlog/spdlog.h"
 
 #include <string>
 #include <vector>
@@ -37,6 +38,8 @@ extern bool DisableRecompile;
 extern bool DisableCoreFiles;
 extern std::string EntryFunc;
 extern std::string FakeArgv0;
+
+extern spdlog::level::level_enum LogLevel;
 
 namespace runtime {
 extern char OptLevel;

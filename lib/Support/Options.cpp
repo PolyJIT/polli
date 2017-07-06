@@ -35,6 +35,19 @@ llvm::cl::OptionCategory
 
 namespace polli {
 namespace opt {
+spdlog::level::level_enum LogLevel;
+static cl::opt<spdlog::level::level_enum, true> LogLevelX(
+    "polli-log-level",
+    cl::desc("Configure PolyJIT's log level."),
+    cl::values(
+        clEnumValN(spdlog::level::off, "off", "Off"),
+        clEnumValN(spdlog::level::info, "info", "Info"),
+        clEnumValN(spdlog::level::warn, "warn", "Warn"),
+        clEnumValN(spdlog::level::err,  "error", "Error"),
+        clEnumValN(spdlog::level::debug, "debug", "Debug"),
+        clEnumValN(spdlog::level::trace, "trace", "Trace")),
+    cl::location(LogLevel), cl::init(spdlog::level::off), cl::ZeroOrMore, cl::cat(PolyJIT_Runtime));
+
 bool DisableRecompile;
 static cl::opt<bool, true> DisableRecompileX(
     "polli-no-recompilation", cl::desc("Disable recompilation of SCoPs"),
@@ -50,11 +63,11 @@ static cl::opt<bool, true>
 bool EnableLogFile;
 static cl::opt<bool, true> EnableLogFileX(
     "polli-enable-log", cl::desc("Enable logging to file instead of stderr"),
-    cl::location(EnableLogFile), cl::init(false), cl::cat(PolliCategory));
+    cl::location(EnableLogFile), cl::init(false), cl::ZeroOrMore, cl::cat(PolliCategory));
 
 namespace runtime {
 PipelineType PipelineChoice;
-static cl::opt<PipelineType> PipelineChoiceX(
+static cl::opt<PipelineType, true> PipelineChoiceX(
     "polli-optimizer",
     cl::desc("Which optimization pipeline should be enabled?"),
     cl::values(
@@ -63,7 +76,7 @@ static cl::opt<PipelineType> PipelineChoiceX(
         clEnumValN(DEBUG, "debug", "Enable the debug pipeline. Additional "
                                    "configuration determines the amoun of "
                                    "debug output you get.")),
-    cl::Hidden, cl::init(RELEASE), cl::ZeroOrMore, cl::cat(PolyJIT_Runtime));
+    cl::location(PipelineChoice), cl::init(RELEASE), cl::ZeroOrMore, cl::cat(PolyJIT_Runtime));
 
 char OptLevel = ' ';
 std::string MArch = "";

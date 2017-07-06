@@ -40,7 +40,7 @@ static inline void setup(const std::string &name) {
     auto logger =
         std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
     spdlog::register_logger(logger);
-    logger->set_level(spdlog::level::trace);
+    logger->set_level(polli::opt::LogLevel);
   }
 }
 }
