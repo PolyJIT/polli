@@ -31,17 +31,16 @@ namespace {
     };
 
     class ProfileScopDetection : public FunctionPass {
-        public:
-            static char ID;
-            explicit ProfileScopDetection() : FunctionPass(ID) {}
-
         private:
             static int LoopID;
             static int instrumentedCounter;
             static int nonInstrumentedCounter;
             static bool calledSetup;
-            static list<string> instrumentedToplevelRegions;
             size_t hashvalue;
+
+        public:
+            static char ID;
+            explicit ProfileScopDetection() : FunctionPass(ID) {}
 
         private:
             static size_t generateHash(Module*&);
@@ -49,8 +48,10 @@ namespace {
             static void insertEnterRegionFunction(Module*&, Instruction*, PProfID&);
             static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
             static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, BasicBlock*, bool);
-            static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, SmallVector<BasicBlock*, 1>&, bool );
-            static bool instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>>&);
+            static SmallVector<BasicBlock*, 1> splitPredecessors(const Region*, SmallVector<BasicBlock*, 1>&, bool);
+            static Instruction *getInsertPosition(BasicBlock*, bool);
+            static PProfID generatePProfID(Module*&);
+            static bool instrumentSplitBlocks(SmallVector<BasicBlock*, 1>&, SmallVector<BasicBlock*, 1>&);
 
         public:
             void getAnalysisUsage(AnalysisUsage&) const override;
@@ -64,7 +65,6 @@ namespace {
     int ProfileScopDetection::instrumentedCounter = 0;
     int ProfileScopDetection::nonInstrumentedCounter = 0;
     bool ProfileScopDetection::calledSetup = false;
-    list<string> ProfileScopDetection::instrumentedToplevelRegions = list<string>();
 
     void ProfileScopDetection::getAnalysisUsage(AnalysisUsage &usage) const {
         usage.setPreservesAll();
@@ -74,7 +74,7 @@ namespace {
     size_t ProfileScopDetection::generateHash(Module *&M){
         LoopID++;
         hash<string> stringhashFn;
-        string hashstring = M->getName().str() + "::Loop" + to_string(LoopID);
+        string hashstring = M->getName().str() + "::SCoP" + to_string(LoopID);
         return stringhashFn(hashstring)/10000000000; //FIXME Avoid dividing hash
     }
 
@@ -101,16 +101,16 @@ namespace {
         IRBuilder<> builder(context);
         builder.SetInsertPoint(insertPosition);
 
-        //void enter_R(uint64_t, const char*)
+        //void enter_region(uint64_t, const char*)
         SmallVector<Value*, 2> arguments;
         arguments.push_back(pprofID.globalID);
         ostringstream name;
         name << M->getName().data() << "::" << insertPosition->getFunction()->getName().data() << " "
             << pprofID.MID;
-        errs() << name.str() << '\n';
+        //errs() << name.str() << '\n';
         arguments.push_back(builder.CreateGlobalStringPtr(name.str()));
         FunctionType *FType = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
-        Constant *F = M->getOrInsertFunction("enter_R", FType);
+        Constant *F = M->getOrInsertFunction("enter_region", FType);
         builder.CreateCall(F, arguments);
     }
 
@@ -121,26 +121,23 @@ namespace {
         IRBuilder<> builder(context);
         builder.SetInsertPoint(insertPosition);
 
-        //void exit_R(uint64_t)
+        //void exit_region(uint64_t)
         SmallVector<Value*, 1> arguments;
         arguments.push_back(pprofID.globalID);
         FunctionType *FType = FunctionType::get(voidty, {int64Ty}, false);
-        Constant *F = M->getOrInsertFunction("exit_R", FType);
+        Constant *F = M->getOrInsertFunction("exit_region", FType);
         builder.CreateCall(F, arguments);
     }
 
     SmallVector<BasicBlock*, 1> ProfileScopDetection::splitPredecessors(const Region *R, BasicBlock *block, bool isEntry){
         SmallVector<BasicBlock*, 1> splitBlocks;
         if(block){
-            errs() << "splitPredecessors: " << block << '\n';
             //TODO May insert warning for nullptr
             //TODO Why is there a comma instead of using it directly in condition?
-            errs() << "pred_empty: " << pred_empty(block) << '\n';
             for(pred_iterator it = pred_begin(block), end = pred_end(block); it != end; it++){
                 BasicBlock *predecessor = *it;
                 if(isEntry != R->contains(predecessor)){
                     BasicBlock *splitBlock = SplitEdge(predecessor, block);
-                    errs() << "splitBlock: " << splitBlock << '\n';
                     if(splitBlock != nullptr){
                         splitBlocks.push_back(splitBlock);
                     }
@@ -160,43 +157,46 @@ namespace {
         return Splits;
     }
 
-    bool ProfileScopDetection::instrumentSplitBlocks(pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> &Splits){
-        Module *M;
-        if(!Splits.first.empty()){
-            M = Splits.first.front()->getModule();
-        } else if(!Splits.second.empty()){
-            M = Splits.second.front()->getModule();
-        } else {
-            return false;
+    Instruction *ProfileScopDetection::getInsertPosition(BasicBlock *BB, bool isEntry){
+        BasicBlock::iterator insertPosition = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
+        if(BB->isLandingPad()){
+            insertPosition++;
         }
-        Type *int64Ty = Type::getInt64Ty(M->getContext());
-        //FIXME According to docs ConstantInt::get(...) returns a ConstantInt, but clang complains...
-        PProfID pprofID((ConstantInt*) ConstantInt::get(int64Ty, generateHash(M), false), LoopID);;
-
-        for(BasicBlock *BB : Splits.first){
-            BasicBlock::iterator insertPosition = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
-            if(BB->isLandingPad()){
-                insertPosition++;
-            }
-            while(isa<AllocaInst>(insertPosition)){
-                insertPosition++;
-            }
+        while(isa<AllocaInst>(insertPosition)){
+            insertPosition++;
+        }
+        if(isEntry){
             //To be sure that the enter call is past a previous exit call.
             while(isa<CallInst>(insertPosition)){
                 insertPosition++;
             }
-            insertEnterRegionFunction(M, &*insertPosition, pprofID);
+        }
+        return &*insertPosition;
+    }
+
+    PProfID ProfileScopDetection::generatePProfID(Module *&M){
+        Type *int64Ty = Type::getInt64Ty(M->getContext());
+        //FIXME According to docs ConstantInt::get(...) returns a ConstantInt, but clang complains...
+        return PProfID((ConstantInt*) ConstantInt::get(int64Ty, generateHash(M), false), LoopID);;
+    }
+
+    bool ProfileScopDetection::instrumentSplitBlocks(SmallVector<BasicBlock*, 1> &EntrySplits, SmallVector<BasicBlock*, 1> &ExitSplits){
+        if(EntrySplits.empty() || ExitSplits.empty()){
+            errs() << "WARNING: Trying to instrument splits either without entries or without exits.\n";
+            return false;
         }
 
-        for(BasicBlock *BB : Splits.second){
-            BasicBlock::iterator insertPosition = BB->getFirstNonPHIOrDbgOrLifetime()->getIterator();
-            if(BB->isLandingPad()){
-                insertPosition++;
-            }
-            while(isa<AllocaInst>(insertPosition)){
-                insertPosition++;
-            }
-            insertExitRegionFunction(M, &*insertPosition, pprofID);
+        Module *M = EntrySplits.front()->getModule();
+        PProfID pprofID = generatePProfID(M);
+
+        for(BasicBlock *BB : EntrySplits){
+            Instruction *insertPosition = getInsertPosition(BB, true);
+            insertEnterRegionFunction(M, insertPosition, pprofID);
+        }
+
+        for(BasicBlock *BB : ExitSplits){
+            Instruction *insertPosition = getInsertPosition(BB, false);
+            insertExitRegionFunction(M, insertPosition, pprofID);
         }
 
         return true;
@@ -207,36 +207,57 @@ namespace {
     }
 
     bool ProfileScopDetection::runOnFunction(Function &F) {
-        bool gotInstrumented = false;
+        bool gotAnyInstrumented = false;
         const ScopDetectionWrapperPass &SDWP = getAnalysis<ScopDetectionWrapperPass>();
         const ScopDetection &SD = SDWP.getSD();
 
         for(const Region *R : SD){
-            errs() << "Region: " << R->getNameStr() << '\n';
+            bool gotInstrumented = false;
             if(const Region *Parent = R->getParent()){
-                errs() << "Invalid because of: " << SD.regionIsInvalidBecause(Parent) << '\n';
+                //errs() << "isTopLevelRegion: " << Parent->isTopLevelRegion() << '\n';
+                errs() << *Parent << " is invalid because of: " << SD.regionIsInvalidBecause(Parent) << '\n';
 
-                BasicBlock *EntryBB = Parent->getEntry();
-                BasicBlock *ExitBB = Parent->getExit();
-                pair<SmallVector<BasicBlock*, 1>, SmallVector<BasicBlock*, 1>> Splits;
+                if(Parent->isTopLevelRegion()){
+                    Module *M = F.getParent();
+                    PProfID pprofID = generatePProfID(M);
 
-                errs() << "EntryBB: " << EntryBB << '\n';
-                Splits.first = splitPredecessors(Parent, EntryBB, true);
-                errs() << "Splits.first.empty(): " << Splits.first.empty() << '\n';
+                    BasicBlock *EntryBB = Parent->getEntry();
+                    //errs() << "TopLevelRegion EntryBB: " << EntryBB << '\n';
+                    insertEnterRegionFunction(M, getInsertPosition(EntryBB, true), pprofID);
 
-                errs() << "ExitBB: " << ExitBB << '\n';
-                Splits.second = splitPredecessors(Parent, ExitBB, false);
-                errs() << "Splits.second.empty(): " << Splits.second.empty() << '\n';
+                    BasicBlock *ExitingBB = Parent->getExitingBlock();
+                    if(!ExitingBB){
+                        errs() << "TopLevelRegions have no exiting block. Currently they can't be instrumented.\n";
+                        nonInstrumentedCounter++;
+                        continue;
+                    }
+                    //errs() << "TopLevelRegion ExitingBB: " << ExitingBB << '\n';
+                    //TODO Think about BasicBlock::getTerminatingMustTailCall()
+                    insertExitRegionFunction(M, ExitingBB->getTerminator(), pprofID);
+                } else {
+                    BasicBlock *EntryBB = Parent->getEntry();
+                    BasicBlock *ExitBB = Parent->getExit();
 
-                if(instrumentSplitBlocks(Splits)){
-                    instrumentedCounter++;
-                    gotInstrumented = true;
+                    //errs() << "EntryBB: " << EntryBB << '\n';
+                    SmallVector<BasicBlock*, 1> EntrySplits = splitPredecessors(Parent, EntryBB, true);
+                    //errs() << "EntrySplits.empty(): " << EntrySplits.empty() << '\n';
+
+                    //errs() << "ExitBB: " << ExitBB << '\n';
+                    SmallVector<BasicBlock*, 1> ExitSplits = splitPredecessors(Parent, ExitBB, false);
+                    //errs() << "ExitSplits.empty(): " << ExitSplits.empty() << '\n';
+
+                    gotInstrumented = instrumentSplitBlocks(EntrySplits, ExitSplits);
                 }
+            }
+
+            if(gotInstrumented){
+                gotAnyInstrumented = true;
+                instrumentedCounter++;
             } else {
                 nonInstrumentedCounter++;
             }
         }
-        return gotInstrumented;
+        return gotAnyInstrumented;
     }
 
     bool ProfileScopDetection::doFinalization(Module &M) {

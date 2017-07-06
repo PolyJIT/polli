@@ -52,10 +52,10 @@ struct TraceData {
 };
 
 TraceData &setup();
-void enter_region(uint64_t id, const char *name);
-void exit_region(uint64_t id);
+extern "C" void enter_region(uint64_t id, const char *name);
+extern "C" void exit_region(uint64_t id);
 void submit_results();
-void setup_tracing();
+extern "C" void setup_tracing();
 
 }
 }
