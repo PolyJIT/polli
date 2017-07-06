@@ -141,6 +141,13 @@ bool EnableASTReport;
 static cl::opt<bool, true> EnableASTReportX(
     "polli-ast-report", cl::desc("Print optimized isl-ast information"),
     cl::location(EnableASTReport), cl::init(false), cl::cat(PolyJIT_Runtime));
+
+bool UsePollyOptions;
+static cl::opt<bool, true> UsePollyOptionsX(
+    "polli-use-polly-options",
+    cl::desc("Use Polly's settings in the optimizer pipeline."),
+    cl::location(UsePollyOptions), cl::init(false), cl::cat(PolyJIT_Runtime));
+
 } // namespace runtime
 
 namespace compiletime {

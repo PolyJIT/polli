@@ -407,21 +407,23 @@ PassManagerBuilder createPMB() {
   Builder.VerifyInput = false;
   Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
-  polly::opt::PollyParallel = true;
-  polly::opt::DetectParallel = true;
-  polly::opt::UseContext = true;
-  polly::opt::PollyParallelForce = false;
-  polly::PollyProcessUnprofitable = false;
-  polly::opt::FusionStrategy = "max";
-  polly::opt::WholeComponent = true;
-  polly::opt::FirstLevelTiling = true;
-  polly::opt::SecondLevelTiling = true;
-  polly::opt::RegisterTiling = false;
-  polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
-  polly::PollyAllowNonAffineSubRegions = false;
-  polly::PollyInvariantLoadHoisting = true;
-  // We accept them blindly.
-  polly::ProfitabilityMinPerLoopInstructions = 1;
+
+  if (!opt::runtime::UsePollyOptions) {
+    polly::opt::PollyParallel = true;
+    polly::opt::DetectParallel = true;
+    polly::opt::UseContext = true;
+    polly::opt::PollyParallelForce = false;
+    polly::PollyProcessUnprofitable = false;
+    polly::opt::FusionStrategy = "max";
+    polly::opt::WholeComponent = true;
+    polly::opt::FirstLevelTiling = true;
+    polly::opt::SecondLevelTiling = false;
+    polly::opt::RegisterTiling = false;
+    polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
+    polly::PollyAllowNonAffineSubRegions = false;
+    polly::PollyInvariantLoadHoisting = true;
+    polly::ProfitabilityMinPerLoopInstructions = 1;
+  }
   Builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible, registerPolly);
 
   return Builder;

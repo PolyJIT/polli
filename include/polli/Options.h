@@ -57,6 +57,7 @@ extern bool EnableScheduleReport;
 extern bool EnableScopReport;
 extern bool EnableFunctionReport;
 extern bool EnableASTReport;
+extern bool UsePollyOptions;
 
 extern PipelineType PipelineChoice;
 }
