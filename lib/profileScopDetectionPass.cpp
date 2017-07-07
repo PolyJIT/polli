@@ -265,7 +265,7 @@ namespace {
 
 //Register for clang
 static void registerProfileScopDetection(const PassManagerBuilder &, legacy::PassManagerBase &PM){
-    if(opt::Enabled){
+    if(opt::compiletime::Enabled){
         registerCanonicalicationPasses(PM);
         PM.add(createScopDetectionWrapperPassPass());
         PM.add(new ProfileScopDetection());
@@ -276,4 +276,4 @@ static RegisterStandardPasses registeredProfileScopDetectionPass(PassManagerBuil
 
 //Register for clang opt
 static cl::opt<bool, true> ProfileScopDetectionEnabled("profileScopDetection", cl::desc("profile using ScopDetection"),
-        cl::ZeroOrMore, cl::location(opt::Enabled), cl::init(false), cl::cat(PolliCategory));
+        cl::ZeroOrMore, cl::location(opt::compiletime::Enabled), cl::init(false), cl::cat(PolliCategory));
