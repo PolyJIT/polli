@@ -232,6 +232,8 @@ namespace {
 
                     gotInstrumented = instrumentSplitBlocks(EntrySplits, ExitSplits);
                 }
+            } else {
+                errs() << "SCoP " << *R << " has no parent.\n";
             }
 
             if(gotInstrumented){
