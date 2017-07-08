@@ -214,7 +214,9 @@ namespace {
         for(const Region *R : SD){
             bool gotInstrumented = false;
             if(const Region *Parent = R->getParent()){
-                if(!Parent->isTopLevelRegion()){
+                if(Parent->isTopLevelRegion()){
+                    errs() << *Parent << " is invalid because of: Region is toplevel region.\n";
+                } else {
                     errs() << *Parent << " is invalid because of: " << SD.regionIsInvalidBecause(Parent) << '\n';
 
                     BasicBlock *EntryBB = Parent->getEntry();
