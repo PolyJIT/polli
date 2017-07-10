@@ -167,9 +167,9 @@ class PolySectionMemoryManager : public SectionMemoryManager {
 
 class PolyJITEngine {
 public:
-  using ObjLayerT = orc::RTDyldObjectLinkingLayer<>;
-  using CompileLayerT = orc::IRCompileLayer<ObjLayerT>;
-  using ModuleHandleT = CompileLayerT::ModuleSetHandleT;
+  using ObjLayerT = orc::RTDyldObjectLinkingLayer;
+  using CompileLayerT = orc::IRCompileLayer<ObjLayerT, SimpleErrorReportingCompiler>;
+  using ModuleHandleT = CompileLayerT::ModuleHandleT;
   using UniqueModule = std::unique_ptr<Module>;
 
   PolyJITEngine()
@@ -179,6 +179,7 @@ public:
                .setMAttrs(opt::runtime::MAttrs)
                .selectTarget()),
         DL(TM->createDataLayout()),
+        ObjectLayer([]() { return std::make_shared<PolySectionMemoryManager>(); }),
         CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)),
         LibHandle(nullptr) {
     SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
@@ -219,7 +220,7 @@ public:
     return *LoadedModules[prototype];
   }
 
-  ModuleHandleT addModule(std::unique_ptr<Module> M) {
+  Expected<ModuleHandleT> addModule(std::unique_ptr<Module> M) {
     if (CompiledModules.count(M.get()))
       return CompiledModules[M.get()];
 
@@ -251,17 +252,12 @@ public:
           return JITSymbol(nullptr);
         });
 
-    std::vector<std::unique_ptr<Module>> MS;
-    MS.push_back(std::move(M));
-    ModuleHandleT MH = CompileLayer.addModuleSet(
-        std::move(MS), std::unique_ptr<PolySectionMemoryManager>(
-                           new PolySectionMemoryManager()),
-        std::move(Resolver));
-    CompiledModules.insert(std::make_pair(M.get(), MH));
+    Expected<ModuleHandleT> MH = CompileLayer.addModule(std::move(M), std::move(Resolver));
+    CompiledModules.insert(std::make_pair(M.get(), *MH));
     return MH;
   }
 
-  void removeModule(ModuleHandleT H) { CompileLayer.removeModuleSet(H); }
+  void removeModule(ModuleHandleT H) { CompileLayer.removeModule(H); }
 
   JITSymbol findSymbol(const std::string &Name) {
     std::string MangledName;
@@ -311,19 +307,6 @@ static JitT &getOrCreateJIT() {
   return JIT;
 }
 
-// static inline void do_shutdown() {
-//  // This forces the linker to keep the symbols around, if tracing is
-//  // enabled.
-//  if (std::getenv("POLLI_BOGUS_VAR") != nullptr) {
-//    POLLI_TRACING_SCOP_START(-1, "polli.invalid.scop");
-//    POLLI_TRACING_SCOP_STOP(-1, "polli.invalid.scop");
-//  }
-//  getOrCreateJIT()->shutdown();
-//
-//  POLLI_TRACING_REGION_STOP(PJIT_REGION_MAIN, "polyjit.main");
-//  POLLI_TRACING_FINALIZE;
-//}
-
 using MainFnT = std::function<void(int, char **)>;
 
 static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
@@ -364,11 +347,13 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   DEBUG(printRunValues(Values));
 
   llvm::JITSymbol FPtr = EE.findSymbol(FnName);
-  SPDLOG_DEBUG(console, "fn ptr: 0x{:x}", FPtr.getAddress());
+  Expected<JITTargetAddress> Addr = FPtr.getAddress();
+
+  SPDLOG_DEBUG(console, "fn ptr: 0x{:x}", *Addr);
   assert(FPtr && "Specializer returned nullptr.");
   if (!Context
            ->insert(std::make_pair(
-               K, MainFnT((void (*)(int, char **))FPtr.getAddress())))
+               K, MainFnT((void (*)(int, char **))(*Addr))))
            .second) {
     console->critical("Key collision in function cache, abort.");
     llvm_unreachable("Key collision");
