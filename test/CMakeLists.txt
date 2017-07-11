@@ -14,6 +14,8 @@ set(LLVM_SHLIBEXT "${CMAKE_SHARED_MODULE_SUFFIX}")
 
 set(POLLI_TEST_DEPENDS LLVMPolyJIT)
 
+# We don't have another one available, maybe ask llvm-config?
+set(LLVM_SOURCE_DIR "${LLVM_INSTALL_ROOT}")
 set(LLVM_BINARY_DIR "${LLVM_INSTALL_ROOT}")
 set(LLVM_TOOLS_DIR "${LLVM_INSTALL_ROOT}/bin")
 set(LLVM_LIBS_DIR "${LLVM_INSTALL_ROOT}/lib")
