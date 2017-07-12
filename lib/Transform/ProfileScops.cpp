@@ -17,9 +17,8 @@
 using namespace llvm;
 using namespace std;
 using namespace polly;
-using namespace polli;
 
-namespace {
+namespace polli {
 
   struct PProfID{
     PProfID(ConstantInt *globalID, size_t MID){
@@ -282,26 +281,12 @@ namespace {
 
     return insertedSetupTracing;
   }
+
+static llvm::RegisterPass<ProfileScopDetection>
+  X("polli-profile-scop-detection",
+    "PolyJIT - Profile runtime performance of rejected SCoPs");
+
+Pass *createProfileScopsPass() {
+  return new ProfileScopDetection();
 }
-
-//Register for opt
-//static RegisterPass<ProfileScopDetection> ProfileScopDetectionRegister("profileScopDetection", "profile using ScopDetection");
-
-//Register for clang
-static void registerProfileScopDetection(
-    const PassManagerBuilder &, legacy::PassManagerBase &PM){
-  if(opt::compiletime::ProfileScops){
-    registerCanonicalicationPasses(PM);
-    PM.add(createScopDetectionWrapperPassPass());
-    PM.add(new ProfileScopDetection());
-  }
 }
-
-static RegisterStandardPasses registeredProfileScopDetectionPass(
-    PassManagerBuilder::EP_EarlyAsPossible, registerProfileScopDetection);
-
-//Register for clang opt
-static cl::opt<bool, true> ProfileScopDetectionEnabled(
-    "profileScopDetection", cl::desc("profile using ScopDetection"),
-    cl::ZeroOrMore, cl::location(opt::compiletime::Enabled),
-    cl::init(false), cl::cat(PolliCategory));

@@ -13,6 +13,7 @@
 
 #include "polli/Options.h"
 #include "polli/Utils.h"
+#include "polli/log.h"
 #include "llvm/Support/CommandLine.h"
 #include <string>
 #include <vector>

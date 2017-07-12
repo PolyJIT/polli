@@ -17,6 +17,7 @@
 #include "polli/ModuleExtractor.h"
 #include "polli/Options.h"
 #include "polli/PapiProfiling.h"
+#include "polli/ProfileScops.h"
 #include "polli/log.h"
 
 #include "polly/Canonicalization.h"
@@ -112,6 +113,15 @@ template <> char FunctionPassPrinter<JITScopDetection>::ID = 0;
 template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
 char InjectMain::ID = 0;
 
+static void registerProfileScops(const PassManagerBuilder &,
+                                 llvm::legacy::PassManagerBase &PM) {
+  if (opt::compiletime::ProfileScops) {
+    polly::registerCanonicalicationPasses(PM);
+    PM.add(polly::createScopDetectionWrapperPassPass());
+    PM.add(polli::createProfileScopsPass());
+  }
+}
+
 static void registerPolyJIT(const llvm::PassManagerBuilder &,
                             llvm::legacy::PassManagerBase &PM) {
   if (!opt::compiletime::Enabled)
@@ -139,4 +149,7 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
 static llvm::RegisterStandardPasses
     RegisterPolyJIT(llvm::PassManagerBuilder::EP_EarlyAsPossible,
                     registerPolyJIT);
+static llvm::RegisterStandardPasses
+    RegisterProfileScops(llvm::PassManagerBuilder::EP_EarlyAsPossible,
+                         registerProfileScops);
 } // namespace polli
