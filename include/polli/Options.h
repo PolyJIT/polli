@@ -66,6 +66,7 @@ namespace compiletime {
 extern bool Enabled;
 extern bool InstrumentRegions;
 extern bool AnalyzeIR;
+extern bool ProfileScops;
 extern bool CollectRegressionTests;
 }
 

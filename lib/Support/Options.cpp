@@ -165,6 +165,12 @@ static cl::opt<bool, true> AnalyzeIRX(
                               "PolyJIT's static compilation passes."),
     cl::location(AnalyzeIR), cl::init(false), cl::cat(PolyJIT_Compiletime));
 
+bool ProfileScops;
+static cl::opt<bool, true> ProfileScopsX(
+    "polli-profile-scops", cl::desc("Instrument regions that are not yet a "
+                                    "valid SCoP for runtime-profiling"),
+    cl::location(ProfileScops), cl::init(false), cl::cat(PolyJIT_Compiletime));
+
 bool CollectRegressionTests = false;
 static cl::opt<bool, true> PolliCollectX(
     "polli-collect-modules",

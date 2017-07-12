@@ -290,7 +290,7 @@ namespace {
 //Register for clang
 static void registerProfileScopDetection(
     const PassManagerBuilder &, legacy::PassManagerBase &PM){
-  if(opt::compiletime::Enabled){
+  if(opt::compiletime::ProfileScops){
     registerCanonicalicationPasses(PM);
     PM.add(createScopDetectionWrapperPassPass());
     PM.add(new ProfileScopDetection());
