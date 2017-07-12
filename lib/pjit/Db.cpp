@@ -15,6 +15,10 @@
 using namespace pqxx;
 using namespace llvm;
 
+namespace papi {
+#include <papi.h>
+}
+
 namespace polli {
 namespace opt {
 std::string Experiment;

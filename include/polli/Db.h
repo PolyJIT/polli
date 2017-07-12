@@ -4,13 +4,8 @@
 #include <unordered_map>
 #include <string>
 
-namespace papi {
-#include <papi.h>
-}
-
 using EventMapTy = std::unordered_map<uint64_t, uint64_t>;
 using RegionMapTy = std::unordered_map<uint64_t, std::string>;
-
 
 namespace polli {
 namespace opt {
