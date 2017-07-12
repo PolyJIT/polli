@@ -29,6 +29,7 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 }
 
 void PolyJIT::setup() {
+  tracing::setup_tracing();
   enter(0, papi::PAPI_get_real_usec());
 
   /* CACHE_HIT */
