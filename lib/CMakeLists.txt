@@ -93,7 +93,7 @@ add_polli_library(pprof SHARED
 )
 
 set(POLLI_LINK_LIBS
-  Polly
+  LLVMPolly
   likwid
   pthread
   pqxx
