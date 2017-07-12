@@ -10,10 +10,10 @@ set(POLYJIT_COMPILETIME_SOURCES
   Support/Utils.cpp
   Support/TypeMapper.cpp
   Transform/InstrumentRegions.cpp
+  Transform/ProfileScops.cpp
   pjit-logging/Log.cpp
   RegisterCompilationPasses.cpp
   PolyJIT.cpp
-  profileScopDetectionPass.cpp
 )
 
 set(POLYJIT_RUNTIME_SOURCES
