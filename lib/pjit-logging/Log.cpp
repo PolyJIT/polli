@@ -23,7 +23,8 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
 
   init = true;
 
-  if (polli::opt::EnableLogFile) {
+  if (polli::opt::EnableLogFile &&
+      (polli::opt::LogLevel != spdlog::level::off)) {
     spdlog::set_async_mode(1048576);
     sinks.push_back(std::make_shared<spdlog::sinks::simple_file_sink_mt>(
         getLogOutFile(), true));
