@@ -93,7 +93,6 @@ add_polli_library(pprof SHARED
 )
 
 set(POLLI_LINK_LIBS
-  LLVMPolly
   likwid
   pthread
   pqxx
@@ -104,6 +103,7 @@ add_polli_loadable_module(LLVMPolyJIT
   ${POLYJIT_COMPILETIME_SOURCES}
 )
 
+target_link_libraries(LLVMPolyJIT INTERFACE LLVMPolly)
 set_target_properties(LLVMPolyJIT
   PROPERTIES
   LINKER_LANGUAGE CXX
