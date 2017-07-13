@@ -232,22 +232,16 @@ namespace polli {
       if(const Region *Parent = R->getParent()){
           errs() << *Parent << " is invalid because of: ";
         if(Parent->isTopLevelRegion()){
-            errs() << "Region is toplevel region.\n";
+          errs() << "Region is toplevel region.\n";
         } else {
-            errs() << SD.regionIsInvalidBecause(Parent) << '\n';
+          errs() << SD.regionIsInvalidBecause(Parent) << '\n';
 
           BasicBlock *EntryBB = Parent->getEntry();
           BasicBlock *ExitBB = Parent->getExit();
-
-          //errs() << "EntryBB: " << EntryBB << '\n';
           SmallVector<BasicBlock*, 1> EntrySplits
             = splitPredecessors(Parent, EntryBB, true);
-          //errs() << "EntrySplits.empty(): " << EntrySplits.empty() << '\n';
-
-          //errs() << "ExitBB: " << ExitBB << '\n';
           SmallVector<BasicBlock*, 1> ExitSplits
             = splitPredecessors(Parent, ExitBB, false);
-          //errs() << "ExitSplits.empty(): " << ExitSplits.empty() << '\n';
 
           gotInstrumented = instrumentSplitBlocks(EntrySplits, ExitSplits);
         }
