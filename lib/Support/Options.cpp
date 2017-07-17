@@ -23,6 +23,8 @@
 #define DEBUG_TYPE polyjit
 #include "llvm/Support/Debug.h"
 
+REGISTER_LOG(console, "polyjit.options");
+
 using namespace llvm;
 
 llvm::cl::OptionCategory PolliCategory("PolyJIT Options",
