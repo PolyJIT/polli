@@ -21,6 +21,7 @@ class PolyJIT {
   std::unordered_map<uint64_t, uint64_t> Events;
   std::unordered_map<uint64_t, uint64_t> Entries;
   std::unordered_map<uint64_t, std::string> Regions;
+
 public:
   explicit PolyJIT() : VariantFunctions(), CodeCache() { setup(); }
   ~PolyJIT() {
@@ -31,20 +32,16 @@ public:
 
   void enter(uint64_t id, uint64_t time) {
     if (!Events.count(id))
-        Events[id] = 0;
+      Events[id] = 0;
     if (!Entries.count(id))
-        Entries[id] = 0;
+      Entries[id] = 0;
     Events[id] -= time;
     Entries[id] += 1;
   }
 
-  void exit(uint64_t id, uint64_t time) {
-    Events[id] += time;
-  }
+  void exit(uint64_t id, uint64_t time) { Events[id] += time; }
 
-  void addRegion(const std::string Name, uint64_t id) {
-    Regions[id] = Name;
-  }
+  void addRegion(const std::string Name, uint64_t id) { Regions[id] = Name; }
 
   /**
    * @name CodeCache interface.
@@ -59,11 +56,9 @@ public:
   const_iterator find(const CacheKey &K) const { return CodeCache.find(K); }
 
   iterator begin() { return CodeCache.begin(); }
-
-  const_iterator begin() const { return CodeCache.begin(); }
-
   iterator end() { return CodeCache.end(); }
 
+  const_iterator begin() const { return CodeCache.begin(); }
   const_iterator end() const { return CodeCache.end(); }
 
   value_type operator[](CacheKey &K) { return CodeCache[K]; }
@@ -111,6 +106,7 @@ public:
 
   void UpdatePrefixMap(uint64_t Prefix, const llvm::Function *);
   const fn_type *FromPrefix(uint64_t K) { return PrefixToFnMap[K]; }
+
 private:
   VariantFunctionMapTy VariantFunctions;
   CodeCacheT CodeCache;

@@ -191,7 +191,6 @@ void ValidateOptions() {
   if (EnableScheduleReport || EnableScopReport || EnableFunctionReport ||
       EnableASTReport || EnableDatabaseExport) {
     PipelineChoice = DEBUG;
-
   }
 }
 
