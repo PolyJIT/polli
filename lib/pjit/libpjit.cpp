@@ -47,6 +47,7 @@
 #include "llvm/Support/DynamicLibrary.h"
 
 #include "polli/Caching.h"
+#include "polli/Compiler.h"
 #include "polli/Jit.h"
 #include "polli/Options.h"
 #include "polli/RunValues.h"
@@ -59,7 +60,6 @@
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
 
-#include <dlfcn.h>
 
 #define DEBUG_TYPE "polyjit"
 
@@ -106,40 +106,6 @@ static inline void set_options_from_environment() {
 namespace polli {
 /// @brief Simple compile functor: Takes a single IR module and returns an
 ///        ObjectFile.
-class SimpleErrorReportingCompiler {
-public:
-  /// @brief Construct a simple compile functor with the given target.
-  SimpleErrorReportingCompiler(TargetMachine &TM) : TM(TM) {}
-
-  /// @brief Compile a Module to an ObjectFile.
-  object::OwningBinary<object::ObjectFile> operator()(Module &M) const {
-    SmallVector<char, 0> ObjBufferSV;
-    raw_svector_ostream ObjStream(ObjBufferSV);
-
-    legacy::PassManager PM;
-    MCContext *Ctx;
-
-    TM.setOptLevel(CodeGenOpt::Aggressive);
-    if (TM.addPassesToEmitMC(PM, Ctx, ObjStream))
-      llvm_unreachable("Target does not support MC emission.");
-    PM.run(M);
-
-    std::unique_ptr<MemoryBuffer> ObjBuffer(
-        new ObjectMemoryBuffer(std::move(ObjBufferSV)));
-    Expected<std::unique_ptr<object::ObjectFile>> Obj =
-        object::ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
-    typedef object::OwningBinary<object::ObjectFile> OwningObj;
-    if (Obj)
-      return OwningObj(std::move(*Obj), std::move(ObjBuffer));
-
-    consumeError(Obj.takeError());
-    return OwningObj(nullptr, nullptr);
-  }
-
-private:
-  TargetMachine &TM;
-};
-
 class PolySectionMemoryManager : public SectionMemoryManager {
   uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
                                unsigned SectionID,
@@ -163,126 +129,6 @@ class PolySectionMemoryManager : public SectionMemoryManager {
         isReadOnly);
     return ptr;
   }
-};
-
-class PolyJITEngine {
-public:
-  using ObjLayerT = orc::RTDyldObjectLinkingLayer;
-  using CompileLayerT = orc::IRCompileLayer<ObjLayerT, SimpleErrorReportingCompiler>;
-  using ModuleHandleT = CompileLayerT::ModuleHandleT;
-  using UniqueModule = std::unique_ptr<Module>;
-
-  PolyJITEngine()
-      : TM(EngineBuilder()
-               .setMArch(opt::runtime::MArch)
-               .setMCPU(opt::runtime::MCPU)
-               .setMAttrs(opt::runtime::MAttrs)
-               .selectTarget()),
-        DL(TM->createDataLayout()),
-        ObjectLayer([]() { return std::make_shared<PolySectionMemoryManager>(); }),
-        CompileLayer(ObjectLayer, SimpleErrorReportingCompiler(*TM)),
-        LibHandle(nullptr) {
-    SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
-    LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
-    llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
-  }
-
-  /**
-   * @brief Read the LLVM-IR module from the given prototype string.
-   *
-   * @param prototype The prototype string we want to read in.
-   * @return llvm::Module& The LLVM-IR module we just read.
-   */
-  Module &getModule(const char *prototype, bool &cache_hit) {
-    cache_hit = true;
-    if (!LoadedModules.count(prototype)) {
-      MemoryBufferRef Buf(prototype, "polli.prototype.module");
-      SMDiagnostic Err;
-      auto Ctx = std::make_shared<LLVMContext>();
-
-      CtxList.push_back(Ctx);
-      if (UniqueMod Mod = parseIR(Buf, Err, *Ctx)) {
-        LoadedModules.insert(std::make_pair(prototype, std::move(Mod)));
-      } else {
-        std::string FileName = Err.getFilename().str();
-        console->critical("{:s}:{:d}:{:d} {:s}", FileName, Err.getLineNo(),
-                          Err.getColumnNo(), Err.getMessage().str());
-        console->critical("{0}", prototype);
-      }
-
-      auto PrototypeM = LoadedModules[prototype];
-      if (!PrototypeM)
-        console->critical("Parsing the prototype module failed!");
-      assert(PrototypeM && "Parsing the prototype module failed!");
-      cache_hit = false;
-    }
-
-    return *LoadedModules[prototype];
-  }
-
-  Expected<ModuleHandleT> addModule(std::unique_ptr<Module> M) {
-    if (CompiledModules.count(M.get()))
-      return CompiledModules[M.get()];
-
-    DEBUG({
-      std::string buf;
-      raw_string_ostream os(buf);
-      M->print(os, nullptr);
-      console->error(os.str());
-    });
-    for (GlobalValue &GV : M->globals()) {
-      std::lock_guard<std::mutex> Lock(DLMutex);
-      dlerror();
-      void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
-      if (char *Error = dlerror())
-        console->error("(dlsym) Could not locate the symbol: {:s}", Error);
-      if (Addr)
-        llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
-    }
-
-    auto Resolver = orc::createLambdaResolver(
-        [&](const std::string &Name) -> JITSymbol {
-          if (auto Sym = findSymbol(Name))
-            return Sym;
-          return JITSymbol(nullptr);
-        },
-        [](const std::string &S) {
-          if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
-            return JITSymbol(SymAddr, JITSymbolFlags::Exported);
-          return JITSymbol(nullptr);
-        });
-
-    Expected<ModuleHandleT> MH = CompileLayer.addModule(std::move(M), std::move(Resolver));
-    CompiledModules.insert(std::make_pair(M.get(), *MH));
-    return MH;
-  }
-
-  void removeModule(ModuleHandleT H) { CompileLayer.removeModule(H); }
-
-  JITSymbol findSymbol(const std::string &Name) {
-    std::string MangledName;
-    raw_string_ostream MangledNameStream(MangledName);
-    Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
-    return CompileLayer.findSymbol(MangledNameStream.str(), false);
-  }
-
-  ~PolyJITEngine() {
-    CompiledModules.clear();
-    LoadedModules.clear();
-    CtxList.clear();
-    SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine.");
-  }
-
-private:
-  std::mutex DLMutex;
-  std::vector<std::shared_ptr<LLVMContext>> CtxList;
-  std::unique_ptr<TargetMachine> TM;
-  const DataLayout DL;
-  ObjLayerT ObjectLayer;
-  CompileLayerT CompileLayer;
-  llvm::DenseMap<const char *, UniqueMod> LoadedModules;
-  llvm::DenseMap<Module *, ModuleHandleT> CompiledModules;
-  void *LibHandle;
 };
 
 static PolyJITEngine &getOrCreateEngine() {
@@ -343,7 +189,10 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   assert(Variant && "Failed to get a new variant.");
 
   PolyJITEngine &EE = getOrCreateEngine();
-  EE.addModule(std::move(Variant));
+  auto status = EE.addModule(std::move(Variant));
+  console->error_if((bool)status, "Adding the module failed!");
+  assert((bool)status && "Adding the module failed!");
+
   DEBUG(printRunValues(Values));
 
   llvm::JITSymbol FPtr = EE.findSymbol(FnName);

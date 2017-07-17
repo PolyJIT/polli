@@ -20,9 +20,10 @@ set(POLYJIT_RUNTIME_SOURCES
   pjit/libpjit.cpp
   pjit/BlockingMap.cpp
   pjit/CodeGen.cpp
+  pjit/Compiler.cpp
+  pjit/Db.cpp
   pjit/Jit.cpp
   pjit/RunValues.cpp
-  pjit/Db.cpp
   pjit-logging/Log.cpp
   Runtime/LikwidMarker.cpp
   Runtime/RuntimeOptimizer.cpp
