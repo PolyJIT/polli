@@ -35,10 +35,10 @@ void PolyJIT::setup() {
   /* CACHE_HIT */
   enter(3, 0);
 
-  Regions[0] = "START";
-  Regions[1] = "CODEGEN";
-  Regions[2] = "VARIANTS";
-  Regions[3] = "CACHE_HIT";
+  Regions[JitRegion::START] = "START";
+  Regions[JitRegion::CODEGEN] = "CODEGEN";
+  Regions[JitRegion::VARIANTS] = "VARIANTS";
+  Regions[JitRegion::CACHE_HIT] = "CACHE_HIT";
 
   SetOptimizationPipeline(opt::runtime::PipelineChoice);
   opt::ValidateOptions();
@@ -46,7 +46,7 @@ void PolyJIT::setup() {
 }
 
 void PolyJIT::tearDown() {
-  exit(0, papi::PAPI_get_real_usec());
+  exit(JitRegion::START, papi::PAPI_get_real_usec());
   db::StoreRun(Events, Entries, Regions);
 }
 

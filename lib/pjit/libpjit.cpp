@@ -274,9 +274,8 @@ void pjit_library_init();
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
-  pjit_library_init();
   JitT Context = getOrCreateJIT();
-  Context->enter(1, papi::PAPI_get_real_usec());
+  Context->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   llvm::Function *F = Request->F;
@@ -294,7 +293,7 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!K.second)
     FutureFn.wait();
-  Context->exit(1, papi::PAPI_get_real_usec());
+  Context->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
   auto FnIt = Context->find(Key);
   if (FnIt != Context->end()) {
@@ -320,9 +319,8 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
                             unsigned paramc, char **params) {
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
-  pjit_library_init();
   JitT Context = getOrCreateJIT();
-  Context->enter(1, papi::PAPI_get_real_usec());
+  Context->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   if (!K.second) {
     llvm::Function *F = Request->F;
@@ -330,7 +328,7 @@ bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
     Context->addRegion(Request->F->getName().str(),
                        GetCandidateId(*Request->F));
   }
-  Context->exit(1, papi::PAPI_get_real_usec());
+  Context->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
   return false;
 }
 

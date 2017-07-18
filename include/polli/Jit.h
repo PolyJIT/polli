@@ -13,6 +13,12 @@
 #include "llvm/IR/Function.h"
 
 namespace polli {
+enum JitRegion : int {
+  START = 0,
+  CODEGEN = 1,
+  VARIANTS = 2,
+  CACHE_HIT = 3
+};
 
 class PolyJIT {
   void setup();
