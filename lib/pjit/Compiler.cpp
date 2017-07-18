@@ -1,4 +1,5 @@
 #include "polli/Compiler.h"
+#include "polli/RuntimeOptimizer.h"
 #include "polli/log.h"
 
 #include "llvm/Support/DynamicLibrary.h"
@@ -68,8 +69,11 @@ PolyJITEngine::PolyJITEngine()
              .setMAttrs(opt::runtime::MAttrs)
              .selectTarget()),
       DL(TM->createDataLayout()),
-      ObjectLayer([]() { return std::make_shared<PolySectionMemoryManager>(); }),
+      ObjectLayer([]() {
+        return std::make_shared<PolySectionMemoryManager>();
+      }),
       CompileLayer(ObjectLayer, ModuleCompiler(*TM)),
+      OptimizeLayer(CompileLayer, optimizeForRuntime),
       LibHandle(nullptr) {
   SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
   LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
@@ -137,7 +141,7 @@ PolyJITEngine::addModule(std::unique_ptr<Module> M) {
       });
 
   Expected<ModuleHandleT> MH =
-      CompileLayer.addModule(std::move(M), std::move(Resolver));
+      OptimizeLayer.addModule(std::move(M), std::move(Resolver));
   CompiledModules.insert(std::make_pair(M.get(), *MH));
   return MH;
 }

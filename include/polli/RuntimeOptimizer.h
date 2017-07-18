@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 #ifndef RUNTIMEOPTIMIZER_H
 #define RUNTIMEOPTIMIZER_H
+#include <memory>
 #include "polli/Options.h"
 
 #include "llvm/IR/Function.h"
@@ -30,6 +31,6 @@ void SetOptimizationPipeline(PipelineType Choice);
 //
 // @param F The function to optimize
 // @return The optimized function.
-Function &OptimizeForRuntime(Function &F);
+std::shared_ptr<Module> optimizeForRuntime(std::shared_ptr<Module> M);
 }
 #endif // RUNTIMEOPTIMIZER_H

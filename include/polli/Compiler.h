@@ -26,11 +26,21 @@ public:
 
 class PolyJITEngine {
 public:
-  using ObjLayerT = llvm::orc::RTDyldObjectLinkingLayer;
-  using CompileLayerT = llvm::orc::IRCompileLayer<ObjLayerT, ModuleCompiler>;
-  using ModuleHandleT = CompileLayerT::ModuleHandleT;
   using UniqueModule = std::unique_ptr<llvm::Module>;
   using SharedModule = std::shared_ptr<llvm::Module>;
+  using OptimizeFunction = std::function<SharedModule(SharedModule)>;
+private:
+  std::mutex DLMutex;
+  std::vector<std::shared_ptr<llvm::LLVMContext>> CtxList;
+  std::unique_ptr<llvm::TargetMachine> TM;
+  const llvm::DataLayout DL;
+  llvm::orc::RTDyldObjectLinkingLayer ObjectLayer;
+  llvm::orc::IRCompileLayer<decltype(ObjectLayer), ModuleCompiler> CompileLayer;
+  llvm::orc::IRTransformLayer<decltype(CompileLayer), OptimizeFunction> OptimizeLayer;
+  void *LibHandle;
+
+public:
+  using ModuleHandleT = decltype(OptimizeLayer)::ModuleHandleT;
 
   explicit PolyJITEngine();
 
@@ -49,15 +59,8 @@ public:
   ~PolyJITEngine();
 
 private:
-  std::mutex DLMutex;
-  std::vector<std::shared_ptr<llvm::LLVMContext>> CtxList;
-  std::unique_ptr<llvm::TargetMachine> TM;
-  const llvm::DataLayout DL;
-  ObjLayerT ObjectLayer;
-  CompileLayerT CompileLayer;
   llvm::DenseMap<const char *, SharedModule> LoadedModules;
   llvm::DenseMap<llvm::Module *, ModuleHandleT> CompiledModules;
-  void *LibHandle;
 };
 
 }

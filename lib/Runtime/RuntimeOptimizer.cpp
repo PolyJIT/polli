@@ -429,15 +429,15 @@ PassManagerBuilder createPMB() {
   return Builder;
 }
 
-Function &OptimizeForRuntime(Function &F) {
+using SharedModule = std::shared_ptr<Module>;
+SharedModule optimizeForRuntime(SharedModule M) {
   PassManagerBuilder Builder = createPMB();
-  Module *M = F.getParent();
 #ifdef POLLI_STORE_OUTPUT
   opt::GenerateOutput = true;
 #endif
 
   legacy::PassManager PM = legacy::PassManager();
-  legacy::FunctionPassManager FPM = legacy::FunctionPassManager(M);
+  legacy::FunctionPassManager FPM = legacy::FunctionPassManager(M.get());
   Builder.populateFunctionPassManager(FPM);
   Builder.populateModulePassManager(PM);
 
@@ -471,6 +471,6 @@ Function &OptimizeForRuntime(Function &F) {
       console->error("fn did not get optimized by polly");
   });
 
-  return F;
+  return M;
 }
 } // namespace polli

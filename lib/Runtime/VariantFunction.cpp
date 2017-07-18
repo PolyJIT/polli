@@ -1,7 +1,6 @@
 #include "likwid.h"
 
 #include "polli/FunctionCloner.h"
-#include "polli/RuntimeOptimizer.h"
 #include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
 #include "polli/Utils.h"
@@ -256,8 +255,6 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
-  std::unique_ptr<Module> NewM;
-  Function *F;
 
   // Prepare a new module to hold our new function.
   Module *M = BaseF.getParent();
@@ -265,7 +262,7 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
     return std::unique_ptr<Module>(nullptr);
 
   assert(M && "Function without parent module?!");
-  NewM = std::unique_ptr<Module>(
+  std::unique_ptr<Module> NewM = std::unique_ptr<Module>(
       new Module(M->getModuleIdentifier(), M->getContext()));
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
@@ -319,9 +316,8 @@ std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
                       BaseF.getName().str());
   Function *NewF = Specializer->start(VMap, /*RemapCalls=*/true);
   NewF->setName(fmt::format("{:s}_{:d}", NewF->getName().str(), K.hash()));
-  F = &OptimizeForRuntime(*NewF);
-  F->addFnAttr("polyjit-id", fmt::format("{:d}", polli::GetCandidateId(BaseF)));
-  FnName = F->getName().str();
+  NewF->addFnAttr("polyjit-id", fmt::format("{:d}", polli::GetCandidateId(BaseF)));
+  FnName = NewF->getName().str();
 
   return NewM;
 }
