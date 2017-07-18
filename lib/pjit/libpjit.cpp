@@ -30,16 +30,16 @@
 #include "llvm/ADT/Triple.h"
 #include "llvm/CodeGen/LinkAllCodegenComponents.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 #include "llvm/IR/Mangler.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 
 #include "llvm/IRReader/IRReader.h"
@@ -60,7 +60,6 @@
 #include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
 
-
 #define DEBUG_TYPE "polyjit"
 
 REGISTER_LOG(console, "libpjit");
@@ -68,13 +67,7 @@ REGISTER_LOG(console, "libpjit");
 using namespace llvm;
 using namespace polli;
 
-namespace {
-using UniqueMod = std::shared_ptr<Module>;
-using UniqueCtx = std::shared_ptr<LLVMContext>;
-
-using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
-static StackTracePtr StackTrace;
-
+namespace polli {
 /**
  * @brief Get the protoype function stored in this module.
  *
@@ -101,40 +94,9 @@ static inline void set_options_from_environment() {
   cl::ParseEnvironmentOptions("libpjit", "PJIT_ARGS", "");
 }
 
-} // end of anonymous namespace
-
-namespace polli {
-/// @brief Simple compile functor: Takes a single IR module and returns an
-///        ObjectFile.
-class PolySectionMemoryManager : public SectionMemoryManager {
-  uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
-                               unsigned SectionID,
-                               StringRef SectionName) override {
-    uint8_t *ptr = SectionMemoryManager::allocateCodeSection(
-        Size, Alignment, SectionID, SectionName);
-    SPDLOG_DEBUG(
-        console, "cs @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s}",
-        (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str());
-    return ptr;
-  }
-
-  uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
-                               unsigned SectionID, StringRef SectionName,
-                               bool isReadOnly) override {
-    uint8_t *ptr = SectionMemoryManager::allocateDataSection(
-        Size, Alignment, SectionID, SectionName, isReadOnly);
-    SPDLOG_DEBUG(console,
-        "ds @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s} ro: {:d}",
-        (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str(),
-        isReadOnly);
-    return ptr;
-  }
-};
-
 static PolyJITEngine &getOrCreateEngine() {
   static PolyJITEngine EE;
   return EE;
-}
 }
 
 static inline Function &getPrototype(const char *function, bool &cache_hit) {
@@ -146,7 +108,6 @@ static inline Function &getPrototype(const char *function, bool &cache_hit) {
   return F;
 }
 
-namespace polli {
 using JitT = std::shared_ptr<PolyJIT>;
 static JitT &getOrCreateJIT() {
   static auto JIT = std::make_shared<PolyJIT>();
@@ -164,24 +125,17 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
-                           CacheKey K, uint64_t prefix, JitT Context) {
-  if (Context->find(K) != Context->end()) {
-    /* CACHE_HIT */
-    Context->enter(3, 0);
-    Context->exit(3, 1);
+                           CacheKey K, uint64_t prefix, JitT Ctx) {
+  if (Ctx->find(K) != Ctx->end()) {
+    Ctx->increment(JitRegion::CACHE_HIT, 1);
     return;
   }
 
-  /* VARIANTS */
-  Context->enter(2, 0);
-  Context->exit(2, 1);
+  Ctx->increment(JitRegion::VARIANTS, 1);
 
-  SPDLOG_DEBUG(console, "{:s}: Create new Variant.",
-               Request->F->getName().str());
-  SPDLOG_DEBUG(console, "Hash: {:x} IR: {:x}", K.ValueHash, (uint64_t)K.IR);
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
-  VariantFunctionTy VarFun = Context->getOrCreateVariantFunction(Request->F);
+  VariantFunctionTy VarFun = Ctx->getOrCreateVariantFunction(Request->F);
   RunValueList Values = runValues(*Request);
   std::string FnName;
 
@@ -193,24 +147,25 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   console->error_if((bool)status, "Adding the module failed!");
   assert((bool)status && "Adding the module failed!");
 
-  DEBUG(printRunValues(Values));
-
   llvm::JITSymbol FPtr = EE.findSymbol(FnName);
-  Expected<JITTargetAddress> Addr = FPtr.getAddress();
+  auto Addr = FPtr.getAddress();
+  console->error_if((bool)Addr, "Could not get the address of the JITSymbol.");
+  assert((bool)Addr && "Could not get the address of the JITSymbol.");
 
-  SPDLOG_DEBUG(console, "fn ptr: 0x{:x}", *Addr);
-  assert(FPtr && "Specializer returned nullptr.");
-  if (!Context
-           ->insert(std::make_pair(
-               K, MainFnT((void (*)(int, char **))(*Addr))))
-           .second) {
+  bool inserted =
+      Ctx->insert(std::make_pair(K, MainFnT((void (*)(int, char **))(*Addr))))
+          .second;
+  if (!inserted) {
     console->critical("Key collision in function cache, abort.");
-    llvm_unreachable("Key collision");
+    llvm_unreachable("Key collision in function cace, abort.");
   }
+  DEBUG(printRunValues(Values));
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 }
 
-namespace {
+using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
+static StackTracePtr StackTrace;
+
 class StaticInitializer {
 public:
   StaticInitializer() {
@@ -245,7 +200,6 @@ public:
 
   ~StaticInitializer() {}
 };
-}
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
@@ -337,7 +291,6 @@ void pjit_library_init() {
   if (initialized)
     return;
   static StaticInitializer InitializeEverything;
-  // atexit(do_shutdown);
   initialized = true;
 }
 } /* extern "C" */

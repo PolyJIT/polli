@@ -46,6 +46,10 @@ public:
   }
 
   void exit(uint64_t id, uint64_t time) { Events[id] += time; }
+  void increment(uint64_t id, uint64_t step) {
+    enter(id, 0);
+    exit(id, step);
+  }
 
   void addRegion(const std::string Name, uint64_t id) { Regions[id] = Name; }
 

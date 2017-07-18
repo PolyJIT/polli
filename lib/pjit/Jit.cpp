@@ -30,10 +30,10 @@ VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
 
 void PolyJIT::setup() {
   tracing::setup_tracing();
-  enter(0, papi::PAPI_get_real_usec());
+  enter(JitRegion::START, papi::PAPI_get_real_usec());
 
   /* CACHE_HIT */
-  enter(3, 0);
+  enter(JitRegion::CACHE_HIT, 0);
 
   Regions[JitRegion::START] = "START";
   Regions[JitRegion::CODEGEN] = "CODEGEN";
