@@ -1,4 +1,4 @@
-// RUN: %clang -rdynamic -O2 -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polli-process-unprofitable -mllvm -polli %s -mllvm -polli-analyze -o %t %pjit 2>&1 | FileCheck %s -check-prefix=STATIC
+// RUN: %clang -rdynamic -O2 -Xclang -load -Xclang LLVMPolly.so -Xclang -load -Xclang LLVMPolyJIT.so -mllvm -polli-process-unprofitable -mllvm -polli %s -mllvm -polli-analyze -o %t %pjit 2>&1 | FileCheck %s -check-prefix=STATIC
 // RUN: env BB_USE_DATABASE=0 %t 2>&1 | FileCheck %s
 #include <stdio.h>
 

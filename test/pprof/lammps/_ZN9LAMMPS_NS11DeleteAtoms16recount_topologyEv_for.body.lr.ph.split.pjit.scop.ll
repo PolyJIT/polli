@@ -1,5 +1,5 @@
 
-; RUN: opt -load LLVMPolyJIT.so -O3  -polli-process-unprofitable -polli  -polli-no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
+; RUN: opt -load LLVMPolly.so -load LLVMPolyJIT.so -O3  -polli-process-unprofitable -polli  -polli-no-recompilation -polli-analyze -disable-output -stats < %s 2>&1 | FileCheck %s
 ; CHECK: 2 regions require runtime support:
 
 ; ModuleID = '../delete_atoms.cpp._ZN9LAMMPS_NS11DeleteAtoms16recount_topologyEv_for.body.lr.ph.split.pjit.scop.prototype'
