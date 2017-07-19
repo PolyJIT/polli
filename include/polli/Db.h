@@ -44,14 +44,14 @@ struct TraceData {
   std::unordered_map<uint64_t, uint64_t> Events;
   std::unordered_map<uint64_t, uint64_t> Entries;
   std::unordered_map<uint64_t, std::string> Regions;
+
+  ~TraceData();
 };
 
 TraceData &setup();
 extern "C" void enter_region(uint64_t id, const char *name);
 extern "C" void exit_region(uint64_t id);
-extern "C" void submit_results();
 extern "C" void setup_tracing();
-
 }
 }
 

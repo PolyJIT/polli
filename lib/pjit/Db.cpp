@@ -1,4 +1,5 @@
 #include "polli/Db.h"
+#include "polli/Jit.h"
 #include "polli/Options.h"
 #include "polli/log.h"
 #include "llvm/Support/CommandLine.h"
@@ -125,7 +126,7 @@ std::string now() {
 }
 
 static bool enable_tracking() {
-  return opt::EnableDatabase && opt::ExecuteAtExit;
+  return opt::EnableDatabase;
 }
 
 class DBConnection {
@@ -271,6 +272,9 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
                                    "duration, events, run_id) "
                                    "VALUES";
 
+  if (Events.size() <= 0)
+    return;
+
   int cnt = 0;
   std::stringstream vals;
   for (auto KV : Events) {
@@ -334,14 +338,16 @@ void exit_region(uint64_t id) {
   D.Events[id] += time;
 }
 
-void submit_results() {
-  TraceData &D = setup();
-  polli::db::StoreRun(D.Events, D.Entries, D.Regions);
+TraceData::~TraceData() {
+  if (!polli::opt::ExecuteAtExit)
+    return;
+
+  std::cerr << fmt::format("Submitting: {:d} events", Events.size()) << "\n";
+  polli::db::StoreRun(Events, Entries, Regions);
 }
 
 void setup_tracing() {
   papi::PAPI_library_init(PAPI_VER_CURRENT);
-  atexit(submit_results);
 }
 }
 }
