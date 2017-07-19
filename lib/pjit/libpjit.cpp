@@ -37,6 +37,7 @@
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/SourceMgr.h"
@@ -68,6 +69,9 @@ using namespace llvm;
 using namespace polli;
 
 namespace polli {
+static ManagedStatic<PolyJITEngine> Compiler;
+static ManagedStatic<PolyJIT> JitContext;
+
 /**
  * @brief Get the protoype function stored in this module.
  *
@@ -90,28 +94,13 @@ static Function &getFunction(Module &M) {
   llvm_unreachable("No JIT candidate found in prototype!");
 }
 
-static inline void set_options_from_environment() {
-  cl::ParseEnvironmentOptions("libpjit", "PJIT_ARGS", "");
-}
-
-static PolyJITEngine &getOrCreateEngine() {
-  static PolyJITEngine EE;
-  return EE;
-}
-
 static inline Function &getPrototype(const char *function, bool &cache_hit) {
   POLLI_TRACING_REGION_START(PJIT_REGION_GET_PROTOTYPE,
                              "polyjit.prototype.get");
-  Module &M = getOrCreateEngine().getModule(function, cache_hit);
+  Module &M = Compiler->getModule(function, cache_hit);
   Function &F = getFunction(M);
   POLLI_TRACING_REGION_STOP(PJIT_REGION_GET_PROTOTYPE, "polyjit.prototype.get");
   return F;
-}
-
-using JitT = std::shared_ptr<PolyJIT>;
-static JitT &getOrCreateJIT() {
-  static auto JIT = std::make_shared<PolyJIT>();
-  return JIT;
 }
 
 using MainFnT = std::function<void(int, char **)>;
@@ -125,35 +114,35 @@ static std::pair<CacheKey, bool> GetCacheKey(SpecializerRequest &Request) {
 
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
-                           CacheKey K, uint64_t prefix, JitT Ctx) {
-  if (Ctx->find(K) != Ctx->end()) {
-    Ctx->increment(JitRegion::CACHE_HIT, 1);
+                           CacheKey K, uint64_t prefix) {
+  if (JitContext->find(K) != JitContext->end()) {
+    JitContext->increment(JitRegion::CACHE_HIT, 0);
     return;
   }
 
-  Ctx->increment(JitRegion::VARIANTS, 1);
+  JitContext->increment(JitRegion::VARIANTS, 1);
 
   POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
-  VariantFunctionTy VarFun = Ctx->getOrCreateVariantFunction(Request->F);
+  VariantFunctionTy VarFun = JitContext->getOrCreateVariantFunction(Request->F);
   RunValueList Values = runValues(*Request);
   std::string FnName;
 
   auto Variant = VarFun->createVariant(Values, FnName);
   assert(Variant && "Failed to get a new variant.");
 
-  PolyJITEngine &EE = getOrCreateEngine();
-  auto status = EE.addModule(std::move(Variant));
+  auto status = Compiler->addModule(std::move(Variant));
   console->error_if((bool)status, "Adding the module failed!");
   assert((bool)status && "Adding the module failed!");
 
-  llvm::JITSymbol FPtr = EE.findSymbol(FnName);
+  llvm::JITSymbol FPtr = Compiler->findSymbol(FnName);
   auto Addr = FPtr.getAddress();
   console->error_if((bool)Addr, "Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
 
   bool inserted =
-      Ctx->insert(std::make_pair(K, MainFnT((void (*)(int, char **))(*Addr))))
+      JitContext
+          ->insert(std::make_pair(K, MainFnT((void (*)(int, char **))(*Addr))))
           .second;
   if (!inserted) {
     console->critical("Key collision in function cache, abort.");
@@ -163,55 +152,15 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
   POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
 }
 
-using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
-static StackTracePtr StackTrace;
-
-class StaticInitializer {
-public:
-  StaticInitializer() {
-    using polly::initializePollyPasses;
-
-    set_options_from_environment();
-
-    StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
-
-    // Make sure to initialize tracing before planting the atexit handler.
-    PassRegistry &Registry = *PassRegistry::getPassRegistry();
-    polly::initializePollyPasses(Registry);
-    initializeCore(Registry);
-    initializeScalarOpts(Registry);
-    initializeVectorization(Registry);
-    initializeIPO(Registry);
-    initializeAnalysis(Registry);
-    initializeTransformUtils(Registry);
-    initializeInstCombine(Registry);
-    initializeInstrumentation(Registry);
-    initializeTarget(Registry);
-    initializeCodeGenPreparePass(Registry);
-    initializeAtomicExpandPass(Registry);
-
-    InitializeNativeTarget();
-    InitializeNativeTargetAsmPrinter();
-    InitializeNativeTargetAsmParser();
-
-    getOrCreateEngine();
-    getOrCreateJIT();
-  }
-
-  ~StaticInitializer() {}
-};
-
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  JitT Context = getOrCreateJIT();
-  const Function *F = Context->FromPrefix((uint64_t)prefix);
-  Context->enter(GetCandidateId(*F), papi::PAPI_get_real_usec());
+  const Function *F = JitContext->FromPrefix((uint64_t)prefix);
+  JitContext->enter(GetCandidateId(*F), papi::PAPI_get_real_usec());
 }
 
 void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
-  JitT Context = getOrCreateJIT();
-  const Function *F = Context->FromPrefix((uint64_t)prefix);
-  Context->exit(GetCandidateId(*F), papi::PAPI_get_real_usec());
+  const Function *F = JitContext->FromPrefix((uint64_t)prefix);
+  JitContext->exit(GetCandidateId(*F), papi::PAPI_get_real_usec());
 }
 
 void pjit_library_init();
@@ -228,29 +177,28 @@ void pjit_library_init();
 bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
                char **params) {
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
-  JitT Context = getOrCreateJIT();
-  Context->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   llvm::Function *F = Request->F;
 
   if (!K.second) {
-    Context->UpdatePrefixMap((uint64_t)prefix, F);
-    Context->addRegion(Request->F->getName().str(),
+    JitContext->UpdatePrefixMap((uint64_t)prefix, F);
+    JitContext->addRegion(Request->F->getName().str(),
                        GetCandidateId(*Request->F));
   }
 
   CacheKey Key = K.first;
-  auto FutureFn = Context->async(GetOrCreateVariantFunction, Request, Key,
-                                 (uint64_t)prefix, Context);
+  auto FutureFn = JitContext->async(GetOrCreateVariantFunction, Request, Key,
+                                    (uint64_t)prefix);
 
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!K.second)
     FutureFn.wait();
-  Context->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
-  auto FnIt = Context->find(Key);
-  if (FnIt != Context->end()) {
+  auto FnIt = JitContext->find(Key);
+  if (FnIt != JitContext->end()) {
     pjit_trace_fnstats_entry(prefix, true);
     (FnIt->second)(paramc, params);
     pjit_trace_fnstats_exit(prefix, true);
@@ -273,25 +221,18 @@ bool pjit_main(const char *fName, uint64_t *prefix, unsigned paramc,
 bool pjit_main_no_recompile(const char *fName, uint64_t *prefix,
                             unsigned paramc, char **params) {
   auto Request = std::make_shared<SpecializerRequest>(fName, paramc, params);
-  JitT Context = getOrCreateJIT();
-  Context->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
   std::pair<CacheKey, bool> K = GetCacheKey(*Request);
   if (!K.second) {
     llvm::Function *F = Request->F;
-    Context->UpdatePrefixMap((uint64_t)prefix, F);
-    Context->addRegion(Request->F->getName().str(),
+    JitContext->UpdatePrefixMap((uint64_t)prefix, F);
+    JitContext->addRegion(Request->F->getName().str(),
                        GetCandidateId(*Request->F));
   }
-  Context->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
   return false;
 }
-
-void pjit_library_init() {
-  static bool initialized = false;
-  if (initialized)
-    return;
-  static StaticInitializer InitializeEverything;
-  initialized = true;
-}
 } /* extern "C" */
+
+static llvm_shutdown_obj StaticDestructor;
 } /* polli */

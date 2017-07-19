@@ -46,38 +46,6 @@ void initializePolliPasses(PassRegistry &Registry) {
   initializeJITScopDetectionPass(Registry);
 }
 
-struct InjectMain : public FunctionPass {
-  std::string PassName;
-  static char ID;
-
-  InjectMain() : FunctionPass(ID), PassName("PolyJIT - Main Injector") {}
-
-  bool runOnFunction(Function &F) override {
-    bool IsMain = F.getName() == "main";
-
-    if (IsMain) {
-      Module *M = F.getParent();
-      LLVMContext &Ctx = M->getContext();
-      IRBuilder<> Builder(Ctx);
-      Function *PJMainFn = cast<Function>(M->getOrInsertFunction(
-          "pjit_library_init", Type::getVoidTy(Ctx)));
-      BasicBlock &Entry = F.getEntryBlock();
-      Builder.SetInsertPoint(Entry.getFirstNonPHI());
-      Builder.CreateCall(PJMainFn);
-      console->debug("Found the main function in {:s}",
-                     M->getModuleIdentifier());
-    }
-
-    return IsMain;
-  }
-
-  StringRef getPassName() const override { return PassName.c_str(); }
-
-  void getAnalysisUsage(AnalysisUsage &AU) const override {
-    AU.setPreservesAll();
-  }
-};
-
 /**
  * @brief Copy of opt's FunctionPassPrinter.
  *
@@ -111,7 +79,6 @@ template <class T> struct FunctionPassPrinter : public FunctionPass {
 
 template <> char FunctionPassPrinter<JITScopDetection>::ID = 0;
 template <> char FunctionPassPrinter<ModuleExtractor>::ID = 0;
-char InjectMain::ID = 0;
 
 static void registerProfileScops(const PassManagerBuilder &,
                                  llvm::legacy::PassManagerBase &PM) {
@@ -143,7 +110,6 @@ static void registerPolyJIT(const llvm::PassManagerBuilder &,
   PM.add(new ModuleInstrumentation());
   if (opt::compiletime::AnalyzeIR)
     PM.add(new FunctionPassPrinter<ModuleExtractor>(outs()));
-  PM.add(new InjectMain());
 }
 
 static llvm::RegisterStandardPasses
