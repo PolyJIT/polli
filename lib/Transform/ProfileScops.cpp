@@ -87,10 +87,8 @@ namespace polli {
   }
 
   auto ProfileScopDetection::getLogger(){
-    errs() << "First HERE\n";
     if(!Log){
       Log = basic_logger_mt("profileScopsLogger", "profileScops.log");
-      errs() << "HERE\n";
     }
     return Log;
   }
