@@ -36,6 +36,7 @@ namespace polli {
       static int nonInstrumentedCounter;
       static bool calledSetup;
       size_t hashvalue;
+      auto Log;
 
     public:
       static char ID;
@@ -43,6 +44,7 @@ namespace polli {
 
     private:
       static size_t generateHash(Module*&);
+      static auto getLogger();
       static void insertSetupTracingFunction(Function*);
       static void insertEnterRegionFunction(Module*&, Instruction*, PProfID&);
       static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
@@ -80,6 +82,14 @@ namespace polli {
     return stringhashFn(hashstring)/10000000000; //FIXME Avoid dividing hash
   }
 
+  auto ProfileScopDetection::getLogger(){
+    if(!Log){
+      Log = spd::basic_logger_mt("profileScopsLogger", "bla/profileScops.log");
+      errs() << "HERE\n";
+    }
+    return Log;
+  }
+
   void ProfileScopDetection::insertSetupTracingFunction(Function *Main){
     Module *M = Main->getParent();
     LLVMContext &context = M->getContext();
@@ -111,7 +121,6 @@ namespace polli {
     ostringstream name;
     name << M->getName().data() << "::"
       << InsertPosition->getFunction()->getName().data() << " " << pprofID.MID;
-    //errs() << name.str() << '\n';
     arguments.push_back(builder.CreateGlobalStringPtr(name.str()));
     FunctionType *FType
       = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
@@ -196,8 +205,8 @@ namespace polli {
       SmallVector<BasicBlock*, 1> &EntrySplits,
       SmallVector<BasicBlock*, 1> &ExitSplits){
     if(EntrySplits.empty() || ExitSplits.empty()){
-      errs() << "WARNING: Trying to instrument splits either without entries"
-        << " or without exits.\n";
+      getLogger()->warn("WARNING: Trying to instrument splits either without entries"
+        + " or without exits.\n");
       return false;
     }
 
@@ -230,11 +239,12 @@ namespace polli {
     for(const Region *R : SD){
       bool gotInstrumented = false;
       if(const Region *Parent = R->getParent()){
-          errs() << *Parent << " is invalid because of: ";
+        stringstream message;
+        message << *Parent << " is invalid because of: ";
         if(Parent->isTopLevelRegion()){
-          errs() << "Region is toplevel region.\n";
+          message << "Region is toplevel region.\n";
         } else {
-          errs() << SD.regionIsInvalidBecause(Parent) << '\n';
+          message << SD.regionIsInvalidBecause(Parent) << '\n';
 
           BasicBlock *EntryBB = Parent->getEntry();
           BasicBlock *ExitBB = Parent->getExit();
@@ -245,8 +255,9 @@ namespace polli {
 
           gotInstrumented = instrumentSplitBlocks(EntrySplits, ExitSplits);
         }
+        getLogger()->info(message.str())
       } else {
-        errs() << "SCoP " << *R << " has no parent.\n";
+        getLogger("SCoP " + *R + " has no parent.\n");
       }
 
       if(gotInstrumented){
@@ -260,8 +271,8 @@ namespace polli {
   }
 
   bool ProfileScopDetection::doFinalization(Module &M) {
-    errs() << "Instrumented SCoPs: " << instrumentedCounter << '\n';
-    errs() << "Not instrumented SCoPs: " << nonInstrumentedCounter << '\n';
+    getLogger("Instrumented SCoPs: " + instrumentedCounter + '\n');
+    getLogger("Not instrumented SCoPs: " + nonInstrumentedCounter + '\n');
 
     bool insertedSetupTracing = false;
     if(!calledSetup && instrumentedCounter > 0){
