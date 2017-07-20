@@ -10,6 +10,8 @@
 #include "polly/LinkAllPasses.h"
 #include "polly/RegisterPasses.h"
 #include "polly/ScopInfo.h"
+#include "spdlog/logger.h"
+#include "spdlog/spdlog.h"
 
 #include <algorithm>
 #include <sstream>
@@ -17,6 +19,7 @@
 using namespace llvm;
 using namespace std;
 using namespace polly;
+using namespace spdlog;
 
 namespace polli {
 
@@ -35,8 +38,8 @@ namespace polli {
       static int instrumentedCounter;
       static int nonInstrumentedCounter;
       static bool calledSetup;
+      static shared_ptr<logger> Log;
       size_t hashvalue;
-      auto Log;
 
     public:
       static char ID;
@@ -69,6 +72,7 @@ namespace polli {
   int ProfileScopDetection::instrumentedCounter = 0;
   int ProfileScopDetection::nonInstrumentedCounter = 0;
   bool ProfileScopDetection::calledSetup = false;
+  shared_ptr<logger> ProfileScopDetection::Log = nullptr;
 
   void ProfileScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.setPreservesAll();
@@ -83,8 +87,9 @@ namespace polli {
   }
 
   auto ProfileScopDetection::getLogger(){
+    errs() << "First HERE\n";
     if(!Log){
-      Log = spd::basic_logger_mt("profileScopsLogger", "bla/profileScops.log");
+      Log = basic_logger_mt("profileScopsLogger", "profileScops.log");
       errs() << "HERE\n";
     }
     return Log;
@@ -205,8 +210,8 @@ namespace polli {
       SmallVector<BasicBlock*, 1> &EntrySplits,
       SmallVector<BasicBlock*, 1> &ExitSplits){
     if(EntrySplits.empty() || ExitSplits.empty()){
-      getLogger()->warn("WARNING: Trying to instrument splits either without entries"
-        + " or without exits.\n");
+      getLogger()->warn("WARNING: Trying to instrument splits either without "
+        "entries or without exits.\n");
       return false;
     }
 
@@ -240,7 +245,7 @@ namespace polli {
       bool gotInstrumented = false;
       if(const Region *Parent = R->getParent()){
         stringstream message;
-        message << *Parent << " is invalid because of: ";
+        message << Parent->getNameStr() << " is invalid because of: ";
         if(Parent->isTopLevelRegion()){
           message << "Region is toplevel region.\n";
         } else {
@@ -255,9 +260,9 @@ namespace polli {
 
           gotInstrumented = instrumentSplitBlocks(EntrySplits, ExitSplits);
         }
-        getLogger()->info(message.str())
+        getLogger()->info(message.str());
       } else {
-        getLogger()->info("SCoP " + *R + " has no parent.\n");
+        getLogger()->info("SCoP {} has no parent.\n", R->getNameStr());
       }
 
       if(gotInstrumented){
@@ -271,8 +276,8 @@ namespace polli {
   }
 
   bool ProfileScopDetection::doFinalization(Module &M) {
-    getLogger()->info("Instrumented SCoPs: " + instrumentedCounter + '\n');
-    getLogger()->info("Not instrumented SCoPs: " + nonInstrumentedCounter + '\n');
+    getLogger()->info("Instrumented SCoPs: {:d}\n", instrumentedCounter);
+    getLogger()->info("Not instrumented SCoPs: {:d}\n", nonInstrumentedCounter);
 
     bool insertedSetupTracing = false;
     if(!calledSetup && instrumentedCounter > 0){
