@@ -257,7 +257,7 @@ namespace polli {
         }
         getLogger()->info(message.str())
       } else {
-        getLogger("SCoP " + *R + " has no parent.\n");
+        getLogger()->info("SCoP " + *R + " has no parent.\n");
       }
 
       if(gotInstrumented){
@@ -271,8 +271,8 @@ namespace polli {
   }
 
   bool ProfileScopDetection::doFinalization(Module &M) {
-    getLogger("Instrumented SCoPs: " + instrumentedCounter + '\n');
-    getLogger("Not instrumented SCoPs: " + nonInstrumentedCounter + '\n');
+    getLogger()->info("Instrumented SCoPs: " + instrumentedCounter + '\n');
+    getLogger()->info("Not instrumented SCoPs: " + nonInstrumentedCounter + '\n');
 
     bool insertedSetupTracing = false;
     if(!calledSetup && instrumentedCounter > 0){
