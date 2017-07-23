@@ -49,20 +49,22 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
 uint64_t GetCandidateId(const Function &F) {
   uint64_t n = 0;
   std::string name_tag = "polyjit-id";
-  if (F.hasFnAttribute(name_tag))
-    if (!(std::stringstream(F.getFnAttribute(name_tag).getValueAsString()) >>
-          n))
-      n = 0;
+  if (F.hasFnAttribute(name_tag)) {
+    auto FnAttr = F.getFnAttribute(name_tag);
+    n = FnAttr.getValueAsInt();
+  }
 
   if (n == 0)
     console->critical("Could not find the polyjit-id!");
   return n;
 }
 
+#if 0
 static inline void printStats(const llvm::Function &F, const Stats &S) {
   SPDLOG_DEBUG("stats",
                "F: {:s} ID: {:x} N: {:d} LT: {:d} RT: {:d} Overhead: {:3.2f}%",
                F.getName().str(), (uint64_t)(&S), S.NumCalls, S.LookupTime,
                S.LastRuntime, (S.LookupTime * 100 / (double)S.LastRuntime));
 }
+#endif
 } // namespace polli

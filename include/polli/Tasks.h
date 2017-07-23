@@ -26,6 +26,7 @@
 #ifndef POLLI_RUNTIME_TASKS_H
 #define POLLI_RUNTIME_TASKS_H
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>

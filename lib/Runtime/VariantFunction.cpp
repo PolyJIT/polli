@@ -189,16 +189,6 @@ public:
    * @param VMap A value-to-value map that tracks cloned values/function args.
    */
   void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
-    // Connect Entry block of TgtF with Cloned version of SrcF's entry block.
-    LLVMContext &Context = To->getContext();
-    IRBuilder<> Builder(Context);
-    BasicBlock *EntryBB = &To->getEntryBlock();
-    BasicBlock *SrcEntryBB = &From->getEntryBlock();
-    BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
-
-    Builder.SetInsertPoint(EntryBB);
-    Builder.CreateBr(ClonedEntryBB);
-
     unsigned i = 0;
     for (Argument &Arg : From->args()) {
       auto P = SpecValues[i++];
@@ -210,9 +200,8 @@ public:
         if (Constant *Replacement = ConstantInt::get(IntTy, *P.value)) {
           Value *NewArg = VMap[&Arg];
 
-          if (!isa<Constant>(NewArg)) {
+          if (!isa<Constant>(NewArg))
             NewArg->replaceAllUsesWith(Replacement);
-          }
         }
       }
     }
@@ -224,7 +213,7 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
   if (!opt::runtime::DisableSpecialization) {
     // Perform parameter value substitution.
     auto Specializer = std::make_unique<FunctionCloner<
-        MainCreator, IgnoreSource, SpecializeEndpoint<RunValue<uint64_t *>>>>();
+        CopyCreator, IgnoreSource, SpecializeEndpoint<RunValue<uint64_t *>>>>();
 
     /* Perform a parameter specialization by taking the unchanged base
      * function
@@ -234,8 +223,9 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
     return Specializer;
   }
 
-  auto Specializer = std::make_unique<
-      FunctionCloner<MainCreator, IgnoreSource, ConnectTarget>>();
+  //auto Specializer = std::make_unique<
+  //    FunctionCloner<MainCreator, IgnoreSource, ConnectTarget>>();
+  auto Specializer = std::make_unique<DefaultFunctionCloner>();
   return Specializer;
 }
 
@@ -250,20 +240,21 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
  *
  * @return a copy of the base function, with the values of K substituted.
  */
-std::unique_ptr<Module> VariantFunction::createVariant(const RunValueList &K,
-                                                       std::string &FnName) {
+std::unique_ptr<Module> createVariant(Function &BaseF, const RunValueList &K,
+                                      std::string &FnName) {
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
 
   // Prepare a new module to hold our new function.
   Module *M = BaseF.getParent();
-  if (!M)
-    return std::unique_ptr<Module>(nullptr);
-
   assert(M && "Function without parent module?!");
-  std::unique_ptr<Module> NewM = std::unique_ptr<Module>(
-      new Module(M->getModuleIdentifier(), M->getContext()));
+  if (!M)
+    llvm_unreachable();
+
+  LLVMContext &Ctx = M->getContext();
+  auto NewM =
+      std::unique_ptr<Module>(new Module(M->getModuleIdentifier(), Ctx));
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
   NewM->setMaterializer(M->getMaterializer());

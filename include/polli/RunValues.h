@@ -33,25 +33,48 @@ class Function;
 }
 
 namespace polli {
-struct SpecializerRequest {
-  const char *IR;
-  unsigned ParamC;
+class SpecializerRequest {
+private:
+  uint64_t IRKey;
+  const unsigned ParamC;
   void *Params;
-  llvm::Function *F{nullptr};
+  std::shared_ptr<llvm::Module> M;
+  llvm::Function &F;
 
-  SpecializerRequest(const char *IR, unsigned ParamC, char **params)
-      : IR(IR), ParamC(ParamC) {
-        size_t n = ParamC * sizeof(void *);
-        Params = std::malloc(n);
-        std::memcpy(Params, params, n);
-      }
+  llvm::Function &init(std::shared_ptr<llvm::Module> PrototypeM);
+
+public:
+  SpecializerRequest(uint64_t key, unsigned ParamC, char **params,
+                     std::shared_ptr<llvm::Module> M)
+      : IRKey(key), ParamC(ParamC), Params(nullptr), M(M), F(init(M)) {
+    size_t n = ParamC * sizeof(void *);
+    Params = std::malloc(n);
+    std::memcpy(Params, params, n);
+  }
+
+  size_t paramSize() const {
+    return ParamC;
+  }
+  void *params() const {
+    return Params;
+  }
+
+  uint64_t key() const {
+    return IRKey;
+  }
+
+  llvm::Function &prototype() const {
+    return F;
+  }
+  llvm::Module &prototypeModule() const {
+    return *M;
+  }
 
   ~SpecializerRequest() {
     std::free(Params);
   }
 };
 
-using JitRequestT = std::shared_ptr<SpecializerRequest>;
 RunValueList runValues(const SpecializerRequest &Request);
 #ifndef NDEBUG
 void printArgs(const llvm::Function &F, size_t argc, void *params);

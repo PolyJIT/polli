@@ -39,6 +39,8 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/GICHelper.h"
 
+#include <iostream>
+
 REGISTER_LOG(console, DEBUG_TYPE);
 
 namespace llvm {

@@ -176,7 +176,10 @@ struct InstrumentEndpoint {
       CallbackName = "pjit_main_no_recompile";
 
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        CallbackName, Type::getInt1Ty(Ctx), Type::getInt8PtrTy(Ctx),
+        CallbackName,
+        Type::getVoidTy(Ctx)->getPointerTo(),
+        Type::getInt8PtrTy(Ctx),
+        Type::getVoidTy(Ctx)->getPointerTo(),
         Type::getInt64PtrTy(Ctx), Type::getInt32Ty(Ctx),
         Type::getInt8PtrTy(Ctx)));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
@@ -190,6 +193,7 @@ struct InstrumentEndpoint {
 
     To->deleteBody();
     To->setLinkage(GlobalValue::WeakAnyLinkage);
+    FallbackF->replaceAllUsesWith(To);
 
     BasicBlock *BB = BasicBlock::Create(Ctx, "polyjit.entry", To);
     IRBuilder<> Builder(BB);
@@ -241,23 +245,16 @@ struct InstrumentEndpoint {
     Value *PrefixData = polli::registerStatStruct(*To, To->getName());
     PrefixData = Builder.CreateBitCast(PrefixData, Type::getInt64PtrTy(Ctx));
     Value *CastParams = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
+    Value *PtrToOriginalF =
+        Builder.CreateBitCast(FallbackF, Type::getVoidTy(Ctx)->getPointerTo());
 
     SmallVector<Value *, 4> Args;
     Args.push_back((PrototypeF) ? PrototypeF
                                 : Builder.CreateGlobalStringPtr(To->getName()));
+    Args.push_back(PtrToOriginalF);
     Args.push_back(PrefixData);
     Args.push_back(ParamC);
     Args.push_back(CastParams);
-
-    BasicBlock *JitReady = BasicBlock::Create(Ctx, "polyjit.ready", To);
-    BasicBlock *JitNotReady = BasicBlock::Create(Ctx, "polyjit.not.ready", To);
-    BasicBlock *Exit = BasicBlock::Create(Ctx, "polyjit.exit", To);
-    CallInst *ReadyCheck = Builder.CreateCall(PJITCB, Args);
-
-    Builder.CreateCondBr(ReadyCheck, JitReady, JitNotReady);
-    Builder.SetInsertPoint(JitReady);
-    Builder.CreateBr(Exit);
-    Builder.SetInsertPoint(JitNotReady);
 
     // Just hand the args from the function down to the source function.
     SmallVector<Value *, 3> ToArgs;
@@ -265,18 +262,13 @@ struct InstrumentEndpoint {
       ToArgs.push_back(&Arg);
     }
 
-    // We need to replace all uses of our fallback function with the new
-    // instrumented version _before_ we create the call to the fallback
-    // function, otherwise we would call ourselves until the jit is ready.
-    FallbackF->replaceAllUsesWith(To);
-
-    Value *False = ConstantInt::getFalse(Ctx);
+    auto False = ConstantInt::getFalse(Ctx);
+    auto Ret = Builder.CreateCall(PJITCB, Args);
 
     Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
-    Builder.CreateCall(FallbackF, ToArgs);
+    Builder.CreateCall(Builder.CreateBitCast(Ret, FallbackF->getType()),
+                       ToArgs);
     Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
-    Builder.CreateBr(Exit);
-    Builder.SetInsertPoint(Exit);
     Builder.CreateRetVoid();
   }
 

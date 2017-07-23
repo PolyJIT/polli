@@ -1,5 +1,6 @@
 #include "polli/Compiler.h"
 #include "polli/RuntimeOptimizer.h"
+#include "polli/Monitor.h"
 #include "polli/log.h"
 
 #include "llvm/Support/DynamicLibrary.h"
@@ -44,9 +45,14 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(llvm::Module &M) const {
 
   legacy::PassManager PM;
   MCContext *Ctx;
+  llvm::EngineBuilder BuildEngine;
+  TargetMachine *TM = BuildEngine.setMCPU(opt::runtime::MCPU)
+                          .setMArch(opt::runtime::MArch)
+                          .setMAttrs(opt::runtime::MAttrs)
+                          .selectTarget();
 
-  TM.setOptLevel(llvm::CodeGenOpt::Aggressive);
-  if (TM.addPassesToEmitMC(PM, Ctx, ObjStream))
+  TM->setOptLevel(llvm::CodeGenOpt::Aggressive);
+  if (TM->addPassesToEmitMC(PM, Ctx, ObjStream))
     llvm_unreachable("Target does not support MC emission.");
   PM.run(M);
 
@@ -62,75 +68,71 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(llvm::Module &M) const {
   return ObjFileT(nullptr, nullptr);
 }
 
-PolyJITEngine::PolyJITEngine()
-    : TM(llvm::EngineBuilder()
-             .setMArch(opt::runtime::MArch)
-             .setMCPU(opt::runtime::MCPU)
-             .setMAttrs(opt::runtime::MAttrs)
-             .selectTarget()),
-      DL(TM->createDataLayout()),
-      ObjectLayer([]() {
+SpecializingCompiler::SpecializingCompiler()
+    : ObjectLayer([]() {
         return std::make_shared<PolySectionMemoryManager>();
       }),
-      CompileLayer(ObjectLayer, ModuleCompiler(*TM)),
-      OptimizeLayer(CompileLayer, optimizeForRuntime),
-      LibHandle(nullptr) {
+      CompileLayer(ObjectLayer, ModuleCompiler()),
+      OptimizeLayer(CompileLayer, optimizeForRuntime), LibHandle(nullptr) {
   SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
   LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
   llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
 }
 
-Module &PolyJITEngine::getModule(const char *prototype, bool &cache_hit) {
-  cache_hit = true;
-  if (!LoadedModules.count(prototype)) {
-    MemoryBufferRef Buf(prototype, "polli.prototype.module");
+SpecializingCompiler::SharedModule
+SpecializingCompiler::getModule(const char *prototype, bool &cache_hit) {
+  uint64_t key = (uint64_t)prototype;
+  cache_hit = LoadedModules.find(key) != LoadedModules.end();
+  if (!cache_hit) {
+    std::string Str(prototype);
+    MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
-    auto Ctx = std::make_shared<LLVMContext>();
+    auto Ctx = std::make_unique<monitor<LLVMContext>>();
+    auto M = parseIR(Buf, Err, Ctx->monitored());
 
-    CtxList.push_back(Ctx);
-    if (UniqueModule Mod = parseIR(Buf, Err, *Ctx)) {
-      LoadedModules.insert(std::make_pair(prototype, std::move(Mod)));
-    } else {
-      std::string FileName = Err.getFilename().str();
-      console->critical("{:s}:{:d}:{:d} {:s}", FileName, Err.getLineNo(),
-                        Err.getColumnNo(), Err.getMessage().str());
-      console->critical("{0}", prototype);
+    if (!M) {
+      Err.print("libpjit", errs(), true, true);
     }
+    assert(M && "Could not load the prototype!");
 
-    auto PrototypeM = LoadedModules[prototype];
-    if (!PrototypeM)
-      console->critical("Parsing the prototype module failed!");
-    assert(PrototypeM && "Parsing the prototype module failed!");
-    cache_hit = false;
+    std::lock_guard<std::mutex> Guard(ModuleMutex);
+    LoadedModules.insert(std::make_pair(key, std::move(M)));
+    LoadedContexts.insert(std::make_pair(key, std::move(Ctx)));
   }
 
-  return *LoadedModules[prototype];
+  return LoadedModules[key];
 }
 
-Expected<PolyJITEngine::ModuleHandleT>
-PolyJITEngine::addModule(std::unique_ptr<Module> M) {
-  if (CompiledModules.count(M.get()))
-    return CompiledModules[M.get()];
+std::shared_ptr<SpecializingCompiler::context_type>
+SpecializingCompiler::getContext(uint64_t key) {
+  assert(LoadedContexts.count(key) && "No context with this key.");
+  return LoadedContexts[key];
+}
 
-  DEBUG({
-    std::string buf;
-    raw_string_ostream os(buf);
-    M->print(os, nullptr);
-    console->error(os.str());
-  });
+Expected<SpecializingCompiler::ModuleHandleT>
+SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
   for (GlobalValue &GV : M->globals()) {
+    if (GV.hasInternalLinkage() ||
+        GV.hasPrivateLinkage())
+        continue;
     std::lock_guard<std::mutex> Lock(DLMutex);
     dlerror();
     void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
-    if (char *Error = dlerror())
+    if (char *Error = dlerror()) {
       console->error("(dlsym) Could not locate the symbol: {:s}", Error);
+      std::string buf;
+      raw_string_ostream os(buf);
+      M->print(os, nullptr, true, true);
+      console->error("{:s}", os.str());
+    }
+
     if (Addr)
       llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
   }
 
   auto Resolver = orc::createLambdaResolver(
       [&](const std::string &Name) -> JITSymbol {
-        if (auto Sym = findSymbol(Name))
+        if (auto Sym = findSymbol(Name, M->getDataLayout()))
           return Sym;
         return JITSymbol(nullptr);
       },
@@ -140,30 +142,30 @@ PolyJITEngine::addModule(std::unique_ptr<Module> M) {
         return JITSymbol(nullptr);
       });
 
-  Expected<ModuleHandleT> MH =
-      OptimizeLayer.addModule(std::move(M), std::move(Resolver));
-  CompiledModules.insert(std::make_pair(M.get(), *MH));
+  Expected<ModuleHandleT> MH = OptimizeLayer.addModule(M, Resolver);
+
   return MH;
 }
 
-void PolyJITEngine::removeModule(ModuleHandleT H) {
+void SpecializingCompiler::removeModule(ModuleHandleT H) {
   llvm::Error status = CompileLayer.removeModule(H);
   console->error_if(!status.success(), "Unable to remove module!"); 
   assert(status.success() && "Unable to remove module!");
     
 }
 
-JITSymbol PolyJITEngine::findSymbol(const std::string &Name) {
+JITSymbol SpecializingCompiler::findSymbol(const std::string &Name,
+                                           const DataLayout &DL) {
   std::string MangledName;
   raw_string_ostream MangledNameStream(MangledName);
   Mangler::getNameWithPrefix(MangledNameStream, Name, DL);
   return CompileLayer.findSymbol(MangledNameStream.str(), false);
 }
 
-PolyJITEngine::~PolyJITEngine() {
-  CompiledModules.clear();
+SpecializingCompiler::~SpecializingCompiler() {
+  std::lock_guard<std::mutex> Guard(ModuleMutex);
   LoadedModules.clear();
-  CtxList.clear();
+  LoadedContexts.clear();
   SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine.");
 }
 }

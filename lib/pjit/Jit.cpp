@@ -24,18 +24,6 @@ namespace polli {
 using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 
-VariantFunctionTy PolyJIT::getOrCreateVariantFunction(Function *F) {
-  // We have already specialized this function at least once.
-  if (VariantFunctions.count(F))
-    return VariantFunctions.at(F);
-
-  // Create a variant function & specialize a new variant, based on key.
-  VariantFunctionTy VarFun = std::make_shared<VariantFunction>(*F);
-
-  VariantFunctions.insert(std::make_pair(F, VarFun));
-  return VarFun;
-}
-
 void PolyJIT::setup() {
   tracing::setup_tracing();
   enter(JitRegion::START, papi::PAPI_get_real_usec());

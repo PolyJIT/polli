@@ -119,37 +119,12 @@ struct Param {
 
 typedef ParamVector<Param> FunctionKey;
 
-class VariantFunction {
-private:
-  // @brief Our base function to create new variants from.
-  llvm::Function &BaseF;
 
-protected:
-  llvm::Function &getBaseFunction() const { return BaseF; }
-
-public:
-  /**
-   * @brief Create a new variant function.
-   *
-   * Variant functions have a base function and a source function.
-   * The source function signals from which function it derives (the function
-   * that is called and rerouted to this variant).
-   * The base function represents the function code without instrumentation.
-   *
-   * @param BaseF
-   * @param SourceF
-   */
-  explicit VariantFunction(llvm::Function &BaseF) : BaseF(BaseF) {}
-
-  // @brief Create a new function variant with they values included in the
-  // key replaced.
-  std::unique_ptr<llvm::Module> createVariant(const RunValueList &K,
-                                              std::string &FnName);
-};
-
-using VariantFunctionTy = std::shared_ptr<VariantFunction>;
-using VariantFunctionMapTy =
-    std::unordered_map<llvm::Function *, VariantFunctionTy>;
+// @brief Create a new function variant with they values included in the
+// key replaced.
+std::unique_ptr<llvm::Module> createVariant(llvm::Function &BaseF,
+                                            const RunValueList &K,
+                                            std::string &FnName);
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out,

@@ -28,17 +28,18 @@
 
 namespace polli {
 struct CacheKey {
-  const char *IR;
+  uint64_t Addr;
   size_t ValueHash;
 
-  CacheKey(const char *IR, size_t ValueHash) : IR(IR), ValueHash(ValueHash) {}
+  CacheKey(uint64_t Addr, size_t ValueHash)
+      : Addr(Addr), ValueHash(ValueHash) {}
 
   bool operator==(const CacheKey &O) const {
-    return IR == O.IR && ValueHash == O.ValueHash;
+    return Addr == O.Addr && ValueHash == O.ValueHash;
   }
 
   bool operator<(const CacheKey &O) const {
-    return IR < O.IR || (IR == O.IR && ValueHash < O.ValueHash);
+    return Addr < O.Addr || (Addr == O.Addr && ValueHash < O.ValueHash);
   }
 };
 }
@@ -46,7 +47,7 @@ struct CacheKey {
 namespace std {
 template <> struct hash<polli::CacheKey> {
   std::size_t operator()(const polli::CacheKey &K) const {
-    size_t h = (size_t)K.IR ^ K.ValueHash;
+    size_t h = (size_t)K.Addr ^ K.ValueHash;
     return h;
   }
 };

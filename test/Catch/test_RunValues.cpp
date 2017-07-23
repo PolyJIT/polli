@@ -47,22 +47,21 @@ using polli::runValues;
 
 SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
   LLVMContext Ctx;
-  Module M("test_RunValues", Ctx);
+  auto M = std::make_shared<Module>("test_RunValues", Ctx);
 
   GIVEN("A Specializer Request for the function 'void f(int a)' with the"
         "arguments a=1") {
     SmallVector<Type*, 1> Args;
     Args.push_back(Type::getInt64Ty(Ctx));
-    Function *F =
-        Function::Create(FunctionType::get(Type::getVoidTy(Ctx), Args, false),
-                         GlobalValue::ExternalLinkage, "test_run_values", &M);
+    Function *F = Function::Create(
+        FunctionType::get(Type::getVoidTy(Ctx), Args, false),
+        GlobalValue::ExternalLinkage, "test_run_values", M.get());
 
     int64_t *A = reinterpret_cast<int64_t *>(std::malloc(sizeof(int64_t*)));
     int64_t i = 1;
     A[0] = reinterpret_cast<int64_t>(&i);
 
-    SpecializerRequest R(nullptr, 1, reinterpret_cast<char **>(A));
-    R.F = F;
+    SpecializerRequest R(0, 1, reinterpret_cast<char **>(A), M);
 
     WHEN("runValues() is called") {
       RunValueList RVs = runValues(R);
@@ -91,9 +90,9 @@ SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
     SmallVector<Type*, 2> Args;
     Args.push_back(Type::getInt64Ty(Ctx));
     Args.push_back(Type::getInt64PtrTy(Ctx));
-    Function *F =
-        Function::Create(FunctionType::get(Type::getVoidTy(Ctx), Args, false),
-                         GlobalValue::ExternalLinkage, "test_run_values_2", &M);
+    Function *F = Function::Create(
+        FunctionType::get(Type::getVoidTy(Ctx), Args, false),
+        GlobalValue::ExternalLinkage, "test_run_values_2", M.get());
 
     int64_t *A = reinterpret_cast<int64_t *>(std::malloc(2*sizeof(int64_t*)));
     int64_t i = 2;
@@ -102,8 +101,7 @@ SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
     A[0] = reinterpret_cast<int64_t>(&i);
     A[1] = reinterpret_cast<int64_t>(&B);
 
-    SpecializerRequest R(nullptr, 2, reinterpret_cast<char **>(A));
-    R.F = F;
+    SpecializerRequest R(0, 2, reinterpret_cast<char **>(A), M);
 
     WHEN("runValues() is called") {
       RunValueList RVs = runValues(R);
