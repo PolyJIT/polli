@@ -90,7 +90,7 @@ public:
     return Pool.async(F, ArgList...);
   }
 
-  void UpdatePrefixMap(uint64_t Prefix, const llvm::Function *);
+  void UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F);
   const fn_type *FromPrefix(uint64_t K) { return PrefixToFnMap[K]; }
 
   void wait() { Pool.wait(); }
