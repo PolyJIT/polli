@@ -64,7 +64,7 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(llvm::Module &M) const {
   if (Obj)
     return ObjFileT(std::move(*Obj), std::move(ObjBuffer));
 
-  consumeError(Obj.takeError());
+  cantFail(Obj.takeError());
   return ObjFileT(nullptr, nullptr);
 }
 
