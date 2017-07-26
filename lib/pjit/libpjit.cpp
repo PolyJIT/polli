@@ -16,7 +16,6 @@
 #include <likwid.h>
 
 #include <atomic>
-#include <condition_variable>
 #include <cstdlib>
 #include <deque>
 #include <memory>
