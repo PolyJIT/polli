@@ -250,7 +250,7 @@ std::unique_ptr<Module> createVariant(Function &BaseF, const RunValueList &K,
   Module *M = BaseF.getParent();
   assert(M && "Function without parent module?!");
   if (!M)
-    llvm_unreachable();
+    llvm_unreachable("Broken function.");
 
   LLVMContext &Ctx = M->getContext();
   auto NewM =

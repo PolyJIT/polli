@@ -73,7 +73,7 @@ public:
             "\n Learn TileSizes"
             "\n==============================================================="
             "\n";
-      console->debug(os.str());
+      console->info(os.str());
     });
     ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
     const Loop *L, *SecondL;
@@ -140,7 +140,7 @@ public:
       os << " FirstLevelTileSize : " << *FirstLevelTileSize << " tile size.\n";
       os << " SecondLevelTileSize : " << *SecondLevelTileSize
          << " tile size.\n";
-      console->error(os.str());
+      console->info(os.str());
     });
     return false;
   }
@@ -184,7 +184,7 @@ public:
       os << "\n";
     }
     SDWP.print(os, M);
-    console->error(os.str());
+    console->info(os.str());
     return false;
   }
 
@@ -218,7 +218,7 @@ public:
           "\n Modelling"
           "\n===============================================================\n";
     SI.print(os, F.getParent());
-    console->error(os.str());
+    console->info(os.str());
     return false;
   }
 
@@ -260,7 +260,6 @@ public:
     db::StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
                              ScheduleTreeStr);
 
-    console->error(os.str());
     return false;
   }
 
@@ -295,7 +294,7 @@ public:
     isl_schedule_free(s_tree);
 
     os << "\n" << ST << "\n";
-    console->error(os.str());
+    console->info(os.str());
     return false;
   }
 
@@ -325,7 +324,7 @@ public:
           "\n ScheduleReport"
           "\n===============================================================\n";
     SO.printScop(os, S);
-    console->error(os.str());
+    console->info(os.str());
     return false;
   }
 
@@ -456,8 +455,16 @@ SharedModule optimizeForRuntime(SharedModule M) {
 #endif
 
   FPM.doInitialization();
-  for (auto &F : *M)
+  for (auto &F : *M) {
     FPM.run(F);
+    DEBUG({
+      if (F.hasFnAttribute("polly-optimized"))
+        console->error("fn got optimized by polly");
+      else
+        console->error("fn did not get optimized by polly");
+    });
+  }
+
   FPM.doFinalization();
   PM.run(*M);
 

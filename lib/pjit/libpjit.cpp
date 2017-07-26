@@ -63,10 +63,10 @@
 
 #define DEBUG_TYPE "polyjit"
 
-REGISTER_LOG(console, "libpjit");
-
 using namespace llvm;
 using namespace polli;
+
+REGISTER_LOG(console, DEBUG_TYPE);
 
 static ManagedStatic<PolyJIT> JitContext;
 static ManagedStatic<SpecializingCompiler> Compiler;

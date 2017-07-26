@@ -77,7 +77,7 @@ static cl::opt<PipelineType, true> PipelineChoiceX(
         clEnumValN(RELEASE, "release",
                    "Enable the default 'release' pipeline. No debug output"),
         clEnumValN(DEBUG, "debug", "Enable the debug pipeline. Additional "
-                                   "configuration determines the amoun of "
+                                   "configuration determines the amount of "
                                    "debug output you get.")),
     cl::location(PipelineChoice), cl::init(RELEASE), cl::ZeroOrMore, cl::cat(PolyJIT_Runtime));
 

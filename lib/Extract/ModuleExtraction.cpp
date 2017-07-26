@@ -520,9 +520,9 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
 
       SetVector<Value *> In, Out;
       Extractor.findInputsOutputs(In, Out, {});
-      std::string buf;
-      raw_string_ostream os(buf);
       DEBUG({
+        std::string buf;
+        raw_string_ostream os(buf);
         os << "\n===========================================================";
         os << "\nExtract Region: " << R->getNameStr();
         os << "\n===========================================================";
@@ -535,6 +535,8 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
           printOperands(Val, os);
         os << "\n-----------------------------------------------------------";
         os << "\n SCEV to Params:\n";
+        console->debug(os.str());
+        os.flush();
       });
 
       SetVector<Value *> ParamValues;
@@ -552,6 +554,8 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
           TrackedParams.insert(V);
 
       DEBUG({
+        std::string buf;
+        raw_string_ostream os(buf);
         os << "\n---------------------------------------------------------";
         os << "\n Tracking:\n";
         for (Value *P : TrackedParams) {
