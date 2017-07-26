@@ -53,8 +53,10 @@ public:
    * @param prototype The prototype string we want to read in.
    * @return llvm::Module& The LLVM-IR module we just read.
    */
-  SpecializingCompiler::SharedModule getModule(const char *prototype, bool &cache_hit);
-  std::shared_ptr<context_type> getContext(uint64_t key);
+  SpecializingCompiler::SharedModule
+  getModule(const uint64_t ID, const char *prototype, bool &cache_hit);
+  std::shared_ptr<context_type> getContext(const uint64_t ID);
+
   llvm::Expected<ModuleHandleT> addModule(std::shared_ptr<llvm::Module> M);
 
   void removeModule(ModuleHandleT H);

@@ -5,6 +5,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/Constants.h"
 
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
@@ -12,15 +13,16 @@
 REGISTER_LOG(console, "runvals");
 
 namespace polli {
-llvm::Function &
+llvm::Function *
 SpecializerRequest::init(std::shared_ptr<llvm::Module> PrototypeM) {
   for (llvm::Function &ProtoF : *PrototypeM) {
-    if (ProtoF.hasFnAttribute("polyjit-jit-candidate"))
-      return ProtoF;
+    if (ProtoF.hasFnAttribute("polyjit-jit-candidate")) {
+      return &ProtoF;
+    }
   }
 
-  console->error("No JIT candidate in prototype!\n");
-  llvm_unreachable("No JIT candidate found in prototype!");
+  llvm_unreachable("No JIT candidate in prototype!");
+  return nullptr;
 }
 
 RunValueList runValues(const SpecializerRequest &Request) {
@@ -33,7 +35,7 @@ RunValueList runValues(const SpecializerRequest &Request) {
   const llvm::Function &F = Request.prototype();
   DEBUG(printArgs(F, Request.paramSize(), Request.params()));
   for (const llvm::Argument &Arg : F.args()) {
-    RunValues.add({reinterpret_cast<uint64_t **>(Request.params())[i], &Arg});
+    RunValues.add({reinterpret_cast<uint64_t *>(Request.params()[i]), &Arg});
     i++;
   }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_SELECT_PARAMS, "polyjit.params.select");
@@ -67,13 +69,31 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
   }
   llvm::dbgs() << "\n";
 }
+#endif
 
 void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
-    console->debug(
-        "{:d} matched against {}\n", *RV.value,
-        reinterpret_cast<void *>(const_cast<llvm::Argument *>(RV.Arg)));
+    llvm::Constant *Cst = nullptr;
+    llvm::Type *Ty = RV.Arg->getType();
+    if (Ty->isIntegerTy()) {
+      Cst = llvm::ConstantInt::get(Ty, *RV.value);
+    } else if (Ty->isFloatTy()) {
+      Cst = llvm::ConstantFP::get(Ty, (double)(*RV.value));
+    }
+
+    std::string buf;
+    llvm::raw_string_ostream os(buf);
+    if (Cst) {
+      Cst->print(os, true);
+    } else {
+      fmt::MemoryWriter w;
+      w << "U 0x" << fmt::hex(*RV.value);
+      os << w.c_str();
+    }
+    console->info("{} => {:s}", reinterpret_cast<void *>(
+                                    const_cast<llvm::Argument *>(RV.Arg)),
+                  os.str());
+    os.flush();
   }
 }
-#endif
 }

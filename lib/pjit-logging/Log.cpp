@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <unistd.h>
+#include <iostream>
 
 namespace {
 static std::string &getLogOutFile() {

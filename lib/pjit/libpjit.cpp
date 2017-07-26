@@ -73,12 +73,20 @@ static ManagedStatic<SpecializingCompiler> Compiler;
 namespace polli {
 using MainFnT = std::function<void(int, char **)>;
 
-static void DoCreateVariant(std::shared_ptr<SpecializerRequest> Request,
-                            CacheKey K) {
+static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
+  //static int tag = 0;
+  if (JitContext->find(K) != JitContext->end()) {
+    JitContext->increment(JitRegion::CACHE_HIT, 0);
+    //console->debug("[tag {:d}] Cache", tag);
+    //console->debug("[tag {:d}] request complete.", tag, K.ValueHash);
+    //tag++;
+    return;
+  }
   JitContext->increment(JitRegion::VARIANTS, 1);
+  //console->debug("[tag {:d}] Variant Hash: {:d}", tag, K.ValueHash);
 
-  Function &Prototype = Request->prototype();
-  RunValueList Values = runValues(*Request);
+  Function &Prototype = Request.prototype();
+  RunValueList Values = runValues(Request);
   std::string FnName;
 
   auto Variant = createVariant(Prototype, Values, FnName);
@@ -88,44 +96,34 @@ static void DoCreateVariant(std::shared_ptr<SpecializerRequest> Request,
   console->error_if(!(bool)MaybeModule, "Adding the module failed!");
   assert((bool)MaybeModule && "Adding the module failed!");
 
-  Module &PM = Request->prototypeModule();
+  const Module &PM = Request.prototypeModule();
   llvm::JITSymbol FPtr = Compiler->findSymbol(FnName, PM.getDataLayout());
   auto Addr = FPtr.getAddress();
   console->error_if(!(bool)Addr, "Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
 
-  auto &Cache = JitContext->cache();
-  auto CacheIt = Cache.insert(std::make_pair(K, std::move(FPtr)));
-  if (!CacheIt.second) {
-    console->critical("Key collision in function cache, abort.");
+  auto CacheIt = JitContext->insert(std::make_pair(K, std::move(FPtr)));
+  if (!CacheIt.second)
     llvm_unreachable("Key collision in function cace, abort.");
-  }
-  printRunValues(Values);
+  DEBUG(printRunValues(Values));
+  //console->debug("[tag {:d}] request complete.", tag, K.ValueHash);
+  //tag++;
 }
 
 static void
-GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
-                           CacheKey K) {
-  auto &Cache = JitContext->cache();
-  if (Cache.find(K) != Cache.end()) {
-    JitContext->increment(JitRegion::CACHE_HIT, 0);
-    return;
-  }
-
-  JitContext->increment(JitRegion::VARIANTS, 1);
-  auto Ctx = Compiler->getContext(Request->key());
+GetOrCreateVariantFunction(const SpecializerRequest Request,
+                           uint64_t ID, CacheKey K) {
+  auto Ctx = Compiler->getContext(ID);
   Ctx->RunInCS(DoCreateVariant, Request, K);
 }
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t Id) {
   JitContext->enter(Id, papi::PAPI_get_real_usec());
-  console->info("Starting execution of {:d}", Id);
 }
 
 void pjit_trace_fnstats_exit(uint64_t Id) {
   JitContext->exit(Id, papi::PAPI_get_real_usec());
-  console->info("Finished execution of {:d}", Id);
 }
 
 /**
@@ -139,30 +137,31 @@ void pjit_trace_fnstats_exit(uint64_t Id) {
  */
 void *pjit_main(const char *fName, void *ptr, uint64_t ID,
                 unsigned paramc, char **params) {
-
-  bool CacheHit;
-  auto M = Compiler->getModule(fName, CacheHit);
-  auto Request =
-      std::make_shared<SpecializerRequest>((uint64_t)fName, paramc, params, M);
   JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
-  RunValueList Values = runValues(*Request);
-  llvm::Function &F = Request->prototype();
+  bool CacheHit;
+  auto M = Compiler->getModule(ID, fName, CacheHit);
+  SpecializerRequest Request((uint64_t)fName, paramc, params, M);
 
+  RunValueList Values = runValues(Request);
+  llvm::Function &F = Request.prototype();
   if (!CacheHit)
     JitContext->addRegion(F.getName().str(), ID);
 
-  CacheKey K{Request->key(), Values.hash()};
-  auto FutureFn = JitContext->async(GetOrCreateVariantFunction, Request, K);
+  CacheKey K{ID, Values.hash()};
+  //console->debug("pjit_main: ID: {:d} Hash: {:d} Values {:s}", ID, K.ValueHash,
+  //               Values.str());
+  auto FutureFn =
+      JitContext->async(GetOrCreateVariantFunction, Request, ID, K);
 
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!CacheHit)
     FutureFn.wait();
+
   JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
-  auto &Cache = JitContext->cache();
-  auto FnIt = Cache.find(K);
-  if (FnIt != Cache.end()) {
+  auto FnIt = JitContext->find(K);
+  if (FnIt != JitContext->end()) {
     auto &Symbol = FnIt->second;
     auto Addr = Symbol.getAddress();
     if (Addr)
@@ -183,14 +182,14 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
  */
 bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
                             unsigned paramc, char **params) {
-  bool CacheHit;
-  auto M = Compiler->getModule(fName, CacheHit);
-  auto Request =
-      std::make_shared<SpecializerRequest>((uint64_t)fName, paramc, params, M);
   JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
+  bool CacheHit;
+  auto M = Compiler->getModule(ID, fName, CacheHit);
+  SpecializerRequest Request((uint64_t)fName, paramc, params, M);
+
   if (!CacheHit) {
-    llvm::Function &F = Request->prototype();
+    llvm::Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
   }
   JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());

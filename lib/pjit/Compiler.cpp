@@ -80,9 +80,9 @@ SpecializingCompiler::SpecializingCompiler()
 }
 
 SpecializingCompiler::SharedModule
-SpecializingCompiler::getModule(const char *prototype, bool &cache_hit) {
-  uint64_t key = (uint64_t)prototype;
-  cache_hit = LoadedModules.find(key) != LoadedModules.end();
+SpecializingCompiler::getModule(const uint64_t ID, const char *prototype,
+                                bool &cache_hit) {
+  cache_hit = LoadedModules.find(ID) != LoadedModules.end();
   if (!cache_hit) {
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
@@ -96,17 +96,17 @@ SpecializingCompiler::getModule(const char *prototype, bool &cache_hit) {
     assert(M && "Could not load the prototype!");
 
     std::lock_guard<std::mutex> Guard(ModuleMutex);
-    LoadedModules.insert(std::make_pair(key, std::move(M)));
-    LoadedContexts.insert(std::make_pair(key, std::move(Ctx)));
+    LoadedModules.insert(std::make_pair(ID, std::move(M)));
+    LoadedContexts.insert(std::make_pair(ID, std::move(Ctx)));
   }
 
-  return LoadedModules[key];
+  return LoadedModules[ID];
 }
 
 std::shared_ptr<SpecializingCompiler::context_type>
-SpecializingCompiler::getContext(uint64_t key) {
-  assert(LoadedContexts.count(key) && "No context with this key.");
-  return LoadedContexts[key];
+SpecializingCompiler::getContext(const uint64_t ID) {
+  assert(LoadedContexts.count(ID) && "No context with this ID.");
+  return LoadedContexts[ID];
 }
 
 Expected<SpecializingCompiler::ModuleHandleT>

@@ -240,14 +240,15 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
  *
  * @return a copy of the base function, with the values of K substituted.
  */
-std::unique_ptr<Module> createVariant(Function &BaseF, const RunValueList &K,
+std::unique_ptr<Module> createVariant(Function &BaseF,
+                                      const RunValueList &K,
                                       std::string &FnName) {
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
 
   // Prepare a new module to hold our new function.
-  Module *M = BaseF.getParent();
+  const Module *M = BaseF.getParent();
   assert(M && "Function without parent module?!");
   if (!M)
     llvm_unreachable("Broken function.");
@@ -258,9 +259,9 @@ std::unique_ptr<Module> createVariant(Function &BaseF, const RunValueList &K,
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
   NewM->setMaterializer(M->getMaterializer());
-  NewM->setModuleIdentifier(fmt::format("{}.{}-{:d}.ll",
-                                        M->getModuleIdentifier(),
-                                        BaseF.getName().str(), K.hash()));
+  NewM->setModuleIdentifier(
+      fmt::format("{}.{}-{:s}-{:d}.variant", M->getModuleIdentifier(),
+                  BaseF.getName().str(), K.str(), K.hash()));
 
   DEBUG({
     console->error(

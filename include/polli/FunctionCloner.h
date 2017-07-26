@@ -62,7 +62,7 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
     if (!verifyFunction(*F, &s))
       s << " OK";
     else {
-      F->getParent()->dump();
+      F->print(s, nullptr, true, true);
       s << " FAILED";
     }
   } else if (F && F->isDeclaration()) {

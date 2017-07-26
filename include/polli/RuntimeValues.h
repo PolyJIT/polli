@@ -9,6 +9,7 @@
 #ifndef POLLI_RUNTIME_VALUES_H
 #define POLLI_RUNTIME_VALUES_H
 
+#include "polli/log.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -20,8 +21,9 @@
 #include <iostream>
 #include <algorithm>
 
+
 namespace {
-template <typename C, typename P> C filter(C const &container, P pred) {
+template <typename C, typename P> C filterOut(C const &container, P pred) {
   C filtered(container);
   filtered.erase(remove_if(filtered.begin(), filtered.end(), pred),
                  filtered.end());
@@ -56,30 +58,25 @@ public:
   using reference = RunValueT&;
 
   explicit RunValueList(std::size_t Seed = 0)
-      : List(new RunValueListT()), Seed(Seed){};
-
-  RunValueList(const RunValueList & Other) = default;
-  RunValueList &operator=(const RunValueList & Other) = default;
-  RunValueList(RunValueList && Other) = default;
-  RunValueList &operator=(RunValueList && Other) = default;
+      : Seed(Seed){};
 
   bool operator==(const RunValueList &RHS) const {
-    return List.get() == RHS.List.get();
+    return hash() == RHS.hash();
   }
 
   void add(const RunValueT &NewVal) {
-    List->push_back(NewVal);
+    List.push_back(NewVal);
   }
 
-  iterator begin() { return List->begin(); }
-  iterator end() { return List->end(); }
-  const_iterator begin() const { return List->begin(); }
-  const_iterator end() const { return List->end(); }
-  size_t size() const { return List->size(); }
+  iterator begin() { return List.begin(); }
+  iterator end() { return List.end(); }
+  const_iterator begin() const { return List.begin(); }
+  const_iterator end() const { return List.end(); }
 
+  size_t size() const { return List.size(); }
   size_t hash() const {
     size_t LocalSeed = Seed;
-    RunValueListT Tmp = filter(*List, [](const RunValueT &V) {
+    RunValueListT Tmp = filterOut(List, [](const RunValueT &V) {
       return !canSpecialize(V);
     });
 
@@ -88,7 +85,7 @@ public:
   }
 
   std::string str() const {
-    RunValueListT Tmp = filter(*List, [](const RunValueT &V) {
+    RunValueListT Tmp = filterOut(List, [](const RunValueT &V) {
       return !canSpecialize(V);
     });
 
@@ -108,10 +105,10 @@ public:
     return os.str();
   }
 
-  reference operator[](size_t i) { return List->operator[](i); }
+  reference operator[](size_t i) { return List[i]; }
 
 private:
-  std::shared_ptr<RunValueListT> List;
+  RunValueListT List;
   std::size_t Seed;
 };
 } // end of polli namespace

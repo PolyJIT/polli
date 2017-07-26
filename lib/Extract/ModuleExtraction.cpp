@@ -20,6 +20,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 using namespace polli;
@@ -249,7 +250,7 @@ struct InstrumentEndpoint {
     Value *CastParams = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
     Value *PtrToOriginalF =
         Builder.CreateBitCast(FallbackF, Type::getVoidTy(Ctx)->getPointerTo());
-
+  
     size_t JitID = GetCandidateId(*From);
     assert((JitID != 0) && "Invalid JIT Id.");
     Constant *JitIDVal = ConstantInt::get(Int64T, JitID, false);
@@ -478,6 +479,7 @@ static void PrepareRegionForExtraction(const Region *R, RegionInfo &RI,
   }
 }
 
+#ifndef NDEBUG
 static void printOperands(Value *V, raw_ostream &os, int level = 0) {
   if (Instruction *I = dyn_cast<Instruction>(V)) {
     I->print((os << "\n").indent(level) << "> ");
@@ -491,6 +493,7 @@ static void printOperands(Value *V, raw_ostream &os, int level = 0) {
     V->print((os << "\n").indent(level) << "|= ");
   }
 }
+#endif
 
 /**
  * @brief Extract all regions marked for extraction into an own function and
@@ -568,7 +571,7 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
 
       // Try to extract the maximal region our tracked parameters reside in.
       //
-
+      
       Region *TrackThis = const_cast<Region*>(R);
       for (auto *Param : TrackedParams) {
         // When we need to go up to function arguments, we take the first region
@@ -716,9 +719,12 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     bool BrokenDbg;
     if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
       // We failed verification, skip this region.
-      PrototypeM->dump();
-      errs() << "Prototype: " << PrototypeM->getModuleIdentifier()
-             << " failed verification. Skipping.\n";
+      std::string buf;
+      llvm::raw_string_ostream os(buf);
+      PrototypeM->print(os, nullptr, true, true);
+      console->error(os.str());
+      console->error("Prototype: {:s} failed verification. Skipping.",
+                     PrototypeM->getModuleIdentifier());
       continue;
     }
 

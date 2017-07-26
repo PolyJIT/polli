@@ -347,22 +347,24 @@ char DBExport::ID = 0;
 
 static void registerPolly(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
-  polly::registerCanonicalicationPasses(PM);
+  //polly::registerCanonicalicationPasses(PM);
+  PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionWrapperPassPass());
   PM.add(polly::createScopInfoRegionPassPass());
   PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
+  PM.add(polly::createCodegenCleanupPass());
 
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
-  PM.add(createBarrierNoopPass());
+  //PM.add(createBarrierNoopPass());
 }
 
 static void registerPollyWithDiagnostics(const llvm::PassManagerBuilder &Builder,
                           llvm::legacy::PassManagerBase &PM) {
-  polly::registerCanonicalicationPasses(PM);
+  //polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionWrapperPassPass());
   PM.add(polly::createScopInfoRegionPassPass());
   PM.add(new TileSizeLearner());
@@ -385,7 +387,7 @@ static void registerPollyWithDiagnostics(const llvm::PassManagerBuilder &Builder
   // FIXME: This dummy ModulePass keeps some programs from miscompiling,
   // probably some not correctly preserved analyses. It acts as a barrier to
   // force all analysis results to be recomputed.
-  PM.add(createBarrierNoopPass());
+  //PM.add(createBarrierNoopPass());
 }
 
 using PipelineFunc = std::function<void(const llvm::PassManagerBuilder &, llvm::legacy::PassManagerBase &)>;
@@ -420,12 +422,10 @@ PassManagerBuilder createPMB() {
     polly::opt::FirstLevelTiling = true;
     polly::opt::SecondLevelTiling = false;
     polly::opt::RegisterTiling = false;
-    polly::PollyVectorizerChoice = VectorizerChoice::VECTORIZER_POLLY;
     polly::PollyAllowNonAffineSubRegions = false;
     polly::PollyInvariantLoadHoisting = true;
-    polly::ProfitabilityMinPerLoopInstructions = 1;
   }
-  Builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible, registerPolly);
+  Builder.addExtension(PassManagerBuilder::EP_VectorizerStart, ActivePipeline);
 
   return Builder;
 }
@@ -472,13 +472,6 @@ SharedModule optimizeForRuntime(SharedModule M) {
   DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));
   opt::GenerateOutput = false;
 #endif
-
-  DEBUG({
-    if (F.hasFnAttribute("polly-optimized"))
-      console->error("fn got optimized by polly");
-    else
-      console->error("fn did not get optimized by polly");
-  });
 
   return M;
 }

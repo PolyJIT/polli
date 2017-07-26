@@ -27,6 +27,7 @@
 #include <memory>
 #include <cstring>
 #include <array>
+#include <iostream>
 
 namespace llvm {
 class Function;
@@ -35,27 +36,29 @@ class Function;
 namespace polli {
 class SpecializerRequest {
 private:
-  uint64_t IRKey;
+  const uint64_t IRKey;
   const unsigned ParamC;
-  void *Params;
-  std::shared_ptr<llvm::Module> M;
-  llvm::Function &F;
+  std::vector<void *> Params;
 
-  llvm::Function &init(std::shared_ptr<llvm::Module> PrototypeM);
+  std::shared_ptr<const llvm::Module> M;
+  llvm::Function *F;
+
+  llvm::Function *init(std::shared_ptr<llvm::Module> PrototypeM);
 
 public:
-  SpecializerRequest(uint64_t key, unsigned ParamC, char **params,
+  SpecializerRequest(uint64_t key, unsigned ParamC, void *params,
                      std::shared_ptr<llvm::Module> M)
-      : IRKey(key), ParamC(ParamC), Params(nullptr), M(M), F(init(M)) {
+      : IRKey(key), ParamC(ParamC), Params(), M(M), F(init(M)) {
     size_t n = ParamC * sizeof(void *);
-    Params = std::malloc(n);
-    std::memcpy(Params, params, n);
+    Params.resize(ParamC);
+    std::memcpy(Params.data(), params, n);
   }
 
   size_t paramSize() const {
     return ParamC;
   }
-  void *params() const {
+
+  const std::vector<void *> &params() const {
     return Params;
   }
 
@@ -64,21 +67,17 @@ public:
   }
 
   llvm::Function &prototype() const {
-    return F;
+    return *F;
   }
-  llvm::Module &prototypeModule() const {
+  const llvm::Module &prototypeModule() const {
     return *M;
-  }
-
-  ~SpecializerRequest() {
-    std::free(Params);
   }
 };
 
 RunValueList runValues(const SpecializerRequest &Request);
 #ifndef NDEBUG
 void printArgs(const llvm::Function &F, size_t argc, void *params);
-void printRunValues(const RunValueList &Values);
 #endif
+void printRunValues(const RunValueList &Values);
 }
 #endif /* end of include guard: POLLI_RUNVALUES_H */

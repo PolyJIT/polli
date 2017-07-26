@@ -71,8 +71,4 @@ void PolyJIT::tearDown() {
   exit(JitRegion::START, papi::PAPI_get_real_usec());
   db::StoreRun(Events, Entries, Regions);
 }
-
-void PolyJIT::UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F) {
-  PrefixToFnMap[Prefix] = F;
-}
 }

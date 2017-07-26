@@ -1,11 +1,6 @@
 #ifndef POLLI_JIT_H
 #define POLLI_JIT_H
 
-#define BOOST_THREAD_PROVIDES_FUTURE
-#include <boost/thread/future.hpp>
-
-#include <unordered_map>
-
 #include "polli/Caching.h"
 #include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
@@ -15,6 +10,8 @@
 #include "llvm/Support/ThreadPool.h"
 
 #include <mutex>
+#include <unordered_map>
+#include <utility>
 
 namespace polli {
 enum JitRegion : int {
@@ -29,12 +26,15 @@ class PolyJIT {
   void tearDown();
 
   std::recursive_mutex TracingMutex;
+  std::recursive_mutex CacheMutex;
+
   std::unordered_map<uint64_t, uint64_t> Events;
   std::unordered_map<uint64_t, uint64_t> Entries;
   std::unordered_map<uint64_t, std::string> Regions;
 
 public:
-  explicit PolyJIT() : CodeCache(), Pool(1) { setup(); }
+  explicit PolyJIT() : Pool(1) { setup(); }
+
   ~PolyJIT() {
     tearDown();
   }
@@ -71,35 +71,45 @@ public:
    * @{ */
   using CodeCacheT =
       std::unordered_map<CacheKey, llvm::JITSymbol>;
-  using fn_type = llvm::Function;
+  using value_type = std::pair<const CacheKey, llvm::JITSymbol>;
+  using iterator = CodeCacheT::iterator;
+  using const_iterator = CodeCacheT::const_iterator;
 
-  CodeCacheT &cache() { return CodeCache; }
+  std::pair<iterator, bool> insert(value_type &&value) {
+    std::lock_guard<std::recursive_mutex> CS(CacheMutex);
+    return CodeCache.insert(std::forward<value_type>(value));
+  }
+
+  iterator find(const CacheKey &key) {
+    std::lock_guard<std::recursive_mutex> CS(CacheMutex);
+    return CodeCache.find(key);
+  }
+
+  iterator end() {
+    std::lock_guard<std::recursive_mutex> CS(CacheMutex);
+    return CodeCache.end();
+  }
+
+  iterator begin() {
+    std::lock_guard<std::recursive_mutex> CS(CacheMutex);
+    return CodeCache.begin();
+  }
+
   /**  @} */
 
   /**
    * @name Asynchronous task scheduling interface.
    * @{ */
-  struct deref_functor {
-    template <typename Pointer> void operator()(Pointer const &p) const {
-      (*p)();
-    }
-  };
-
   template <typename Function, typename... Args>
   auto async(Function &&F, Args &&... ArgList) {
     return Pool.async(F, ArgList...);
   }
-
-  void UpdatePrefixMap(uint64_t Prefix, const llvm::Function *F);
-  const fn_type *FromPrefix(uint64_t K) { return PrefixToFnMap[K]; }
 
   void wait() { Pool.wait(); }
 
 private:
   CodeCacheT CodeCache;
   llvm::ThreadPool Pool;
-
-  std::unordered_map<uint64_t, const llvm::Function *> PrefixToFnMap;
 };
 }
 #endif /* end of include guard: POLLI_JIT_H */
