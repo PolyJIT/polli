@@ -75,9 +75,8 @@ namespace polli {
 using MainFnT = std::function<void(int, char **)>;
 
 static void DoCreateVariant(std::shared_ptr<SpecializerRequest> Request,
-                            CacheKey K, uint64_t prefix) {
+                            CacheKey K) {
   JitContext->increment(JitRegion::VARIANTS, 1);
-  POLLI_TRACING_REGION_START(PJIT_REGION_CODEGEN, "polyjit.codegen");
 
   Function &Prototype = Request->prototype();
   RunValueList Values = runValues(*Request);
@@ -102,13 +101,12 @@ static void DoCreateVariant(std::shared_ptr<SpecializerRequest> Request,
     console->critical("Key collision in function cache, abort.");
     llvm_unreachable("Key collision in function cace, abort.");
   }
-  DEBUG(printRunValues(Values));
-  POLLI_TRACING_REGION_STOP(PJIT_REGION_CODEGEN, "polyjit.codegen");
+  printRunValues(Values);
 }
 
 static void
 GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
-                           CacheKey K, uint64_t prefix) {
+                           CacheKey K) {
   auto &Cache = JitContext->cache();
   if (Cache.find(K) != Cache.end()) {
     JitContext->increment(JitRegion::CACHE_HIT, 0);
@@ -117,18 +115,18 @@ GetOrCreateVariantFunction(std::shared_ptr<SpecializerRequest> Request,
 
   JitContext->increment(JitRegion::VARIANTS, 1);
   auto Ctx = Compiler->getContext(Request->key());
-  Ctx->RunInCS(DoCreateVariant, Request, K, prefix);
+  Ctx->RunInCS(DoCreateVariant, Request, K);
 }
 
 extern "C" {
-void pjit_trace_fnstats_entry(uint64_t *prefix, bool is_variant) {
-  const Function *F = JitContext->FromPrefix((uint64_t)prefix);
-  JitContext->enter(GetCandidateId(*F), papi::PAPI_get_real_usec());
+void pjit_trace_fnstats_entry(uint64_t Id) {
+  JitContext->enter(Id, papi::PAPI_get_real_usec());
+  console->info("Starting execution of {:d}", Id);
 }
 
-void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
-  const Function *F = JitContext->FromPrefix((uint64_t)prefix);
-  JitContext->exit(GetCandidateId(*F), papi::PAPI_get_real_usec());
+void pjit_trace_fnstats_exit(uint64_t Id) {
+  JitContext->exit(Id, papi::PAPI_get_real_usec());
+  console->info("Finished execution of {:d}", Id);
 }
 
 /**
@@ -140,7 +138,7 @@ void pjit_trace_fnstats_exit(uint64_t *prefix, bool is_variant) {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void *pjit_main(const char *fName, void *ptr, uint64_t *prefix,
+void *pjit_main(const char *fName, void *ptr, uint64_t ID,
                 unsigned paramc, char **params) {
 
   bool CacheHit;
@@ -152,15 +150,11 @@ void *pjit_main(const char *fName, void *ptr, uint64_t *prefix,
   RunValueList Values = runValues(*Request);
   llvm::Function &F = Request->prototype();
 
-  if (!CacheHit) {
-    JitContext->UpdatePrefixMap((uint64_t)prefix, &F);
-    JitContext->addRegion(F.getName().str(),
-                       GetCandidateId(F));
-  }
+  if (!CacheHit)
+    JitContext->addRegion(F.getName().str(), ID);
 
   CacheKey K{Request->key(), Values.hash()};
-  auto FutureFn = JitContext->async(GetOrCreateVariantFunction, Request, K,
-                                    (uint64_t)prefix);
+  auto FutureFn = JitContext->async(GetOrCreateVariantFunction, Request, K);
 
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!CacheHit)
@@ -188,7 +182,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t *prefix,
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t *prefix,
+bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
                             unsigned paramc, char **params) {
   bool CacheHit;
   auto M = Compiler->getModule(fName, CacheHit);
@@ -198,8 +192,7 @@ bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t *prefix,
 
   if (!CacheHit) {
     llvm::Function &F = Request->prototype();
-    JitContext->UpdatePrefixMap((uint64_t)prefix, &F);
-    JitContext->addRegion(F.getName().str(), GetCandidateId(F));
+    JitContext->addRegion(F.getName().str(), ID);
   }
   JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
   return ptr;

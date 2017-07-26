@@ -96,7 +96,6 @@ using ArgListT = SmallVector<Type *, 4>;
  */
 static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
                                    Module &M) {
-  static unsigned int i = 65536;
   using ExtractFunction =
       FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>;
 
@@ -108,7 +107,10 @@ static Function *extractPrototypeM(ValueToValueMapTy &VMap, Function &F,
   Cloner.setSource(&F);
 
   Function *Proto = Cloner.start(VMap, /*RemapCalls=*/true);
-  Proto->addFnAttr("polyjit-id", fmt::format("{:d}", i++));
+
+  // Use the prototype's hash as identifier for polyjit.
+  size_t FnHash = std::hash<std::string>{}(Proto->getName().str());
+  Proto->addFnAttr("polyjit-id", fmt::format("{:d}", FnHash));
   return Proto;
 }
 
@@ -175,21 +177,21 @@ struct InstrumentEndpoint {
     if (opt::DisableRecompile)
       CallbackName = "pjit_main_no_recompile";
 
+    Type *Int64T = Type::getInt64Ty(Ctx);
+    Type *Void = Type::getVoidTy(Ctx);
+    Type *VoidPtr = Type::getVoidTy(Ctx)->getPointerTo();
+    Type *CharPtr = Type::getInt8PtrTy(Ctx);
+    Type *Int32T = Type::getInt32Ty(Ctx);
+
     Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        CallbackName,
-        Type::getVoidTy(Ctx)->getPointerTo(),
-        Type::getInt8PtrTy(Ctx),
-        Type::getVoidTy(Ctx)->getPointerTo(),
-        Type::getInt64PtrTy(Ctx), Type::getInt32Ty(Ctx),
-        Type::getInt8PtrTy(Ctx)));
+        CallbackName, VoidPtr,
+        CharPtr, VoidPtr, Int64T, Int32T, CharPtr));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
     Function *TraceFnStatsEntry = cast<Function>(M->getOrInsertFunction(
-        "pjit_trace_fnstats_entry", Type::getVoidTy(Ctx),
-        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx)));
+        "pjit_trace_fnstats_entry", Void, Int64T));
     Function *TraceFnStatsExit = cast<Function>(M->getOrInsertFunction(
-        "pjit_trace_fnstats_exit", Type::getVoidTy(Ctx),
-        Type::getInt64PtrTy(Ctx), Type::getInt1Ty(Ctx)));
+        "pjit_trace_fnstats_exit", Void, Int64T));
 
     To->deleteBody();
     To->setLinkage(GlobalValue::WeakAnyLinkage);
@@ -248,11 +250,15 @@ struct InstrumentEndpoint {
     Value *PtrToOriginalF =
         Builder.CreateBitCast(FallbackF, Type::getVoidTy(Ctx)->getPointerTo());
 
+    size_t JitID = GetCandidateId(*From);
+    assert((JitID != 0) && "Invalid JIT Id.");
+    Constant *JitIDVal = ConstantInt::get(Int64T, JitID, false);
+
     SmallVector<Value *, 4> Args;
     Args.push_back((PrototypeF) ? PrototypeF
                                 : Builder.CreateGlobalStringPtr(To->getName()));
     Args.push_back(PtrToOriginalF);
-    Args.push_back(PrefixData);
+    Args.push_back(JitIDVal);
     Args.push_back(ParamC);
     Args.push_back(CastParams);
 
@@ -262,13 +268,12 @@ struct InstrumentEndpoint {
       ToArgs.push_back(&Arg);
     }
 
-    auto False = ConstantInt::getFalse(Ctx);
     auto Ret = Builder.CreateCall(PJITCB, Args);
 
-    Builder.CreateCall(TraceFnStatsEntry, {PrefixData, False});
+    Builder.CreateCall(TraceFnStatsEntry, {JitIDVal});
     Builder.CreateCall(Builder.CreateBitCast(Ret, FallbackF->getType()),
                        ToArgs);
-    Builder.CreateCall(TraceFnStatsExit, {PrefixData, False});
+    Builder.CreateCall(TraceFnStatsExit, {JitIDVal});
     Builder.CreateRetVoid();
   }
 
