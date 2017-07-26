@@ -31,6 +31,8 @@ void PolyJIT::setup() {
   using polly::initializePollyPasses;
 
   cl::ParseEnvironmentOptions("libpjit", "PJIT_ARGS", "");
+  cl::PrintOptionValues();
+
   StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
   // Make sure to initialize tracing before planting the atexit handler.
