@@ -566,7 +566,35 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
         os.flush();
       });
 
-      if (Function *ExtractedF = Extractor.extractCodeRegion()) {
+      // Try to extract the maximal region our tracked parameters reside in.
+      //
+
+      Region *TrackThis = const_cast<Region*>(R);
+      for (auto *Param : TrackedParams) {
+        // When we need to go up to function arguments, we take the first region
+        // after the top level region.
+        Region *TrackNext = const_cast<Region*>(R);
+        if (llvm::isa<Argument>(Param)) {
+          Region *TopLevelRegion = RI.getTopLevelRegion();
+
+          while (TrackNext->getParent() != TopLevelRegion) {
+            TrackNext = TrackNext->getParent();
+          }
+        } else if (llvm::Instruction *Inst =
+                       llvm::dyn_cast<Instruction>(Param)) {
+          TrackNext = RI.getRegionFor(Inst->getParent());
+        }
+
+        SmallVector<BasicBlock *, 8> NextBlocks(TrackNext->blocks());
+        CodeExtractor TestExtract(NextBlocks, &DT,
+                                  /*AggregateArgs*/ false);
+        if (TestExtract.isEligible())
+          TrackThis = RI.getCommonRegion(TrackNext, TrackThis);
+      }
+
+      SmallVector<BasicBlock *, 8> RealBlocks(TrackThis->blocks());
+      CodeExtractor RealExtractor(RealBlocks, &DT, /*AggregateArgs*/ false);
+      if (Function *ExtractedF = RealExtractor.extractCodeRegion()) {
         CallSite FunctionCall = findExtractedCallSite(*ExtractedF, F);
         if (FunctionCall.isCall() || FunctionCall.isInvoke()) {
           Instruction *I = FunctionCall.getInstruction();
