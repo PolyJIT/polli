@@ -37,6 +37,9 @@ namespace polli {
       static int LoopID;
       static int instrumentedCounter;
       static int nonInstrumentedCounter;
+      static long instructionCountScops;
+      static long instructionCountParents;
+      static long instructionCountAll;
       static bool calledSetup;
       static shared_ptr<logger> Log;
       size_t hashvalue;
@@ -71,6 +74,9 @@ namespace polli {
   int ProfileScopDetection::LoopID = 0;
   int ProfileScopDetection::instrumentedCounter = 0;
   int ProfileScopDetection::nonInstrumentedCounter = 0;
+  long ProfileScopDetection::instructionCountScops = 0;
+  long ProfileScopDetection::instructionCountParents = 0;
+  long ProfileScopDetection::instructionCountAll = 0;
   bool ProfileScopDetection::calledSetup = false;
   shared_ptr<logger> ProfileScopDetection::Log = nullptr;
 
@@ -239,9 +245,18 @@ namespace polli {
       = getAnalysis<ScopDetectionWrapperPass>();
     const ScopDetection &SD = SDWP.getSD();
 
+    Region *TopLevelRegion = SD.getRI()->getTopLevelRegion();
+    //FIXME May use accumulate or reduce
+    for(RegionBase<RegionTraits<Function>>::block_iterator it
+        = TopLevelRegion->block_begin();
+        it != TopLevelRegion->block_end(); it++){
+      instructionCountAll += it->size();
+    }
+
     for(const Region *R : SD){
       bool gotInstrumented = false;
-      if(const Region *Parent = R->getParent()){
+      const Region *Parent = R->getParent();
+      if(Parent){
         stringstream message;
         message << Parent->getNameStr() << " is invalid because of: ";
         if(Parent->isTopLevelRegion()){
@@ -266,6 +281,15 @@ namespace polli {
       if(gotInstrumented){
         gotAnyInstrumented = true;
         instrumentedCounter++;
+        int blockSizes[distance(R->block_begin(), R->block_end())];
+        //FIXME May use accumulate or reduce
+        for(auto it = R->block_begin(); it != R->block_end(); it++){
+          instructionCountScops += it->size();
+        }
+        //FIXME May use accumulate or reduce
+        for(auto it = Parent->block_begin(); it != Parent->block_end(); it++){
+          instructionCountParents += it->size();
+        }
       } else {
         nonInstrumentedCounter++;
       }
@@ -275,7 +299,13 @@ namespace polli {
 
   bool ProfileScopDetection::doFinalization(Module &M) {
     getLogger()->info("Instrumented SCoPs: {:d}\n", instrumentedCounter);
-    getLogger()->info("Not instrumented SCoPs: {:d}\n", nonInstrumentedCounter);
+    getLogger()
+      ->info("Not instrumented SCoPs: {:d}\n", nonInstrumentedCounter);
+    getLogger()
+      ->info("Instruction count SCoPs: {:d}\n", instructionCountScops);
+    getLogger()
+      ->info("Instruction count parents: {:d}\n", instructionCountParents);
+    getLogger()->info("Instruction count all: {:d}\n", instructionCountAll);
 
     bool insertedSetupTracing = false;
     if(!calledSetup && instrumentedCounter > 0){
