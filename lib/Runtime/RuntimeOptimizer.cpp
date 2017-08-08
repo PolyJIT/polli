@@ -411,10 +411,13 @@ PassManagerBuilder createPMB() {
   Builder.VerifyInput = false;
   Builder.VerifyOutput = false;
   Builder.OptLevel = 3;
+  Builder.SLPVectorize = true;
+  Builder.SizeLevel = 0;
+  Builder.LoopVectorize = true;
 
+  polly::opt::PollyParallel = true;
+  polly::opt::DetectParallel = true;
   if (!opt::runtime::UsePollyOptions) {
-    polly::opt::PollyParallel = true;
-    polly::opt::DetectParallel = true;
     polly::opt::UseContext = true;
     polly::opt::PollyParallelForce = false;
     polly::PollyProcessUnprofitable = false;
