@@ -149,7 +149,13 @@ bool UsePollyOptions;
 static cl::opt<bool, true> UsePollyOptionsX(
     "polli-use-polly-options",
     cl::desc("Use Polly's settings in the optimizer pipeline."),
-    cl::location(UsePollyOptions), cl::init(false), cl::cat(PolyJIT_Runtime));
+    cl::location(UsePollyOptions), cl::init(true), cl::cat(PolyJIT_Runtime));
+
+bool EnablePolly;
+static cl::opt<bool, true> EnablePollyX(
+    "polli-enable-polly",
+    cl::desc("Use Polly's settings in the optimizer pipeline."),
+    cl::location(EnablePolly), cl::init(true), cl::cat(PolyJIT_Runtime));
 
 } // namespace runtime
 

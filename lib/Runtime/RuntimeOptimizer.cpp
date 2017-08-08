@@ -426,7 +426,11 @@ PassManagerBuilder createPMB() {
     polly::PollyAllowNonAffineSubRegions = false;
     polly::PollyInvariantLoadHoisting = true;
   }
-  Builder.addExtension(PassManagerBuilder::EP_VectorizerStart, ActivePipeline);
+
+  if (opt::runtime::EnablePolly) {
+    Builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
+                         ActivePipeline);
+  }
 
   return Builder;
 }
