@@ -1197,14 +1197,6 @@ void JITScopDetection::printLocations(llvm::Function &F) {
   }
 }
 
-void JITScopDetection::emitMissedRemarks(const Function &F) {
-  for (auto &DIt : DetectionContextMap) {
-    auto &DC = DIt.getSecond();
-    if (DC.Log.hasErrors())
-      polly::emitRejectionRemarks(DIt.getFirst(), DC.Log);
-  }
-}
-
 /// @brief Enum for coloring BBs in Region.
 ///
 /// WHITE - Unvisited BB in DFS walk.
@@ -1321,10 +1313,6 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
       --JitRegion;
     }
   }
-
-  // Only makes sense when we tracked errors.
-  if (PollyTrackFailures)
-    emitMissedRemarks(F);
 
   if (ReportLevel)
     printLocations(F);

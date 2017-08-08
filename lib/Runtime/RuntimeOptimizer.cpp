@@ -39,6 +39,8 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/GICHelper.h"
 
+#include "polly/isl-noexceptions.h"
+
 #include <iostream>
 
 REGISTER_LOG(console, DEBUG_TYPE);
@@ -50,6 +52,7 @@ class Function;
 using namespace llvm;
 using namespace llvm::legacy;
 using namespace polly;
+using namespace isl;
 
 namespace polli {
 class TileSizeLearner : public polly::ScopPass {
@@ -253,9 +256,8 @@ public:
     AI.printScop(os, S);
     IslAstrStr = os.str();
 
-    isl_schedule *s_tree = S.getScheduleTree();
-    ScheduleTreeStr = polly::stringFromIslObj(s_tree);
-    isl_schedule_free(s_tree);
+    isl::schedule s_tree = S.getScheduleTree();
+    ScheduleTreeStr = s_tree.to_str();
 
     db::StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
                              ScheduleTreeStr);
@@ -289,9 +291,8 @@ public:
           "\n===============================================================\n";
     AIWP.printScop(os, S);
 
-    isl_schedule *s_tree = S.getScheduleTree();
-    std::string ST = polly::stringFromIslObj(s_tree);
-    isl_schedule_free(s_tree);
+    isl::schedule s_tree = S.getScheduleTree();
+    std::string ST = s_tree.to_str();
 
     os << "\n" << ST << "\n";
     console->info(os.str());

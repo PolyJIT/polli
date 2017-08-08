@@ -511,11 +511,6 @@ public:
   const_iterator end() const { return ValidRegions.end(); }
   //@}
 
-  /// @brief Emit rejection remarks for all rejected regions.
-  ///
-  /// @param F The function to emit remarks for.
-  void emitMissedRemarks(const Function &F);
-
   /// @brief Mark the function as invalid so we will not extract any scop from
   ///        the function.
   ///
