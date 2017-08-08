@@ -61,12 +61,13 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(llvm::Module &M) const {
 
   Expected<std::unique_ptr<llvm::object::ObjectFile>> Obj =
       object::ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
+
   if (Obj)
     return ObjFileT(std::move(*Obj), std::move(ObjBuffer));
 
-  cantFail(Obj.takeError());
-  return ObjFileT(nullptr, nullptr);
+  llvm_unreachable("No object file generated.");
 }
+
 
 SpecializingCompiler::SpecializingCompiler()
     : ObjectLayer([]() {
