@@ -190,19 +190,17 @@ public:
    */
   void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
     unsigned i = 0;
+
     for (Argument &Arg : From->args()) {
       auto P = SpecValues[i++];
       if (!canSpecialize(P))
         continue;
+      Type *Ty = Arg.getType();
 
-      if (IntegerType *IntTy = dyn_cast<IntegerType>(Arg.getType())) {
-        // Get a constant value for P.
-        if (Constant *Replacement = ConstantInt::get(IntTy, *P.value)) {
-          Value *NewArg = VMap[&Arg];
-
-          if (!isa<Constant>(NewArg))
-            NewArg->replaceAllUsesWith(Replacement);
-        }
+      if (Ty->isIntegerTy()) {
+        auto *IntVal = ConstantInt::get(Ty, *P.value);
+        Value *MappedArg = VMap[&Arg];
+        MappedArg->replaceAllUsesWith(IntVal);
       }
     }
   }

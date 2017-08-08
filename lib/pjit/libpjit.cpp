@@ -85,6 +85,7 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   JitContext->increment(JitRegion::VARIANTS, 1);
   //console->debug("[tag {:d}] Variant Hash: {:d}", tag, K.ValueHash);
 
+  const Module &PM = Request.prototypeModule();
   Function &Prototype = Request.prototype();
   RunValueList Values = runValues(Request);
   std::string FnName;
@@ -96,7 +97,6 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   console->error_if(!(bool)MaybeModule, "Adding the module failed!");
   assert((bool)MaybeModule && "Adding the module failed!");
 
-  const Module &PM = Request.prototypeModule();
   llvm::JITSymbol FPtr = Compiler->findSymbol(FnName, PM.getDataLayout());
   auto Addr = FPtr.getAddress();
   console->error_if(!(bool)Addr, "Could not get the address of the JITSymbol.");
