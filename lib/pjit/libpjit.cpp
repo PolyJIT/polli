@@ -142,8 +142,6 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
     JitContext->addRegion(F.getName().str(), ID);
 
   CacheKey K{ID, Values.hash()};
-  //console->debug("pjit_main: ID: {:d} Hash: {:d} Values {:s}", ID, K.ValueHash,
-  //               Values.str());
   auto FutureFn =
       JitContext->async(GetOrCreateVariantFunction, Request, ID, K);
 
