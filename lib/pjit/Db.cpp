@@ -260,7 +260,8 @@ public:
   }
 
   ~DBConnection() {
-    c->disconnect();
+    if (c && c->is_open())
+      c->disconnect();
     c.reset(nullptr);
   }
 };
