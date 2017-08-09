@@ -3,8 +3,9 @@
 #include "polli/Options.h"
 #include "polli/log.h"
 #include "llvm/Support/CommandLine.h"
-#include <pqxx/pqxx>
+#include "llvm/Support/ManagedStatic.h"
 
+#include <pqxx/pqxx>
 #include <ctime>
 #include <iostream>
 #include <numeric>
@@ -22,94 +23,95 @@ namespace papi {
 
 namespace polli {
 namespace opt {
-std::string Experiment;
+static std::string Experiment;
 static cl::opt<std::string, true>
     ExperimentX("polli-db-experiment",
                 cl::desc("Name of the experiment we are running under."),
                 cl::location(Experiment), cl::init("unknown"),
                 cl::cat(PolyJIT_Runtime));
 
-std::string ExperimentUUID;
+static std::string ExperimentUUID;
 static cl::opt<std::string, true>
     ExperimentUUIDX("polli-db-experiment-uuid", cl::desc("Experiment UUID."),
                     cl::location(ExperimentUUID),
                     cl::init("00000000-0000-0000-0000-000000000000"),
                     cl::cat(PolyJIT_Runtime));
 
-std::string Project;
+static std::string Project;
 static cl::opt<std::string, true>
     ProjectX("polli-db-project", cl::desc("The project we are running under."),
              cl::location(Project), cl::init("unknown"),
              cl::cat(PolyJIT_Runtime));
 
-std::string Domain;
+static std::string Domain;
 static cl::opt<std::string, true>
     DomainX("polli-db-domain", cl::desc("The domain we are running under."),
             cl::location(Domain), cl::init("unknown"),
             cl::cat(PolyJIT_Runtime));
 
-std::string Group;
+static std::string Group;
 static cl::opt<std::string, true>
     GroupX("polli-db-group", cl::desc("The group we are running under."),
            cl::location(Group), cl::init("unknown"), cl::cat(PolyJIT_Runtime));
 
-std::string SourceUri;
+static std::string SourceUri;
 static cl::opt<std::string, true> SourceUriX(
     "polli-db-src-uri", cl::desc("The src_uri we are running under."),
     cl::location(SourceUri), cl::init("unknown"), cl::cat(PolyJIT_Runtime));
 
-std::string Argv0;
+static std::string Argv0;
 static cl::opt<std::string, true>
     Argv0X("polli-db-argv", cl::desc("The command we are executing."),
            cl::location(SourceUri), cl::init("unknown"),
            cl::cat(PolyJIT_Runtime));
 
-bool EnableDatabase;
+static bool EnableDatabase;
 static cl::opt<bool, true> EnableDatabaseX(
     "polli-db-enable", cl::desc("Enable database communication."),
     cl::location(EnableDatabase), cl::init(false), cl::cat(PolyJIT_Runtime));
 
-bool ExecuteAtExit;
+static bool ExecuteAtExit;
 static cl::opt<bool, true> ExecuteAtExitX(
     "polli-db-execute-atexit", cl::desc("Enable execution of atexit handler."),
     cl::location(ExecuteAtExit), cl::init(false), cl::cat(PolyJIT_Runtime));
 
-std::string DbHost;
+static std::string DbHost;
 static cl::opt<std::string, true>
     DbHostX("polli-db-host", cl::desc("DB Hostname"), cl::location(DbHost),
             cl::init("localhost"), cl::cat(PolyJIT_Runtime));
 
-int DbPort;
+static int DbPort;
 static cl::opt<int, true> DbPortX("polli-db-port", cl::desc("DB Port"),
                                   cl::location(DbPort), cl::init(5432),
                                   cl::cat(PolyJIT_Runtime));
 
-std::string DbUsername;
+static std::string DbUsername;
 static cl::opt<std::string, true> DbUsernameX("polli-db-username",
                                               cl::desc("DB Username"),
                                               cl::location(DbUsername),
                                               cl::init("benchbuild"),
                                               cl::cat(PolyJIT_Runtime));
 
-std::string DbPassword;
+static std::string DbPassword;
 static cl::opt<std::string, true> DbPasswordX("polli-db-password",
                                               cl::desc("DB Password"),
                                               cl::location(DbPassword),
                                               cl::init("benchbuild"),
                                               cl::cat(PolyJIT_Runtime));
-std::string DbName;
+static std::string DbName;
 static cl::opt<std::string, true> DbNameX("polli-db-name", cl::desc("DB Name"),
                                           cl::location(DbName),
                                           cl::init("benchbuild"),
                                           cl::cat(PolyJIT_Runtime));
 
-std::string RunGroupUUID;
+static std::string RunGroupUUID;
 static cl::opt<std::string, true>
     DbRunGroupUUIDX("polli-db-run-group", cl::desc("DB RunGroup (UUID)"),
-                    cl::location(RunGroupUUID), cl::init(""),
+                    cl::location(RunGroupUUID),
+                    cl::init("00000000-0000-0000-0000-000000000000"),
                     cl::cat(PolyJIT_Runtime));
 
-int RunID;
+static int RunID;
 static cl::opt<int, true> DbRunIdX("polli-db-run-id",
                                    cl::desc("DB RunGroup (UUID)"),
                                    cl::location(RunID), cl::init(0),
@@ -129,20 +131,62 @@ static bool enable_tracking() {
   return opt::EnableDatabase;
 }
 
+static pqxx::result submit(const std::string &Query,
+                           pqxx::work &w) throw(pqxx::syntax_error) {
+  pqxx::result res;
+  try {
+    res = w.exec(Query);
+  } catch (pqxx::data_exception e) {
+    std::cerr << "pgsql: Encountered the following error:\n";
+    std::cerr << e.what();
+    std::cerr << "\n";
+    std::cerr << e.query();
+    throw e;
+  }
+  return res;
+}
+
+
 class DBConnection {
   std::unique_ptr<pqxx::connection> c;
+  std::string ConnectionString;
+
+  std::string Experiment;
+  std::string ExperimentUUID;
+
+  std::string Project;
+  std::string Domain;
+  std::string Group;
+  std::string SourceURI;
+  std::string Argv0;
+
+  std::string RunGroupUUID;
+  int RunID;
 
   void connect() {
     if (!enable_tracking())
       return;
 
+    c = std::unique_ptr<pqxx::connection>(
+        new pqxx::connection(ConnectionString));
+  }
+
+public:
+  explicit DBConnection(std::string Experiment, std::string ExperimentUUID,
+                        std::string Project, std::string Domain,
+                        std::string Group, std::string SourceURI,
+                        std::string Argv0, std::string RunGroupUUID, int RunID)
+      : Experiment(Experiment), ExperimentUUID(ExperimentUUID),
+        Project(Project), Domain(Domain), Group(Group), SourceURI(SourceURI),
+        Argv0(Argv0), RunGroupUUID(RunGroupUUID), RunID(RunID) {
     std::string CONNECTION_FMT_STR =
         "user={} port={} host={} dbname={} password={}";
-    std::string connection_str =
+    ConnectionString =
         fmt::format(CONNECTION_FMT_STR, opt::DbUsername, opt::DbPort,
                     opt::DbHost, opt::DbName, opt::DbPassword);
+  }
 
-    c = std::unique_ptr<pqxx::connection>(new pqxx::connection(connection_str));
+  void prepare() {
     if (c) {
       std::string SELECT_RUN =
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
@@ -165,7 +209,6 @@ class DBConnection {
     }
   }
 
-public:
   pqxx::connection &operator->() {
     if (c)
       return *c;
@@ -180,73 +223,63 @@ public:
     return *c;
   }
 
+  uint64_t prepareRun(pqxx::work &w) {
+    std::string SEARCH_PROJECT_SQL =
+        "SELECT name FROM project WHERE name = '{}';";
+
+    std::string NEW_PROJECT_SQL =
+        "INSERT INTO project (name, description, src_url, domain, group_name) "
+        "VALUES ('{}', '{}', '{}', '{}', '{}');";
+
+    std::string NEW_RUN_SQL =
+        "INSERT INTO run (\"end\", command, "
+        "project_name, experiment_name, run_group, experiment_group) "
+        "VALUES (TIMESTAMP '{}', '{}', "
+        "'{}', '{}', '{}', '{}') RETURNING id;";
+
+    pqxx::result project_exists =
+        submit(fmt::format(SEARCH_PROJECT_SQL, Project), w);
+
+    if (project_exists.affected_rows() == 0)
+      submit(fmt::format(NEW_PROJECT_SQL, Project, Project,
+                         SourceURI, Domain, Group),
+             w);
+
+    uint64_t run_id = 0;
+    if (!opt::RunID) {
+      pqxx::result r =
+          submit(fmt::format(NEW_RUN_SQL, now(), Argv0, Project, Experiment,
+                             RunGroupUUID, ExperimentUUID),
+                 w);
+      r[0]["id"].to(run_id);
+    } else {
+      run_id = RunID;
+    }
+
+    return run_id;
+  }
+
   ~DBConnection() {
     c->disconnect();
     c.reset(nullptr);
   }
 };
 
-static pqxx::connection &getDatabase() {
-  static DBConnection DB;
-  return *DB;
-}
-
-static pqxx::result submit(const std::string &Query,
-                           pqxx::work &w) throw(pqxx::syntax_error) {
-  pqxx::result res;
-  try {
-    res = w.exec(Query);
-  } catch (pqxx::data_exception e) {
-    std::cerr << "pgsql: Encountered the following error:\n";
-    std::cerr << e.what();
-    std::cerr << "\n";
-    std::cerr << e.query();
-    throw e;
+struct DBCreator {
+  static void *call() {
+    return new DBConnection(
+        opt::Experiment, opt::ExperimentUUID, opt::Project, opt::Domain,
+        opt::Group, opt::SourceUri, opt::Argv0, opt::RunGroupUUID, opt::RunID);
   }
-  return res;
-}
+};
+
+static llvm::ManagedStatic<DBConnection, DBCreator> DB;
 
 struct Event {
   std::string Name;
   uint64_t ID;
   uint64_t Time;
 };
-
-static uint64_t PrepareRun(pqxx::work &w) {
-  std::string SEARCH_PROJECT_SQL =
-      "SELECT name FROM project WHERE name = '{}';";
-
-  std::string NEW_PROJECT_SQL =
-      "INSERT INTO project (name, description, src_url, domain, group_name) "
-      "VALUES ('{}', '{}', '{}', '{}', '{}');";
-
-  std::string NEW_RUN_SQL =
-      "INSERT INTO run (\"end\", command, "
-      "project_name, experiment_name, run_group, experiment_group) "
-      "VALUES (TIMESTAMP '{}', '{}', "
-      "'{}', '{}', '{}', '{}') RETURNING id;";
-
-  pqxx::result project_exists =
-      submit(fmt::format(SEARCH_PROJECT_SQL, opt::Project), w);
-
-  if (project_exists.affected_rows() == 0)
-    submit(fmt::format(NEW_PROJECT_SQL, opt::Project, opt::Project,
-                       opt::SourceUri, opt::Domain, opt::Group),
-           w);
-
-  uint64_t run_id = 0;
-  if (!opt::RunID) {
-    pqxx::result r = submit(fmt::format(NEW_RUN_SQL, now(), opt::Argv0,
-                                        opt::Project, opt::Experiment,
-                                        opt::RunGroupUUID, opt::ExperimentUUID),
-                            w);
-    r[0]["id"].to(run_id);
-  } else {
-    run_id = opt::RunID;
-  }
-
-  return run_id;
-}
 
 namespace db {
 void ValidateOptions() {
@@ -258,15 +291,16 @@ void ValidateOptions() {
       opt::RunID = run_id ? std::stoi(run_id) : 0;
     }
   }
+
+  DB->prepare();
 }
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
   if (!enable_tracking())
     return;
 
-  pqxx::connection &DB = getDatabase();
-  pqxx::work w(DB);
-  uint64_t run_id = PrepareRun(w);
+  pqxx::work w(**DB);
+  uint64_t run_id = DB->prepareRun(w);
 
   std::string NEW_RUN_RESULT_SQL = "INSERT INTO regions (name, id, "
                                    "duration, events, run_id) "
@@ -298,9 +332,8 @@ void StoreTransformedScop(const std::string &FnName,
   if (!enable_tracking())
     return;
 
-  pqxx::connection &DB = getDatabase();
-  pqxx::work w(DB);
-  uint64_t run_id = PrepareRun(w);
+  pqxx::work w(**DB);
+  uint64_t run_id = DB->prepareRun(w);
 
   std::string SCHEDULE_SQL = "INSERT INTO schedules (function, schedule, "
                              "run_id) VALUES ('{:s}', '{:s}', {:d});";

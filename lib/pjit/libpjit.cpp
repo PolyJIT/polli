@@ -74,16 +74,11 @@ namespace polli {
 using MainFnT = std::function<void(int, char **)>;
 
 static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
-  //static int tag = 0;
   if (JitContext->find(K) != JitContext->end()) {
     JitContext->increment(JitRegion::CACHE_HIT, 0);
-    //console->debug("[tag {:d}] Cache", tag);
-    //console->debug("[tag {:d}] request complete.", tag, K.ValueHash);
-    //tag++;
     return;
   }
   JitContext->increment(JitRegion::VARIANTS, 1);
-  //console->debug("[tag {:d}] Variant Hash: {:d}", tag, K.ValueHash);
 
   const Module &PM = Request.prototypeModule();
   Function &Prototype = Request.prototype();
@@ -106,8 +101,6 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   if (!CacheIt.second)
     llvm_unreachable("Key collision in function cace, abort.");
   DEBUG(printRunValues(Values));
-  //console->debug("[tag {:d}] request complete.", tag, K.ValueHash);
-  //tag++;
 }
 
 static void

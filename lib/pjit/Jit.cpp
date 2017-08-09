@@ -31,7 +31,6 @@ void PolyJIT::setup() {
   using polly::initializePollyPasses;
 
   cl::ParseEnvironmentOptions("libpjit", "PJIT_ARGS", "");
-  cl::PrintOptionValues();
 
   StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
