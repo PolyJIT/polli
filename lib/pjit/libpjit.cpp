@@ -190,7 +190,8 @@ bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
 
 struct PolliShutdown {
   ~PolliShutdown() {
-    JitContext->wait();
+    if (JitContext.isConstructed())
+      JitContext->wait();
   }
 private:
   llvm_shutdown_obj Shutdown;

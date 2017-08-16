@@ -28,7 +28,6 @@ struct TraceData {
   ~TraceData();
 };
 
-TraceData &setup();
 extern "C" void enter_region(uint64_t id, const char *name);
 extern "C" void exit_region(uint64_t id);
 extern "C" void setup_tracing();

@@ -348,28 +348,23 @@ void StoreTransformedScop(const std::string &FnName,
 }
 
 namespace tracing {
-TraceData &setup() {
-  static TraceData T;
-  return T;
-}
+static ManagedStatic<TraceData> TD;
 
 void enter_region(uint64_t id, const char *name) {
-  TraceData &D = setup();
   uint64_t time = papi::PAPI_get_real_usec();
-  if (!D.Events.count(id))
-    D.Events[id] = 0;
-  if (!D.Entries.count(id))
-    D.Entries[id] = 0;
-  if (!D.Regions.count(id))
-    D.Regions[id] = name;
-  D.Events[id] -= time;
-  D.Entries[id] += 1;
+  if (!TD->Events.count(id))
+    TD->Events[id] = 0;
+  if (!TD->Entries.count(id))
+    TD->Entries[id] = 0;
+  if (!TD->Regions.count(id))
+    TD->Regions[id] = name;
+  TD->Events[id] -= time;
+  TD->Entries[id] += 1;
 }
 
 void exit_region(uint64_t id) {
-  TraceData &D = setup();
   uint64_t time = papi::PAPI_get_real_usec();
-  D.Events[id] += time;
+  TD->Events[id] += time;
 }
 
 TraceData::~TraceData() {
@@ -381,6 +376,9 @@ TraceData::~TraceData() {
 }
 
 void setup_tracing() {
+  cl::ParseEnvironmentOptions("profile-scops", "PJIT_ARGS", "");
+  opt::ValidateOptions();
+  db::ValidateOptions();
   papi::PAPI_library_init(PAPI_VER_CURRENT);
 }
 }

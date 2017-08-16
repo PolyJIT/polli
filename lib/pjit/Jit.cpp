@@ -29,9 +29,6 @@ void PolyJIT::setup() {
   enter(JitRegion::START, papi::PAPI_get_real_usec());
 
   using polly::initializePollyPasses;
-
-  cl::ParseEnvironmentOptions("libpjit", "PJIT_ARGS", "");
-
   StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
 
   // Make sure to initialize tracing before planting the atexit handler.
