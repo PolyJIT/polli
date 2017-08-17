@@ -547,8 +547,12 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
         SetVector<Value *> Values = SCEVParamValueExtractor::extract(P, SE);
         ParamValues.insert(Values.begin(), Values.end());
         DEBUG({
+          std::string buf;
+          raw_string_ostream os(buf);
           for (auto *Val : Values)
             printOperands(Val, os);
+          console->debug(os.str());
+          os.flush();
         });
       }
 

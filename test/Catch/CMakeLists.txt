@@ -1,9 +1,5 @@
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fexceptions")
-string(REPLACE "-fno-exceptions" "-fexceptions" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-
 set(POLLI_LINK_LIBS
   papi
-  pprof
   pjit
   likwid
   LLVMCore

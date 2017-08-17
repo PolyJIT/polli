@@ -77,6 +77,7 @@ set(POLLI_LINK_LIBS
   pthread
   papi
   pqxx
+  pq
   boost_system
   boost_thread
 )
@@ -87,6 +88,8 @@ add_polli_library(pjit SHARED
 
 set(POLLI_LINK_LIBS
   papi
+  pqxx
+  pq
 )
 
 add_polli_library(pprof SHARED
@@ -97,6 +100,7 @@ set(POLLI_LINK_LIBS
   likwid
   pthread
   pqxx
+  pq
   boost_system
 )
 

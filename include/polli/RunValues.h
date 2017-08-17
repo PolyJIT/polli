@@ -76,7 +76,8 @@ public:
 
 RunValueList runValues(const SpecializerRequest &Request);
 #ifndef NDEBUG
-void printArgs(const llvm::Function &F, size_t argc, void *params);
+void printArgs(const llvm::Function &F, size_t argc,
+               const std::vector<void *> &Params);
 #endif
 void printRunValues(const RunValueList &Values);
 }

@@ -26,7 +26,6 @@ SpecializerRequest::init(std::shared_ptr<llvm::Module> PrototypeM) {
 }
 
 RunValueList runValues(const SpecializerRequest &Request) {
-  assert(Request.F && "Request malformed! Need an llvm function.");
   POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
                              "polyjit.params.select");
   int i = 0;
@@ -43,14 +42,14 @@ RunValueList runValues(const SpecializerRequest &Request) {
 }
 
 #ifndef NDEBUG
-void printArgs(const llvm::Function &F, size_t argc, void *params) {
+void printArgs(const llvm::Function &F, size_t argc, const std::vector<void *> &Params) {
   std::string buf;
   llvm::raw_string_ostream s(buf);
 
   size_t i = 0;
   for (auto &Arg : F.args()) {
     if (i < argc) {
-      RunValue<uint64_t *> V{reinterpret_cast<uint64_t **>(params)[i], &Arg};
+      RunValue<uint64_t *> V{reinterpret_cast<uint64_t *>(Params[i]), &Arg};
       if (polli::canSpecialize(V)) {
         s << fmt::format("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
                          *V.value);
@@ -58,12 +57,13 @@ void printArgs(const llvm::Function &F, size_t argc, void *params) {
       llvm::Type *Ty = Arg.getType();
       if (Ty->isIntegerTy())
         console->debug("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
-                       (int)*((uint64_t **)params)[i]);
+                       *reinterpret_cast<int64_t *>(Params[i]));
       if (Ty->isDoubleTy())
-        console->debug("[{:d}] -> {:g} ", i, (double)*((double **)params)[i]);
+        console->debug("[{:d}] -> {:g} ", i,
+                       (double)*(reinterpret_cast<double *>(Params[i])));
       if (Ty->isPointerTy())
         console->debug("[{:d}] -> 0x{:x} ", i,
-                       (uint64_t)((uint64_t **)params)[i]);
+                       (int64_t)(reinterpret_cast<int64_t *>(Params[i])));
       i++;
     }
   }
