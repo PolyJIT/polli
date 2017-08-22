@@ -24,17 +24,17 @@ using namespace spdlog;
 namespace polli {
 
   struct PProfID{
-    PProfID(ConstantInt *globalID, size_t MID){
+    PProfID(ConstantInt *globalID, int LocalID){
       this->globalID = globalID;
-      this->MID = MID;
+      this->LocalID = LocalID;
     }
     ConstantInt *globalID;
-    size_t MID;
+    int LocalID;
   };
 
   class ProfileScopDetection : public FunctionPass {
     private:
-      static int LoopID;
+      static int LocalCounter;
       static int instrumentedCounter;
       static int nonInstrumentedCounter;
       static long instructionCountScops;
@@ -42,15 +42,14 @@ namespace polli {
       static long instructionCountAll;
       static bool calledSetup;
       static shared_ptr<logger> Log;
-      size_t hashvalue;
 
     public:
       static char ID;
       explicit ProfileScopDetection() : FunctionPass(ID) {}
 
     private:
-      static size_t generateHash(Module*&);
-      static auto getLogger();
+      static size_t generateHash(Module*&, bool);
+      static shared_ptr<logger> getLogger();
       static void insertSetupTracingFunction(Function*);
       static void insertEnterRegionFunction(Module*&, Instruction*, PProfID&);
       static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
@@ -59,9 +58,9 @@ namespace polli {
       static SmallVector<BasicBlock*, 1> splitPredecessors(
           const Region*, SmallVector<BasicBlock*, 1>&, bool);
       static Instruction *getInsertPosition(BasicBlock*, bool);
-      static PProfID generatePProfID(Module*&);
+      static PProfID generatePProfID(Module*&, bool);
       static bool instrumentSplitBlocks(
-          SmallVector<BasicBlock*, 1>&, SmallVector<BasicBlock*, 1>&);
+          SmallVector<BasicBlock*, 1>&, SmallVector<BasicBlock*, 1>&, bool);
 
     public:
       void getAnalysisUsage(AnalysisUsage&) const override;
@@ -71,7 +70,7 @@ namespace polli {
   };
 
   char ProfileScopDetection::ID = 0;
-  int ProfileScopDetection::LoopID = 0;
+  int ProfileScopDetection::LocalCounter = 0;
   int ProfileScopDetection::instrumentedCounter = 0;
   int ProfileScopDetection::nonInstrumentedCounter = 0;
   long ProfileScopDetection::instructionCountScops = 0;
@@ -85,14 +84,16 @@ namespace polli {
     AU.addRequired<ScopDetectionWrapperPass>();
   }
 
-  size_t ProfileScopDetection::generateHash(Module *&M){
-    LoopID++;
+  size_t ProfileScopDetection::generateHash(Module *&M, bool isParent){
+    LocalCounter++;
     hash<string> stringhashFn;
-    string hashstring = M->getName().str() + "::SCoP" + to_string(LoopID);
+    string suffix = isParent ? "Parent" : "SCoP";
+    string hashstring
+      = M->getName().str() + "::" + suffix + to_string(LocalCounter);
     return stringhashFn(hashstring)/10000000000; //FIXME Avoid dividing hash
   }
 
-  auto ProfileScopDetection::getLogger(){
+  shared_ptr<logger> ProfileScopDetection::getLogger(){
     if(!Log){
       Log = basic_logger_mt("profileScopsLogger", "profileScops.log");
     }
@@ -129,7 +130,8 @@ namespace polli {
     arguments.push_back(pprofID.globalID);
     ostringstream name;
     name << M->getName().data() << "::"
-      << InsertPosition->getFunction()->getName().data() << " " << pprofID.MID;
+      << InsertPosition->getFunction()->getName().data()
+      << " " << pprofID.LocalID;
     arguments.push_back(builder.CreateGlobalStringPtr(name.str()));
     FunctionType *FType
       = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
@@ -202,17 +204,18 @@ namespace polli {
     return &*InsertPosition;
   }
 
-  PProfID ProfileScopDetection::generatePProfID(Module *&M){
+  PProfID ProfileScopDetection::generatePProfID(Module *&M, bool isParent){
     Type *int64Ty = Type::getInt64Ty(M->getContext());
     //FIXME According to docs ConstantInt::get(...) returns a ConstantInt,
     //but clang complains...
     return PProfID((ConstantInt*) ConstantInt::get(
-          int64Ty, generateHash(M), false), LoopID);;
+          int64Ty, generateHash(M, isParent), false), LocalCounter);;
   }
 
   bool ProfileScopDetection::instrumentSplitBlocks(
       SmallVector<BasicBlock*, 1> &EntrySplits,
-      SmallVector<BasicBlock*, 1> &ExitSplits){
+      SmallVector<BasicBlock*, 1> &ExitSplits,
+      bool isParent){
     if(EntrySplits.empty() || ExitSplits.empty()){
       getLogger()->warn("WARNING: Trying to instrument splits either without "
         "entries or without exits.\n");
@@ -220,7 +223,7 @@ namespace polli {
     }
 
     Module *M = EntrySplits.front()->getModule();
-    PProfID pprofID = generatePProfID(M);
+    PProfID pprofID = generatePProfID(M, isParent);
 
     for(BasicBlock *BB : EntrySplits){
       Instruction *InsertPosition = getInsertPosition(BB, true);
@@ -271,7 +274,8 @@ namespace polli {
           SmallVector<BasicBlock*, 1> ExitSplits
             = splitPredecessors(Parent, ExitBB, false);
 
-          gotInstrumented = instrumentSplitBlocks(EntrySplits, ExitSplits);
+          gotInstrumented
+            = instrumentSplitBlocks(EntrySplits, ExitSplits, true);
         }
         getLogger()->info(message.str());
       } else {
@@ -281,7 +285,6 @@ namespace polli {
       if(gotInstrumented){
         gotAnyInstrumented = true;
         instrumentedCounter++;
-        int blockSizes[distance(R->block_begin(), R->block_end())];
         //FIXME May use accumulate or reduce
         for(auto it = R->block_begin(); it != R->block_end(); it++){
           instructionCountScops += it->size();
@@ -320,11 +323,11 @@ namespace polli {
     return insertedSetupTracing;
   }
 
-static llvm::RegisterPass<ProfileScopDetection>
-  X("polli-profile-scop-detection",
-    "PolyJIT - Profile runtime performance of rejected SCoPs");
+  static llvm::RegisterPass<ProfileScopDetection>
+    X("polli-profile-scop-detection",
+      "PolyJIT - Profile runtime performance of rejected SCoPs");
 
-Pass *createProfileScopsPass() {
-  return new ProfileScopDetection();
-}
+  Pass *createProfileScopsPass() {
+    return new ProfileScopDetection();
+  }
 }
