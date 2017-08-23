@@ -313,7 +313,7 @@ namespace polli {
     bool insertedSetupTracing = false;
     if(!calledSetup && instrumentedCounter > 0){
       Function *Main = M.getFunction("main");
-      if(Main != nullptr){
+      if(Main){
         insertSetupTracingFunction(Main);
         insertedSetupTracing = true;
         calledSetup = true;
