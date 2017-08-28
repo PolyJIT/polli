@@ -21,6 +21,13 @@ using namespace std;
 using namespace polly;
 using namespace spdlog;
 
+#define DEBUG_TYPE "profileScopsDetection"
+
+STATISTIC(InstrumentedScopsCounter, "Number of instrumented scops");
+STATISTIC(NonInstrumentedScopsCounter, "Number of not instrumented scops");
+STATISTIC(InstrumentedParentsCounter, "Number of instrumented parents");
+STATISTIC(NonInstrumentedParentsCounter, "Number of not instrumented parents");
+
 namespace polli {
 
   struct PProfID{
@@ -35,11 +42,6 @@ namespace polli {
   class ProfileScopDetection : public FunctionPass {
     private:
       static int LocalCounter;
-      static int instrumentedCounter;
-      static int nonInstrumentedCounter;
-      static long instructionCountScops;
-      static long instructionCountParents;
-      static long instructionCountAll;
       static bool calledSetup;
       static shared_ptr<logger> Log;
 
@@ -61,6 +63,7 @@ namespace polli {
       static PProfID generatePProfID(Module*&, bool);
       static bool instrumentSplitBlocks(
           SmallVector<BasicBlock*, 1>&, SmallVector<BasicBlock*, 1>&, bool);
+      static bool instrumentRegion(const Region*, bool);
 
     public:
       void getAnalysisUsage(AnalysisUsage&) const override;
@@ -71,11 +74,6 @@ namespace polli {
 
   char ProfileScopDetection::ID = 0;
   int ProfileScopDetection::LocalCounter = 0;
-  int ProfileScopDetection::instrumentedCounter = 0;
-  int ProfileScopDetection::nonInstrumentedCounter = 0;
-  long ProfileScopDetection::instructionCountScops = 0;
-  long ProfileScopDetection::instructionCountParents = 0;
-  long ProfileScopDetection::instructionCountAll = 0;
   bool ProfileScopDetection::calledSetup = false;
   shared_ptr<logger> ProfileScopDetection::Log = nullptr;
 
@@ -238,82 +236,78 @@ namespace polli {
     return true;
   }
 
+  bool ProfileScopDetection::instrumentRegion(const Region *R, bool isParent){
+    BasicBlock *EntryBB = R->getEntry();
+    BasicBlock *ExitBB = R->getExit();
+    SmallVector<BasicBlock*, 1> EntrySplits
+      = splitPredecessors(R, EntryBB, true);
+    SmallVector<BasicBlock*, 1> ExitSplits
+      = splitPredecessors(R, ExitBB, false);
+
+    return instrumentSplitBlocks(EntrySplits, ExitSplits, true);
+  }
+
   bool ProfileScopDetection::doInitialization(Module &) {
     return false;
   }
 
   bool ProfileScopDetection::runOnFunction(Function &F) {
-    bool gotAnyInstrumented = false;
+    bool anyInstrumented = false;
     const ScopDetectionWrapperPass &SDWP
       = getAnalysis<ScopDetectionWrapperPass>();
     const ScopDetection &SD = SDWP.getSD();
 
     Region *TopLevelRegion = SD.getRI()->getTopLevelRegion();
-    //FIXME May use accumulate or reduce
-    for(RegionBase<RegionTraits<Function>>::block_iterator it
-        = TopLevelRegion->block_begin();
-        it != TopLevelRegion->block_end(); it++){
-      instructionCountAll += it->size();
-    }
 
     for(const Region *R : SD){
-      bool gotInstrumented = false;
-      const Region *Parent = R->getParent();
-      if(Parent){
-        stringstream message;
-        message << Parent->getNameStr() << " is invalid because of: ";
-        if(Parent->isTopLevelRegion()){
-          message << "Region is toplevel region.\n";
+      bool scopGotInstrumented = instrumentRegion(R, false);
+      if(scopGotInstrumented){
+        InstrumentedScopsCounter++;
+        bool parentGotInstrumented = false;
+        const Region *Parent = R->getParent();
+        if(Parent){
+          stringstream message;
+          message << Parent->getNameStr() << " is invalid because of: ";
+          if(Parent->isTopLevelRegion()){
+            message << "Region is toplevel region.\n";
+          } else {
+            message << SD.regionIsInvalidBecause(Parent) << '\n';
+            parentGotInstrumented = instrumentRegion(Parent, true);
+          }
+          getLogger()->info(message.str());
         } else {
-          message << SD.regionIsInvalidBecause(Parent) << '\n';
-
-          BasicBlock *EntryBB = Parent->getEntry();
-          BasicBlock *ExitBB = Parent->getExit();
-          SmallVector<BasicBlock*, 1> EntrySplits
-            = splitPredecessors(Parent, EntryBB, true);
-          SmallVector<BasicBlock*, 1> ExitSplits
-            = splitPredecessors(Parent, ExitBB, false);
-
-          gotInstrumented
-            = instrumentSplitBlocks(EntrySplits, ExitSplits, true);
+          getLogger()->info("SCoP {} has no parent.\n", R->getNameStr());
         }
-        getLogger()->info(message.str());
-      } else {
-        getLogger()->info("SCoP {} has no parent.\n", R->getNameStr());
-      }
 
-      if(gotInstrumented){
-        gotAnyInstrumented = true;
-        instrumentedCounter++;
-        //FIXME May use accumulate or reduce
-        for(auto it = R->block_begin(); it != R->block_end(); it++){
-          instructionCountScops += it->size();
-        }
-        //FIXME May use accumulate or reduce
-        for(auto it = Parent->block_begin(); it != Parent->block_end(); it++){
-          instructionCountParents += it->size();
+        if(parentGotInstrumented){
+          InstrumentedParentsCounter++;
+        } else {
+          NonInstrumentedParentsCounter++;
+          instrumentRegion(R, true);
         }
       } else {
-        nonInstrumentedCounter++;
+        getLogger()
+          ->error("SCoP {} could not be instrumented.\n", R->getNameStr());
+        NonInstrumentedScopsCounter++;
       }
     }
-    return gotAnyInstrumented;
+    return anyInstrumented;
   }
 
   bool ProfileScopDetection::doFinalization(Module &M) {
-    getLogger()->info("Instrumented SCoPs: {:d}\n", instrumentedCounter);
     getLogger()
-      ->info("Not instrumented SCoPs: {:d}\n", nonInstrumentedCounter);
+      ->info("Instrumented SCoPs: {:d}\n", InstrumentedScopsCounter);
     getLogger()
-      ->info("Instruction count SCoPs: {:d}\n", instructionCountScops);
+      ->info("Not instrumented SCoPs: {:d}\n", NonInstrumentedScopsCounter);
     getLogger()
-      ->info("Instruction count parents: {:d}\n", instructionCountParents);
-    getLogger()->info("Instruction count all: {:d}\n", instructionCountAll);
+      ->info("Instrumented Parents: {:d}\n", InstrumentedParentsCounter);
+    getLogger()->info(
+        "Not instrumented Parents: {:d}\n", NonInstrumentedParentsCounter);
 
     bool insertedSetupTracing = false;
-    if(!calledSetup && instrumentedCounter > 0){
+    if(!calledSetup && InstrumentedScopsCounter > 0){
       Function *Main = M.getFunction("main");
-      if(Main){
+      if(Main != nullptr){
         insertSetupTracingFunction(Main);
         insertedSetupTracing = true;
         calledSetup = true;
