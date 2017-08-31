@@ -302,9 +302,9 @@ namespace polli {
     getLogger()
       ->info("Not instrumented SCoPs: {:d}\n", NonInstrumentedScopsCounter);
     getLogger()
-      ->info("Instrumented Parents: {:d}\n", InstrumentedParentsCounter);
+      ->info("Instrumented parents: {:d}\n", InstrumentedParentsCounter);
     getLogger()->info(
-        "Not instrumented Parents: {:d}\n", NonInstrumentedParentsCounter);
+        "Not instrumented parents: {:d}\n", NonInstrumentedParentsCounter);
 
     bool insertedSetupTracing = false;
     if(!calledSetup && InstrumentedScopsCounter > 0){
