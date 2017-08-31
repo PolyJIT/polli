@@ -53,7 +53,8 @@ namespace polli {
       static size_t generateHash(Module*&, bool);
       static shared_ptr<logger> getLogger();
       static void insertSetupTracingFunction(Function*);
-      static void insertEnterRegionFunction(Module*&, Instruction*, PProfID&);
+      static void insertEnterRegionFunction(
+          Module*&, Instruction*, PProfID&, bool);
       static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
       static SmallVector<BasicBlock*, 1> splitPredecessors(
           const Region*, BasicBlock*, bool);
@@ -114,8 +115,8 @@ namespace polli {
     builder.CreateCall(F, {});
   }
 
-  void ProfileScopDetection::insertEnterRegionFunction(
-      Module *&M, Instruction *InsertPosition, PProfID &pprofID){
+  void ProfileScopDetection::insertEnterRegionFunction(Module *&M,
+      Instruction *InsertPosition, PProfID &pprofID, bool isParent){
     LLVMContext &context = M->getContext();
     Type *voidty = Type::getVoidTy(context);
     Type *int64Ty = Type::getInt64Ty(context);
@@ -129,6 +130,7 @@ namespace polli {
     ostringstream name;
     name << M->getName().data() << "::"
       << InsertPosition->getFunction()->getName().data()
+      << "::" << (isParent ? "Parent" : "SCoP")
       << " " << pprofID.LocalID;
     arguments.push_back(builder.CreateGlobalStringPtr(name.str()));
     FunctionType *FType
@@ -225,7 +227,7 @@ namespace polli {
 
     for(BasicBlock *BB : EntrySplits){
       Instruction *InsertPosition = getInsertPosition(BB, true);
-      insertEnterRegionFunction(M, InsertPosition, pprofID);
+      insertEnterRegionFunction(M, InsertPosition, pprofID, isParent);
     }
 
     for(BasicBlock *BB : ExitSplits){
