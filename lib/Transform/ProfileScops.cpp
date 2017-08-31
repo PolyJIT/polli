@@ -216,29 +216,37 @@ namespace polli {
       SmallVector<BasicBlock*, 1> &EntrySplits,
       SmallVector<BasicBlock*, 1> &ExitSplits,
       bool isParent){
-    if(EntrySplits.empty() || ExitSplits.empty()){
-      getLogger()->warn("WARNING: Trying to instrument splits either without "
-        "entries or without exits.\n");
-      return false;
+    bool isInstrumentable = true;
+    if(EntrySplits.empty()){
+      getLogger()->warn("Trying to instrument splits without entries");
+      isInstrumentable = false;
+    }
+    if(ExitSplits.empty()){
+      getLogger()->warn("Trying to instrument splits without exits");
+      isInstrumentable = false;
     }
 
-    Module *M = EntrySplits.front()->getModule();
-    PProfID pprofID = generatePProfID(M, isParent);
+    if(isInstrumentable){
+      Module *M = EntrySplits.front()->getModule();
+      PProfID pprofID = generatePProfID(M, isParent);
 
-    for(BasicBlock *BB : EntrySplits){
-      Instruction *InsertPosition = getInsertPosition(BB, true);
-      insertEnterRegionFunction(M, InsertPosition, pprofID, isParent);
+      for(BasicBlock *BB : EntrySplits){
+        Instruction *InsertPosition = getInsertPosition(BB, true);
+        insertEnterRegionFunction(M, InsertPosition, pprofID, isParent);
+      }
+
+      for(BasicBlock *BB : ExitSplits){
+        Instruction *InsertPosition = getInsertPosition(BB, false);
+        insertExitRegionFunction(M, InsertPosition, pprofID);
+      }
     }
 
-    for(BasicBlock *BB : ExitSplits){
-      Instruction *InsertPosition = getInsertPosition(BB, false);
-      insertExitRegionFunction(M, InsertPosition, pprofID);
-    }
-
-    return true;
+    return isInstrumentable;
   }
 
   bool ProfileScopDetection::instrumentRegion(const Region *R, bool isParent){
+    getLogger()
+      ->info("Instrumenting (Parent: {}) {}", isParent, R->getNameStr());
     BasicBlock *EntryBB = R->getEntry();
     BasicBlock *ExitBB = R->getExit();
     SmallVector<BasicBlock*, 1> EntrySplits
@@ -246,7 +254,7 @@ namespace polli {
     SmallVector<BasicBlock*, 1> ExitSplits
       = splitPredecessors(R, ExitBB, false);
 
-    return instrumentSplitBlocks(EntrySplits, ExitSplits, true);
+    return instrumentSplitBlocks(EntrySplits, ExitSplits, isParent);
   }
 
   bool ProfileScopDetection::doInitialization(Module &) {
@@ -271,25 +279,26 @@ namespace polli {
           stringstream message;
           message << Parent->getNameStr() << " is invalid because of: ";
           if(Parent->isTopLevelRegion()){
-            message << "Region is toplevel region.\n";
+            message << "Region is toplevel region.";
           } else {
-            message << SD.regionIsInvalidBecause(Parent) << '\n';
+            message << SD.regionIsInvalidBecause(Parent);
+            //FIXME Can't instrument SCoPs and parents simultaneously
+            //logger tells: warning: splits without exits
             parentGotInstrumented = instrumentRegion(Parent, true);
           }
           getLogger()->info(message.str());
         } else {
-          getLogger()->info("SCoP {} has no parent.\n", R->getNameStr());
+          getLogger()->info("SCoP {} has no parent.", R->getNameStr());
         }
 
         if(parentGotInstrumented){
           InstrumentedParentsCounter++;
         } else {
           NonInstrumentedParentsCounter++;
-          instrumentRegion(R, true);
         }
       } else {
         getLogger()
-          ->error("SCoP {} could not be instrumented.\n", R->getNameStr());
+          ->error("SCoP {} could not be instrumented.", R->getNameStr());
         NonInstrumentedScopsCounter++;
       }
     }
@@ -298,13 +307,13 @@ namespace polli {
 
   bool ProfileScopDetection::doFinalization(Module &M) {
     getLogger()
-      ->info("Instrumented SCoPs: {:d}\n", InstrumentedScopsCounter);
+      ->info("Instrumented SCoPs: {:d}", InstrumentedScopsCounter);
     getLogger()
-      ->info("Not instrumented SCoPs: {:d}\n", NonInstrumentedScopsCounter);
+      ->info("Not instrumented SCoPs: {:d}", NonInstrumentedScopsCounter);
     getLogger()
-      ->info("Instrumented parents: {:d}\n", InstrumentedParentsCounter);
+      ->info("Instrumented parents: {:d}", InstrumentedParentsCounter);
     getLogger()->info(
-        "Not instrumented parents: {:d}\n", NonInstrumentedParentsCounter);
+        "Not instrumented parents: {:d}", NonInstrumentedParentsCounter);
 
     bool insertedSetupTracing = false;
     if(!calledSetup && InstrumentedScopsCounter > 0){
