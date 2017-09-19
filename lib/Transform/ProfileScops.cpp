@@ -284,7 +284,7 @@ namespace polli {
             message << SD.regionIsInvalidBecause(Parent);
             //FIXME Can't instrument SCoPs and parents simultaneously
             //logger tells: warning: splits without exits
-            parentGotInstrumented = instrumentRegion(Parent, true);
+            //parentGotInstrumented = instrumentRegion(Parent, true);
           }
           getLogger()->info(message.str());
         } else {
