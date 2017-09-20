@@ -1,7 +1,7 @@
 #include "llvm/Pass.h"
 
 namespace polli {
-Pass *createProfileScopsPass();
+Pass *createProfileScopsPass(bool);
 }
 
 namespace llvm {

@@ -14,6 +14,7 @@
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
+#include <map>
 #include <sstream>
 
 using namespace llvm;
@@ -23,47 +24,59 @@ using namespace spdlog;
 
 #define DEBUG_TYPE "profileScopsDetection"
 
-STATISTIC(InstrumentedScopsCounter, "Number of instrumented scops");
-STATISTIC(NonInstrumentedScopsCounter, "Number of not instrumented scops");
-STATISTIC(InstrumentedParentsCounter, "Number of instrumented parents");
-STATISTIC(NonInstrumentedParentsCounter, "Number of not instrumented parents");
-
 namespace polli {
 
-  struct PProfID{
-    PProfID(ConstantInt *globalID, int LocalID){
-      this->globalID = globalID;
-      this->LocalID = LocalID;
+  struct RegionID{
+    RegionID(){}
+    RegionID(size_t measurementID, SmallVector<BasicBlock*, 1> EntrySplits,
+        SmallVector<BasicBlock*, 1> ExitSplits){
+      this->measurementID = measurementID;
+      this->EntrySplits = EntrySplits;
+      this->ExitSplits = ExitSplits;
     }
-    ConstantInt *globalID;
-    int LocalID;
+    size_t measurementID;
+    SmallVector<BasicBlock*, 1> EntrySplits;
+    SmallVector<BasicBlock*, 1> ExitSplits;
   };
+
+  typedef map<BasicBlock*, const Region*> BBRegionMap;
+  typedef map<const Region*, RegionID> RegionIDMap;
 
   class ProfileScopDetection : public FunctionPass {
     private:
-      static int LocalCounter;
       static bool calledSetup;
       static shared_ptr<logger> Log;
+      static BBRegionMap entryExitToRegionMap;
+      static RegionIDMap regionToIDMap;
+      bool instrumentParents;
+      int InstrumentedScopsCounter = 0;
+      int NonInstrumentedScopsCounter = 0;
+      int InstrumentedParentsCounter = 0;
+      int NonInstrumentedParentsCounter = 0;
 
     public:
       static char ID;
-      explicit ProfileScopDetection() : FunctionPass(ID) {}
+      //NOTE: Default constructor required
+      explicit ProfileScopDetection(bool instrumentParents = false)
+        : FunctionPass(ID) {
+        this->instrumentParents = instrumentParents;
+        getLogger()->debug("instrumentParents: {}", instrumentParents);
+      }
 
     private:
-      static size_t generateHash(Module*&, bool);
+      static size_t generateMeasurementID();
       static shared_ptr<logger> getLogger();
       static void insertSetupTracingFunction(Function*);
       static void insertEnterRegionFunction(
-          Module*&, Instruction*, PProfID&, bool);
-      static void insertExitRegionFunction(Module*&, Instruction*, PProfID&);
+          Module*&, Instruction*, size_t, bool);
+      static void insertExitRegionFunction(Module*&, Instruction*, size_t);
       static SmallVector<BasicBlock*, 1> splitPredecessors(
           const Region*, BasicBlock*, bool);
       static SmallVector<BasicBlock*, 1> splitPredecessors(
           const Region*, SmallVector<BasicBlock*, 1>&, bool);
       static Instruction *getInsertPosition(BasicBlock*, bool);
-      static PProfID generatePProfID(Module*&, bool);
-      static bool instrumentSplitBlocks(
-          SmallVector<BasicBlock*, 1>&, SmallVector<BasicBlock*, 1>&, bool);
+      static bool instrumentSplitBlocks(SmallVector<BasicBlock*, 1>&,
+          SmallVector<BasicBlock*, 1>&, bool, size_t);
       static bool instrumentRegion(const Region*, bool);
 
     public:
@@ -74,27 +87,38 @@ namespace polli {
   };
 
   char ProfileScopDetection::ID = 0;
-  int ProfileScopDetection::LocalCounter = 0;
   bool ProfileScopDetection::calledSetup = false;
   shared_ptr<logger> ProfileScopDetection::Log = nullptr;
+  BBRegionMap ProfileScopDetection::entryExitToRegionMap = {};
+  RegionIDMap ProfileScopDetection::regionToIDMap = {};
 
   void ProfileScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.setPreservesAll();
     AU.addRequired<ScopDetectionWrapperPass>();
   }
 
-  size_t ProfileScopDetection::generateHash(Module *&M, bool isParent){
-    LocalCounter++;
-    hash<string> stringhashFn;
-    string suffix = isParent ? "Parent" : "SCoP";
-    string hashstring
-      = M->getName().str() + "::" + suffix + to_string(LocalCounter);
-    return stringhashFn(hashstring)/10000000000; //FIXME Avoid dividing hash
+  size_t ProfileScopDetection::generateMeasurementID(){
+    size_t newID;
+    bool newIDAlreadyExists;
+    do {
+      newID = rand() % 1000000000;
+      newIDAlreadyExists = false;
+      for(RegionIDMap::iterator it = regionToIDMap.begin();
+          it != regionToIDMap.end() && !newIDAlreadyExists; it++){
+        /*NOTE: = may be sufficient (instead of |=) because of the additional
+         * condition.
+         */
+        newIDAlreadyExists |= it->second.measurementID == newID;
+      }
+    } while(newIDAlreadyExists);
+
+    return newID;
   }
 
   shared_ptr<logger> ProfileScopDetection::getLogger(){
     if(!Log){
       Log = basic_logger_mt("profileScopsLogger", "profileScops.log");
+      Log->set_level(level::debug);
     }
     return Log;
   }
@@ -116,7 +140,7 @@ namespace polli {
   }
 
   void ProfileScopDetection::insertEnterRegionFunction(Module *&M,
-      Instruction *InsertPosition, PProfID &pprofID, bool isParent){
+      Instruction *InsertPosition, size_t measurementID, bool isParent){
     LLVMContext &context = M->getContext();
     Type *voidty = Type::getVoidTy(context);
     Type *int64Ty = Type::getInt64Ty(context);
@@ -126,12 +150,11 @@ namespace polli {
 
     //void enter_region(uint64_t, const char*)
     SmallVector<Value*, 2> arguments;
-    arguments.push_back(pprofID.globalID);
+    arguments.push_back(ConstantInt::get(int64Ty, measurementID, false));
     ostringstream name;
     name << M->getName().data() << "::"
       << InsertPosition->getFunction()->getName().data()
-      << "::" << (isParent ? "Parent" : "SCoP")
-      << " " << pprofID.LocalID;
+      << "::" << (isParent ? "Parent" : "SCoP");
     arguments.push_back(builder.CreateGlobalStringPtr(name.str()));
     FunctionType *FType
       = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
@@ -140,7 +163,7 @@ namespace polli {
   }
 
   void ProfileScopDetection::insertExitRegionFunction(
-      Module *&M, Instruction *InsertPosition, PProfID &pprofID){
+      Module *&M, Instruction *InsertPosition, size_t measurementID){
     LLVMContext &context = M->getContext();
     Type *voidty = Type::getVoidTy(context);
     Type *int64Ty = Type::getInt64Ty(context);
@@ -149,7 +172,7 @@ namespace polli {
 
     //void exit_region(uint64_t)
     SmallVector<Value*, 1> arguments;
-    arguments.push_back(pprofID.globalID);
+    arguments.push_back(ConstantInt::get(int64Ty, measurementID, false));
     FunctionType *FType = FunctionType::get(voidty, {int64Ty}, false);
     Constant *F = M->getOrInsertFunction("exit_region", FType);
     builder.CreateCall(F, arguments);
@@ -161,7 +184,8 @@ namespace polli {
     if(BB){
       //TODO May insert warning for nullptr
       //TODO Why is there a comma instead of using it directly in condition?
-      for(pred_iterator it = pred_begin(BB), end = pred_end(BB); it != end; it++){
+      for(pred_iterator it = pred_begin(BB), end = pred_end(BB);
+          it != end; it++){
         BasicBlock *predecessor = *it;
         if(IsEntry != R->contains(predecessor)){
           BasicBlock *splitBlock = SplitEdge(predecessor, BB);
@@ -204,18 +228,10 @@ namespace polli {
     return &*InsertPosition;
   }
 
-  PProfID ProfileScopDetection::generatePProfID(Module *&M, bool isParent){
-    Type *int64Ty = Type::getInt64Ty(M->getContext());
-    //FIXME According to docs ConstantInt::get(...) returns a ConstantInt,
-    //but clang complains...
-    return PProfID((ConstantInt*) ConstantInt::get(
-          int64Ty, generateHash(M, isParent), false), LocalCounter);;
-  }
-
   bool ProfileScopDetection::instrumentSplitBlocks(
       SmallVector<BasicBlock*, 1> &EntrySplits,
-      SmallVector<BasicBlock*, 1> &ExitSplits,
-      bool isParent){
+      SmallVector<BasicBlock*, 1> &ExitSplits, bool isParent,
+      size_t measurementID){
     bool isInstrumentable = true;
     if(EntrySplits.empty()){
       getLogger()->warn("Trying to instrument splits without entries");
@@ -228,16 +244,15 @@ namespace polli {
 
     if(isInstrumentable){
       Module *M = EntrySplits.front()->getModule();
-      PProfID pprofID = generatePProfID(M, isParent);
 
       for(BasicBlock *BB : EntrySplits){
         Instruction *InsertPosition = getInsertPosition(BB, true);
-        insertEnterRegionFunction(M, InsertPosition, pprofID, isParent);
+        insertEnterRegionFunction(M, InsertPosition, measurementID, isParent);
       }
 
       for(BasicBlock *BB : ExitSplits){
         Instruction *InsertPosition = getInsertPosition(BB, false);
-        insertExitRegionFunction(M, InsertPosition, pprofID);
+        insertExitRegionFunction(M, InsertPosition, measurementID);
       }
     }
 
@@ -246,7 +261,7 @@ namespace polli {
 
   bool ProfileScopDetection::instrumentRegion(const Region *R, bool isParent){
     getLogger()
-      ->info("Instrumenting (Parent: {}) {}", isParent, R->getNameStr());
+      ->debug("Instrumenting (Parent: {}) {}", isParent, R->getNameStr());
     BasicBlock *EntryBB = R->getEntry();
     BasicBlock *ExitBB = R->getExit();
     SmallVector<BasicBlock*, 1> EntrySplits
@@ -254,7 +269,13 @@ namespace polli {
     SmallVector<BasicBlock*, 1> ExitSplits
       = splitPredecessors(R, ExitBB, false);
 
-    return instrumentSplitBlocks(EntrySplits, ExitSplits, isParent);
+    entryExitToRegionMap[EntryBB] = R;
+    entryExitToRegionMap[ExitBB] = R;
+    size_t measurementID = generateMeasurementID();
+    regionToIDMap[R] = RegionID(measurementID, EntrySplits, ExitSplits);
+
+    return instrumentSplitBlocks(
+        EntrySplits, ExitSplits, isParent, measurementID);
   }
 
   bool ProfileScopDetection::doInitialization(Module &) {
@@ -267,12 +288,9 @@ namespace polli {
       = getAnalysis<ScopDetectionWrapperPass>();
     const ScopDetection &SD = SDWP.getSD();
 
-    Region *TopLevelRegion = SD.getRI()->getTopLevelRegion();
-
     for(const Region *R : SD){
-      bool scopGotInstrumented = instrumentRegion(R, false);
-      if(scopGotInstrumented){
-        InstrumentedScopsCounter++;
+
+      if(instrumentParents){
         bool parentGotInstrumented = false;
         const Region *Parent = R->getParent();
         if(Parent){
@@ -282,24 +300,28 @@ namespace polli {
             message << "Region is toplevel region.";
           } else {
             message << SD.regionIsInvalidBecause(Parent);
-            //FIXME Can't instrument SCoPs and parents simultaneously
-            //logger tells: warning: splits without exits
-            //parentGotInstrumented = instrumentRegion(Parent, true);
+            parentGotInstrumented = instrumentRegion(Parent, true);
           }
           getLogger()->info(message.str());
         } else {
-          getLogger()->info("SCoP {} has no parent.", R->getNameStr());
+          getLogger()->warn("SCoP {} has no parent.", R->getNameStr());
         }
 
         if(parentGotInstrumented){
+          anyInstrumented = true;
           InstrumentedParentsCounter++;
         } else {
           NonInstrumentedParentsCounter++;
         }
       } else {
-        getLogger()
-          ->error("SCoP {} could not be instrumented.", R->getNameStr());
-        NonInstrumentedScopsCounter++;
+        if(instrumentRegion(R, false)){
+          anyInstrumented = true;
+          InstrumentedScopsCounter++;
+        } else {
+          getLogger()
+            ->error("SCoP {} could not be instrumented.", R->getNameStr());
+          NonInstrumentedScopsCounter++;
+        }
       }
     }
     return anyInstrumented;
@@ -330,9 +352,9 @@ namespace polli {
 
   static llvm::RegisterPass<ProfileScopDetection>
     X("polli-profile-scop-detection",
-      "PolyJIT - Profile runtime performance of rejected SCoPs");
+        "PolyJIT - Profile runtime performance of rejected SCoPs");
 
-  Pass *createProfileScopsPass() {
-    return new ProfileScopDetection();
+  Pass *createProfileScopsPass(bool instrumentParents) {
+    return new ProfileScopDetection(instrumentParents);
   }
 }
