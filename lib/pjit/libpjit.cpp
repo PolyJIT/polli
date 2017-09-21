@@ -74,6 +74,13 @@ struct ThreadPoolCreator {
 };
 
 static ManagedStatic<llvm::ThreadPool, ThreadPoolCreator> Pool;
+struct polyjit_shutdown_obj {
+  ~polyjit_shutdown_obj() {
+    Pool->wait();
+    llvm_shutdown();
+  }
+};
+static polyjit_shutdown_obj shutdown;
 
 namespace polli {
 using MainFnT = std::function<void(int, char **)>;
