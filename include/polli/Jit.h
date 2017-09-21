@@ -33,7 +33,7 @@ class PolyJIT {
   std::unordered_map<uint64_t, std::string> Regions;
 
 public:
-  explicit PolyJIT() : Pool(1) { setup(); }
+  explicit PolyJIT() { setup(); }
 
   ~PolyJIT() {
     tearDown();
@@ -97,19 +97,8 @@ public:
 
   /**  @} */
 
-  /**
-   * @name Asynchronous task scheduling interface.
-   * @{ */
-  template <typename Function, typename... Args>
-  auto async(Function &&F, Args &&... ArgList) {
-    return Pool.async(F, ArgList...);
-  }
-
-  void wait() { Pool.wait(); }
-
 private:
   CodeCacheT CodeCache;
-  llvm::ThreadPool Pool;
 };
 }
 #endif /* end of include guard: POLLI_JIT_H */

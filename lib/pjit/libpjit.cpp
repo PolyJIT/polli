@@ -19,7 +19,6 @@
 #include <cstdlib>
 #include <deque>
 #include <memory>
-#include <stdlib.h>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -36,9 +35,9 @@
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
 #include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/Support/ManagedStatic.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
 
@@ -69,6 +68,12 @@ REGISTER_LOG(console, DEBUG_TYPE);
 
 static ManagedStatic<PolyJIT> JitContext;
 static ManagedStatic<SpecializingCompiler> Compiler;
+
+struct ThreadPoolCreator {
+  static void *call() { return new llvm::ThreadPool(1); }
+};
+
+static ManagedStatic<llvm::ThreadPool, ThreadPoolCreator> Pool;
 
 namespace polli {
 using MainFnT = std::function<void(int, char **)>;
@@ -130,9 +135,11 @@ void pjit_trace_fnstats_exit(uint64_t Id) {
  */
 void *pjit_main(const char *fName, void *ptr, uint64_t ID,
                 unsigned paramc, char **params) {
+  // 1. JitContext.
   JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
 
   bool CacheHit;
+  // 2. Compiler.
   auto M = Compiler->getModule(ID, fName, CacheHit);
   SpecializerRequest Request((uint64_t)fName, paramc, params, M);
 
@@ -142,8 +149,8 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
     JitContext->addRegion(F.getName().str(), ID);
 
   CacheKey K{ID, Values.hash()};
-  auto FutureFn =
-      JitContext->async(GetOrCreateVariantFunction, Request, ID, K);
+  // 3. ThreadPool
+  auto FutureFn = Pool->async(GetOrCreateVariantFunction, Request, ID, K);
 
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!CacheHit)
@@ -187,15 +194,4 @@ bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
   return ptr;
 }
 } /* extern "C" */
-
-struct PolliShutdown {
-  ~PolliShutdown() {
-    if (JitContext.isConstructed())
-      JitContext->wait();
-  }
-private:
-  llvm_shutdown_obj Shutdown;
-};
-
-static PolliShutdown Cleanup;
 } /* polli */
