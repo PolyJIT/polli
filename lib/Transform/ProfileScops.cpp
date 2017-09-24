@@ -56,6 +56,7 @@ namespace polli {
       int NonInstrumentedScopsCounter = 0;
       int InstrumentedParentsCounter = 0;
       int NonInstrumentedParentsCounter = 0;
+      int ScopDetectionIterated = 0;
 
     public:
       static char ID;
@@ -233,11 +234,13 @@ namespace polli {
       RegionID regionID, size_t measurementID){
     bool isInstrumentable = true;
     if(regionID.EntrySplits.empty()){
-      getLogger()->critical("Trying to instrument splits without entries");
+      getLogger()->critical("Trying to instrument splits without entries: {}",
+          regionID.region->getNameStr());
       isInstrumentable = false;
     }
     if(regionID.ExitSplits.empty()){
-      getLogger()->critical("Trying to instrument splits without exits");
+      getLogger()->critical("Trying to instrument splits without exits: {}",
+          regionID.region->getNameStr());
       isInstrumentable = false;
     }
 
@@ -319,7 +322,7 @@ namespace polli {
     const ScopDetection &SD = SDWP.getSD();
 
     for(const Region *R : SD){
-
+      ScopDetectionIterated++;
       if(instrumentParents){
         bool parentGotInstrumented = false;
         const Region *Parent = R->getParent();
@@ -366,6 +369,8 @@ namespace polli {
       ->info("Instrumented parents: {:d}", InstrumentedParentsCounter);
     getLogger()->info(
         "Not instrumented parents: {:d}", NonInstrumentedParentsCounter);
+    getLogger()->debug(
+        "ScopDetection iterated {:d} times", ScopDetectionIterated);
 
     bool insertedSetupTracing = false;
     if(!calledSetup && InstrumentedScopsCounter > 0){
