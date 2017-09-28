@@ -315,9 +315,16 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
   for (auto KV : Events) {
     if (cnt > 0)
       vals << ",";
+    auto Key  = KV.first;
+    if (! Regions.count(Key))
+        std::cerr << fmt::format("Key {:d} missing in Regions.", Key);
+    if (! Events.count(Key))
+        std::cerr << fmt::format("Key {:d} missing in Events.", Key);
+    if (! Entries.count(Key))
+        std::cerr << fmt::format("Key {:d} missing in Entries.", Key);
     vals << fmt::format(" ('{:s}', {:d}, {:d}, {:d}, {:d})",
-                        Regions.at(KV.first), KV.first, KV.second,
-                        Entries.at(KV.first), run_id);
+                        Regions.at(Key), Key, KV.second,
+                        Entries.at(Key), run_id);
     cnt++;
   }
   vals << ";";
@@ -358,12 +365,17 @@ void enter_region(uint64_t id, const char *name) {
     TD->Entries[id] = 0;
   if (!TD->Regions.count(id))
     TD->Regions[id] = name;
+
   TD->Events[id] -= time;
   TD->Entries[id] += 1;
 }
 
 void exit_region(uint64_t id) {
   uint64_t time = papi::PAPI_get_real_usec();
+  if (!TD->Events.count(id))
+    std::cerr << fmt::format(
+        "exit_region called before enter_region for ID: {:d}!\n", id);
+
   TD->Events[id] += time;
 }
 

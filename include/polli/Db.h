@@ -21,9 +21,9 @@ void ValidateOptions();
 
 namespace tracing {
 struct TraceData {
-  std::unordered_map<uint64_t, uint64_t> Events;
-  std::unordered_map<uint64_t, uint64_t> Entries;
-  std::unordered_map<uint64_t, std::string> Regions;
+  EventMapTy Events;
+  EventMapTy Entries;
+  RegionMapTy Regions;
 
   ~TraceData();
 };

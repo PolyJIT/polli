@@ -86,8 +86,8 @@ static void registerProfileScops(const PassManagerBuilder &,
     polly::registerCanonicalicationPasses(PM);
     PM.add(polly::createScopDetectionWrapperPassPass());
     PM.add(polli::createProfileScopsPass(true));
-    PM.add(createBarrierNoopPass());
     PM.add(polli::createProfileScopsPass(false));
+    PM.add(llvm::createBarrierNoopPass());
   }
 }
 
