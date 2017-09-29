@@ -69,11 +69,19 @@ REGISTER_LOG(console, DEBUG_TYPE);
 static ManagedStatic<PolyJIT> JitContext;
 static ManagedStatic<SpecializingCompiler> Compiler;
 
+static void wait_for_threads();
 struct ThreadPoolCreator {
-  static void *call() { return new llvm::ThreadPool(1); }
+  static void *call() {
+    std::atexit(&wait_for_threads);
+    return new llvm::ThreadPool(1);
+  }
 };
 
 static ManagedStatic<llvm::ThreadPool, ThreadPoolCreator> Pool;
+static void wait_for_threads() {
+  Pool->wait();
+}
+
 struct polyjit_shutdown_obj {
   ~polyjit_shutdown_obj() {
     Pool->wait();
