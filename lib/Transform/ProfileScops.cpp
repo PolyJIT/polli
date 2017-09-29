@@ -47,20 +47,13 @@ namespace polli {
     SetVector<BasicBlock*> ExitSplits;
   };
 
-  typedef map<BasicBlock*, const Region*> BBRegionMap;
-  typedef map<const Region*, RegionID> RegionIDMap;
-
-  using IDToNameMapTy = std::unordered_map<size_t, std::string>;
+  using BBRegionMap = unordered_map<BasicBlock*, const Region*>;
+  using RegionIDMap = unordered_map<const Region*, RegionID>;
+  using IDToNameMapTy = unordered_map<size_t, string>;
 
   class ProfileScopDetection : public FunctionPass {
     private:
       static bool calledSetup;
-      //static shared_ptr<logger> Log;
-      static BBRegionMap entryExitToRegionMap;
-      static RegionIDMap regionToIDMap;
-
-      IDToNameMapTy IDToName;
-
       bool instrumentParents;
       int InstrumentedScopsCounter = 0;
       int NonInstrumentedScopsCounter = 0;
@@ -68,8 +61,9 @@ namespace polli {
       int NonInstrumentedParentsCounter = 0;
       int ScopDetectionIterated = 0;
 
-      llvm::LoopInfo *LI = nullptr;
-      llvm::DominatorTree *DT = nullptr;
+      IDToNameMapTy IDToName;
+      LoopInfo *LI = nullptr;
+      DominatorTree *DT = nullptr;
     public:
       static char ID;
       //NOTE: Default constructor required
@@ -86,13 +80,11 @@ namespace polli {
       static void insertExitRegionFunction(Module*&, Instruction*, size_t);
       SetVector<BasicBlock*> splitPredecessors(
           const Region*, BasicBlock*, bool);
-      //static SmallVector<BasicBlock*, 1> splitPredecessors(
-      //    const Region*, SmallVector<BasicBlock*, 1>&, bool);
       static Instruction *getInsertPosition(BasicBlock*, bool);
       void insertEnterRegionFunction(Module*&, Instruction*, size_t);
       bool instrumentSplitBlocks(RegionID, size_t);
       bool instrumentRegion(const Region*, int ScopNum);
-      std::string getUniqueName(const llvm::Function &F, const llvm::Module &M,
+      string getUniqueName(const Function &F, const Module &M,
                                 int ScopNum);
 
     public:
@@ -104,27 +96,21 @@ namespace polli {
 
   char ProfileScopDetection::ID = 0;
   bool ProfileScopDetection::calledSetup = false;
-  //shared_ptr<logger> ProfileScopDetection::Log = nullptr;
-  BBRegionMap ProfileScopDetection::entryExitToRegionMap = {};
-  RegionIDMap ProfileScopDetection::regionToIDMap = {};
 
   void ProfileScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetectionWrapperPass>();
-    AU.addRequiredTransitive<llvm::LoopInfoWrapperPass>();
-    AU.addRequiredTransitive<llvm::DominatorTreeWrapperPass>();
+    AU.addRequiredTransitive<LoopInfoWrapperPass>();
+    AU.addRequiredTransitive<DominatorTreeWrapperPass>();
   }
 
   size_t ProfileScopDetection::generateMeasurementID(StringRef Name) {
-    std::hash<std::string> str_hasher;
+    hash<string> str_hasher;
     return str_hasher(Name.str());
   }
 
   shared_ptr<logger> ProfileScopDetection::getLogger(){
-    static auto Log = basic_logger_st("profileScopsLogger", "profileScops.log");
-    Log->set_level(level::debug);
-    //if(!Log){
-    //  Log->set_level(level::debug);
-    //}
+    static auto Log = basic_logger_st(DEBUG_TYPE, "profileScops.log", true);
+    Log->set_level(level::debug); //TODO Think about how to call it only once.
     return Log;
   }
 
@@ -146,7 +132,7 @@ namespace polli {
 
   void ProfileScopDetection::insertEnterRegionFunction(Module *&M,
       Instruction *InsertPosition, size_t measurementID){
-    getLogger()->warn("Insert Region Enter:: {:d}", measurementID);
+    getLogger()->debug("Insert Region Enter:: {:d}", measurementID);
     LLVMContext &context = M->getContext();
     Type *voidty = Type::getVoidTy(context);
     Type *int64Ty = Type::getInt64Ty(context);
@@ -157,7 +143,7 @@ namespace polli {
     //void enter_region(uint64_t, const char*)
     SmallVector<Value*, 2> arguments;
     arguments.push_back(ConstantInt::get(int64Ty, measurementID, false));
-    std::string name = IDToName[measurementID];
+    string name = IDToName[measurementID];
     arguments.push_back(builder.CreateGlobalStringPtr(name));
     FunctionType *FType
       = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
@@ -167,7 +153,7 @@ namespace polli {
 
   void ProfileScopDetection::insertExitRegionFunction(
       Module *&M, Instruction *InsertPosition, size_t measurementID){
-    getLogger()->warn("Insert Region Exit:: {:d}", measurementID);
+    getLogger()->debug("Insert Region Exit:: {:d}", measurementID);
     LLVMContext &context = M->getContext();
     Type *voidty = Type::getVoidTy(context);
     Type *int64Ty = Type::getInt64Ty(context);
@@ -187,26 +173,16 @@ namespace polli {
     SetVector<BasicBlock*> splitBlocks;
     assert(BB && "Trying to split a BB that is null.");
 
-    //TODO May insert warning for nullptr
-    //TODO Why is there a comma instead of using it directly in condition?
-    llvm::errs() << "============\n";
-    auto *F = BB->getParent();
     SmallVector<BasicBlock *, 2> SplitPreds;
-    for (auto *PredBB : llvm::predecessors(BB)) {
-      llvm::errs() << "PredBB:\n";
-      PredBB->print(llvm::errs());
+    for (BasicBlock *PredBB : predecessors(BB)) {
       if (IsEntry != R->contains(PredBB)) {
         SplitPreds.push_back(PredBB);
       }
     }
-    BasicBlock *NewBB = llvm::SplitBlockPredecessors(
+    BasicBlock *NewBB = SplitBlockPredecessors(
         BB, SplitPreds, ".profile.exit.split", DT, LI);
 
     splitBlocks.insert(NewBB);
-
-    llvm::errs() << "============\n";
-    llvm::errs() << F->getName().str() << "\n"; 
-    R->print(llvm::errs());
 
     return splitBlocks;
   }
@@ -232,40 +208,27 @@ namespace polli {
 
   bool ProfileScopDetection::instrumentSplitBlocks(
       RegionID regionID, size_t measurementID){
-    bool isInstrumentable = true;
-    //if(regionID.EntrySplits.empty()){
-    //  getLogger()->critical("Trying to instrument splits without entries: {}",
-    //      regionID.region->getNameStr());
-    //  isInstrumentable = false;
-    //}
-    //if(regionID.ExitSplits.empty()){
-    //  getLogger()->critical("Trying to instrument splits without exits: {}",
-    //      regionID.region->getNameStr());
-    //  isInstrumentable = false;
-    //}
+    Module *M = regionID.EntrySplits.front()->getModule();
 
-    if(isInstrumentable){
-      Module *M = regionID.EntrySplits.front()->getModule();
-
-      for(BasicBlock *BB : regionID.EntrySplits){
-        Instruction *InsertPosition = getInsertPosition(BB, true);
-        insertEnterRegionFunction(
-            M, InsertPosition, regionID.measurementID);
-      }
-
-      for(BasicBlock *BB : regionID.ExitSplits){
-        Instruction *InsertPosition = getInsertPosition(BB, false);
-        insertExitRegionFunction(M, InsertPosition, regionID.measurementID);
-      }
+    for(BasicBlock *BB : regionID.EntrySplits){
+      Instruction *InsertPosition = getInsertPosition(BB, true);
+      insertEnterRegionFunction(
+          M, InsertPosition, regionID.measurementID);
     }
 
-    return isInstrumentable;
+    for(BasicBlock *BB : regionID.ExitSplits){
+      Instruction *InsertPosition = getInsertPosition(BB, false);
+      insertExitRegionFunction(M, InsertPosition, regionID.measurementID);
+    }
+
+    //Check whether both loops iterated at least once
+    return !(regionID.EntrySplits.empty() || regionID.ExitSplits.empty());
   }
 
-  std::string ProfileScopDetection::getUniqueName(const llvm::Function &F,
-                                                  const llvm::Module &M,
+  string ProfileScopDetection::getUniqueName(const Function &F,
+                                                  const Module &M,
                                                   int ScopNum) {
-    std::string Name = fmt::format("{:s}::{:s}::{:d}::{:s}", M.getName().str(),
+    string Name = fmt::format("{:s}::{:s}::{:d}::{:s}", M.getName().str(),
                                    F.getName().str(), ScopNum,
                                    (instrumentParents ? "Parent" : "SCoP"));
     return Name;
@@ -274,59 +237,20 @@ namespace polli {
   bool ProfileScopDetection::instrumentRegion(const Region *R, int ScopNum){
     getLogger()->debug(
         "Instrumenting (Parent: {}) {}", instrumentParents, R->getNameStr());
-    bool instrumentable = true;
-
     BasicBlock *EntryBB = R->getEntry();
     const Function &F = *EntryBB->getParent();
 
-    std::string UniqueName = getUniqueName(F, *F.getParent(), ScopNum);
+    string UniqueName = getUniqueName(F, *F.getParent(), ScopNum);
     size_t measurementID = generateMeasurementID(UniqueName);
-    llvm::errs() << UniqueName << " ID " << measurementID << "\n";
-    SetVector<BasicBlock*> EntrySplits
-      = splitPredecessors(R, EntryBB, true);
-    //if(EntrySplits.empty()){
-    //  //Retrieve entry splits of previously instrumented region
-    //  if(entryExitToRegionMap.count(EntryBB)){
-    //    EntrySplits = regionToIDMap.at(entryExitToRegionMap.at(EntryBB))
-    //      .EntrySplits;
-    //  } else {
-    //    getLogger()->warn("Has no entry splits and there are no entry "
-    //        "splits found for its EntryBB: {}", R->getNameStr());
-    //    instrumentable = false;
-    //  }
-    //} else {
-      entryExitToRegionMap[EntryBB] = R;
-    //}
+    SetVector<BasicBlock*> EntrySplits = splitPredecessors(R, EntryBB, true);
 
     BasicBlock *ExitBB = R->getExit();
-    SetVector<BasicBlock*> ExitSplits
-      = splitPredecessors(R, ExitBB, false);
-    //if(ExitSplits.empty()){
-    //  //Retrieve exit splits of previously instrumented region
-    //  if(entryExitToRegionMap.count(ExitBB)){
-    //    ExitSplits = regionToIDMap.at(entryExitToRegionMap.at(ExitBB))
-    //      .ExitSplits;
-    //  } else {
-    //    getLogger()->warn("Has no exit splits and there are no exit "
-    //        "splits found for its ExitBB: {}", R->getNameStr());
-    //    instrumentable = false;
-    //  }
-    //} else {
-      entryExitToRegionMap[ExitBB] = R;
-    //}
+    SetVector<BasicBlock*> ExitSplits = splitPredecessors(R, ExitBB, false);
 
-    if(instrumentable){
-      IDToName[measurementID] = UniqueName;
+    IDToName[measurementID] = UniqueName;
 
-      RegionID regionID = RegionID(R, measurementID, EntrySplits, ExitSplits);
-      regionToIDMap[R] = regionID;
-      getLogger()->warn(UniqueName);
-      getLogger()->warn(R->getNameStr());
-      getLogger()->warn(measurementID);
-      return instrumentSplitBlocks(regionID, measurementID);
-    } else {
-      return false;
-    }
+    RegionID regionID = RegionID(R, measurementID, EntrySplits, ExitSplits);
+    return instrumentSplitBlocks(regionID, measurementID);
   }
 
   bool ProfileScopDetection::doInitialization(Module &) {
@@ -338,9 +262,6 @@ namespace polli {
     DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     int ScopNum = 0;
 
-    //getLogger()->warn("Running on: {:s}", F.getName().str());
-    //if (F.getName() == "trie_insert")
-    //  F.print(llvm::outs());
     bool anyInstrumented = false;
     const ScopDetectionWrapperPass &SDWP
       = getAnalysis<ScopDetectionWrapperPass>();
@@ -384,10 +305,8 @@ namespace polli {
 
       ScopNum++;
     }
-    //if (F.getName() == "trie_insert")
-    //  F.print(llvm::outs());
-    //
-    std::string ModStr;
+
+    string ModStr;
     raw_string_ostream os(ModStr);
     AnalysisManager<Module> AM;
     ModulePassManager PM;
@@ -396,8 +315,8 @@ namespace polli {
     PM.addPass(PrintModuleP);
     PM.run(*F.getParent(), AM);
     os.flush();
-    std::error_code ec;
-    llvm::tool_output_file outf(
+    error_code ec;
+    tool_output_file outf(
         fmt::format("{:s}-profile-scops-after.ll", F.getName().str()), ec,
         sys::fs::OpenFlags::F_RW);
     outf.os() << ModStr;
@@ -421,7 +340,7 @@ namespace polli {
     bool insertedSetupTracing = false;
     if(!calledSetup && InstrumentedScopsCounter > 0){
       Function *Main = M.getFunction("main");
-      if(Main != nullptr){
+      if(Main){
         insertSetupTracingFunction(Main);
         insertedSetupTracing = true;
         calledSetup = true;
@@ -431,7 +350,7 @@ namespace polli {
     return insertedSetupTracing;
   }
 
-  static llvm::RegisterPass<ProfileScopDetection>
+  static RegisterPass<ProfileScopDetection>
     X("polli-profile-scop-detection",
         "PolyJIT - Profile runtime performance of rejected SCoPs");
 
