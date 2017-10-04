@@ -151,7 +151,7 @@ void pjit_trace_fnstats_exit(uint64_t Id) {
 void *pjit_main(const char *fName, void *ptr, uint64_t ID,
                 unsigned paramc, char **params) {
   // 1. JitContext.
-  JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  pjit_trace_fnstats_entry(JitRegion::CODEGEN);
 
   bool CacheHit;
   // 2. Compiler.
@@ -171,7 +171,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
   if (!CacheHit)
     FutureFn.wait();
 
-  JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  pjit_trace_fnstats_exit(JitRegion::CODEGEN);
 
   auto FnIt = JitContext->find(K);
   if (FnIt != JitContext->end()) {
@@ -195,7 +195,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
  */
 bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
                             unsigned paramc, char **params) {
-  JitContext->enter(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  pjit_trace_fnstats_entry(JitRegion::CODEGEN);
 
   bool CacheHit;
   auto M = Compiler->getModule(ID, fName, CacheHit);
@@ -205,7 +205,7 @@ bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
     llvm::Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
   }
-  JitContext->exit(JitRegion::CODEGEN, papi::PAPI_get_real_usec());
+  pjit_trace_fnstats_exit(JitRegion::CODEGEN);
   return ptr;
 }
 } /* extern "C" */
