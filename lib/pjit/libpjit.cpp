@@ -82,13 +82,13 @@ static void wait_for_threads() {
   Pool->wait();
 }
 
-struct polyjit_shutdown_obj {
-  ~polyjit_shutdown_obj() {
+struct PolyjitShutdownObject {
+  ~PolyjitShutdownObject() {
     Pool->wait();
     llvm_shutdown();
   }
 };
-static polyjit_shutdown_obj shutdown;
+static PolyjitShutdownObject Shutdown;
 
 namespace polli {
 using MainFnT = std::function<void(int, char **)>;
@@ -109,12 +109,13 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   assert(Variant && "Failed to get a new variant.");
   auto MaybeModule = Compiler->addModule(std::move(Variant));
 
-  console->error_if(!(bool)MaybeModule, "Adding the module failed!");
-  assert((bool)MaybeModule && "Adding the module failed!");
+  console->error_if(!MaybeModule,
+                    "Adding the module failed!");
+  assert(MaybeModule && "Adding the module failed!");
 
   llvm::JITSymbol FPtr = Compiler->findSymbol(FnName, PM.getDataLayout());
   auto Addr = FPtr.getAddress();
-  console->error_if(!(bool)Addr, "Could not get the address of the JITSymbol.");
+  console->error_if(!Addr, "Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
 
   auto CacheIt = JitContext->insert(std::make_pair(K, std::move(FPtr)));
@@ -156,20 +157,23 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
   bool CacheHit;
   // 2. Compiler.
   auto M = Compiler->getModule(ID, fName, CacheHit);
-  SpecializerRequest Request((uint64_t)fName, paramc, params, M);
+  SpecializerRequest Request(reinterpret_cast<uint64_t>(fName), paramc, params,
+                             M);
 
   RunValueList Values = runValues(Request);
   llvm::Function &F = Request.prototype();
-  if (!CacheHit)
+  if (!CacheHit) {
     JitContext->addRegion(F.getName().str(), ID);
+  }
 
   CacheKey K{ID, Values.hash()};
   // 3. ThreadPool
   auto FutureFn = Pool->async(GetOrCreateVariantFunction, Request, ID, K);
 
   // If it was not a cache-hit, wait until the first variant is ready.
-  if (!CacheHit)
+  if (!CacheHit) {
     FutureFn.wait();
+  }
 
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
 
@@ -177,8 +181,9 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
   if (FnIt != JitContext->end()) {
     auto &Symbol = FnIt->second;
     auto Addr = Symbol.getAddress();
-    if (Addr)
-      return (void *)*Addr;
+    if (Addr) {
+      return reinterpret_cast<void *>(*Addr);
+    }
   }
   return ptr;
 }
@@ -193,13 +198,14 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
-                            unsigned paramc, char **params) {
+void *pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
+                             unsigned paramc, char **params) {
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
 
   bool CacheHit;
   auto M = Compiler->getModule(ID, fName, CacheHit);
-  SpecializerRequest Request((uint64_t)fName, paramc, params, M);
+  SpecializerRequest Request(reinterpret_cast<uint64_t>(fName), paramc, params,
+                             M);
 
   if (!CacheHit) {
     llvm::Function &F = Request.prototype();
@@ -209,4 +215,4 @@ bool pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
   return ptr;
 }
 } /* extern "C" */
-} /* polli */
+} // namespace polli
