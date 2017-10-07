@@ -278,7 +278,12 @@ namespace polli {
           if(Parent->isTopLevelRegion()){
             message << "Region is toplevel region.";
           } else {
-            message << SD.regionIsInvalidBecause(Parent);
+            string invalidReason = SD.regionIsInvalidBecause(Parent);
+            if(invalidReason.empty()){
+              message << "Polly returned no reason";
+            } else {
+              message << invalidReason;
+            }
             parentGotInstrumented = instrumentRegion(Parent, ScopNum);
           }
           getLogger()->info(message.str());
