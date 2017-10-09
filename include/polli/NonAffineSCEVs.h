@@ -35,7 +35,7 @@ class ScalarEvolution;
 class Value;
 class Loop;
 class LoadInst;
-} // namespace llvm // namespace llvm
+} // namespace llvm
 
 namespace polli {
 bool isNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
@@ -45,5 +45,5 @@ bool isNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
 std::vector<const llvm::SCEV *>
 getParamsInNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
                          const llvm::SCEV *Expr, llvm::ScalarEvolution &SE);
-} // namespace polli // namespace polli
+} // namespace polli
 #endif // POLLI_NONAFFINESCEVS_H

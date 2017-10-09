@@ -31,7 +31,7 @@
 
 namespace llvm {
 class Function;
-} // namespace llvm // namespace llvm // namespace llvm
+} // namespace llvm
 
 namespace polli {
 class SpecializerRequest {
@@ -80,5 +80,5 @@ void printArgs(const llvm::Function &F, size_t argc,
                const std::vector<void *> &Params);
 #endif
 void printRunValues(const RunValueList &Values);
-} // namespace polli // namespace polli // namespace polli
+} // namespace polli
 #endif // POLLI_RUNVALUES_H

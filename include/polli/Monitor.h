@@ -69,7 +69,7 @@ private:
   object_type Obj;
   std::mutex M;
 };
-} // namespace polli // namespace polli
+} // namespace polli
 
 #endif // POLLI_MONITOR_H
 

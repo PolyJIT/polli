@@ -32,5 +32,5 @@ void SetOptimizationPipeline(PipelineType Choice);
 // @param F The function to optimize
 // @return The optimized function.
 std::shared_ptr<Module> optimizeForRuntime(std::shared_ptr<Module> M);
-} // namespace polli // namespace polli // namespace polli // namespace polli
+} // namespace polli
 #endif // POLLI_RUNTIMEOPTIMIZER_H

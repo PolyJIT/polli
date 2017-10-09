@@ -48,11 +48,11 @@ static inline void setup(const std::string &name) {
     Logger->set_level(polli::opt::LogLevel);
   }
 }
-} // namespace // namespace
+} // namespace
 
 namespace polli {
 std::shared_ptr<spdlog::logger> register_log(const std::string &name) {
   setup(name);
   return spdlog::get(name);
 }
-} // namespace polli // namespace polli
+} // namespace polli

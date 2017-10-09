@@ -74,4 +74,4 @@ void constantExprToInstruction(Instruction &I, InstrList &Converted,
     }
   }
 }
-} // namespace polli // namespace polli
+} // namespace polli

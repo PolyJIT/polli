@@ -42,7 +42,7 @@ struct CacheKey {
     return Addr < O.Addr || (Addr == O.Addr && ValueHash < O.ValueHash);
   }
 };
-} // namespace polli // namespace polli // namespace polli // namespace polli // namespace polli
+} // namespace polli
 
 namespace std {
 template <> struct hash<polli::CacheKey> {
@@ -51,5 +51,5 @@ template <> struct hash<polli::CacheKey> {
     return H;
   }
 };
-} // namespace std // namespace std // namespace std // namespace std // namespace std
+} // namespace std
 #endif // POLLI_CACHING_H
