@@ -6,8 +6,8 @@
 
 #include <fstream>
 #include <iostream>
-#include <string>
 #include <map>
+#include <string>
 
 namespace pprof {
 static std::map<uint32_t, PPStringRegion> PPStrings;
@@ -20,11 +20,11 @@ struct FileOptions {
 FileOptions getFileOptions() {
   FileOptions Opts;
 
-  const char *profile = std::getenv("PPROF_FILE_PROFILE");
-  const char *calls = std::getenv("PPROF_FILE_CALLS");
+  const char *Profile = std::getenv("PPROF_FILE_PROFILE");
+  const char *Calls = std::getenv("PPROF_FILE_CALLS");
 
-  Opts.profile = profile ? profile : "papi.profile.out";
-  Opts.calls = calls ? calls : "papi.calls.out";
+  Opts.profile = Profile ? Profile : "papi.profile.out";
+  Opts.calls = Calls ? Calls : "papi.calls.out";
 
   return Opts;
 }
@@ -37,20 +37,20 @@ void StoreRun(Run<PPEvent> &Events, const Options &opts) {
     return;
 
   FileOptions Opts = getFileOptions();
-  ofstream out(Opts.profile, ios_base::out | ios_base::app);
+  ofstream Out(Opts.profile, ios_base::out | ios_base::app);
 
   // Append Events
-  for (auto &event : Events)
-    out << event;
+  for (auto &Event : Events)
+    Out << Event;
 
-  out.flush();
-  out.close();
+  Out.flush();
+  Out.close();
 
   // Append calls to papi
-  FILE *fp = fopen(Opts.calls.c_str(), "a+");
-  if (fp) {
-    fprintf(fp, "%zu\n", Events.size());
-    fclose(fp);
+  FILE *Fp = fopen(Opts.calls.c_str(), "a+");
+  if (Fp) {
+    fprintf(Fp, "%zu\n", Events.size());
+    fclose(Fp);
   }
 }
 
@@ -84,30 +84,30 @@ static bool ReadRun(std::unique_ptr<std::ifstream> &in, Run<PPEvent> &Events,
   return true;
 }
 
-std::unique_ptr<ifstream> ifs;
+std::unique_ptr<ifstream> Ifs;
 
 bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
              const Options &opt) {
   FileOptions FileOpts = getFileOptions();
-  bool gotValidRun = false;
+  bool GotValidRun = false;
 
-  if (!ifs) {
-    ifs = std::unique_ptr<std::ifstream>(
+  if (!Ifs) {
+    Ifs = std::unique_ptr<std::ifstream>(
         new std::ifstream(FileOpts.profile, ios_base::in));
     std::cout << "Reading runs from: " << FileOpts.profile << "\n";
   }
 
-  if (ifs) {
+  if (Ifs) {
     Events.clear();
-    gotValidRun = file::ReadRun(ifs, Events, Regions);
+    GotValidRun = file::ReadRun(Ifs, Events, Regions);
 
-    if (!gotValidRun) {
-      ifs->close();
-      ifs.reset(nullptr);
+    if (!GotValidRun) {
+      Ifs->close();
+      Ifs.reset(nullptr);
     }
   }
 
-  return gotValidRun;
+  return GotValidRun;
 }
 
 } // namespace file

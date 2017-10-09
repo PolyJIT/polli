@@ -6,30 +6,30 @@
 // License. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_RUNTIME_VALUES_H
-#define POLLI_RUNTIME_VALUES_H
+#ifndef POLLI_RUNTIMEVALUES_H
+#define POLLI_RUNTIMEVALUES_H
 
 #include "polli/log.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Type.h"
+#include "llvm/Support/Casting.h"
 
+#include <algorithm>
 #include <boost/functional/hash.hpp>
+#include <iostream>
 #include <memory>
 #include <vector>
-#include <iostream>
-#include <algorithm>
 
 
 namespace {
 template <typename C, typename P> C filterOut(C const &container, P pred) {
-  C filtered(container);
-  filtered.erase(remove_if(filtered.begin(), filtered.end(), pred),
-                 filtered.end());
-  return filtered;
+  C Filtered(container);
+  Filtered.erase(remove_if(Filtered.begin(), Filtered.end(), pred),
+                 Filtered.end());
+  return Filtered;
 }
-}
+} // namespace
 
 namespace polli {
 template <typename T>
@@ -42,7 +42,7 @@ template<typename T>
 inline bool canSpecialize(const RunValue<T> &V) {
   return V.Arg->hasAttr("polli.specialize");
 }
-} // end of polli namespace
+} // namespace polli
 
 namespace polli {
 inline size_t hash_value(const polli::RunValue<uint64_t *> &V) {
@@ -89,20 +89,20 @@ public:
       return !canSpecialize(V);
     });
 
-    int i = 0;
-    std::stringstream os;
-    os << "[";
+    int I = 0;
+    std::stringstream Os;
+    Os << "[";
     for (auto &V : Tmp) {
-      if (i > 0)
-        os << ", ";
+      if (I > 0)
+        Os << ", ";
       if (canSpecialize(V))
-        os << *V.value;
+        Os << *V.value;
       else
-        os << V.value;
-      i++;
+        Os << V.value;
+      I++;
     }
-    os << "]";
-    return os.str();
+    Os << "]";
+    return Os.str();
   }
 
   reference operator[](size_t i) { return List[i]; }
@@ -111,7 +111,7 @@ private:
   RunValueListT List;
   std::size_t Seed;
 };
-} // end of polli namespace
+} // namespace polli
 
 namespace std {
 template <> struct hash<const polli::RunValueList> {
@@ -119,5 +119,5 @@ template <> struct hash<const polli::RunValueList> {
     return This.hash();
   }
 };
-}
-#endif //POLLI_RUNTIME_VALUES_H
+} // namespace std
+#endif // POLLI_RUNTIMEVALUES_H

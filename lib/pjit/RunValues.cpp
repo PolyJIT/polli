@@ -2,10 +2,10 @@
 #include "polli/log.h"
 #include "pprof/Tracing.h"
 
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/IR/Constants.h"
 
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
@@ -28,14 +28,14 @@ SpecializerRequest::init(std::shared_ptr<llvm::Module> PrototypeM) {
 RunValueList runValues(const SpecializerRequest &Request) {
   POLLI_TRACING_REGION_START(PJIT_REGION_SELECT_PARAMS,
                              "polyjit.params.select");
-  int i = 0;
+  int I = 0;
   RunValueList RunValues(boost::hash_value(Request.key()));
 
   const llvm::Function &F = Request.prototype();
   DEBUG(printArgs(F, Request.paramSize(), Request.params()));
   for (const llvm::Argument &Arg : F.args()) {
-    RunValues.add({reinterpret_cast<uint64_t *>(Request.params()[i]), &Arg});
-    i++;
+    RunValues.add({reinterpret_cast<uint64_t *>(Request.params()[I]), &Arg});
+    I++;
   }
   POLLI_TRACING_REGION_STOP(PJIT_REGION_SELECT_PARAMS, "polyjit.params.select");
   return RunValues;
@@ -81,19 +81,19 @@ void printRunValues(const RunValueList &Values) {
       Cst = llvm::ConstantFP::get(Ty, (double)(*RV.value));
     }
 
-    std::string buf;
-    llvm::raw_string_ostream os(buf);
+    std::string Buf;
+    llvm::raw_string_ostream Os(Buf);
     if (Cst) {
-      Cst->print(os, true);
+      Cst->print(Os, true);
     } else {
-      fmt::MemoryWriter w;
-      w << "U 0x" << fmt::hex(*RV.value);
-      os << w.c_str();
+      fmt::MemoryWriter W;
+      W << "U 0x" << fmt::hex(*RV.value);
+      Os << W.c_str();
     }
     console->info("{} => {:s}", reinterpret_cast<void *>(
                                     const_cast<llvm::Argument *>(RV.Arg)),
-                  os.str());
-    os.flush();
+                  Os.str());
+    Os.flush();
   }
 }
-}
+} // namespace polli

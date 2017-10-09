@@ -12,14 +12,14 @@
 // Policy based function cloning.
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_FUNCTION_CLONER_H
-#define POLLI_FUNCTION_CLONER_H
+#ifndef POLLI_FUNCTIONCLONER_H
+#define POLLI_FUNCTIONCLONER_H
 
-#include "polli/Options.h"
-#include "polli/Utils.h"
-#include "polli/TypeMapper.h"
-#include "polli/log.h"
 #include "polli/FuncTools.h"
+#include "polli/Options.h"
+#include "polli/TypeMapper.h"
+#include "polli/Utils.h"
+#include "polli/log.h"
 
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
@@ -27,23 +27,23 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
-#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/GlobalValue.h"
-#include "llvm/IR/Instructions.h"
-#include "llvm/IR/InstIterator.h"
-#include "llvm/IR/IntrinsicInst.h"
+#include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/InstIterator.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/Linker/IRMover.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
 #include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
 
 #include <chrono>
 
@@ -52,25 +52,25 @@ using namespace llvm;
 namespace polli {
 namespace log {
 REGISTER_LOG(console, "cloner");
-}
+} // namespace log
 
 static inline void verifyFn(const Twine &Prefix, const Function *F) {
-  std::string buffer;
-  llvm::raw_string_ostream s(buffer);
-  s << Prefix;
+  std::string Buffer;
+  llvm::raw_string_ostream S(Buffer);
+  S << Prefix;
   if (F && !F->isDeclaration()) {
-    if (!verifyFunction(*F, &s))
-      s << " OK";
+    if (!verifyFunction(*F, &S))
+      S << " OK";
     else {
-      F->print(s, nullptr, true, true);
-      s << " FAILED";
+      F->print(S, nullptr, true, true);
+      S << " FAILED";
     }
   } else if (F && F->isDeclaration()) {
-    F->getType()->print(s << " OK \n\t\t(declare) : ");
+    F->getType()->print(S << " OK \n\t\t(declare) : ");
   } else {
-    s << " OK (F is nullptr)";
+    S << " OK (F is nullptr)";
   }
-  errs() << "\n" << s.str() << "\n";
+  errs() << "\n" << S.str() << "\n";
 }
 
 static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
@@ -229,9 +229,9 @@ private:
            */
 
           using namespace std::chrono;
-          milliseconds ms = duration_cast<milliseconds>(
+          milliseconds Ms = duration_cast<milliseconds>(
               system_clock::now().time_since_epoch());
-          GV->setName(GV->getName() + "_POLYJIT_GLOBAL_" + fmt::format("{:d}", ms.count()));
+          GV->setName(GV->getName() + "_POLYJIT_GLOBAL_" + fmt::format("{:d}", Ms.count()));
           GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         }
 
@@ -327,6 +327,6 @@ typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
 
 typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
     MovingFunctionCloner;
-}
+} // namespace polli
 #undef DEBUG_TYPE
-#endif // POLLI_FUNCTION_CLONER_H
+#endif // POLLI_FUNCTIONCLONER_H

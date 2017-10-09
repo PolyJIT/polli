@@ -1,9 +1,9 @@
-#ifndef LLVM_PAPI_PROFILING_H
-#define LLVM_PAPI_PROFILING_H
+#ifndef POLLI_PAPIPROFILING_H
+#define POLLI_PAPIPROFILING_H
 
-#include "llvm/Pass.h"
-#include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/RegionPass.h"
+#include "llvm/Pass.h"
 
 #include "polly/ScopDetection.h"
 #include "polly/Support/ScopHelper.h"
@@ -62,11 +62,11 @@ private:
                           GlobalValue *Array);
 };
 
-}
+} // namespace llvm
 
 namespace llvm {
   class PassRegistry;
   void initializePapiProfilingPass(llvm::PassRegistry&);
   void initializePapiRegionPreparePass(llvm::PassRegistry&);
-}
-#endif // LLVM_PAPI_PROFILING_H
+} // namespace llvm
+#endif // POLLI_PAPIPROFILING_H

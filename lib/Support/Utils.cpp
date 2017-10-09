@@ -32,11 +32,11 @@ static bool DirReady = false;
 
 void initializeOutputDir() {
   DefaultDir = new SmallVector<char, 255>();
-  SmallVector<char, 255> cwd;
-  fs::current_path(cwd);
+  SmallVector<char, 255> Cwd;
+  fs::current_path(Cwd);
 
-  p::append(cwd, "polli");
-  fs::createUniqueDirectory(StringRef(cwd.data(), cwd.size()), *DefaultDir);
+  p::append(Cwd, "polli");
+  fs::createUniqueDirectory(StringRef(Cwd.data(), Cwd.size()), *DefaultDir);
 
   DirReady = true;
 }
@@ -50,14 +50,14 @@ void StoreModule(Module &M, const Twine &Name) {
 
   M.setModuleIdentifier(Name.str());
 
-  SmallVector<char, 255> destPath = *DefaultDir;
+  SmallVector<char, 255> DestPath = *DefaultDir;
   std::error_code ErrorInfo;
 
-  p::append(destPath, Name);
+  p::append(DestPath, Name);
 
-  std::string path = StringRef(destPath.data(), destPath.size()).str();
+  std::string Path = StringRef(DestPath.data(), DestPath.size()).str();
   std::unique_ptr<tool_output_file> Out(
-      new tool_output_file(path.c_str(), ErrorInfo, sys::fs::F_None));
+      new tool_output_file(Path.c_str(), ErrorInfo, sys::fs::F_None));
 
   // Remove all debug info before storing.
   // FIXME: This is just working around bugs.
@@ -74,8 +74,8 @@ void StoreModule(Module &M, const Twine &Name) {
 }
 
 void StoreModules(ManagedModules &Modules) {
-  for (auto &Modules_MI : Modules) {
-    ModulePtrT M = (Modules_MI).first;
+  for (auto &ModulesMi : Modules) {
+    ModulePtrT M = (ModulesMi).first;
     StoreModule(*M, M->getModuleIdentifier());
   }
 }
@@ -102,4 +102,4 @@ void removeFunctionFromDomTree(Function &F, DominatorTree &DT) {
   for (BasicBlock *BB : Nodes)
     DT.eraseNode(BB);
 }
-}
+} // namespace polli

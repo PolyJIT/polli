@@ -1,8 +1,8 @@
 #ifndef POLLI_DB_H
 #define POLLI_DB_H
 
-#include <unordered_map>
 #include <string>
+#include <unordered_map>
 
 using EventMapTy = std::unordered_map<uint64_t, uint64_t>;
 using RegionMapTy = std::unordered_map<uint64_t, std::string>;
@@ -17,7 +17,7 @@ void StoreTransformedScop(const std::string &FnName,
                           const std::string &ScheduleTreeStr);
 
 void ValidateOptions();
-}
+} // namespace db
 
 namespace tracing {
 struct TraceData {
@@ -31,7 +31,7 @@ struct TraceData {
 extern "C" void enter_region(uint64_t id, const char *name);
 extern "C" void exit_region(uint64_t id);
 extern "C" void setup_tracing();
-}
-}
+} // namespace tracing
+} // namespace polli
 
-#endif /* end of include guard: POLLI_DB_H */
+#endif // POLLI_DB_H

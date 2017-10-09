@@ -100,5 +100,5 @@ public:
 private:
   CodeCacheT CodeCache;
 };
-}
-#endif /* end of include guard: POLLI_JIT_H */
+} // namespace polli // namespace polli // namespace polli // namespace polli // namespace polli
+#endif // POLLI_JIT_H

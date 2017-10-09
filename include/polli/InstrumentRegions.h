@@ -17,12 +17,12 @@
 // edge and a single exit edge. Therefore, it is necessary to transform the
 // regions before we perform any instrumentation.
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_INSTRUMENT_REGIONS_H
-#define POLLI_INSTRUMENT_REGIONS_H
+#ifndef POLLI_INSTRUMENTREGIONS_H
+#define POLLI_INSTRUMENTREGIONS_H
 
-#include "llvm/Pass.h"
-#include "llvm/Analysis/RegionPass.h"
 #include "llvm/Analysis/LoopInfo.h"
+#include "llvm/Analysis/RegionPass.h"
+#include "llvm/Pass.h"
 
 #include "polli/ScopDetection.h"
 #include "polly/Support/ScopHelper.h"
@@ -36,7 +36,7 @@ class LoopInfo;
 class PointerType;
 class RegionInfo;
 class Region;
-}
+} // namespace llvm
 
 typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
 
@@ -110,12 +110,12 @@ private:
    */
   void print(raw_ostream &, const Module *) const {}
 };
-}
+} // namespace polli
 
 namespace llvm {
 class PassRegistry;
 void initializePapiCScopProfilingPass(llvm::PassRegistry &);
 void initializePapiCScopProfilingInitPass(llvm::PassRegistry &);
-}
-#endif // POLLI_INSTRUMENT_REGIONS_H
+} // namespace llvm
+#endif // POLLI_INSTRUMENTREGIONS_H
 

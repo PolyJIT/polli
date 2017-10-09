@@ -36,7 +36,7 @@ using namespace polli;
 
 namespace {
 REGISTER_LOG(console, "register");
-}
+} // namespace
 
 namespace polli {
 

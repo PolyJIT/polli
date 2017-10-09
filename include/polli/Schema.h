@@ -12,8 +12,8 @@
 #ifndef POLLI_SCHEMA_H
 #define POLLI_SCHEMA_H
 #include "polli/log.h"
-#include "pprof/pprof.h"
 #include "pprof/pgsql.h"
+#include "pprof/pprof.h"
 #include "llvm/IR/Module.h"
 #include <pqxx/pqxx>
 #include <string>
@@ -101,6 +101,6 @@ public:
   void commit();
   void rollback() { Items.clear(); }
 };
-} // end of db namespace
-} // end of polli namespace
+} // namespace db
+} // namespace polli
 #endif // POLLI_SCHEMA_H

@@ -132,7 +132,7 @@ public:
     if (polly::opt::FirstLevelTileSizes.empty()) {
       polly::opt::FirstLevelTileSizes.addValue(
           FirstLevelTileSize->getLimitedValue());
-      for (unsigned i = 1; i < MaxDimensions; i++) {
+      for (unsigned I = 1; I < MaxDimensions; I++) {
         polly::opt::FirstLevelTileSizes.addValue(
             std::numeric_limits<int>::max());
       }
@@ -172,22 +172,22 @@ public:
         getAnalysis<polly::ScopDetectionWrapperPass>();
     polly::ScopDetection &SD = SDWP.getSD();
     llvm::RegionInfo &RI = getAnalysis<llvm::RegionInfoPass>().getRegionInfo();
-    std::string buf;
-    raw_string_ostream os(buf);
-    os << "\n===============================================================";
-    os << "\n ScopDetection:: " << F.getName();
-    os << "\n===============================================================\n";
+    std::string Buf;
+    raw_string_ostream Os(Buf);
+    Os << "\n===============================================================";
+    Os << "\n ScopDetection:: " << F.getName();
+    Os << "\n===============================================================\n";
     for (auto &R : *RI.getTopLevelRegion()) {
       if (!R)
         continue;
       if (const RejectLog *L = SD.lookupRejectionLog(R.get()))
-        L->print(os << R->getNameStr() << "\n");
+        L->print(Os << R->getNameStr() << "\n");
       else
-        os << R->getNameStr() << " No log entry found.\n";
-      os << "\n";
+        Os << R->getNameStr() << " No log entry found.\n";
+      Os << "\n";
     }
-    SDWP.print(os, M);
-    console->info(os.str());
+    SDWP.print(Os, M);
+    console->info(Os.str());
     return false;
   }
 
@@ -215,13 +215,13 @@ public:
 
   bool runOnFunction(Function &F) override {
     ScopInfoWrapperPass &SI = getAnalysis<polly::ScopInfoWrapperPass>();
-    std::string buf;
-    raw_string_ostream os(buf);
-    os << "\n==============================================================="
+    std::string Buf;
+    raw_string_ostream Os(Buf);
+    Os << "\n==============================================================="
           "\n Modelling"
           "\n===============================================================\n";
-    SI.print(os, F.getParent());
-    console->info(os.str());
+    SI.print(Os, F.getParent());
+    console->info(Os.str());
     return false;
   }
 
@@ -251,13 +251,13 @@ public:
 
   bool runOnScop(Scop &S) override {
     IslAstInfoWrapperPass &AI = getAnalysis<IslAstInfoWrapperPass>();
-    std::string buf, IslAstrStr, ScheduleTreeStr;
-    raw_string_ostream os(buf);
-    AI.printScop(os, S);
-    IslAstrStr = os.str();
+    std::string Buf, IslAstrStr, ScheduleTreeStr;
+    raw_string_ostream Os(Buf);
+    AI.printScop(Os, S);
+    IslAstrStr = Os.str();
 
-    isl::schedule s_tree = S.getScheduleTree();
-    ScheduleTreeStr = s_tree.to_str();
+    isl::schedule STree = S.getScheduleTree();
+    ScheduleTreeStr = STree.to_str();
 
     db::StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
                              ScheduleTreeStr);
@@ -284,18 +284,18 @@ public:
 
   bool runOnScop(Scop &S) override {
     auto &AIWP = getAnalysis<IslAstInfoWrapperPass>();
-    std::string buf;
-    raw_string_ostream os(buf);
-    os << "\n==============================================================="
+    std::string Buf;
+    raw_string_ostream Os(Buf);
+    Os << "\n==============================================================="
           "\n IslAst"
           "\n===============================================================\n";
-    AIWP.printScop(os, S);
+    AIWP.printScop(Os, S);
 
-    isl::schedule s_tree = S.getScheduleTree();
-    std::string ST = s_tree.to_str();
+    isl::schedule STree = S.getScheduleTree();
+    std::string ST = STree.to_str();
 
-    os << "\n" << ST << "\n";
-    console->info(os.str());
+    Os << "\n" << ST << "\n";
+    console->info(Os.str());
     return false;
   }
 
@@ -319,13 +319,13 @@ public:
   bool runOnScop(Scop &S) override {
     polly::IslScheduleOptimizer &SO =
         getAnalysis<polly::IslScheduleOptimizer>();
-    std::string buf;
-    raw_string_ostream os(buf);
-    os << "\n==============================================================="
+    std::string Buf;
+    raw_string_ostream Os(Buf);
+    Os << "\n==============================================================="
           "\n ScheduleReport"
           "\n===============================================================\n";
-    SO.printScop(os, S);
-    console->info(os.str());
+    SO.printScop(Os, S);
+    console->info(Os.str());
     return false;
   }
 

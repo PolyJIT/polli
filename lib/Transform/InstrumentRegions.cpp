@@ -51,14 +51,14 @@
 
 namespace papi {
 #include "papi.h"
-}
+} // namespace papi
 
 namespace llvm {
 class LLVMContext;
-} // lines 49-49
+} // namespace llvm
 namespace llvm {
 class Value;
-} // lines 50-50
+} // namespace llvm
 
 using namespace llvm;
 using namespace polli;
@@ -206,10 +206,10 @@ static void InsertProfilingInitCall(Function *MainFn) {
     AI = MainFn->arg_begin();
     ++AI;
     if (AI->getType() != ArgVTy) {
-      Instruction::CastOps opcode =
+      Instruction::CastOps Opcode =
           CastInst::getCastOpcode(&*AI, false, ArgVTy, false);
       InitCall->setArgOperand(
-          1, CastInst::Create(opcode, &*AI, ArgVTy, "argv.cast", InitCall));
+          1, CastInst::Create(Opcode, &*AI, ArgVTy, "argv.cast", InitCall));
     } else {
       InitCall->setArgOperand(1, &*AI);
     }
@@ -219,9 +219,9 @@ static void InsertProfilingInitCall(Function *MainFn) {
     // If the program looked at argc, have it look at the return value of the
     // init call instead.
     if (!AI->getType()->isIntegerTy(32)) {
-      Instruction::CastOps opcode =
+      Instruction::CastOps Opcode =
           CastInst::getCastOpcode(&*AI, true, Type::getInt32Ty(Context), true);
-      InitCall->setArgOperand(0, CastInst::Create(opcode, &*AI,
+      InitCall->setArgOperand(0, CastInst::Create(Opcode, &*AI,
                                                   Type::getInt32Ty(Context),
                                                   "argc.cast", InitCall));
     } else
@@ -266,8 +266,8 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
   SD = &getAnalysis<polli::JITScopDetection>();
   RI = &getAnalysis<RegionInfoPass>();
 
-  for (const auto &elem : *SD) {
-    if (processRegion(elem))
+  for (const auto &Elem : *SD) {
+    if (processRegion(Elem))
       ++InstrumentedRegions;
   }
 
@@ -284,10 +284,10 @@ bool PapiCScopProfiling::runOnFunction(Function &) {
 bool PapiCScopProfiling::processRegion(const Region *R) {
   BasicBlock *Entry, *Exit;
   Function *F = R->getEntry()->getParent();
-  std::string baseName = F->getName().str() + "::";
+  std::string BaseName = F->getName().str() + "::";
 
-  std::string entryName = baseName + R->getEntry()->getName().str();
-  std::string exitName = baseName + R->getExit()->getName().str();
+  std::string EntryName = BaseName + R->getEntry()->getName().str();
+  std::string ExitName = BaseName + R->getExit()->getName().str();
 
   Entry = R->getEntry();
   Exit = R->getExit();
@@ -331,7 +331,7 @@ bool PapiCScopProfiling::processRegion(const Region *R) {
   /* Use the curent Region-Exit, we will chose an appropriate place
    * for a PAPI counter later. */
   Module *M = Entry->getParent()->getParent();
-  instrumentRegion(M, EntrySplits, ExitSplits, R, entryName, exitName);
+  instrumentRegion(M, EntrySplits, ExitSplits, R, EntryName, ExitName);
   return true;
 }
 

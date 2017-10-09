@@ -1,15 +1,15 @@
-#ifndef POLLI_TYPE_MAPPER_H
-#define POLLI_TYPE_MAPPER_H
+#ifndef POLLI_TYPEMAPPER_H
+#define POLLI_TYPEMAPPER_H
 
-#include "llvm/Linker/IRMover.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/IR/TypeFinder.h"
-#include "llvm/Transforms/Utils/ValueMapper.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
+#include "llvm/IR/TypeFinder.h"
+#include "llvm/Linker/IRMover.h"
 #include "llvm/Support/Casting.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
 
 namespace polli {
 class TypeMapTy : public llvm::ValueMapTypeRemapper {
@@ -63,4 +63,4 @@ private:
   bool areTypesIsomorphic(llvm::Type *DstTy, llvm::Type *SrcTy);
 };
 } //namespace polli
-#endif /* end of include guard: POLLI_TYPE_MAPPER_H */
+#endif // POLLI_TYPEMAPPER_H

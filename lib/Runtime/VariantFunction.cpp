@@ -35,9 +35,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                               const ParamVector<Param> &Params) {
   out << "[";
-  for (size_t i = 0; i < Params.size(); ++i) {
-    out << Params[i];
-    if (!(i == Params.size() - 1))
+  for (size_t I = 0; I < Params.size(); ++I) {
+    out << Params[I];
+    if (!(I == Params.size() - 1))
       out << " ";
   }
 
@@ -47,7 +47,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
 
 void getRuntimeParameters(Function *F, unsigned paramc, void *params,
                           std::vector<Param> &ParamV) {
-  int i = 0;
+  int I = 0;
   for (const Argument &Arg : F->args()) {
     Type *ArgTy = Arg.getType();
 
@@ -56,10 +56,10 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
       Param P;
       P.Ty = IntTy;
       P.Name = Arg.getName();
-      P.Val = ConstantInt::get(IntTy, ((uint64_t **)params)[i][0]);
+      P.Val = ConstantInt::get(IntTy, ((uint64_t **)params)[I][0]);
       ParamV.push_back(P);
     }
-    i++;
+    I++;
   }
 }
 
@@ -92,15 +92,15 @@ struct MainCreator {
 
     // Unpack params. Allocate space on the stack and store the pointers.
     // Some parameters are not required anymore.
-    unsigned i = 0;
+    unsigned I = 0;
     for (Argument &Arg : SrcF->args()) {
-      Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), i++);
+      Value *IdxI = ConstantInt::get(Type::getInt64Ty(Ctx), I++);
 
       Type *ArgTy = Arg.getType();
       std::string SlotName =
-          fmt::format("polyjit.slot.{:d}_{:s}", i - 1, Arg.getName().str());
+          fmt::format("polyjit.slot.{:d}_{:s}", I - 1, Arg.getName().str());
       std::string IdxName =
-          fmt::format("polyjit.idx.{:d}_{:s}", i - 1, Arg.getName().str());
+          fmt::format("polyjit.idx.{:d}_{:s}", I - 1, Arg.getName().str());
       if (!ArgTy->isPointerTy()) {
         Value *ArrIdx = Builder.CreateInBoundsGEP(&ArgV, {IdxI});
         Value *CastVal = Builder.CreateBitCast(
@@ -189,10 +189,10 @@ public:
    * @param VMap A value-to-value map that tracks cloned values/function args.
    */
   void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
-    unsigned i = 0;
+    unsigned I = 0;
 
     for (Argument &Arg : From->args()) {
-      auto P = SpecValues[i++];
+      auto P = SpecValues[I++];
       if (!canSpecialize(P))
         continue;
       Type *Ty = Arg.getType();

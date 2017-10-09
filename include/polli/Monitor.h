@@ -1,8 +1,8 @@
 #ifndef POLLI_MONITOR_H
 #define POLLI_MONITOR_H
 
-#include <mutex>
 #include <iostream>
+#include <mutex>
 
 namespace polli {
 template <class F> struct FunctionType;
@@ -28,7 +28,7 @@ struct FunctionType<R (Args...) const> {
 };
 
 template <class O>
-class monitor {
+class Monitor {
 public:
   using object_type = O;
   template <class Function, class... Args>
@@ -59,7 +59,7 @@ public:
     return F(args...);
   }
 
-  ~monitor() {}
+  ~Monitor() {}
 
   object_type &monitored() {
     return Obj;
@@ -69,7 +69,7 @@ private:
   object_type Obj;
   std::mutex M;
 };
-}
+} // namespace polli // namespace polli
 
-#endif /* end of include guard: POLLI_MONITOR_H */
+#endif // POLLI_MONITOR_H
 

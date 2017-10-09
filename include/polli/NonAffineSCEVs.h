@@ -20,8 +20,8 @@
 * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-#ifndef POLLI_NON_AFFINE_SCEVS_H
-#define POLLI_NON_AFFINE_SCEVS_H
+#ifndef POLLI_NONAFFINESCEVS_H
+#define POLLI_NONAFFINESCEVS_H
 
 #include "polly/Support/ScopHelper.h"
 #include "llvm/ADT/SetVector.h"
@@ -35,7 +35,7 @@ class ScalarEvolution;
 class Value;
 class Loop;
 class LoadInst;
-}
+} // namespace llvm // namespace llvm
 
 namespace polli {
 bool isNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
@@ -45,5 +45,5 @@ bool isNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
 std::vector<const llvm::SCEV *>
 getParamsInNonAffineExpr(const llvm::Region *R, llvm::Loop *Scope,
                          const llvm::SCEV *Expr, llvm::ScalarEvolution &SE);
-}
-#endif /* end of include guard: POLLI_NON_AFFINE_SCEVS_H */
+} // namespace polli // namespace polli
+#endif // POLLI_NONAFFINESCEVS_H

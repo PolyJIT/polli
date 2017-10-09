@@ -1,13 +1,16 @@
-#include "polli/Options.h"
+#ifndef POLLI_COMPILER_H
+#define POLLI_COMPILER_H
+
 #include "polli/Monitor.h"
+#include "polli/Options.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
 #include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
 #include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
+#include "llvm/ExecutionEngine/RuntimeDyld.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
 #include "llvm/IRReader/IRReader.h"
@@ -29,9 +32,9 @@ public:
   using SharedModule = std::shared_ptr<llvm::Module>;
   using OptimizeFunction = std::function<SharedModule(SharedModule)>;
 
-  using context_type = polli::monitor<llvm::LLVMContext>;
+  using context_type = polli::Monitor<llvm::LLVMContext>;
   using context_module_pair =
-      std::pair<llvm::Module &, polli::monitor<llvm::LLVMContext> &>;
+      std::pair<llvm::Module &, polli::Monitor<llvm::LLVMContext> &>;
 
 private:
   std::mutex DLMutex;
@@ -72,4 +75,6 @@ private:
   std::unordered_map<uint64_t, SharedModule> LoadedModules;
 };
 
-}
+} // namespace polli
+
+#endif

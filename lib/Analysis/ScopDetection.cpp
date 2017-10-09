@@ -1,6 +1,6 @@
 #include "polli/Options.h"
-#include "polli/ScopDetection.h"
 #include "polli/NonAffineSCEVs.h"
+#include "polli/ScopDetection.h"
 #include "polly/CodeGen/CodeGeneration.h"
 #include "polly/LinkAllPasses.h"
 #include "polly/Options.h"
@@ -29,13 +29,13 @@ using namespace polli;
 
 namespace {
 REGISTER_LOG(console, DEBUG_TYPE);
-}
+} // namespace
 
 namespace polli {
 bool PollyTrackFailures = false;
 bool PollyProcessUnprofitable;
 StringRef PollySkipFnAttr = "polly.skip.fn";
-}
+} // namespace polli
 
 // This option is set to a very high value, as analyzing such loops increases
 // compile time on several cases. For experiments that enable this option,
@@ -102,7 +102,7 @@ static cl::opt<bool>
                 cl::cat(PolliCategory));
 
 /// @brief The minimal trip count under which loops are considered unprofitable.
-static const unsigned MIN_LOOP_TRIP_COUNT = 8;
+static const unsigned MinLoopTripCount = 8;
 
 //===----------------------------------------------------------------------===//
 // Statistics.
@@ -149,7 +149,7 @@ void DiagnosticScopFound::print(DiagnosticPrinter &DP) const {
   DP << FileName << ":" << EntryLine << ": Start of scop\n";
   DP << FileName << ":" << ExitLine << ": End of scop";
 }
-}
+} // namespace polli
 
 //===----------------------------------------------------------------------===//
 // JITScopDetection.
@@ -250,13 +250,13 @@ bool JITScopDetection::isAffine(const SCEV *S, Loop *Scope,
                                 Value *BaseAddress) const {
 
   polly::InvariantLoadsSetTy AccessILS;
-  bool isAffine =
+  bool IsAffine =
       polly::isAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS);
 
-  if (!isAffine) {
-    bool isValidNonAffine =
+  if (!IsAffine) {
+    bool IsValidNonAffine =
         isNonAffineExpr(&Context.CurRegion, Scope, S, *SE, &AccessILS);
-    if (!isValidNonAffine)
+    if (!IsValidNonAffine)
       return false;
 
     for (auto P : getParamsInNonAffineExpr(&Context.CurRegion, Scope, S, *SE))
@@ -859,16 +859,16 @@ bool JITScopDetection::isValidLoop(Loop *L, DetectionContext &Context) const {
 static int countBeneficialSubLoops(Loop *L, ScalarEvolution &SE) {
   auto *TripCount = SE.getBackedgeTakenCount(L);
 
-  int count = 1;
+  int Count = 1;
   if (auto *TripCountC = dyn_cast<SCEVConstant>(TripCount))
     if (TripCountC->getType()->getScalarSizeInBits() <= 64)
-      if (TripCountC->getValue()->getZExtValue() < MIN_LOOP_TRIP_COUNT)
-        count -= 1;
+      if (TripCountC->getValue()->getZExtValue() < MinLoopTripCount)
+        Count -= 1;
 
   for (auto &SubLoop : *L)
-    count += countBeneficialSubLoops(SubLoop, SE);
+    Count += countBeneficialSubLoops(SubLoop, SE);
 
-  return count;
+  return Count;
 }
 
 int JITScopDetection::countBeneficialLoops(Region *R) const {
@@ -1365,19 +1365,19 @@ void JITScopDetection::print(raw_ostream &OS, const Module *) const {
   for (const Region *R : ValidRegions)
     OS << "Valid Region for Scop: " << R->getNameStr() << '\n';
 
-  unsigned count = ValidRuntimeRegions.size();
-  unsigned i = 0;
+  unsigned Count = ValidRuntimeRegions.size();
+  unsigned I = 0;
 
-  OS << fmt::format("{:d} regions require runtime support:\n", count);
+  OS << fmt::format("{:d} regions require runtime support:\n", Count);
   for (const Region *R : ValidRuntimeRegions) {
     if (!R || (R && !RequiredParams.count(R)))
       continue;
     const ParamVec &L = RequiredParams.at(R);
-    OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", i++,
+    OS.indent(2) << fmt::format("{:d} region {:s} requires {:d} params\n", I++,
                                 R->getNameStr(), L.size());
-    unsigned j = 0;
+    unsigned J = 0;
     for (const SCEV *S : L) {
-      OS.indent(4) << fmt::format("{:d} - ", j);
+      OS.indent(4) << fmt::format("{:d} - ", J);
       S->print(OS);
       OS << "\n";
     }
@@ -1397,7 +1397,7 @@ void JITScopDetection::releaseMemory() {
 
 namespace polli {
 char JITScopDetection::ID = 0;
-}
+} // namespace polli
 Pass *polli::createScopDetectionPass() { return new JITScopDetection(); }
 
 INITIALIZE_PASS_BEGIN(JITScopDetection, "polli-detect-scops",

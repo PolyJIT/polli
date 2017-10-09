@@ -5,8 +5,8 @@
 #include "polli/log.h"
 #include "pprof/pprof.h"
 
-#include "llvm/LinkAllPasses.h"
 #include "llvm/IR/Function.h"
+#include "llvm/LinkAllPasses.h"
 #include "llvm/PassRegistry.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetSelect.h"
@@ -14,7 +14,7 @@
 #include "polly/RegisterPasses.h"
 namespace papi {
 #include <papi.h>
-}
+} // namespace papi
 
 using namespace llvm;
 
@@ -67,4 +67,4 @@ void PolyJIT::tearDown() {
   exit(JitRegion::START, papi::PAPI_get_real_usec());
   db::StoreRun(Events, Entries, Regions);
 }
-}
+} // namespace polli

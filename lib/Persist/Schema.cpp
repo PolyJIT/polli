@@ -38,5 +38,5 @@ void Session::commit() {
   Items.clear();
 }
 const std::string RegressionTest::TableName = "regressions";
-} // enf of namespace db
+} // namespace db
 } // end of namespace polli

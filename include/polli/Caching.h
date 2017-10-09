@@ -42,14 +42,14 @@ struct CacheKey {
     return Addr < O.Addr || (Addr == O.Addr && ValueHash < O.ValueHash);
   }
 };
-}
+} // namespace polli // namespace polli // namespace polli // namespace polli // namespace polli
 
 namespace std {
 template <> struct hash<polli::CacheKey> {
   std::size_t operator()(const polli::CacheKey &K) const {
-    size_t h = (size_t)K.Addr ^ K.ValueHash;
-    return h;
+    size_t H = (size_t)K.Addr ^ K.ValueHash;
+    return H;
   }
 };
-}
-#endif /* end of include guard: POLLI_CACHING_H */
+} // namespace std // namespace std // namespace std // namespace std // namespace std
+#endif // POLLI_CACHING_H

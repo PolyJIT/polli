@@ -13,27 +13,27 @@ namespace pprof {
 Options getPprofOptionsFromEnv() {
   Options Opts;
 
-  const char *exp = std::getenv("BB_EXPERIMENT");
-  const char *prj = std::getenv("BB_PROJECT");
-  const char *dom = std::getenv("BB_DOMAIN");
-  const char *grp = std::getenv("BB_GROUP");
-  const char *uri = std::getenv("BB_SRC_URI");
-  const char *cmd = std::getenv("BB_CMD");
-  const char *db = std::getenv("BB_USE_DATABASE");
-  const char *csv = std::getenv("BB_USE_CSV");
-  const char *file = std::getenv("BB_USE_FILE");
-  const char *exec = std::getenv("BB_ENABLE");
+  const char *Exp = std::getenv("BB_EXPERIMENT");
+  const char *Prj = std::getenv("BB_PROJECT");
+  const char *Dom = std::getenv("BB_DOMAIN");
+  const char *Grp = std::getenv("BB_GROUP");
+  const char *Uri = std::getenv("BB_SRC_URI");
+  const char *Cmd = std::getenv("BB_CMD");
+  const char *Db = std::getenv("BB_USE_DATABASE");
+  const char *Csv = std::getenv("BB_USE_CSV");
+  const char *File = std::getenv("BB_USE_FILE");
+  const char *Exec = std::getenv("BB_ENABLE");
 
-  Opts.experiment = exp ? exp : "unknown";
-  Opts.project = prj ? prj : "unknown";
-  Opts.domain = dom ? dom : "unknown";
-  Opts.group = grp ? grp : "unknown";
-  Opts.src_uri = uri ? uri : "unknown";
-  Opts.command = cmd ? cmd : "unknown";
-  Opts.use_db = db ? (bool)stoi(db) : true;
-  Opts.use_csv = csv ? (bool)stoi(csv) : false;
-  Opts.use_file = file ? (bool)stoi(file) : false;
-  Opts.execute_atexit = exec ? (bool)stoi(exec) : true;
+  Opts.experiment = Exp ? Exp : "unknown";
+  Opts.project = Prj ? Prj : "unknown";
+  Opts.domain = Dom ? Dom : "unknown";
+  Opts.group = Grp ? Grp : "unknown";
+  Opts.src_uri = Uri ? Uri : "unknown";
+  Opts.command = Cmd ? Cmd : "unknown";
+  Opts.use_db = Db ? (bool)stoi(Db) : true;
+  Opts.use_csv = Csv ? (bool)stoi(Csv) : false;
+  Opts.use_file = File ? (bool)stoi(File) : false;
+  Opts.execute_atexit = Exec ? (bool)stoi(Exec) : true;
 
   return Opts;
 }
@@ -94,33 +94,33 @@ std::ostream &operator<<(std::ostream &os, const PPEvent &event) {
 }
 
 std::ostream &operator<<(std::ostream &os, const PPStringRegion &R) {
-  std::string entStr = R.Entry;
-  if (entStr.size() == 0)
-    entStr = "ERROR:Entry";
-  std::string exStr = R.Exit;
-  if (exStr.size() == 0)
-    exStr = "ERROR:Exit";
+  std::string EntStr = R.Entry;
+  if (EntStr.size() == 0)
+    EntStr = "ERROR:Entry";
+  std::string ExStr = R.Exit;
+  if (ExStr.size() == 0)
+    ExStr = "ERROR:Exit";
 
-  return os << R.ID << " " << entStr << " " << exStr << "\n";
+  return os << R.ID << " " << EntStr << " " << ExStr << "\n";
 }
 
 std::istream &operator>>(std::istream &is, PPEvent &event) {
-  uint16_t id;
-  uint64_t timestamp;
-  uint32_t type;
+  uint16_t Id;
+  uint64_t Timestamp;
+  uint32_t Type;
 
-  ((is >> id) >> timestamp) >> type;
-  event = PPEvent(id, (PPEventType)type, timestamp);
+  ((is >> Id) >> Timestamp) >> Type;
+  event = PPEvent(Id, (PPEventType)Type, Timestamp);
 
   return is;
 }
 
 std::istream &operator>>(std::istream &is, PPStringRegion &R) {
-  uint32_t id;
-  std::string entry;
-  std::string exit;
-  ((is >> id) >> entry) >> exit;
+  uint32_t Id;
+  std::string Entry;
+  std::string Exit;
+  ((is >> Id) >> Entry) >> Exit;
 
-  R = PPStringRegion(id, entry, exit);
+  R = PPStringRegion(Id, Entry, Exit);
   return is;
 }

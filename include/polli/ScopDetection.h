@@ -20,8 +20,8 @@
 * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
 * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-#ifndef POLLI_SCOP_DETECTION
-#define POLLI_SCOP_DETECTION
+#ifndef POLLI_SCOPDETECTION_H
+#define POLLI_SCOPDETECTION_H
 
 #include "polly/ScopDetectionDiagnostic.h"
 #include "polly/Support/ScopHelper.h"
@@ -47,7 +47,7 @@ class CallInst;
 class Instruction;
 class Value;
 class IntrinsicInst;
-}
+} // namespace llvm
 
 namespace polli {
 typedef std::set<const SCEV *> ParamSetType;
@@ -165,14 +165,14 @@ public:
     /// @brief Initialize a DetectionContext with the data from @p DC.
     DetectionContext(const DetectionContext &&DC)
         : CurRegion(DC.CurRegion), AST(DC.AST.getAliasAnalysis()),
-          Verifying(DC.Verifying), Log(std::move(DC.Log)),
-          Accesses(std::move(DC.Accesses)),
-          NonAffineAccesses(std::move(DC.NonAffineAccesses)),
-          ElementSize(std::move(DC.ElementSize)), hasLoads(DC.hasLoads),
+          Verifying(DC.Verifying), Log(DC.Log),
+          Accesses(DC.Accesses),
+          NonAffineAccesses(DC.NonAffineAccesses),
+          ElementSize(DC.ElementSize), hasLoads(DC.hasLoads),
           hasStores(DC.hasStores), HasUnknownAccess(DC.HasUnknownAccess),
-          NonAffineSubRegionSet(std::move(DC.NonAffineSubRegionSet)),
-          BoxedLoopsSet(std::move(DC.BoxedLoopsSet)),
-          RequiredILS(std::move(DC.RequiredILS)),
+          NonAffineSubRegionSet(DC.NonAffineSubRegionSet),
+          BoxedLoopsSet(DC.BoxedLoopsSet),
+          RequiredILS(DC.RequiredILS),
           requiresJIT(DC.requiresJIT) {
       AST.add(DC.AST);
     }
@@ -542,5 +542,5 @@ Pass *createScopDetectionPass();
 namespace llvm {
 class PassRegistry;
 void initializeJITScopDetectionPass(llvm::PassRegistry &);
-}
-#endif /* end of include guard: POLLI_SCOP_DETECTION */
+} // namespace llvm
+#endif // POLLI_SCOPDETECTION_H

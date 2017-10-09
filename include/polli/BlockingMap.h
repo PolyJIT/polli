@@ -12,12 +12,12 @@
 //
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_BLOCKING_MAP_H
-#define POLLI_BLOCKING_MAP_H
+#ifndef POLLI_BLOCKINGMAP_H
+#define POLLI_BLOCKINGMAP_H
 
-#include <unordered_map>
 #include <condition_variable>
 #include <mutex>
+#include <unordered_map>
 
 template <typename K, typename V> class BlockingMap {
 private:
@@ -56,4 +56,4 @@ public:
   V &operator[](K &&X) { return Cache[X]; }
 };
 
-#endif /* ifndef POLLI_BLOCKING_MAP_H */
+#endif // POLLI_BLOCKINGMAP_H

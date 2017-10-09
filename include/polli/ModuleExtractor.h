@@ -9,12 +9,12 @@
 // Copyright 2015 Andreas Simbürger <simbuerg@fim.uni-passau.de>
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_MODULE_EXTRACTOR_H
-#define POLLI_MODULE_EXTRACTOR_H
+#ifndef POLLI_MODULEEXTRACTOR_H
+#define POLLI_MODULEEXTRACTOR_H
 
 #include "llvm/ADT/SetVector.h"
-#include "llvm/IR/Module.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
 namespace polli {
@@ -67,4 +67,4 @@ private:
   const ModuleInstrumentation &operator=(const ModuleInstrumentation &);
 };
 }  // end of namespace polli
-#endif // POLLI_MODULE_EXTRACTOR_H
+#endif // POLLI_MODULEEXTRACTOR_H

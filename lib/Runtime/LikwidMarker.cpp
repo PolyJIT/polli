@@ -22,7 +22,7 @@
 
 namespace {
 REGISTER_LOG(console, DEBUG_TYPE);
-}
+} // namespace
 
 namespace polli {
 class LikwidMarker : public llvm::ModulePass {

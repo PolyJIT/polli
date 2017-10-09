@@ -10,8 +10,8 @@
 // Register the compilation sequence required for the PolyJIT runtime support.
 //
 //===----------------------------------------------------------------------===//
-#ifndef POLLI_REGISTER_COMPILATION_PASSES_H
-#define POLLI_REGISTER_COMPILATION_PASSES_H
+#ifndef POLLI_REGISTERCOMPILATIONPASSES_H
+#define POLLI_REGISTERCOMPILATIONPASSES_H
 
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/PassRegistry.h"
@@ -19,10 +19,10 @@
 namespace llvm {
 namespace legacy {
 class PassManagerBase;
-}
+} // namespace legacy
 
 class PassRegistry;
-}
+} // namespace llvm
 
 namespace polli {
   /**
@@ -41,5 +41,5 @@ namespace polli {
    * @return void
    */
   void initializePolliPasses(llvm::PassRegistry &Registry);
-}
+} // namespace polli
 #endif

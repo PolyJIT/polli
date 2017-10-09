@@ -23,15 +23,15 @@
 #define POLLI_RUNVALUES_H
 
 #include "polli/RuntimeValues.h"
-#include <cassert>
-#include <memory>
-#include <cstring>
 #include <array>
+#include <cassert>
+#include <cstring>
 #include <iostream>
+#include <memory>
 
 namespace llvm {
 class Function;
-}
+} // namespace llvm // namespace llvm // namespace llvm
 
 namespace polli {
 class SpecializerRequest {
@@ -49,9 +49,9 @@ public:
   SpecializerRequest(uint64_t key, unsigned ParamC, void *params,
                      std::shared_ptr<llvm::Module> M)
       : IRKey(key), ParamC(ParamC), Params(), M(M), F(init(M)) {
-    size_t n = ParamC * sizeof(void *);
+    size_t N = ParamC * sizeof(void *);
     Params.resize(ParamC);
-    std::memcpy(Params.data(), params, n);
+    std::memcpy(Params.data(), params, N);
   }
 
   size_t paramSize() const {
@@ -80,5 +80,5 @@ void printArgs(const llvm::Function &F, size_t argc,
                const std::vector<void *> &Params);
 #endif
 void printRunValues(const RunValueList &Values);
-}
-#endif /* end of include guard: POLLI_RUNVALUES_H */
+} // namespace polli // namespace polli // namespace polli
+#endif // POLLI_RUNVALUES_H

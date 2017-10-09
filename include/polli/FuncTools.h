@@ -1,10 +1,10 @@
 #ifndef POLLI_FUNCTOOLS_H
 #define POLLI_FUNCTOOLS_H
 
-#include "llvm/IR/GlobalValue.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
 namespace polli {
@@ -60,7 +60,7 @@ static T apply(llvm::Function &F,
 
   return L;
 }
-}
+} // namespace polli
 
 
-#endif /* end of include guard: POLLI_FUNCTOOLS_H */
+#endif // POLLI_FUNCTOOLS_H

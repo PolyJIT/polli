@@ -1,16 +1,16 @@
 #ifndef POLLI_VARIANTFUNCTION_H
 #define POLLI_VARIANTFUNCTION_H
 
-#include "llvm/IR/Function.h"
-#include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "polli/RuntimeValues.h"
 
+#include <memory>
 #include <unordered_map>
 #include <vector>
-#include <memory>
 
 namespace polli {
 
@@ -53,52 +53,52 @@ public:
   const P &operator[](unsigned const &index) const { return Params[index]; }
 
   bool operator<(ParamVector<P> const &rhs) {
-    bool isLess = false;
-    bool isGrtr = false;
-    unsigned i = 0;
-    unsigned n = Params.size();
+    bool IsLess = false;
+    bool IsGrtr = false;
+    unsigned I = 0;
+    unsigned N = Params.size();
 
-    if (n == 0)
+    if (N == 0)
       return false;
 
     do {
-      isLess = Params[i] < rhs[i];
-      isGrtr = Params[i] > rhs[i];
-      ++i;
-    } while ((isLess || !isGrtr) && (i < n));
+      IsLess = Params[I] < rhs[I];
+      IsGrtr = Params[I] > rhs[I];
+      ++I;
+    } while ((IsLess || !IsGrtr) && (I < N));
 
-    return isLess;
+    return IsLess;
   }
 
   bool operator<(ParamVector<P> const &rhs) const {
-    bool isLess = false;
-    bool isGrtr = false;
-    unsigned i = 0;
-    unsigned n = Params.size();
+    bool IsLess = false;
+    bool IsGrtr = false;
+    unsigned I = 0;
+    unsigned N = Params.size();
 
-    if (n == 0)
+    if (N == 0)
       return false;
 
     do {
-      isLess = Params[i] < rhs[i];
-      isGrtr = Params[i] > rhs[i];
-      ++i;
-    } while ((isLess || !isGrtr) && (i < n));
+      IsLess = Params[I] < rhs[I];
+      IsGrtr = Params[I] > rhs[I];
+      ++I;
+    } while ((IsLess || !IsGrtr) && (I < N));
 
-    return isLess;
+    return IsLess;
   }
 
   llvm::StringRef getShortName() const {
-    std::string res = "";
+    std::string Res = "";
 
-    for (unsigned i = 0; i < Params.size(); ++i)
-      if (llvm::Constant *c = Params[i].Val) {
-        const llvm::APInt &val = c->getUniqueInteger();
-        llvm::SmallVector<char, 2> str;
-        val.toStringUnsigned(str);
-        res = res + "." + llvm::StringRef(str.data(), str.size()).str();
+    for (unsigned I = 0; I < Params.size(); ++I)
+      if (llvm::Constant *C = Params[I].Val) {
+        const llvm::APInt &Val = C->getUniqueInteger();
+        llvm::SmallVector<char, 2> Str;
+        Val.toStringUnsigned(Str);
+        Res = Res + "." + llvm::StringRef(Str.data(), Str.size()).str();
       }
-    return res;
+    return Res;
   }
 };
 
@@ -131,5 +131,5 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                               const ParamVector<Param> &Params);
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
                               const RunValueList &Params);
-}
+} // namespace polli
 #endif // POLLI_VARIANTFUNCTION_H

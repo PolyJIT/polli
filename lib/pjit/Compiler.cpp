@@ -1,11 +1,11 @@
 #include "polli/Compiler.h"
-#include "polli/RuntimeOptimizer.h"
 #include "polli/Monitor.h"
+#include "polli/RuntimeOptimizer.h"
 #include "polli/log.h"
 
+#include "llvm/IR/Mangler.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/SourceMgr.h"
-#include "llvm/IR/Mangler.h"
 
 #include <dlfcn.h>
 
@@ -15,27 +15,28 @@ REGISTER_LOG(console, "compiler");
 
 namespace polli {
 class PolySectionMemoryManager : public SectionMemoryManager {
+public:
   uint8_t *allocateCodeSection(uintptr_t Size, unsigned Alignment,
                                unsigned SectionID,
                                StringRef SectionName) override {
-    uint8_t *ptr = SectionMemoryManager::allocateCodeSection(
+    uint8_t *Ptr = SectionMemoryManager::allocateCodeSection(
         Size, Alignment, SectionID, SectionName);
     SPDLOG_DEBUG(
         console, "cs @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s}",
         (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str());
-    return ptr;
+    return Ptr;
   }
 
   uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
                                unsigned SectionID, StringRef SectionName,
                                bool isReadOnly) override {
-    uint8_t *ptr = SectionMemoryManager::allocateDataSection(
+    uint8_t *Ptr = SectionMemoryManager::allocateDataSection(
         Size, Alignment, SectionID, SectionName, isReadOnly);
     SPDLOG_DEBUG(console,
         "ds @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s} ro: {:d}",
         (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str(),
         isReadOnly);
-    return ptr;
+    return Ptr;
   }
 };
 
@@ -88,7 +89,7 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype,
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
-    auto Ctx = std::make_unique<monitor<LLVMContext>>();
+    auto Ctx = std::make_unique<Monitor<LLVMContext>>();
     auto M = parseIR(Buf, Err, Ctx->monitored());
 
     if (!M) {
@@ -121,10 +122,10 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
     void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
     if (char *Error = dlerror()) {
       console->error("(dlsym) Could not locate the symbol: {:s}", Error);
-      std::string buf;
-      raw_string_ostream os(buf);
-      M->print(os, nullptr, true, true);
-      console->error("{:s}", os.str());
+      std::string Buf;
+      raw_string_ostream Os(Buf);
+      M->print(Os, nullptr, true, true);
+      console->error("{:s}", Os.str());
     }
 
     if (Addr)
@@ -149,8 +150,8 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
 }
 
 void SpecializingCompiler::removeModule(ModuleHandleT H) {
-  llvm::Error status = CompileLayer.removeModule(H);
-  console->error_if(!status.success(), "Unable to remove module!"); 
+  llvm::Error Status = CompileLayer.removeModule(H);
+  console->error_if(!Status.success(), "Unable to remove module!"); 
   assert(status.success() && "Unable to remove module!");
     
 }
@@ -169,4 +170,4 @@ SpecializingCompiler::~SpecializingCompiler() {
   LoadedContexts.clear();
   SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine.");
 }
-}
+} // namespace polli

@@ -17,10 +17,10 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
-#include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
 using namespace polli;
@@ -69,15 +69,15 @@ void ModuleExtractor::releaseMemory() { ExtractedFunctions.clear(); }
  */
 static std::string moduleToString(Module &M) {
   std::string ModStr;
-  raw_string_ostream os(ModStr);
+  raw_string_ostream Os(ModStr);
   AnalysisManager<Module> AM;
   ModulePassManager PM;
-  PrintModulePass PrintModuleP(os);
+  PrintModulePass PrintModuleP(Os);
 
   PM.addPass(PrintModuleP);
   PM.run(M, AM);
 
-  os.flush();
+  Os.flush();
   return ModStr;
 }
 
@@ -214,21 +214,21 @@ struct InstrumentEndpoint {
      */
 
     /* Store each parameter as pointer in the params array */
-    int i = 0;
+    int I = 0;
     Value *Size1 = ConstantInt::get(Type::getInt32Ty(Ctx), 1);
     Value *Idx0 = ConstantInt::get(Type::getInt32Ty(Ctx), 0);
 
     /* Prepare a stack array for the parameters. We will pass a pointer to
      * this array into our callback function. */
-    int argc = To->arg_size();
-    Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), argc);
-    ArrayType *StackArrayT = ArrayType::get(Type::getInt8PtrTy(Ctx), argc);
+    int Argc = To->arg_size();
+    Value *ParamC = ConstantInt::get(Type::getInt32Ty(Ctx), Argc);
+    ArrayType *StackArrayT = ArrayType::get(Type::getInt8PtrTy(Ctx), Argc);
     Value *Params = Builder.CreateAlloca(StackArrayT, Size1, "params");
 
     for (Argument &Arg : To->args()) {
       /* Get the appropriate slot in the parameters array and store
        * the stack slot in form of a i8*. */
-      Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), i++);
+      Value *ArrIdx = ConstantInt::get(Type::getInt32Ty(Ctx), I++);
 
       Value *Slot;
       if (Arg.getType()->isPointerTy()) {
@@ -408,11 +408,11 @@ static bool hasDuplicatePredsInPHI(BasicBlock *BB) {
     if (PHINode *PHI = dyn_cast<PHINode>(&I)) {
       DenseMap<Value *, BasicBlock *> NewValues;
       SetVector<std::pair<Value *, BasicBlock *>> IncomingValues;
-      unsigned n = PHI->getNumIncomingValues();
+      unsigned N = PHI->getNumIncomingValues();
 
-      for (unsigned i = 0; i < n; i++) {
-        Value *V = PHI->getIncomingValue(i);
-        BasicBlock *BB = PHI->getIncomingBlock(i);
+      for (unsigned I = 0; I < N; I++) {
+        Value *V = PHI->getIncomingValue(I);
+        BasicBlock *BB = PHI->getIncomingBlock(I);
         if (BB && !IncomingValues.insert(std::make_pair(V, BB)))
           return true;
       }
@@ -435,16 +435,16 @@ static void fixSuccessorPHI(BasicBlock *BB) {
   for (BasicBlock *Succ : llvm::successors(BB)) {
     for (Instruction &I : *Succ) {
       if (PHINode *PHI = dyn_cast<PHINode>(&I)) {
-        unsigned n = PHI->getNumIncomingValues();
+        unsigned N = PHI->getNumIncomingValues();
         SetVector<BasicBlock *> IncomingEdges;
         SmallVector<int, 2> MarkedIndices;
-        for (unsigned i = 0; i < n; i++) {
-          BasicBlock *Pred = PHI->getIncomingBlock(n - (i + 1));
+        for (unsigned I = 0; I < N; I++) {
+          BasicBlock *Pred = PHI->getIncomingBlock(N - (I + 1));
           if (!IncomingEdges.insert(Pred))
-            MarkedIndices.push_back(n - (i + 1));
+            MarkedIndices.push_back(N - (I + 1));
         }
-        for (int j : MarkedIndices) {
-          PHI->removeIncomingValue(j);
+        for (int J : MarkedIndices) {
+          PHI->removeIncomingValue(J);
         }
       }
     }
@@ -668,9 +668,9 @@ bool ModuleExtractor::runOnFunction(Function &F) {
 }
 
 void ModuleExtractor::print(raw_ostream &os, const Module *M) const {
-  int i = 0;
+  int I = 0;
   for (const Function *F : ExtractedFunctions) {
-    os << fmt::format("{:d} {:s} ", i++, F->getName().str());
+    os << fmt::format("{:d} {:s} ", I++, F->getName().str());
     F->print(os);
     os << "\n";
   }
@@ -684,9 +684,9 @@ void ModuleInstrumentation::getAnalysisUsage(AnalysisUsage &AU) const {
 void ModuleInstrumentation::releaseMemory() { InstrumentedFunctions.clear(); }
 
 void ModuleInstrumentation::print(raw_ostream &os, const Module *M) const {
-  int i = 0;
+  int I = 0;
   for (const Function *F : InstrumentedFunctions) {
-    os << fmt::format("{:d} {:s} ", i++, F->getName().str());
+    os << fmt::format("{:d} {:s} ", I++, F->getName().str());
     F->print(os);
     os << "\n";
   }
@@ -723,10 +723,10 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     bool BrokenDbg;
     if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
       // We failed verification, skip this region.
-      std::string buf;
-      llvm::raw_string_ostream os(buf);
-      PrototypeM->print(os, nullptr, true, true);
-      console->error(os.str());
+      std::string Buf;
+      llvm::raw_string_ostream Os(Buf);
+      PrototypeM->print(Os, nullptr, true, true);
+      console->error(Os.str());
       console->error("Prototype: {:s} failed verification. Skipping.",
                      PrototypeM->getModuleIdentifier());
       continue;

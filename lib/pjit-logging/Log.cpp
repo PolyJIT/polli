@@ -5,54 +5,54 @@
 #include "spdlog/spdlog.h"
 
 #include <cstdlib>
-#include <unistd.h>
 #include <iostream>
+#include <unistd.h>
 
 namespace {
 static std::string &getLogOutFile() {
-  static __pid_t pid = getpid();
-  static std::string logFile = fmt::format("./polyjit.{:d}.log", pid);
-  return logFile;
+  static __pid_t Pid = getpid();
+  static std::string LogFile = fmt::format("./polyjit.{:d}.log", Pid);
+  return LogFile;
 }
 
 static inline std::vector<spdlog::sink_ptr> &global_init() {
-  static bool init = false;
-  static std::vector<spdlog::sink_ptr> sinks;
+  static bool Init = false;
+  static std::vector<spdlog::sink_ptr> Sinks;
 
-  if (init)
-    return sinks;
+  if (Init)
+    return Sinks;
 
-  init = true;
+  Init = true;
 
   if (polli::opt::EnableLogFile &&
       (polli::opt::LogLevel != spdlog::level::off)) {
     spdlog::set_async_mode(1048576);
 
-    auto sink = std::make_shared<spdlog::sinks::simple_file_sink_mt>(
+    auto Sink = std::make_shared<spdlog::sinks::simple_file_sink_mt>(
         getLogOutFile(), true);
-    sink->set_force_flush(true);
-    sinks.push_back(sink);
+    Sink->set_force_flush(true);
+    Sinks.push_back(Sink);
   } else {
-    sinks.push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());
+    Sinks.push_back(std::make_shared<spdlog::sinks::stderr_sink_mt>());
   }
 
-  return sinks;
+  return Sinks;
 }
 
 static inline void setup(const std::string &name) {
   if (!spdlog::get(name)) {
-    auto &sinks = global_init();
-    auto logger =
-        std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
-    spdlog::register_logger(logger);
-    logger->set_level(polli::opt::LogLevel);
+    auto &Sinks = global_init();
+    auto Logger =
+        std::make_shared<spdlog::logger>(name, Sinks.begin(), Sinks.end());
+    spdlog::register_logger(Logger);
+    Logger->set_level(polli::opt::LogLevel);
   }
 }
-}
+} // namespace // namespace
 
 namespace polli {
 std::shared_ptr<spdlog::logger> register_log(const std::string &name) {
   setup(name);
   return spdlog::get(name);
 }
-}
+} // namespace polli // namespace polli

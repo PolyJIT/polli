@@ -23,18 +23,18 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
  * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#ifndef POLLI_RUNTIME_TASKS_H
-#define POLLI_RUNTIME_TASKS_H
+#ifndef POLLI_TASKS_H
+#define POLLI_TASKS_H
 
 #include <algorithm>
 #include <atomic>
-#include <memory>
-#include <mutex>
 #include <condition_variable>
-#include <thread>
-#include <vector>
 #include <deque>
 #include <functional>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <vector>
 
 namespace polli {
 using LockT = std::unique_lock<std::mutex>;
@@ -135,14 +135,14 @@ public:
   }
 
   template <typename F> void async(F &&Fn) {
-    auto i = Index++;
+    auto I = Index++;
 
-    for (unsigned n = 0; n < Count; ++n) {
-      if (JobQs[(i + n) % Count].try_push(std::forward<F>(Fn)))
+    for (unsigned N = 0; N < Count; ++N) {
+      if (JobQs[(I + N) % Count].try_push(std::forward<F>(Fn)))
         return;
     }
-    JobQs[i % Count].push(std::forward<F>(Fn));
+    JobQs[I % Count].push(std::forward<F>(Fn));
   }
 };
 } // namespace polli
-#endif /* end of include guard: POLLI_RUNTIME_TASKS_H */
+#endif // POLLI_TASKS_H

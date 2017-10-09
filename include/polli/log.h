@@ -12,8 +12,8 @@ struct WrappedLogger {
   WrappedLogger(const std::string &name) : Name(name) {}
 
   auto operator->() const -> std::shared_ptr<spdlog::logger>& {
-    static std::shared_ptr<spdlog::logger> _log = polli::register_log(Name);
-    return _log;
+    static std::shared_ptr<spdlog::logger> Log = polli::register_log(Name);
+    return Log;
   }
 
   private:
@@ -22,5 +22,5 @@ struct WrappedLogger {
 
 #define REGISTER_LOG(VARNAME, NAME) \
     static polli::WrappedLogger VARNAME(NAME)
-}
+} // namespace polli
 #endif // POLLI_LOG_H

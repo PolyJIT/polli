@@ -11,7 +11,7 @@ using namespace polli;
 
 namespace {
 REGISTER_LOG(console, DEBUG_TYPE);
-}
+} // namespace
 
 namespace polli {
 namespace SCEVType {
@@ -35,7 +35,7 @@ enum TYPE {
   // An invalid expression.
   INVALID
 };
-}
+} // namespace SCEVType
 
 /// @brief The result the validator returns for a SCEV expression.
 class ValidatorResult {
@@ -170,8 +170,8 @@ public:
   class ValidatorResult visitAddExpr(const SCEVAddExpr *Expr) {
     ValidatorResult Return(SCEVType::INT);
 
-    for (int i = 0, e = Expr->getNumOperands(); i < e; ++i) {
-      ValidatorResult Op = visit(Expr->getOperand(i));
+    for (int I = 0, E = Expr->getNumOperands(); I < E; ++I) {
+      ValidatorResult Op = visit(Expr->getOperand(I));
       Return.merge(Op);
 
       // Early exit.
@@ -188,8 +188,8 @@ public:
 
     bool HasMultipleParams = false;
 
-    for (int i = 0, e = Expr->getNumOperands(); i < e; ++i) {
-      ValidatorResult Op = visit(Expr->getOperand(i));
+    for (int I = 0, E = Expr->getNumOperands(); I < E; ++I) {
+      ValidatorResult Op = visit(Expr->getOperand(I));
 
       if (Op.isINT())
         continue;
@@ -300,8 +300,8 @@ public:
   class ValidatorResult visitSMaxExpr(const SCEVSMaxExpr *Expr) {
     ValidatorResult Return(SCEVType::INT);
 
-    for (int i = 0, e = Expr->getNumOperands(); i < e; ++i) {
-      ValidatorResult Op = visit(Expr->getOperand(i));
+    for (int I = 0, E = Expr->getNumOperands(); I < E; ++I) {
+      ValidatorResult Op = visit(Expr->getOperand(I));
 
       if (!Op.isValid())
         return Op;
@@ -315,8 +315,8 @@ public:
   class ValidatorResult visitUMaxExpr(const SCEVUMaxExpr *Expr) {
     // We do not support unsigned operations. If 'Expr' is constant during Scop
     // execution we treat this as a parameter, otherwise we bail out.
-    for (int i = 0, e = Expr->getNumOperands(); i < e; ++i) {
-      ValidatorResult Op = visit(Expr->getOperand(i));
+    for (int I = 0, E = Expr->getNumOperands(); I < E; ++I) {
+      ValidatorResult Op = visit(Expr->getOperand(I));
 
       if (!Op.isConstant()) {
         DEBUG(dbgs() << "INVALID: UMaxExpr has a non-constant operand");
@@ -429,22 +429,22 @@ public:
 
 bool isNonAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
                      ScalarEvolution &SE, polly::InvariantLoadsSetTy *ILS) {
-  std::string buf;
-  raw_string_ostream os(buf);
-  os << "\n";
-  os << "Expr: " << *Expr << "\n";
+  std::string Buf;
+  raw_string_ostream Os(Buf);
+  Os << "\n";
+  Os << "Expr: " << *Expr << "\n";
   if (isa<SCEVCouldNotCompute>(Expr))
     return false;
 
   NonAffSCEVValidator Validator(R, Scope, SE, ILS);
-  os << "Region: " << R->getNameStr() << "\n";
-  os << " -> ";
+  Os << "Region: " << R->getNameStr() << "\n";
+  Os << " -> ";
 
   ValidatorResult Result = Validator.visit(Expr);
 
   if (Result.isValid())
-    os << "VALID\n";
-  os << "\n";
+    Os << "VALID\n";
+  Os << "\n";
   DEBUG(console->debug(os.str()));
 
   return Result.isValid();
@@ -467,4 +467,4 @@ std::vector<const SCEV *> getParamsInNonAffineExpr(const Region *R, Loop *Scope,
   }
   return Res;
 }
-}
+} // namespace polli

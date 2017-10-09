@@ -12,13 +12,13 @@
 #ifndef POLLI_STATS_H
 #define POLLI_STATS_H
 
-#include "llvm/IR/Function.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/IR/Function.h"
 #include <stdint.h>
 
 namespace llvm {
 class Value;
-}
+} // namespace llvm
 
 namespace polli {
 struct Stats {
@@ -35,4 +35,4 @@ llvm::Value *registerStatStruct(llvm::Function &F,
 
 uint64_t GetCandidateId(const llvm::Function &F);
 } // namespace polli
-#endif /* end of include guard: POLLI_STATS_H */
+#endif // POLLI_STATS_H

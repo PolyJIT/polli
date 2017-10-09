@@ -12,10 +12,10 @@
 // optimization should be executed, e.g. with Polly.
 //
 //===----------------------------------------------------------------------===//
-#ifndef RUNTIMEOPTIMIZER_H
-#define RUNTIMEOPTIMIZER_H
-#include <memory>
+#ifndef POLLI_RUNTIMEOPTIMIZER_H
+#define POLLI_RUNTIMEOPTIMIZER_H
 #include "polli/Options.h"
+#include <memory>
 
 #include "llvm/IR/Function.h"
 
@@ -32,5 +32,5 @@ void SetOptimizationPipeline(PipelineType Choice);
 // @param F The function to optimize
 // @return The optimized function.
 std::shared_ptr<Module> optimizeForRuntime(std::shared_ptr<Module> M);
-}
-#endif // RUNTIMEOPTIMIZER_H
+} // namespace polli // namespace polli // namespace polli // namespace polli
+#endif // POLLI_RUNTIMEOPTIMIZER_H

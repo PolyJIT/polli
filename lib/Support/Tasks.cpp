@@ -4,12 +4,12 @@
 
 namespace {
 REGISTER_LOG(console, "tasks");
-}
+} // namespace
 
 namespace polli {
 TaskSystem::TaskSystem() {
-  for (unsigned n = 0; n < Count; ++n) {
-    Threads.emplace_back([&, n] { run(n); });
+  for (unsigned N = 0; N < Count; ++N) {
+    Threads.emplace_back([&, N] { run(N); });
   }
 }
 
@@ -19,8 +19,8 @@ void TaskSystem::run(unsigned i) {
   while (true) {
     std::function<void()> F;
 
-    for (unsigned n = 0; n != Count * 32; ++n) {
-      if (JobQs[(i + n) % Count].try_pop(F))
+    for (unsigned N = 0; N != Count * 32; ++N) {
+      if (JobQs[(i + N) % Count].try_pop(F))
         break;
     }
 
@@ -30,4 +30,4 @@ void TaskSystem::run(unsigned i) {
     F();
   }
 }
-}
+} // namespace polli

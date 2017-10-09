@@ -62,4 +62,4 @@ public:
 };
 
 
-#endif /* end of include guard: POLLI_CODEGEN_H */
+#endif // POLLI_CODEGEN_H

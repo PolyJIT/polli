@@ -47,17 +47,17 @@ Value *registerStatStruct(Function &F, const Twine &NameSuffix) {
 }
 
 uint64_t GetCandidateId(const Function &F) {
-  uint64_t n = 0;
-  std::string name_tag = "polyjit-id";
-  if (F.hasFnAttribute(name_tag)) {
-    auto FnAttr = F.getFnAttribute(name_tag);
-    n = FnAttr.getValueAsInt();
+  uint64_t N = 0;
+  std::string NameTag = "polyjit-id";
+  if (F.hasFnAttribute(NameTag)) {
+    auto FnAttr = F.getFnAttribute(NameTag);
+    N = FnAttr.getValueAsInt();
   }
 
   assert(n && "Could not find the polyjit-id!");
-  if (n == 0)
+  if (N == 0)
     console->critical("Could not find the polyjit-id!");
-  return n;
+  return N;
 }
 
 #if 0

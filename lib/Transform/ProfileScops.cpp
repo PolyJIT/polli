@@ -1,13 +1,4 @@
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/Module.h"
-#include "llvm/Pass.h"
-#include "llvm/IR/IRPrintingPasses.h"
-#include "llvm/Pass.h"
-#include "llvm/Support/ToolOutputFile.h"
-#include "llvm/Support/FileSystem.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "polli/Options.h"
 #include "polli/RegisterCompilationPasses.h"
 #include "polly/Canonicalization.h"
@@ -16,6 +7,15 @@
 #include "polly/ScopInfo.h"
 #include "spdlog/logger.h"
 #include "spdlog/spdlog.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/Module.h"
+#include "llvm/Pass.h"
+#include "llvm/Pass.h"
+#include "llvm/Support/FileSystem.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include <algorithm>
 #include <functional>
@@ -53,7 +53,7 @@ namespace polli {
 
   class ProfileScopDetection : public FunctionPass {
     private:
-      static bool calledSetup;
+      static bool CalledSetup;
       bool instrumentParents;
       int InstrumentedScopsCounter = 0;
       int NonInstrumentedScopsCounter = 0;
@@ -95,7 +95,7 @@ namespace polli {
   };
 
   char ProfileScopDetection::ID = 0;
-  bool ProfileScopDetection::calledSetup = false;
+  bool ProfileScopDetection::CalledSetup = false;
 
   void ProfileScopDetection::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<ScopDetectionWrapperPass>();
@@ -104,8 +104,8 @@ namespace polli {
   }
 
   size_t ProfileScopDetection::generateMeasurementID(StringRef Name) {
-    hash<string> str_hasher;
-    return str_hasher(Name.str());
+    hash<string> StrHasher;
+    return StrHasher(Name.str());
   }
 
   shared_ptr<logger> ProfileScopDetection::getLogger(){
@@ -116,61 +116,61 @@ namespace polli {
 
   void ProfileScopDetection::insertSetupTracingFunction(Function *Main){
     Module *M = Main->getParent();
-    LLVMContext &context = M->getContext();
-    IRBuilder<> builder(context);
-    Instruction *insertInstruction
+    LLVMContext &Context = M->getContext();
+    IRBuilder<> Builder(Context);
+    Instruction *InsertInstruction
       = Main->getEntryBlock().getFirstNonPHIOrDbgOrLifetime();
-    builder.SetInsertPoint(insertInstruction);
+    Builder.SetInsertPoint(InsertInstruction);
 
-    Type *voidty = Type::getVoidTy(context);
+    Type *Voidty = Type::getVoidTy(Context);
 
     //void setup_tracing()
-    FunctionType *FType = FunctionType::get(voidty, false);
+    FunctionType *FType = FunctionType::get(Voidty, false);
     Constant *F = M->getOrInsertFunction("setup_tracing", FType);
-    builder.CreateCall(F, {});
+    Builder.CreateCall(F, {});
   }
 
   void ProfileScopDetection::insertEnterRegionFunction(Module *&M,
       Instruction *InsertPosition, size_t measurementID){
     getLogger()->debug("Insert Region Enter:: {:d}", measurementID);
-    LLVMContext &context = M->getContext();
-    Type *voidty = Type::getVoidTy(context);
-    Type *int64Ty = Type::getInt64Ty(context);
-    Type *charPtrTy = Type::getInt8PtrTy(context);
-    IRBuilder<> builder(context);
-    builder.SetInsertPoint(InsertPosition);
+    LLVMContext &Context = M->getContext();
+    Type *Voidty = Type::getVoidTy(Context);
+    Type *Int64Ty = Type::getInt64Ty(Context);
+    Type *CharPtrTy = Type::getInt8PtrTy(Context);
+    IRBuilder<> Builder(Context);
+    Builder.SetInsertPoint(InsertPosition);
 
     //void enter_region(uint64_t, const char*)
-    SmallVector<Value*, 2> arguments;
-    arguments.push_back(ConstantInt::get(int64Ty, measurementID, false));
-    string name = IDToName[measurementID];
-    arguments.push_back(builder.CreateGlobalStringPtr(name));
+    SmallVector<Value*, 2> Arguments;
+    Arguments.push_back(ConstantInt::get(Int64Ty, measurementID, false));
+    string Name = IDToName[measurementID];
+    Arguments.push_back(Builder.CreateGlobalStringPtr(Name));
     FunctionType *FType
-      = FunctionType::get(voidty, {int64Ty, charPtrTy}, false);
+      = FunctionType::get(Voidty, {Int64Ty, CharPtrTy}, false);
     Constant *F = M->getOrInsertFunction("enter_region", FType);
-    builder.CreateCall(F, arguments);
+    Builder.CreateCall(F, Arguments);
   }
 
   void ProfileScopDetection::insertExitRegionFunction(
       Module *&M, Instruction *InsertPosition, size_t measurementID){
     getLogger()->debug("Insert Region Exit:: {:d}", measurementID);
-    LLVMContext &context = M->getContext();
-    Type *voidty = Type::getVoidTy(context);
-    Type *int64Ty = Type::getInt64Ty(context);
-    IRBuilder<> builder(context);
-    builder.SetInsertPoint(InsertPosition);
+    LLVMContext &Context = M->getContext();
+    Type *Voidty = Type::getVoidTy(Context);
+    Type *Int64Ty = Type::getInt64Ty(Context);
+    IRBuilder<> Builder(Context);
+    Builder.SetInsertPoint(InsertPosition);
 
     //void exit_region(uint64_t)
-    SmallVector<Value*, 1> arguments;
-    arguments.push_back(ConstantInt::get(int64Ty, measurementID, false));
-    FunctionType *FType = FunctionType::get(voidty, {int64Ty}, false);
+    SmallVector<Value*, 1> Arguments;
+    Arguments.push_back(ConstantInt::get(Int64Ty, measurementID, false));
+    FunctionType *FType = FunctionType::get(Voidty, {Int64Ty}, false);
     Constant *F = M->getOrInsertFunction("exit_region", FType);
-    builder.CreateCall(F, arguments);
+    Builder.CreateCall(F, Arguments);
   }
 
   SetVector<BasicBlock*> ProfileScopDetection::splitPredecessors(
       const Region *R, BasicBlock *BB, bool IsEntry){
-    SetVector<BasicBlock*> splitBlocks;
+    SetVector<BasicBlock*> SplitBlocks;
     assert(BB && "Trying to split a BB that is null.");
 
     SmallVector<BasicBlock *, 2> SplitPreds;
@@ -182,9 +182,9 @@ namespace polli {
     BasicBlock *NewBB = SplitBlockPredecessors(
         BB, SplitPreds, ".profile.exit.split", DT, LI);
 
-    splitBlocks.insert(NewBB);
+    SplitBlocks.insert(NewBB);
 
-    return splitBlocks;
+    return SplitBlocks;
   }
 
   Instruction *ProfileScopDetection::getInsertPosition(
@@ -241,16 +241,16 @@ namespace polli {
     const Function &F = *EntryBB->getParent();
 
     string UniqueName = getUniqueName(F, *F.getParent(), ScopNum);
-    size_t measurementID = generateMeasurementID(UniqueName);
+    size_t MeasurementId = generateMeasurementID(UniqueName);
     SetVector<BasicBlock*> EntrySplits = splitPredecessors(R, EntryBB, true);
 
     BasicBlock *ExitBB = R->getExit();
     SetVector<BasicBlock*> ExitSplits = splitPredecessors(R, ExitBB, false);
 
-    IDToName[measurementID] = UniqueName;
+    IDToName[MeasurementId] = UniqueName;
 
-    RegionID regionID = RegionID(R, measurementID, EntrySplits, ExitSplits);
-    return instrumentSplitBlocks(regionID, measurementID);
+    RegionID RegionId = RegionID(R, MeasurementId, EntrySplits, ExitSplits);
+    return instrumentSplitBlocks(RegionId, MeasurementId);
   }
 
   bool ProfileScopDetection::doInitialization(Module &) {
@@ -262,7 +262,7 @@ namespace polli {
     DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     int ScopNum = 0;
 
-    bool anyInstrumented = false;
+    bool AnyInstrumented = false;
     const ScopDetectionWrapperPass &SDWP
       = getAnalysis<ScopDetectionWrapperPass>();
     const ScopDetection &SD = SDWP.getSD();
@@ -270,36 +270,36 @@ namespace polli {
     for(const Region *R : SD){
       ScopDetectionIterated++;
       if(instrumentParents){
-        bool parentGotInstrumented = false;
+        bool ParentGotInstrumented = false;
         const Region *Parent = R->getParent();
         if(Parent){
-          stringstream message;
-          message << Parent->getNameStr() << " is invalid because of: ";
+          stringstream Message;
+          Message << Parent->getNameStr() << " is invalid because of: ";
           if(Parent->isTopLevelRegion()){
-            message << "Region is toplevel region.";
+            Message << "Region is toplevel region.";
           } else {
-            string invalidReason = SD.regionIsInvalidBecause(Parent);
-            if(invalidReason.empty()){
-              message << "Polly returned no reason";
+            string InvalidReason = SD.regionIsInvalidBecause(Parent);
+            if(InvalidReason.empty()){
+              Message << "Polly returned no reason";
             } else {
-              message << invalidReason;
+              Message << InvalidReason;
             }
-            parentGotInstrumented = instrumentRegion(Parent, ScopNum);
+            ParentGotInstrumented = instrumentRegion(Parent, ScopNum);
           }
-          getLogger()->info(message.str());
+          getLogger()->info(Message.str());
         } else {
           getLogger()->warn("SCoP {} has no parent.", R->getNameStr());
         }
 
-        if(parentGotInstrumented){
-          anyInstrumented = true;
+        if(ParentGotInstrumented){
+          AnyInstrumented = true;
           InstrumentedParentsCounter++;
         } else {
           NonInstrumentedParentsCounter++;
         }
       } else {
         if(instrumentRegion(R, ScopNum)){
-          anyInstrumented = true;
+          AnyInstrumented = true;
           InstrumentedScopsCounter++;
         } else {
           getLogger()
@@ -312,22 +312,22 @@ namespace polli {
     }
 
     string ModStr;
-    raw_string_ostream os(ModStr);
+    raw_string_ostream Os(ModStr);
     AnalysisManager<Module> AM;
     ModulePassManager PM;
-    PrintModulePass PrintModuleP(os);
+    PrintModulePass PrintModuleP(Os);
 
     PM.addPass(PrintModuleP);
     PM.run(*F.getParent(), AM);
-    os.flush();
-    error_code ec;
-    tool_output_file outf(
-        fmt::format("{:s}-profile-scops-after.ll", F.getName().str()), ec,
+    Os.flush();
+    error_code Ec;
+    tool_output_file Outf(
+        fmt::format("{:s}-profile-scops-after.ll", F.getName().str()), Ec,
         sys::fs::OpenFlags::F_RW);
-    outf.os() << ModStr;
-    outf.keep();
+    Outf.os() << ModStr;
+    Outf.keep();
 
-    return anyInstrumented;
+    return AnyInstrumented;
   }
 
   bool ProfileScopDetection::doFinalization(Module &M) {
@@ -342,17 +342,17 @@ namespace polli {
     getLogger()->debug(
         "ScopDetection iterated {:d} times", ScopDetectionIterated);
 
-    bool insertedSetupTracing = false;
-    if(!calledSetup && InstrumentedScopsCounter > 0){
+    bool InsertedSetupTracing = false;
+    if(!CalledSetup && InstrumentedScopsCounter > 0){
       Function *Main = M.getFunction("main");
       if(Main){
         insertSetupTracingFunction(Main);
-        insertedSetupTracing = true;
-        calledSetup = true;
+        InsertedSetupTracing = true;
+        CalledSetup = true;
       }
     }
 
-    return insertedSetupTracing;
+    return InsertedSetupTracing;
   }
 
   static RegisterPass<ProfileScopDetection>
@@ -362,4 +362,4 @@ namespace polli {
   Pass *createProfileScopsPass(bool instrumentParents) {
     return new ProfileScopDetection(instrumentParents);
   }
-}
+} // namespace polli

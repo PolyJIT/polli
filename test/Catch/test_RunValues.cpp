@@ -1,10 +1,10 @@
 #include "catch.hpp"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/GlobalValue.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
-#include "llvm/IR/GlobalValue.h"
 
 #include "polli/RunValues.h"
 #include "llvm/Support/raw_ostream.h"
@@ -14,18 +14,18 @@
 SCENARIO("Pointer indirection over the stack", "[run]") {
   GIVEN("An array with 1 pointer to a 64-bit integer on the stack") {
     std::array<int64_t *, 1> A;
-    int64_t i = 0;
-    A[0] = &i;
+    int64_t I = 0;
+    A[0] = &I;
 
     WHEN("The value 1 is written to the pointer in the first array cell") {
       *(A[0]) = 1;
       THEN("1 can be read from the stack variable") {
-        REQUIRE(i == 1);
+        REQUIRE(I == 1);
       }
     }
 
     WHEN("The value 2 is written to the stack variable") {
-      i = 2;
+      I = 2;
       THEN("2 can be read from the array") {
         REQUIRE(*(A[0]) == 2);
       }
@@ -58,8 +58,8 @@ SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
         GlobalValue::ExternalLinkage, "test_run_values", M.get());
 
     int64_t *A = reinterpret_cast<int64_t *>(std::malloc(sizeof(int64_t*)));
-    int64_t i = 1;
-    A[0] = reinterpret_cast<int64_t>(&i);
+    int64_t I = 1;
+    A[0] = reinterpret_cast<int64_t>(&I);
 
     SpecializerRequest R(0, 1, reinterpret_cast<char **>(A), M);
 
@@ -95,10 +95,10 @@ SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
         GlobalValue::ExternalLinkage, "test_run_values_2", M.get());
 
     int64_t *A = reinterpret_cast<int64_t *>(std::malloc(2*sizeof(int64_t*)));
-    int64_t i = 2;
+    int64_t I = 2;
     int64_t *B = reinterpret_cast<int64_t *>(std::malloc(sizeof(int64_t)));
 
-    A[0] = reinterpret_cast<int64_t>(&i);
+    A[0] = reinterpret_cast<int64_t>(&I);
     A[1] = reinterpret_cast<int64_t>(&B);
 
     SpecializerRequest R(0, 2, reinterpret_cast<char **>(A), M);
