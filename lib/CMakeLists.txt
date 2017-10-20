@@ -73,13 +73,12 @@ set(LLVM_LINK_COMPONENTS
 
 set(POLLI_LINK_LIBS
   Polly
+  dl
   likwid
   pthread
   papi
   pqxx
   pq
-  boost_system
-  boost_thread
 )
 
 add_polli_library(pjit SHARED
@@ -101,7 +100,6 @@ set(POLLI_LINK_LIBS
   pthread
   pqxx
   pq
-  boost_system
 )
 
 add_polli_loadable_module(LLVMPolyJIT

@@ -11,8 +11,6 @@ FIND_PATH(POLLY_ISL_INCLUDE_DIRS isl-noexceptions.h
     ${POLLY_INSTALL_ROOT}/tools/polly/include/polly/
 )
 
-message(${POLLY_INCLUDE_DIRS})
-
 FIND_LIBRARY(POLLY_LIBRARY lib
   NAMES
     libPolly.so

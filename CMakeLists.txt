@@ -1,5 +1,5 @@
 project(polli)
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.8)
 
 # Set our project paths
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -16,25 +16,14 @@ include_directories(AFTER
 # Add path for polli custom modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 
-set(LLVM_INSTALL_ROOT "" CACHE PATH "Root of LLVM install.")
-if( NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm )
-  message(FATAL_ERROR "LLVM_INSTALL_ROOT (${LLVM_INSTALL_ROOT}) is not a valid LLVM installation.")
-endif(NOT EXISTS ${LLVM_INSTALL_ROOT}/include/llvm)
-
-# Add LLVM's cmake modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH}
-  "${LLVM_INSTALL_ROOT}/lib/cmake/llvm"
-  "${LLVM_INSTALL_ROOT}/share/llvm/cmake"
-)
-
-## Find LLVM
-find_package(LLVM REQUIRED PATHS
-  "${LLVM_INSTALL_ROOT}/lib/cmake/llvm"
-  "${LLVM_INSTALL_ROOT}/share/llvm/cmake"
-  NO_DEFAULT_PATH
-)
-
+# Where is LLVM installed?
+find_package(LLVM CONFIG REQUIRED)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${LLVM_CMAKE_DIR})
+include(HandleLLVMOptions)
 include(AddLLVM)
+
+# Add the llvm header path.
+include_directories(${LLVM_INCLUDE_DIRS})
 
 include_directories(${LLVM_INCLUDE_DIRS})
 link_directories(${LLVM_LIBRARY_DIRS})
@@ -46,69 +35,6 @@ include_directories (${POLLY_INCLUDE_DIRS} )
 include_directories (${POLLY_ISL_INCLUDE_DIRS} )
 link_directories( ${POLLY_LIBRARY_DIRS} )
 add_definitions( ${POLLY_DEFINITIONS} )
-
-# Get the system librarys that will link into LLVM.
-function(get_system_libs return_var)
-  # Returns in `return_var' a list of system libraries used by LLVM.
-  if( NOT MSVC )
-    if( MINGW )
-      set(system_libs ${system_libs} imagehlp psapi)
-    elseif( CMAKE_HOST_UNIX )
-      if( HAVE_LIBDL )
-        set(system_libs ${system_libs} ${CMAKE_DL_LIBS})
-      endif()
-      if( LLVM_ENABLE_THREADS AND HAVE_LIBPTHREAD )
-        set(system_libs ${system_libs} pthread)
-      endif()
-    endif( MINGW )
-  endif( NOT MSVC )
-  set(${return_var} ${system_libs} PARENT_SCOPE)
-endfunction(get_system_libs)
-
-# Now set the header paths.
-execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --includedir
-                OUTPUT_VARIABLE LLVM_INCLUDE_DIR
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-include_directories( ${LLVM_INCLUDE_DIR} )
-
-# Get the TARGET_TRIPLE
-execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --host-target
-                OUTPUT_VARIABLE TARGET_TRIPLE
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-# And then set the cxx flags.
-execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --cxxflags
-                OUTPUT_VARIABLE LLVM_CXX_FLAGS
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-set(CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS} ${LLVM_CXX_FLAGS})
-
-# Check LLVM_ENABLE_ASSERTIONS
-execute_process(COMMAND "${LLVM_INSTALL_ROOT}/bin/llvm-config" --assertion-mode
-                OUTPUT_VARIABLE LLVM_ENABLE_ASSERTIONS
-                OUTPUT_STRIP_TRAILING_WHITESPACE)
-# Copied from LLVM's HandleLLVMOptions.cmake
-if( LLVM_ENABLE_ASSERTIONS )
-  # MSVC doesn't like _DEBUG on release builds. See PR 4379.
-  if( NOT MSVC )
-    add_definitions( -D_DEBUG )
-  endif()
-  # On non-Debug builds cmake automatically defines NDEBUG, so we
-  # explicitly undefine it:
-  if( NOT uppercase_CMAKE_BUILD_TYPE STREQUAL "DEBUG" )
-    add_definitions( -UNDEBUG )
-    # Also remove /D NDEBUG to avoid MSVC warnings about conflicting defines.
-    foreach (flags_var_to_scrub
-        CMAKE_CXX_FLAGS_RELEASE
-        CMAKE_CXX_FLAGS_RELWITHDEBINFO
-        CMAKE_CXX_FLAGS_MINSIZEREL
-        CMAKE_C_FLAGS_RELEASE
-        CMAKE_C_FLAGS_RELWITHDEBINFO
-        CMAKE_C_FLAGS_MINSIZEREL)
-      string (REGEX REPLACE "(^| )[/-]D *NDEBUG($| )" " "
-        "${flags_var_to_scrub}" "${${flags_var_to_scrub}}")
-    endforeach()
-  endif()
-endif()
 
 include("polli_macros")
 
@@ -141,7 +67,7 @@ get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
 link_directories(${PQXX_LIBDIR})
 
 set(BOOST_MIN_VERSION "1.58.0")
-find_package(Boost ${BOOST_MIN_VERSION} REQUIRED COMPONENTS system thread)
+find_package(Boost ${BOOST_MIN_VERSION} REQUIRED)
 include_directories(BEFORE ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
@@ -181,7 +107,6 @@ set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
 add_definitions( -D_GNU_SOURCE -DFMT_HEADER_ONLY)
 
-add_subdirectory(tools)
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)

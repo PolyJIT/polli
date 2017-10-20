@@ -152,7 +152,7 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
 void SpecializingCompiler::removeModule(ModuleHandleT H) {
   llvm::Error Status = CompileLayer.removeModule(H);
   console->error_if(!Status.success(), "Unable to remove module!"); 
-  assert(status.success() && "Unable to remove module!");
+  assert(Status.success() && "Unable to remove module!");
     
 }
 

@@ -204,7 +204,7 @@ public:
                      << "\tExpr: " << *Expr << "\n"
                      << "\tPrevious expression type: " << Return << "\n"
                      << "\tNext operand (" << Op
-                     << "): " << *Expr->getOperand(i) << "\n");
+                     << "): " << *Expr->getOperand(I) << "\n");
 
         return ValidatorResult(SCEVType::INVALID);
       }
@@ -445,7 +445,7 @@ bool isNonAffineExpr(const Region *R, llvm::Loop *Scope, const SCEV *Expr,
   if (Result.isValid())
     Os << "VALID\n";
   Os << "\n";
-  DEBUG(console->debug(os.str()));
+  DEBUG(console->debug(Os.str()));
 
   return Result.isValid();
 }
