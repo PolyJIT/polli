@@ -40,7 +40,9 @@ set(POLYJIT_PPROF_SOURCES
   pprof/Tracing.cpp
   pprof/pprof.cpp
   pprof/libpprof.cpp
-  pprof/libpprof-pgsql.cpp
+  pjit-logging/Log.cpp
+  Support/Options.cpp
+  #pprof/libpprof-pgsql.cpp
   pprof/libpprof-file.cpp
 )
 
@@ -75,38 +77,39 @@ set(POLLI_LINK_LIBS
   Polly
   likwid
   pthread
+  dl
   papi
-  pqxx
-  pq
-  boost_system
-  boost_thread
+  #  pqxx
+  #  pq
 )
 
 add_polli_library(pjit SHARED
   ${POLYJIT_RUNTIME_SOURCES}
 )
+add_dependencies(pjit sqlpp11 sqlpp11-postgres)
 
-set(POLLI_LINK_LIBS
-  papi
-  pqxx
-  pq
-)
-
-add_polli_library(pprof SHARED
-  ${POLYJIT_PPROF_SOURCES}
-)
+#set(POLLI_LINK_LIBS
+#  papi
+#  #pqxx
+#  #pq
+#)
+#
+#add_polli_library(pprof SHARED
+#  ${POLYJIT_PPROF_SOURCES}
+#)
+#add_dependencies(pprof sqlpp11 sqlpp11-postgres)
 
 set(POLLI_LINK_LIBS
   likwid
   pthread
-  pqxx
-  pq
-  boost_system
+  #pqxx
+  #pq
 )
 
 add_polli_loadable_module(LLVMPolyJIT
   ${POLYJIT_COMPILETIME_SOURCES}
 )
+add_dependencies(LLVMPolyJIT sqlpp11 sqlpp11-postgres)
 
 target_link_libraries(LLVMPolyJIT INTERFACE LLVMPolly)
 set_target_properties(LLVMPolyJIT

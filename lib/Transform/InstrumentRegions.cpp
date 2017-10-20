@@ -43,15 +43,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include <papi.h>
 #include <set>
 #include <stddef.h>
 #include <stdint.h>
 #include <string>
 #include <vector>
-
-namespace papi {
-#include "papi.h"
-} // namespace papi
 
 namespace llvm {
 class LLVMContext;
@@ -63,7 +60,6 @@ class Value;
 using namespace llvm;
 using namespace polli;
 using namespace polly;
-using namespace papi;
 
 STATISTIC(InstrumentedRegions, "Number of instrumented regions");
 STATISTIC(MoreEntries, "Number of regions with more than one entry edge");

@@ -10,3 +10,12 @@
 [submodule "external/isl-cpp"]
 	path = external/isl
 	url = https://github.com/simbuerg/isl-cpp.git
+[submodule "external/sqlpp11"]
+	path = external/sqlpp11
+	url = https://github.com/rbock/sqlpp11
+[submodule "external/sqlpp11-postgres"]
+	path = external/sqlpp11-postgres
+	url = https://github.com/matthijs/sqlpp11-connector-postgresql
+[submodule "external/hdate"]
+	path = external/hdate
+	url = https://github.com/HowardHinnant/date

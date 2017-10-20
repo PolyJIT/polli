@@ -54,7 +54,7 @@ uint64_t GetCandidateId(const Function &F) {
     N = FnAttr.getValueAsInt();
   }
 
-  assert(n && "Could not find the polyjit-id!");
+  assert(N && "Could not find the polyjit-id!");
   if (N == 0)
     console->critical("Could not find the polyjit-id!");
   return N;

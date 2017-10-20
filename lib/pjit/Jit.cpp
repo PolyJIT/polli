@@ -12,9 +12,7 @@
 #include "llvm/Support/TargetSelect.h"
 
 #include "polly/RegisterPasses.h"
-namespace papi {
 #include <papi.h>
-} // namespace papi
 
 using namespace llvm;
 
@@ -26,7 +24,7 @@ static StackTracePtr StackTrace;
 
 void PolyJIT::setup() {
   tracing::setup_tracing();
-  enter(JitRegion::START, papi::PAPI_get_real_usec());
+  enter(JitRegion::START, PAPI_get_real_usec());
 
   using polly::initializePollyPasses;
   StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
@@ -64,7 +62,7 @@ void PolyJIT::setup() {
 }
 
 void PolyJIT::tearDown() {
-  exit(JitRegion::START, papi::PAPI_get_real_usec());
+  exit(JitRegion::START, PAPI_get_real_usec());
   db::StoreRun(Events, Entries, Regions);
 }
 } // namespace polli

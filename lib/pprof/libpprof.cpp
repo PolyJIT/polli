@@ -23,9 +23,7 @@
 
 #include "spdlog/spdlog.h"
 
-namespace papi {
 #include <papi.h>
-} // namespace papi
 
 using namespace pprof;
 
@@ -84,7 +82,7 @@ Run<PPEvent> PapiEvents;
 void papi_store_thread_events(const Options &opts) {
   thread::id Tid = std::this_thread::get_id();
   uint64_t Id = papi_get_tid_map()[Tid];
-  pgsql::StoreRun(Id, papi_threaded_events()[Tid], opts);
+  //pgsql::StoreRun(Id, papi_threaded_events()[Tid], opts);
 }
 } // namespace pprof
 
@@ -95,14 +93,14 @@ static void do_papi_thread_init_once() {
     if (!PapiInit)
       papi_region_setup();
 
-    int Ret = papi::PAPI_thread_init(papi_get_thread_id);
+    int Ret = PAPI_thread_init(papi_get_thread_id);
     if (Ret != PAPI_OK) {
       if (Ret == PAPI_ENOINIT) {
-        papi::PAPI_library_init(PAPI_VER_CURRENT);
+        PAPI_library_init(PAPI_VER_CURRENT);
         do_papi_thread_init_once();
       } else {
         console->error("PAPI_thread_init() = {:d}", Ret);
-        console->error("{:s}", papi::PAPI_strerror(Ret));
+        console->error("{:s}", PAPI_strerror(Ret));
         exit(Ret);
       }
     } else {
@@ -205,7 +203,7 @@ void papi_atexit_handler(void) {
     }
   }
 
-  papi::PAPI_shutdown();
+  PAPI_shutdown();
 }
 
 /**
@@ -216,10 +214,10 @@ void papi_atexit_handler(void) {
  * @return void
  */
 void papi_region_setup() {
-  int Init = papi::PAPI_library_init(PAPI_VER_CURRENT);
+  int Init = PAPI_library_init(PAPI_VER_CURRENT);
   if (Init != PAPI_VER_CURRENT) {
     console->error("[ERROR] PAPI_library_init = {:d}", Init);
-    console->error("[ERROR] {:s}", papi::PAPI_strerror(Init));
+    console->error("[ERROR] {:s}", PAPI_strerror(Init));
   }
 
   PapiInit = true;

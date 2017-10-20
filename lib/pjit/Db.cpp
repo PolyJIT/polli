@@ -8,18 +8,15 @@
 #include <ctime>
 #include <iostream>
 #include <numeric>
-#include <pqxx/pqxx>
+#include <papi.h>
 #include <set>
 #include <stdlib.h>
 #include <string>
 #include <thread>
 
-using namespace pqxx;
+//using namespace pqxx;
 using namespace llvm;
 
-namespace papi {
-#include <papi.h>
-} // namespace papi
 
 namespace polli {
 namespace opt {
@@ -131,24 +128,24 @@ static bool enable_tracking() {
   return opt::EnableDatabase;
 }
 
-static pqxx::result submit(const std::string &Query,
-                           pqxx::work &w) throw(pqxx::syntax_error) {
-  pqxx::result Res;
-  try {
-    Res = w.exec(Query);
-  } catch (pqxx::data_exception E) {
-    std::cerr << "pgsql: Encountered the following error:\n";
-    std::cerr << E.what();
-    std::cerr << "\n";
-    std::cerr << E.query();
-    throw E;
-  }
-  return Res;
-}
+//static pqxx::result submit(const std::string &Query,
+//                           pqxx::work &w) throw(pqxx::syntax_error) {
+//  pqxx::result Res;
+//  try {
+//    Res = w.exec(Query);
+//  } catch (pqxx::data_exception E) {
+//    std::cerr << "pgsql: Encountered the following error:\n";
+//    std::cerr << E.what();
+//    std::cerr << "\n";
+//    std::cerr << E.query();
+//    throw E;
+//  }
+//  return Res;
+//}
 
 
 class DBConnection {
-  std::unique_ptr<pqxx::connection> c;
+  //std::unique_ptr<pqxx::connection> c;
   std::string ConnectionString;
 
   std::string Experiment;
@@ -167,8 +164,8 @@ class DBConnection {
     if (!enable_tracking())
       return;
 
-    c = std::unique_ptr<pqxx::connection>(
-        new pqxx::connection(ConnectionString));
+    //c = std::unique_ptr<pqxx::connection>(
+    //    new pqxx::connection(ConnectionString));
   }
 
 public:
@@ -187,83 +184,83 @@ public:
   }
 
   void prepare() {
-    if (c) {
-      std::string SelectRun =
-          "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
-          "timestamp;";
-      std::string SelectSimpleRun = "SELECT id,type,start,duration,name,tid "
-                                      "FROM benchbuild_events WHERE run_id=$1 "
-                                      "ORDER BY "
-                                      "start;";
-      std::string DeleteSimpleRun =
-          "DELETE FROM benchbuild_events WHERE run_id=$1";
-      std::string SelectRunIDs = "SELECT id FROM run WHERE run_group = $1;";
-      std::string SelectRunGroups =
-          "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
+    //if (c) {
+    //  std::string SelectRun =
+    //      "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
+    //      "timestamp;";
+    //  std::string SelectSimpleRun = "SELECT id,type,start,duration,name,tid "
+    //                                  "FROM benchbuild_events WHERE run_id=$1 "
+    //                                  "ORDER BY "
+    //                                  "start;";
+    //  std::string DeleteSimpleRun =
+    //      "DELETE FROM benchbuild_events WHERE run_id=$1";
+    //  std::string SelectRunIDs = "SELECT id FROM run WHERE run_group = $1;";
+    //  std::string SelectRunGroups =
+    //      "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
 
-      c->prepare("select_run", SelectRun);
-      c->prepare("select_simple_run", SelectSimpleRun);
-      c->prepare("delete_simple_run", DeleteSimpleRun);
-      c->prepare("select_run_ids", SelectRunIDs);
-      c->prepare("select_run_groups", SelectRunGroups);
-    }
+    //  c->prepare("select_run", SelectRun);
+    //  c->prepare("select_simple_run", SelectSimpleRun);
+    //  c->prepare("delete_simple_run", DeleteSimpleRun);
+    //  c->prepare("select_run_ids", SelectRunIDs);
+    //  c->prepare("select_run_groups", SelectRunGroups);
+    //}
   }
 
-  pqxx::connection &operator->() {
-    if (c)
-      return *c;
-    connect();
-    return *c;
-  }
+  //pqxx::connection &operator->() {
+  //  if (c)
+  //    return *c;
+  //  connect();
+  //  return *c;
+  //}
 
-  pqxx::connection &operator*() {
-    if (c)
-      return *c;
-    connect();
-    return *c;
-  }
+  //pqxx::connection &operator*() {
+  //  if (c)
+  //    return *c;
+  //  connect();
+  //  return *c;
+  //}
 
-  uint64_t prepareRun(pqxx::work &w) {
-    std::string SearchProjectSql =
-        "SELECT name FROM project WHERE name = '{}';";
+  //uint64_t prepareRun(pqxx::work &w) {
+  //  std::string SearchProjectSql =
+  //      "SELECT name FROM project WHERE name = '{}';";
 
-    std::string NewProjectSql =
-        "INSERT INTO project (name, description, src_url, domain, group_name) "
-        "VALUES ('{}', '{}', '{}', '{}', '{}');";
+  //  std::string NewProjectSql =
+  //      "INSERT INTO project (name, description, src_url, domain, group_name) "
+  //      "VALUES ('{}', '{}', '{}', '{}', '{}');";
 
-    std::string NewRunSql =
-        "INSERT INTO run (\"end\", command, "
-        "project_name, experiment_name, run_group, experiment_group) "
-        "VALUES (TIMESTAMP '{}', '{}', "
-        "'{}', '{}', '{}', '{}') RETURNING id;";
+  //  std::string NewRunSql =
+  //      "INSERT INTO run (\"end\", command, "
+  //      "project_name, experiment_name, run_group, experiment_group) "
+  //      "VALUES (TIMESTAMP '{}', '{}', "
+  //      "'{}', '{}', '{}', '{}') RETURNING id;";
 
-    pqxx::result ProjectExists =
-        submit(fmt::format(SearchProjectSql, Project), w);
+  //  pqxx::result ProjectExists =
+  //      submit(fmt::format(SearchProjectSql, Project), w);
 
-    if (ProjectExists.affected_rows() == 0)
-      submit(fmt::format(NewProjectSql, Project, Project,
-                         SourceURI, Domain, Group),
-             w);
+  //  if (ProjectExists.affected_rows() == 0)
+  //    submit(fmt::format(NewProjectSql, Project, Project,
+  //                       SourceURI, Domain, Group),
+  //           w);
 
-    uint64_t RunId = 0;
-    if (!opt::RunID) {
-      pqxx::result R =
-          submit(fmt::format(NewRunSql, now(), Argv0, Project, Experiment,
-                             RunGroupUUID, ExperimentUUID),
-                 w);
-      R[0]["id"].to(RunId);
-    } else {
-      RunId = RunID;
-    }
+  //  uint64_t RunId = 0;
+  //  if (!opt::RunID) {
+  //    pqxx::result R =
+  //        submit(fmt::format(NewRunSql, now(), Argv0, Project, Experiment,
+  //                           RunGroupUUID, ExperimentUUID),
+  //               w);
+  //    R[0]["id"].to(RunId);
+  //  } else {
+  //    RunId = RunID;
+  //  }
 
-    return RunId;
-  }
+  //  return RunId;
+  //}
 
-  ~DBConnection() {
-    if (c && c->is_open())
-      c->disconnect();
-    c.reset(nullptr);
-  }
+  //~DBConnection() {
+  //  if (c && c->is_open())
+  //    c->disconnect();
+  //  c.reset(nullptr);
+  //}
 };
 
 struct DBCreator {
@@ -300,8 +297,8 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
   if (!enable_tracking())
     return;
 
-  pqxx::work W(**DB);
-  uint64_t RunId = DB->prepareRun(W);
+  //pqxx::work W(**DB);
+  //uint64_t RunId = DB->prepareRun(W);
 
   std::string NewRunResultSql = "INSERT INTO regions (name, id, "
                                    "duration, events, run_id) "
@@ -322,16 +319,16 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
         std::cerr << fmt::format("Key {:d} missing in Events.", Key);
     if (! Entries.count(Key))
         std::cerr << fmt::format("Key {:d} missing in Entries.", Key);
-    Vals << fmt::format(" ('{:s}', {:d}, {:d}, {:d}, {:d})",
-                        Regions.at(Key), Key, KV.second,
-                        Entries.at(Key), RunId);
+    //Vals << fmt::format(" ('{:s}', {:d}, {:d}, {:d}, {:d})",
+    //                    Regions.at(Key), Key, KV.second,
+    //                    Entries.at(Key), RunId);
     Cnt++;
   }
   Vals << ";";
-  submit(NewRunResultSql + Vals.str(), W);
+  //submit(NewRunResultSql + Vals.str(), W);
   Vals.clear();
   Vals.flush();
-  W.commit();
+  //W.commit();
 }
 
 void StoreTransformedScop(const std::string &FnName,
@@ -340,17 +337,17 @@ void StoreTransformedScop(const std::string &FnName,
   if (!enable_tracking())
     return;
 
-  pqxx::work W(**DB);
-  uint64_t RunId = DB->prepareRun(W);
+  //pqxx::work W(**DB);
+  //uint64_t RunId = DB->prepareRun(W);
 
   std::string ScheduleSql = "INSERT INTO schedules (function, schedule, "
                              "run_id) VALUES ('{:s}', '{:s}', {:d});";
   std::string AstSql = "INSERT INTO isl_asts (function, ast, run_id) VALUES "
                         "('{:s}', '{:s}', {:d});";
 
-  submit(fmt::format(ScheduleSql, FnName, ScheduleTreeStr, RunId), W);
-  submit(fmt::format(AstSql, FnName, IslAstStr, RunId), W);
-  W.commit();
+  //submit(fmt::format(ScheduleSql, FnName, ScheduleTreeStr, RunId), W);
+  //submit(fmt::format(AstSql, FnName, IslAstStr, RunId), W);
+  //W.commit();
 }
 } // namespace db
 
@@ -358,7 +355,7 @@ namespace tracing {
 static ManagedStatic<TraceData> TD;
 
 void enter_region(uint64_t id, const char *name) {
-  uint64_t Time = papi::PAPI_get_real_usec();
+  uint64_t Time = PAPI_get_real_usec();
   if (!TD->Events.count(id))
     TD->Events[id] = 0;
   if (!TD->Entries.count(id))
@@ -371,7 +368,7 @@ void enter_region(uint64_t id, const char *name) {
 }
 
 void exit_region(uint64_t id) {
-  uint64_t Time = papi::PAPI_get_real_usec();
+  uint64_t Time = PAPI_get_real_usec();
   if (!TD->Events.count(id))
     std::cerr << fmt::format(
         "exit_region called before enter_region for ID: {:d}!\n", id);
@@ -391,7 +388,7 @@ void setup_tracing() {
   cl::ParseEnvironmentOptions("profile-scops", "PJIT_ARGS", "");
   opt::ValidateOptions();
   db::ValidateOptions();
-  papi::PAPI_library_init(PAPI_VER_CURRENT);
+  PAPI_library_init(PAPI_VER_CURRENT);
 }
 } // namespace tracing
 } // namespace polli

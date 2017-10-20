@@ -1,7 +1,9 @@
 #include "polli/log.h"
 #include "pprof/pgsql.h"
 #include "pprof/pprof.h"
+#if 0
 #include <pqxx/pqxx>
+#endif
 
 #include <ctime>
 #include <numeric>
@@ -198,7 +200,7 @@ static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
 }
 
 static pqxx::result submit(const std::string &Query,
-                           pqxx::work &w) throw(pqxx::syntax_error) {
+                           pqxx::work &w) noexcept(false) {
   pqxx::result Res;
   try {
     Res = w.exec(Query);

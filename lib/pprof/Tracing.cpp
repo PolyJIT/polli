@@ -11,6 +11,7 @@ static TracerTy createTracer() {
 
   return TracerTy(new Tracer());
 }
+B
 
 TracerTy getOrCreateActiveTracer() {
   static std::unique_ptr<Tracer> ActiveTracer = createTracer();

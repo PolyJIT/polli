@@ -133,11 +133,11 @@ GetOrCreateVariantFunction(const SpecializerRequest Request,
 
 extern "C" {
 void pjit_trace_fnstats_entry(uint64_t Id) {
-  JitContext->enter(Id, papi::PAPI_get_real_usec());
+  JitContext->enter(Id, PAPI_get_real_usec());
 }
 
 void pjit_trace_fnstats_exit(uint64_t Id) {
-  JitContext->exit(Id, papi::PAPI_get_real_usec());
+  JitContext->exit(Id, PAPI_get_real_usec());
 }
 
 /**
