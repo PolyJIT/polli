@@ -198,7 +198,7 @@ static Run<pprof::Event> GetSimplifiedRun(Run<PPEvent> &Events) {
 }
 
 static pqxx::result submit(const std::string &Query,
-                           pqxx::work &w) throw(pqxx::syntax_error) {
+                           pqxx::work &w) noexcept(false) {
   pqxx::result Res;
   try {
     Res = w.exec(Query);

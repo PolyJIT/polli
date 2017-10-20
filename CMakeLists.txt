@@ -64,8 +64,8 @@ option(POLLI_ENABLE_BASE_POINTERS "Enable SubExpression modelling" OFF)
 option(POLLI_STORE_OUTPUT "Store intermediate SCoPs as IR" OFF)
 
 string(REPLACE "-fno-exceptions" "-fexceptions" NEW_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-string(REPLACE "-O3" "-O2" NEW_CMAKE_CXX_FLAGS "${NEW_CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${NEW_CMAKE_CXX_FLAGS} -DNDEBUG -g -fno-inline -std=c++14 -fno-omit-frame-pointer -fPIC -fno-rtti -pthread -Wall")
+string(REPLACE "-std=c++11" "-std=c++1z" NEW_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${NEW_CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fno-rtti")
 
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )

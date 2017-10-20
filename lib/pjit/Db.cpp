@@ -132,7 +132,7 @@ static bool enable_tracking() {
 }
 
 static pqxx::result submit(const std::string &Query,
-                           pqxx::work &w) throw(pqxx::syntax_error) {
+                           pqxx::work &w) noexcept(false) {
   pqxx::result Res;
   try {
     Res = w.exec(Query);

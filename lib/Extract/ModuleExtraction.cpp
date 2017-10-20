@@ -701,20 +701,20 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
   if (F.hasFnAttribute("polyjit-jit-candidate"))
     return false;
 
-  for (auto *F : ME) {
-    if (F->isDeclaration())
+  for (auto *ExtractedFromF : ME) {
+    if (ExtractedFromF->isDeclaration())
       continue;
-    console->info("Instrumenting: {:s}", F->getName().str());
+    console->info("Instrumenting: {:s}", ExtractedFromF->getName().str());
 
     ValueToValueMapTy VMap;
-    Module *M = F->getParent();
-    StringRef ModuleName = F->getParent()->getModuleIdentifier();
-    StringRef FromName = F->getName();
+    Module *M = ExtractedFromF->getParent();
+    StringRef ModuleName = ExtractedFromF->getParent()->getModuleIdentifier();
+    StringRef FromName = ExtractedFromF->getName();
     UniqueModule PrototypeM = copyModule(*M);
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
-    Function *ProtoF = extractPrototypeM(VMap, *F, *PrototypeM);
+    Function *ProtoF = extractPrototypeM(VMap, *ExtractedFromF, *PrototypeM);
 
     llvm::legacy::PassManager MPM;
     MPM.add(llvm::createStripSymbolsPass(true));
@@ -732,11 +732,11 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
       continue;
     }
 
-    clearFunctionLocalMetadata(F);
+    clearFunctionLocalMetadata(ExtractedFromF);
 
     // Make sure that we do not destroy the function before we're done
     // using the IRBuilder, otherwise this will end poorly.
-    IRBuilder<> Builder(&*(F->begin()));
+    IRBuilder<> Builder(&*(ExtractedFromF->begin()));
     const std::string ModStr = moduleToString(*PrototypeM);
     Value *Prototype =
         Builder.CreateGlobalStringPtr(ModStr, FromName + ".prototype");
@@ -749,7 +749,7 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     InstrumentingFunctionCloner InstCloner;
     InstCloner.setSource(ProtoF);
     InstCloner.setPrototype(Prototype);
-    InstCloner.setFallback(F);
+    InstCloner.setFallback(ExtractedFromF);
     InstCloner.setDominatorTree(&DT);
     InstCloner.setTargetModule(M);
 
