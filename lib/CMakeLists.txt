@@ -37,11 +37,13 @@ set(POLYJIT_RUNTIME_SOURCES
 )
 
 set(POLYJIT_PPROF_SOURCES
+  pjit-logging/Log.cpp
   pprof/Tracing.cpp
   pprof/pprof.cpp
   pprof/libpprof.cpp
   pprof/libpprof-pgsql.cpp
   pprof/libpprof-file.cpp
+  Support/Options.cpp
 )
 
 set(LLVM_LINK_COMPONENTS

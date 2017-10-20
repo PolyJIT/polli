@@ -66,7 +66,6 @@ macro(add_polli_library name)
     ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX})
   set_property(GLOBAL APPEND PROPERTY LLVM_EXPORTS ${name})
   set_output_directory(${name} LIBRARY_DIR ${POLLI_LIBRARY_OUTPUT_INTDIR})
-  unset(LLVM_LINK_COMPONENTS)
   unset(POLLI_LINK_LIBS)
 endmacro(add_polli_library)
 

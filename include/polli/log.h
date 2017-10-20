@@ -1,7 +1,9 @@
 #ifndef POLLI_LOG_H
 #define POLLI_LOG_H
-#include "spdlog/spdlog.h"
 #include <memory>
+#include <string>
+
+#include "spdlog/spdlog.h"
 
 using namespace spdlog;
 
