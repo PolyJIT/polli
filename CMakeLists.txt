@@ -22,6 +22,15 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${LLVM_CMAKE_DIR})
 include(HandleLLVMOptions)
 include(AddLLVM)
 
+macro(add_pjit_dependency name Name NAME)
+  find_package(${Name} REQUIRED)
+  add_library(${name} UNKNOWN IMPORTED)
+  set_target_properties(${name} PROPERTIES IMPORTED_LOCATION ${${NAME}_LIBRARY})
+  include_directories(BEFORE ${${NAME}_INCLUDE_DIR})
+  get_filename_component(${NAME}_LIBDIR ${${NAME}_LIBRARY} DIRECTORY)
+  link_directories(${${NAME}_LIBDIR})
+endmacro(add_pjit_dependency)
+
 # Add the llvm header path.
 include_directories(${LLVM_INCLUDE_DIRS})
 
@@ -38,33 +47,10 @@ add_definitions( ${POLLY_DEFINITIONS} )
 
 include("polli_macros")
 
-find_package(Papi REQUIRED)
-add_library(papi UNKNOWN IMPORTED)
-set_target_properties(papi PROPERTIES IMPORTED_LOCATION ${PAPI_LIBRARY})
-include_directories(BEFORE ${PAPI_INCLUDE_DIR})
-get_filename_component(PAPI_LIBDIR ${PAPI_LIBRARY} DIRECTORY)
-link_directories(${PAPI_LIBDIR})
-
-find_package(Pthread REQUIRED)
-add_library(pthread UNKNOWN IMPORTED)
-set_target_properties(pthread PROPERTIES IMPORTED_LOCATION ${PTHREAD_LIBRARY})
-include_directories(BEFORE ${PTHREAD_INCLUDE_DIR})
-get_filename_component(PTHREAD_LIBDIR ${PTHREAD_LIBRARY} DIRECTORY)
-link_directories(${PTHREAD_LIBDIR})
-
-find_package(Likwid REQUIRED)
-add_library(likwid UNKNOWN IMPORTED)
-set_target_properties(likwid PROPERTIES IMPORTED_LOCATION ${LIKWID_LIBRARY})
-include_directories(BEFORE ${LIKWID_INCLUDE_DIR})
-get_filename_component(LIKWID_LIBDIR ${LIKWID_LIBRARY} DIRECTORY)
-link_directories(${LIKWID_LIBDIR})
-
-find_package(Pqxx REQUIRED)
-add_library(pqxx UNKNOWN IMPORTED)
-set_target_properties(pqxx PROPERTIES IMPORTED_LOCATION ${PQXX_LIBRARY})
-include_directories(BEFORE ${PQXX_INCLUDE_DIR})
-get_filename_component(PQXX_LIBDIR ${PQXX_LIBRARY} DIRECTORY)
-link_directories(${PQXX_LIBDIR})
+add_pjit_dependency(papi Papi PAPI)
+add_pjit_dependency(pthread Pthread PTHREAD)
+add_pjit_dependency(likwid Likwid LIKWID)
+add_pjit_dependency(pqxx Pqxx PQXX)
 
 set(BOOST_MIN_VERSION "1.58.0")
 find_package(Boost ${BOOST_MIN_VERSION} REQUIRED)
