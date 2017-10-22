@@ -224,21 +224,21 @@ public:
   }
 
   uint64_t prepareRun(pqxx::work &w) {
-    std::string SearchProjectSql =
-        "SELECT name FROM project WHERE name = '{}';";
+    std::string SearchProjectSql = "SELECT name, group FROM project WHERE name "
+                                   "= '{}' AND group_name = '{}';";
 
     std::string NewProjectSql =
         "INSERT INTO project (name, description, src_url, domain, group_name) "
         "VALUES ('{}', '{}', '{}', '{}', '{}');";
 
-    std::string NewRunSql =
-        "INSERT INTO run (\"end\", command, "
-        "project_name, experiment_name, run_group, experiment_group) "
-        "VALUES (TIMESTAMP '{}', '{}', "
-        "'{}', '{}', '{}', '{}') RETURNING id;";
+    std::string NewRunSql = "INSERT INTO run (\"end\", command, "
+                            "project_name, project_group, experiment_name, "
+                            "run_group, experiment_group) "
+                            "VALUES (TIMESTAMP '{}', '{}', '{}', "
+                            "'{}', '{}', '{}', '{}') RETURNING id;";
 
     pqxx::result ProjectExists =
-        submit(fmt::format(SearchProjectSql, Project), w);
+        submit(fmt::format(SearchProjectSql, Project, Group), w);
 
     if (ProjectExists.affected_rows() == 0)
       submit(fmt::format(NewProjectSql, Project, Project,
@@ -248,8 +248,8 @@ public:
     uint64_t RunId = 0;
     if (!opt::RunID) {
       pqxx::result R =
-          submit(fmt::format(NewRunSql, now(), Argv0, Project, Experiment,
-                             RunGroupUUID, ExperimentUUID),
+          submit(fmt::format(NewRunSql, now(), Argv0, Project, Group,
+                             Experiment, RunGroupUUID, ExperimentUUID),
                  w);
       R[0]["id"].to(RunId);
     } else {
