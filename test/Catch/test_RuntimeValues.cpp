@@ -40,7 +40,7 @@ SCENARIO("String-Attribute attached to function arguments", "[unit]") {
       Attribute ParamAttr = llvm::Attribute::get(Ctx, "polli.specialize");
       AttrBuilder Builder(ParamAttr);
       F->addParamAttrs(0, Builder);
-      THEN("1 can be read from the stack variable") {
+      THEN("The first Fn attribute has string value 'polli.specialize'") {
         Attribute FnArgAttr = F->getAttribute(1, "polli.specialize");
         REQUIRE(FnArgAttr.getKindAsEnum() != llvm::Attribute::AttrKind::None);
         REQUIRE(FnArgAttr.getAsString() == "\"polli.specialize\"");
