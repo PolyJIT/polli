@@ -17,7 +17,7 @@ include_directories(AFTER
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 
 # Where is LLVM installed?
-find_package(LLVM 6.0.0 CONFIG REQUIRED)
+find_package(LLVM 6.0 CONFIG REQUIRED)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${LLVM_CMAKE_DIR})
 include(HandleLLVMOptions)
 include(AddLLVM)
