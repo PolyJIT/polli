@@ -44,7 +44,7 @@ inline bool canSpecialize(const RunValue<T> &V) {
   const llvm::Function *F = V.Arg->getParent();
   unsigned I = V.Arg->getArgNo();
   llvm::Attribute Attr = F->getAttribute(I+1, "polli.specialize");
-  return Attr.getKindAsEnum() != llvm::Attribute::AttrKind::None;
+  return Attr.getAsString() == "\"polli.specialize\"";
 }
 } // namespace polli
 
