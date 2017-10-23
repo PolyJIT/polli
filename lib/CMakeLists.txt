@@ -3,98 +3,17 @@ set(POLYJIT_COMPILETIME_SOURCES
   Analysis/ScopDetection.cpp
   Extract/ModuleExtraction.cpp
   Persist/Schema.cpp
-  Support/Tasks.cpp
+  PolyJIT.cpp
+  RegisterCompilationPasses.cpp
   Support/FuncTools.cpp
+  Support/Log.cpp
   Support/Options.cpp
   Support/Stats.cpp
-  Support/Utils.cpp
+  Support/Tasks.cpp
   Support/TypeMapper.cpp
+  Support/Utils.cpp
   Transform/InstrumentRegions.cpp
   Transform/ProfileScops.cpp
-  pjit-logging/Log.cpp
-  RegisterCompilationPasses.cpp
-  PolyJIT.cpp
-)
-
-set(POLYJIT_RUNTIME_SOURCES
-  pjit/libpjit.cpp
-  pjit/BlockingMap.cpp
-  pjit/CodeGen.cpp
-  pjit/Compiler.cpp
-  pjit/Db.cpp
-  pjit/Jit.cpp
-  pjit/RunValues.cpp
-  pjit-logging/Log.cpp
-  Runtime/LikwidMarker.cpp
-  Runtime/RuntimeOptimizer.cpp
-  Runtime/VariantFunction.cpp
-  Support/Tasks.cpp
-  Support/FuncTools.cpp
-  Support/Options.cpp
-  Support/Stats.cpp
-  Support/Utils.cpp
-  Support/TypeMapper.cpp
-)
-
-set(POLYJIT_PPROF_SOURCES
-  pjit-logging/Log.cpp
-  pprof/Tracing.cpp
-  pprof/pprof.cpp
-  pprof/libpprof.cpp
-  pprof/libpprof-pgsql.cpp
-  pprof/libpprof-file.cpp
-  Support/Options.cpp
-)
-
-set(LLVM_LINK_COMPONENTS
-  ${LLVM_TARGETS_TO_BUILD}
-  Analysis
-  AsmParser
-  BitReader
-  BitWriter
-  CodeGen
-  Core
-  ExecutionEngine
-  IRReader
-  Interpreter
-  InstCombine
-  Instrumentation
-  IPO
-  Linker
-  OrcJIT
-  native
-  objcarcopts
-  RuntimeDyld
-  ScalarOpts
-  SelectionDAG
-  Support
-  Target
-  TransformUtils
-  Vectorize
-)
-
-set(POLLI_LINK_LIBS
-  Polly
-  dl
-  likwid
-  pthread
-  papi
-  pqxx
-  pq
-)
-
-add_polli_library(pjit SHARED
-  ${POLYJIT_RUNTIME_SOURCES}
-)
-
-set(POLLI_LINK_LIBS
-  papi
-  pqxx
-  pq
-)
-
-add_polli_library(pprof SHARED
-  ${POLYJIT_PPROF_SOURCES}
 )
 
 set(POLLI_LINK_LIBS
@@ -113,3 +32,6 @@ set_target_properties(LLVMPolyJIT
   PROPERTIES
   LINKER_LANGUAGE CXX
   PREFIX "")
+
+add_subdirectory(LibPJIT)
+add_subdirectory(LibPPROF)

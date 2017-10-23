@@ -224,8 +224,9 @@ public:
   }
 
   uint64_t prepareRun(pqxx::work &w) {
-    std::string SearchProjectSql = "SELECT name, group FROM project WHERE name "
-                                   "= '{}' AND group_name = '{}';";
+    std::string SearchProjectSql =
+        "SELECT name, group_name FROM project WHERE name "
+        "= '{}' AND group_name = '{}';";
 
     std::string NewProjectSql =
         "INSERT INTO project (name, description, src_url, domain, group_name) "

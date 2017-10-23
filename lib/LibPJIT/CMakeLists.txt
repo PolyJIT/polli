@@ -1,0 +1,61 @@
+set(LLVM_LINK_COMPONENTS
+  ${LLVM_TARGETS_TO_BUILD}
+  Analysis
+  AsmParser
+  BitReader
+  BitWriter
+  CodeGen
+  Core
+  ExecutionEngine
+  IRReader
+  Interpreter
+  InstCombine
+  Instrumentation
+  IPO
+  Linker
+  OrcJIT
+  native
+  objcarcopts
+  RuntimeDyld
+  ScalarOpts
+  SelectionDAG
+  Support
+  Target
+  TransformUtils
+  Vectorize
+)
+
+set(POLLI_LINK_LIBS
+  Polly
+  PollyISL
+  dl
+  likwid
+  pthread
+  papi
+  pqxx
+  pq
+)
+
+set(POLYJIT_RUNTIME_SOURCES
+  libpjit.cpp
+  BlockingMap.cpp
+  CodeGen.cpp
+  Compiler.cpp
+  Db.cpp
+  Jit.cpp
+  RunValues.cpp
+  ../Runtime/LikwidMarker.cpp
+  ../Runtime/RuntimeOptimizer.cpp
+  ../Runtime/VariantFunction.cpp
+  ../Support/FuncTools.cpp
+  ../Support/Log.cpp
+  ../Support/Options.cpp
+  ../Support/Stats.cpp
+  ../Support/Tasks.cpp
+  ../Support/TypeMapper.cpp
+  ../Support/Utils.cpp
+)
+
+add_polli_library(pjit SHARED
+  ${POLYJIT_RUNTIME_SOURCES}
+)
