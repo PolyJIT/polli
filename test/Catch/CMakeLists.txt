@@ -10,6 +10,7 @@ remove_definitions(-DPOLLI_ENABLE_TRACING)
 add_polli_executable(test-polyjit
   CatchTests.cpp
   test_RunValues.cpp
+  test_RuntimeValues.cpp
 )
 
 set(EXTRA_CATCH_FLAGS "-fexceptions")

@@ -12,6 +12,7 @@
 #include "polli/log.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/Casting.h"
 
@@ -40,7 +41,10 @@ struct RunValue {
 
 template<typename T>
 inline bool canSpecialize(const RunValue<T> &V) {
-  return V.Arg->hasAttr("polli.specialize");
+  const llvm::Function *F = V.Arg->getParent();
+  unsigned I = V.Arg->getArgNo();
+  llvm::Attribute Attr = F->getAttribute(I+1, "polli.specialize");
+  return Attr.getKindAsEnum() != llvm::Attribute::AttrKind::None;
 }
 } // namespace polli
 
