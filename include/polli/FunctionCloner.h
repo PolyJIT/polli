@@ -193,6 +193,7 @@ private:
 
           if (isa<IntrinsicInst>(&I))
             continue;
+
           NewF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
@@ -244,7 +245,8 @@ private:
           using namespace std::chrono;
           milliseconds Ms = duration_cast<milliseconds>(
               system_clock::now().time_since_epoch());
-          GV->setName(GV->getName() + "_POLYJIT_GLOBAL_" + fmt::format("{:d}", Ms.count()));
+          GV->setName(GV->getName() + "_POLYJIT_GLOBAL_" +
+                      fmt::format("{:d}", Ms.count()));
           GV->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
         }
 
