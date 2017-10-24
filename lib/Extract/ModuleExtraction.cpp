@@ -715,9 +715,9 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
-    bool BrokenDbg;
     Function *ProtoF = extractPrototypeM(VMap, *ExtractedFromF, *PrototypeM);
 
+    llvm::stripDebugInfo(*ExtractedFromF);
     llvm::StripDebugInfo(*PrototypeM);
     //if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
     //  // We failed verification, skip this region.
