@@ -4,6 +4,7 @@
 #include "polli/log.h"
 
 #include "llvm/IR/Mangler.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/SourceMgr.h"
 
@@ -86,6 +87,7 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype,
                                 bool &cache_hit) {
   cache_hit = LoadedModules.find(ID) != LoadedModules.end();
   if (!cache_hit) {
+    auto &errs = llvm::errs();
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
@@ -93,13 +95,16 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype,
     auto M = parseIR(Buf, Err, Ctx->monitored());
 
     if (!M) {
-      Err.print("libpjit", errs(), true, true);
+      Err.print("libpjit", errs, true, true);
     }
     assert(M && "Could not load the prototype!");
 
-    std::lock_guard<std::mutex> Guard(ModuleMutex);
-    LoadedModules.insert(std::make_pair(ID, std::move(M)));
-    LoadedContexts.insert(std::make_pair(ID, std::move(Ctx)));
+    // Ensure the module is not broken.
+    if (!verifyModule(*M, &errs)) {
+      std::lock_guard<std::mutex> Guard(ModuleMutex);
+      LoadedModules.insert(std::make_pair(ID, std::move(M)));
+      LoadedContexts.insert(std::make_pair(ID, std::move(Ctx)));
+    }
   }
 
   return LoadedModules[ID];

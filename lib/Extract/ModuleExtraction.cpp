@@ -715,19 +715,20 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
 
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
-    Function *ProtoF = extractPrototypeM(VMap, *ExtractedFromF, *PrototypeM);
     bool BrokenDbg;
-    if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
-      // We failed verification, skip this region.
-      std::string Buf;
-      llvm::raw_string_ostream Os(Buf);
-      PrototypeM->print(Os, nullptr, true, true);
-      console->error(Os.str());
-      console->error("Prototype: {:s} failed verification. Skipping.",
-                     PrototypeM->getModuleIdentifier());
-      continue;
-    }
+    Function *ProtoF = extractPrototypeM(VMap, *ExtractedFromF, *PrototypeM);
+
     llvm::StripDebugInfo(*PrototypeM);
+    //if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
+    //  // We failed verification, skip this region.
+    //  std::string Buf;
+    //  llvm::raw_string_ostream Os(Buf);
+    //  PrototypeM->print(Os, nullptr, true, true);
+    //  console->error(Os.str());
+    //  console->error("Prototype: {:s} failed verification. Skipping.",
+    //                 PrototypeM->getModuleIdentifier());
+    //  continue;
+    //}
 
     clearFunctionLocalMetadata(ExtractedFromF);
 
