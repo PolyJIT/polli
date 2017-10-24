@@ -171,6 +171,19 @@ private:
       if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
         CallSite CS = CallSite(&I);
         if (Function *CalledF = CS.getCalledFunction()) {
+          if (CalledF->hasFnAttribute("polli.mapped_fn"))
+            continue;
+
+          bool IsInternal = (CalledF->getLinkage() ==
+                             GlobalValue::LinkageTypes::InternalLinkage);
+          if (IsInternal) {
+            std::hash<std::string> name_hash;
+            CalledF->setName(
+                CalledF->getName() + "_FN_" +
+                fmt::format("{:d}", name_hash(TgtM->getModuleIdentifier())));
+            CalledF->addFnAttr("polli.mapped_fn");
+          }
+
           Function *NewF = cast<Function>(TgtM->getOrInsertFunction(
               CalledF->getName(), CalledF->getFunctionType(),
               CalledF->getAttributes()));
