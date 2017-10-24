@@ -13,6 +13,7 @@
 #include "llvm/Analysis/RegionInfo.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -715,11 +716,6 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
     PrototypeM->setModuleIdentifier((ModuleName + "." + FromName).str() +
                                     ".prototype");
     Function *ProtoF = extractPrototypeM(VMap, *ExtractedFromF, *PrototypeM);
-
-    llvm::legacy::PassManager MPM;
-    MPM.add(llvm::createStripSymbolsPass(true));
-    MPM.run(*PrototypeM);
-
     bool BrokenDbg;
     if (verifyModule(*PrototypeM, &errs(), &BrokenDbg)) {
       // We failed verification, skip this region.
@@ -731,6 +727,7 @@ bool ModuleInstrumentation::runOnFunction(Function &F) {
                      PrototypeM->getModuleIdentifier());
       continue;
     }
+    llvm::StripDebugInfo(*PrototypeM);
 
     clearFunctionLocalMetadata(ExtractedFromF);
 
