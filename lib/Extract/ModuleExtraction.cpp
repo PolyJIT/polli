@@ -181,7 +181,7 @@ struct InstrumentEndpoint {
 
     Type *Int64T = Type::getInt64Ty(Ctx);
     Type *Void = Type::getVoidTy(Ctx);
-    Type *VoidPtr = Type::getVoidTy(Ctx)->getPointerTo();
+    Type *VoidPtr = Type::getInt64PtrTy(Ctx);
     Type *CharPtr = Type::getInt8PtrTy(Ctx);
     Type *Int32T = Type::getInt32Ty(Ctx);
 
@@ -249,9 +249,8 @@ struct InstrumentEndpoint {
     Value *PrefixData = polli::registerStatStruct(*To, To->getName());
     PrefixData = Builder.CreateBitCast(PrefixData, Type::getInt64PtrTy(Ctx));
     Value *CastParams = Builder.CreateBitCast(Params, Type::getInt8PtrTy(Ctx));
-    Value *PtrToOriginalF =
-        Builder.CreateBitCast(FallbackF, Type::getVoidTy(Ctx)->getPointerTo());
-  
+    Value *PtrToOriginalF = Builder.CreateBitCast(FallbackF, VoidPtr);
+
     size_t JitID = GetCandidateId(*From);
     assert((JitID != 0) && "Invalid JIT Id.");
     Constant *JitIDVal = ConstantInt::get(Int64T, JitID, false);
