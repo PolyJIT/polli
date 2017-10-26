@@ -51,7 +51,7 @@ uint64_t GetCandidateId(const Function &F) {
   std::string NameTag = "polyjit-id";
   if (F.hasFnAttribute(NameTag)) {
     auto FnAttr = F.getFnAttribute(NameTag);
-    N = FnAttr.getValueAsInt();
+    N = FnAttr.getValueAsString().getAsInteger(10, N);
   }
 
   assert(N && "Could not find the polyjit-id!");
