@@ -118,9 +118,11 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   console->error_if(!Addr, "Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
 
-  auto CacheIt = JitContext->insert(std::make_pair(K, std::move(FPtr)));
-  if (!CacheIt.second)
+  if (auto [CacheIt, inserted] =
+          JitContext->insert(std::make_pair(K, std::move(FPtr)));
+      inserted) {
     llvm_unreachable("Key collision in function cace, abort.");
+  }
   DEBUG(printRunValues(Values));
 }
 
@@ -177,11 +179,9 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
 
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
 
-  auto FnIt = JitContext->find(K);
-  if (FnIt != JitContext->end()) {
+  if (auto FnIt = JitContext->find(K); FnIt != JitContext->end()) {
     auto &Symbol = FnIt->second;
-    auto Addr = Symbol.getAddress();
-    if (Addr) {
+    if (auto Addr = Symbol.getAddress(); Addr) {
       return reinterpret_cast<void *>(*Addr);
     }
   }

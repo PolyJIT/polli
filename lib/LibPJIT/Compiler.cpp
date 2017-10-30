@@ -119,12 +119,15 @@ SpecializingCompiler::getContext(const uint64_t ID) {
 Expected<SpecializingCompiler::ModuleHandleT>
 SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
   for (GlobalValue &GV : M->globals()) {
-    if (GV.hasInternalLinkage() ||
-        GV.hasPrivateLinkage())
-        continue;
+    if (GV.hasInternalLinkage() || GV.hasPrivateLinkage()) {
+      continue;
+    }
     std::lock_guard<std::mutex> Lock(DLMutex);
     dlerror();
-    void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
+    if(void *Addr = dlsym(LibHandle, GV.getName().str().c_str()); Addr) {
+      llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
+    }
+
     if (char *Error = dlerror()) {
       console->error("(dlsym) Could not locate the symbol: {:s}", Error);
       std::string Buf;
@@ -132,9 +135,6 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
       M->print(Os, nullptr, true, true);
       console->error("{:s}", Os.str());
     }
-
-    if (Addr)
-      llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
   }
 
   auto Resolver = orc::createLambdaResolver(
