@@ -95,10 +95,10 @@ using MainFnT = std::function<void(int, char **)>;
 
 static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   if (JitContext->find(K) != JitContext->end()) {
-    JitContext->increment(JitRegion::CACHE_HIT, 0);
+    JitContext->increment(JitRegion::CACHE_HIT);
     return;
   }
-  JitContext->increment(JitRegion::VARIANTS, 1);
+  JitContext->increment(JitRegion::VARIANTS);
 
   const Module &PM = Request.prototypeModule();
   Function &Prototype = Request.prototype();

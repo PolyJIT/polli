@@ -55,7 +55,7 @@ public:
     Events[id] += time;
   }
 
-  void increment(uint64_t id, uint64_t step) {
+  void increment(uint64_t id, uint64_t step = 1) {
     std::lock_guard<std::recursive_mutex> CS(TracingMutex);
     enter(id, 0);
     exit(id, step);
