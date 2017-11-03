@@ -17,6 +17,7 @@
 #include "llvm/Support/TargetSelect.h"
 
 #include <unordered_map>
+#include <utility>
 
 namespace polli {
 class ModuleCompiler {
@@ -56,8 +57,8 @@ public:
    * @param prototype The prototype string we want to read in.
    * @return llvm::Module& The LLVM-IR module we just read.
    */
-  SpecializingCompiler::SharedModule
-  getModule(const uint64_t ID, const char *prototype, bool &cache_hit);
+  using ModCacheResult = std::pair<SharedModule, bool>;
+  ModCacheResult getModule(const uint64_t ID, const char *prototype);
   std::shared_ptr<context_type> getContext(const uint64_t ID);
 
   llvm::Expected<ModuleHandleT> addModule(std::shared_ptr<llvm::Module> M);

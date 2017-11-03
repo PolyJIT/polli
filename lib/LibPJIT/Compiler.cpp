@@ -82,11 +82,10 @@ SpecializingCompiler::SpecializingCompiler()
   llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
 }
 
-SpecializingCompiler::SharedModule
-SpecializingCompiler::getModule(const uint64_t ID, const char *prototype,
-                                bool &cache_hit) {
-  cache_hit = LoadedModules.find(ID) != LoadedModules.end();
-  if (!cache_hit) {
+SpecializingCompiler::ModCacheResult
+SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
+  bool CacheHit = LoadedModules.find(ID) != LoadedModules.end();
+  if (!CacheHit) {
     auto &errs = llvm::errs();
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
@@ -107,7 +106,7 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype,
     }
   }
 
-  return LoadedModules[ID];
+  return std::make_pair(LoadedModules.at(ID), CacheHit);
 }
 
 std::shared_ptr<SpecializingCompiler::context_type>

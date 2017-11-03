@@ -155,20 +155,18 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
                 unsigned paramc, char **params) {
   // 1. JitContext.
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
+  std::hash<std::string_view> FnHash;
 
-  bool CacheHit;
   // 2. Compiler.
-  auto M = Compiler->getModule(ID, fName, CacheHit);
-  SpecializerRequest Request(reinterpret_cast<uint64_t>(fName), paramc, params,
-                             M);
+  auto [M, CacheHit] = Compiler->getModule(ID, fName);
+  SpecializerRequest Request(FnHash(fName), paramc, params, M);
 
-  RunValueList Values = runValues(Request);
-  llvm::Function &F = Request.prototype();
   if (!CacheHit) {
+    llvm::Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
   }
 
-  CacheKey K{ID, Values.hash()};
+  CacheKey K{ID, runValues(Request).hash()};
   // 3. ThreadPool
   auto FutureFn = Pool->async(GetOrCreateVariantFunction, Request, ID, K);
 
@@ -201,11 +199,10 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
 void *pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
                              unsigned paramc, char **params) {
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
+  std::hash<std::string_view> FnHash;
 
-  bool CacheHit;
-  auto M = Compiler->getModule(ID, fName, CacheHit);
-  SpecializerRequest Request(reinterpret_cast<uint64_t>(fName), paramc, params,
-                             M);
+  auto [M, CacheHit] = Compiler->getModule(ID, fName);
+  SpecializerRequest Request(FnHash(fName), paramc, params, M);
 
   if (!CacheHit) {
     llvm::Function &F = Request.prototype();
