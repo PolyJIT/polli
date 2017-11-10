@@ -5,6 +5,10 @@ cmake_minimum_required(VERSION 3.8)
 set(POLLI_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(POLLI_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
+# Add path for polli custom modules
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
+include("polli_macros")
+
 include_directories(AFTER
   ${POLLI_SOURCE_DIR}/external/spdlog/include
   ${POLLI_SOURCE_DIR}/external/catch/include
@@ -13,14 +17,16 @@ include_directories(AFTER
   ${POLLI_BINARY_DIR}/include/
 )
 
-# Add path for polli custom modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
-
 # Where is LLVM installed?
 find_package(LLVM 6.0 CONFIG REQUIRED)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${LLVM_CMAKE_DIR})
 include(HandleLLVMOptions)
 include(AddLLVM)
+
+# Add the llvm header path.
+include_directories(${LLVM_INCLUDE_DIRS})
+link_directories(${LLVM_LIBRARY_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
 
 macro(add_pjit_dependency name Name NAME)
   find_package(${Name} REQUIRED)
@@ -31,21 +37,12 @@ macro(add_pjit_dependency name Name NAME)
   link_directories(${${NAME}_LIBDIR})
 endmacro(add_pjit_dependency)
 
-# Add the llvm header path.
-include_directories(${LLVM_INCLUDE_DIRS})
-
-include_directories(${LLVM_INCLUDE_DIRS})
-link_directories(${LLVM_LIBRARY_DIRS})
-add_definitions(${LLVM_DEFINITIONS})
-
 ## Find Polly
 find_package(Polly REQUIRED)
 include_directories (${POLLY_INCLUDE_DIRS} )
 include_directories (${POLLY_ISL_INCLUDE_DIRS} )
 link_directories( ${POLLY_LIBRARY_DIRS} )
 add_definitions( ${POLLY_DEFINITIONS} )
-
-include("polli_macros")
 
 add_pjit_dependency(papi Papi PAPI)
 add_pjit_dependency(pthread Pthread PTHREAD)
@@ -90,7 +87,7 @@ install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
 set(POLLI_BINARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
 set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
-add_definitions( -D_GNU_SOURCE -DFMT_HEADER_ONLY)
+add_definitions(-DFMT_HEADER_ONLY)
 
 add_subdirectory(include)
 add_subdirectory(lib)
