@@ -45,3 +45,4 @@ set(POLLI_LINK_LIBS
 add_polli_library(pprof SHARED
   ${POLYJIT_PPROF_SOURCES}
 )
+target_compile_features(pprof PUBLIC cxx_std_17)

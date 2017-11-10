@@ -59,3 +59,4 @@ set(POLYJIT_RUNTIME_SOURCES
 add_polli_library(pjit SHARED
   ${POLYJIT_RUNTIME_SOURCES}
 )
+target_compile_features(pjit PUBLIC cxx_std_17)

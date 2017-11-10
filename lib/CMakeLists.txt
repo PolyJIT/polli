@@ -28,6 +28,7 @@ add_polli_loadable_module(LLVMPolyJIT
 )
 
 target_link_libraries(LLVMPolyJIT INTERFACE LLVMPolly)
+target_compile_features(LLVMPolyJIT PUBLIC cxx_std_17)
 set_target_properties(LLVMPolyJIT
   PROPERTIES
   LINKER_LANGUAGE CXX
