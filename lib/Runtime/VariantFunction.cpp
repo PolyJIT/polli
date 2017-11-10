@@ -1,5 +1,7 @@
 #include "likwid.h"
 
+#include "absl/memory/memory.h"
+
 #include "polli/FunctionCloner.h"
 #include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
@@ -210,7 +212,7 @@ static std::unique_ptr<FunctionClonerBase>
 createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
   if (!opt::runtime::DisableSpecialization) {
     // Perform parameter value substitution.
-    auto Specializer = std::make_unique<FunctionCloner<
+    auto Specializer = absl::make_unique<FunctionCloner<
         CopyCreator, IgnoreSource, SpecializeEndpoint<RunValue<uint64_t *>>>>();
 
     /* Perform a parameter specialization by taking the unchanged base
@@ -223,7 +225,7 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
 
   //auto Specializer = std::make_unique<
   //    FunctionCloner<MainCreator, IgnoreSource, ConnectTarget>>();
-  auto Specializer = std::make_unique<DefaultFunctionCloner>();
+  auto Specializer = absl::make_unique<DefaultFunctionCloner>();
   return Specializer;
 }
 

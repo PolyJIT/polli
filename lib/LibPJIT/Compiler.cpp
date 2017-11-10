@@ -1,3 +1,5 @@
+#include "absl/memory/memory.h"
+
 #include "polli/Compiler.h"
 #include "polli/Monitor.h"
 #include "polli/RuntimeOptimizer.h"
@@ -90,7 +92,7 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
-    auto Ctx = std::make_unique<Monitor<LLVMContext>>();
+    auto Ctx = absl::make_unique<Monitor<LLVMContext>>();
     auto M = parseIR(Buf, Err, Ctx->monitored());
 
     if (!M) {

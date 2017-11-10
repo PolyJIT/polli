@@ -10,7 +10,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${POLLI_SOURCE_DIR}/cmake")
 include("polli_macros")
 
 include_directories(AFTER
-  ${POLLI_SOURCE_DIR}/external/spdlog/include
   ${POLLI_SOURCE_DIR}/external/catch/include
   ${POLLI_SOURCE_DIR}/external/
   ${POLLI_SOURCE_DIR}/include/
@@ -60,22 +59,14 @@ option(POLLI_ENABLE_PAPI "Enable tracing via libPAPI" OFF)
 option(POLLI_ENABLE_BASE_POINTERS "Enable SubExpression modelling" OFF)
 option(POLLI_STORE_OUTPUT "Store intermediate SCoPs as IR" OFF)
 
-string(REPLACE "-fno-exceptions" "-fexceptions" NEW_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
-set(CMAKE_CXX_FLAGS "${NEW_CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fno-rtti")
-
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/include/pprof/Config.h.cmake
   ${POLLI_BINARY_DIR}/include/pprof/Config.h )
 
-FILE(GLOB_RECURSE PolliHeaderFiles "include/polli/*.h")
-FILE(GLOB_RECURSE PprofHeaderFiles "include/pprof/*.h")
-add_custom_target(headers SOURCES ${PolliHeaderFiles} ${PprofHeaderFiles})
+#string(REPLACE "-fno-exceptions" "-fexceptions" NEW_CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fno-rtti")
 
 install(DIRECTORY include/ DESTINATION include
   FILES_MATCHING PATTERN "*.h" PATTERN ".svn" EXCLUDE
-  )
-
-install(DIRECTORY external/catch/include DESTINATION include
-  FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
   )
 
 install(DIRECTORY ${POLLI_BINARY_DIR}/include/ DESTINATION include
@@ -88,6 +79,11 @@ set(POLLI_BINARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/bin)
 set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
 add_definitions(-DFMT_HEADER_ONLY)
+
+add_subdirectory(external/spdlog)
+add_subdirectory(external/gtest)
+add_subdirectory(external/cctz)
+add_subdirectory(external/abseil)
 
 add_subdirectory(include)
 add_subdirectory(lib)

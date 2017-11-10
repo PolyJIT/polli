@@ -22,13 +22,14 @@
 #ifndef POLLI_RUNVALUES_H
 #define POLLI_RUNVALUES_H
 
-#include "polli/RuntimeValues.h"
 #include <array>
 #include <cassert>
 #include <cstring>
 #include <iostream>
 #include <memory>
-#include <string_view>
+
+#include "absl/strings/string_view.h"
+#include "polli/RuntimeValues.h"
 
 namespace llvm {
 class Function;

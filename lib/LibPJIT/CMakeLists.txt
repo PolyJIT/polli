@@ -28,12 +28,12 @@ set(LLVM_LINK_COMPONENTS
 set(POLLI_LINK_LIBS
   Polly
   PollyISL
-  dl
   likwid
-  pthread
   papi
   pqxx
-  pq
+  absl::base
+  absl::strings
+  spdlog
 )
 
 set(POLYJIT_RUNTIME_SOURCES
@@ -59,4 +59,4 @@ set(POLYJIT_RUNTIME_SOURCES
 add_polli_library(pjit SHARED
   ${POLYJIT_RUNTIME_SOURCES}
 )
-target_compile_features(pjit PUBLIC cxx_std_17)
+target_compile_features(pjit PUBLIC cxx_std_14)

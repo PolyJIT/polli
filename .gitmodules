@@ -7,3 +7,12 @@
 [submodule "external/isl-cpp"]
 	path = external/isl
 	url = https://github.com/simbuerg/isl-cpp.git
+[submodule "external/abseil"]
+	path = external/abseil
+	url = https://github.com/abseil/abseil-cpp
+[submodule "external/cctz"]
+	path = external/cctz
+	url = https://github.com/google/cctz
+[submodule "external/gtest"]
+	path = external/gtest
+	url = https://github.com/google/googletest

@@ -23,6 +23,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "absl/strings/string_view.h"
+
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Triple.h"
@@ -155,7 +157,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
                 unsigned paramc, char **params) {
   // 1. JitContext.
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
-  std::hash<std::string_view> FnHash;
+  std::hash<std::string> FnHash;
 
   // 2. Compiler.
   auto [M, CacheHit] = Compiler->getModule(ID, fName);
@@ -199,7 +201,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
 void *pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
                              unsigned paramc, char **params) {
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
-  std::hash<std::string_view> FnHash;
+  std::hash<std::string> FnHash;
 
   auto [M, CacheHit] = Compiler->getModule(ID, fName);
   SpecializerRequest Request(FnHash(fName), paramc, params, M);

@@ -1,10 +1,3 @@
-#include "polli/Db.h"
-#include "polli/Jit.h"
-#include "polli/Options.h"
-#include "polli/log.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/ManagedStatic.h"
-
 #include <ctime>
 #include <iostream>
 #include <numeric>
@@ -13,6 +6,15 @@
 #include <stdlib.h>
 #include <string>
 #include <thread>
+
+#include "absl/strings/str_cat.h"
+
+#include "polli/Db.h"
+#include "polli/Jit.h"
+#include "polli/Options.h"
+#include "polli/log.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/ManagedStatic.h"
 
 using namespace pqxx;
 using namespace llvm;
@@ -246,15 +248,19 @@ public:
                          SourceURI, Domain, Group),
              w);
 
-    uint64_t RunId = 0;
-    if (!opt::RunID) {
-      pqxx::result R =
-          submit(fmt::format(NewRunSql, now(), Argv0, Project, Group,
-                             Experiment, RunGroupUUID, ExperimentUUID),
-                 w);
+    uint64_t RunId = opt::RunID;
+    if (RunID == 0) {
+      pqxx::result R = submit(
+          absl::StrCat(
+              "INSERT INTO run (\"end\", command, project_name, project_group, "
+              "experiment_name, run_group, experiment_group) "
+              "VALUES (TIMESTAMP '",
+              now(), "', '", Argv0, "', '", Project, "', '", Group, "', '",
+              Experiment, "', '", RunGroupUUID, "', '", ExperimentUUID,
+              "')"
+              "RETURNING id;"),
+          w);
       R[0]["id"].to(RunId);
-    } else {
-      RunId = RunID;
     }
 
     return RunId;
