@@ -39,7 +39,7 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/GICHelper.h"
 
-#include "polly/isl-noexceptions.h"
+#include "isl/isl-noexceptions.h"
 
 #include <iostream>
 
