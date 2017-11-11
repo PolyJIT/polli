@@ -321,11 +321,12 @@ namespace polli {
     PM.run(*F.getParent(), AM);
     Os.flush();
     error_code Ec;
-    tool_output_file Outf(
+    auto OutFile = std::make_unique<llvm::ToolOutputFile>(
         fmt::format("{:s}-profile-scops-after.ll", F.getName().str()), Ec,
         sys::fs::OpenFlags::F_RW);
-    Outf.os() << ModStr;
-    Outf.keep();
+
+    OutFile->os() << ModStr;
+    OutFile->keep();
 
     return AnyInstrumented;
   }

@@ -20,25 +20,27 @@
 #ifndef POLLI_INSTRUMENTREGIONS_H
 #define POLLI_INSTRUMENTREGIONS_H
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/RegionPass.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
 
-#include "polli/ScopDetection.h"
 #include "polly/Support/ScopHelper.h"
 
 namespace llvm {
-class Value;
 class Instruction;
 class GlobalVariable;
 class GlobalValue;
 class LoopInfo;
 class PointerType;
-class RegionInfo;
 class Region;
+class RegionInfo;
+class Value;
 } // namespace llvm
 
-typedef SmallVector<std::pair<Instruction *, Instruction *>, 8> TimerPairs;
+using TimerPairs =
+    llvm::SmallVector<std::pair<llvm::Instruction *, llvm::Instruction *>, 8>;
 
 namespace polli {
 class JITScopDetection;
@@ -46,47 +48,40 @@ class JITScopDetection;
 /**
  * @brief Initialize PAPI CSCoP profiling
  */
-class PapiCScopProfilingInit : public ModulePass {
+class PapiCScopProfilingInit : public llvm::ModulePass {
 public:
-  explicit PapiCScopProfilingInit() : ModulePass(ID) {};
+  explicit PapiCScopProfilingInit() : llvm::ModulePass(ID) {};
 
   /**
    * @name ModulePass interface
    * @{ */
   static char ID;
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.setPreservesAll();
-  }
-
-  virtual bool runOnModule(Module &M);
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
+  virtual bool runOnModule(llvm::Module &M);
   /**  @} */
 };
 
 /**
  * @brief Instrument SCoPs for PAPI profiling
  */
-class PapiCScopProfiling : public FunctionPass {
+class PapiCScopProfiling : public llvm::FunctionPass {
 public:
-  explicit PapiCScopProfiling() : FunctionPass(ID) {}
+  explicit PapiCScopProfiling() : llvm::FunctionPass(ID) {}
 
   /**
    * @name FunctionPass interface
    * @{ */
   static char ID;
 
-  virtual void getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<polli::JITScopDetection>();
-    AU.addRequired<RegionInfoPass>();
-  }
-
-  virtual bool runOnFunction(Function &);
+  virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const;
+  virtual bool runOnFunction(llvm::Function &);
   /**  @} */
 
 private:
   JITScopDetection *SD;
-  RegionInfoPass *RI;
+  llvm::RegionInfoPass *RI;
 
-  bool processRegion(const Region *R);
+  bool processRegion(const llvm::Region *R);
 
   /**
    * @brief Instrument a region for papi profiling
@@ -98,9 +93,11 @@ private:
    * @param entryName name of our region entry
    * @param exitName name of our region exit
    */
-  void instrumentRegion(Module *M, std::vector<BasicBlock *> &EntryBBs,
-                        std::vector<BasicBlock *> &ExitBBs, const Region *R,
-                        std::string entryName, std::string exitName);
+  void instrumentRegion(llvm::Module *M,
+                        std::vector<llvm::BasicBlock *> &EntryBBs,
+                        std::vector<llvm::BasicBlock *> &ExitBBs,
+                        const llvm::Region *R, std::string entryName,
+                        std::string exitName);
 
   /**
    * @brief Print analysis information. Empty.
@@ -108,7 +105,7 @@ private:
    * @param
    * @param
    */
-  void print(raw_ostream &, const Module *) const {}
+  void print(llvm::raw_ostream &, const llvm::Module *) const {}
 };
 } // namespace polli
 

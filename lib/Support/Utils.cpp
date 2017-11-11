@@ -45,8 +45,9 @@ void StoreModule(Module &M, const Twine &Name) {
   if (!opt::runtime::GenerateOutput)
     return;
 
-  if (!DirReady)
+  if (!DirReady) {
     initializeOutputDir();
+  }
 
   M.setModuleIdentifier(Name.str());
 
@@ -56,8 +57,8 @@ void StoreModule(Module &M, const Twine &Name) {
   p::append(DestPath, Name);
 
   std::string Path = StringRef(DestPath.data(), DestPath.size()).str();
-  std::unique_ptr<tool_output_file> Out(
-      new tool_output_file(Path.c_str(), ErrorInfo, sys::fs::F_None));
+  auto OutFile = std::make_unique<llvm::ToolOutputFile>(Path.c_str(), ErrorInfo,
+                                                        sys::fs::F_None);
 
   // Remove all debug info before storing.
   // FIXME: This is just working around bugs.
@@ -66,11 +67,11 @@ void StoreModule(Module &M, const Twine &Name) {
 
   llvm::legacy::PassManager PM;
   PM.add(llvm::createVerifierPass());
-  PM.add(createPrintModulePass(Out->os()));
+  PM.add(createPrintModulePass(OutFile->os()));
   PM.run(M);
 
-  Out->os().close();
-  Out->keep();
+  OutFile->os().close();
+  OutFile->keep();
 }
 
 void StoreModules(ManagedModules &Modules) {

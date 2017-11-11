@@ -18,36 +18,30 @@
 // regions before we perform any instrumentation.
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "polyjit"
-#include "polli/InstrumentRegions.h"
-#include "polli/ScopDetection.h"
+#include <set>
+#include <string>
+#include <vector>
+
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/ilist.h"
 #include "llvm/Analysis/RegionInfo.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/IR/Argument.h"
 #include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/CFG.h"
 #include "llvm/IR/Constant.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstrTypes.h"
 #include "llvm/IR/Instruction.h"
-#include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/PassAnalysisSupport.h"
 #include "llvm/PassSupport.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include <set>
-#include <stddef.h>
-#include <stdint.h>
-#include <string>
-#include <vector>
+
+#include "polli/InstrumentRegions.h"
+#include "polli/ScopDetection.h"
 
 namespace papi {
 #include "papi.h"
@@ -385,6 +379,14 @@ void PapiCScopProfiling::instrumentRegion(Module *M,
   }
 
   ++EvID;
+}
+
+void PapiCScopProfiling::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
+  AU.addRequired<polli::JITScopDetection>();
+  AU.addRequired<RegionInfoPass>();
+}
+void PapiCScopProfilingInit::getAnalysisUsage(llvm::AnalysisUsage &AU) const {
+  AU.setPreservesAll();
 }
 
 char PapiCScopProfiling::ID = 0;

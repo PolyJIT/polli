@@ -28,8 +28,10 @@ set(LLVM_LINK_COMPONENTS
 set(POLLI_LINK_LIBS
   Polly
   PollyISL
+  dl
   likwid
   papi
+  pthread
   pqxx
   absl::base
   absl::strings

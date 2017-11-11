@@ -11,6 +11,8 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
 #include "llvm/Analysis/RegionInfo.h"
+#include "llvm/Analysis/ScalarEvolution.h"
+#include "llvm/Analysis/ScalarEvolutionExpressions.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/IR/DebugInfo.h"

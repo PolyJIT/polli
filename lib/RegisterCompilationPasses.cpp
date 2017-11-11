@@ -18,6 +18,7 @@
 #include "polli/Options.h"
 #include "polli/PapiProfiling.h"
 #include "polli/ProfileScops.h"
+#include "polli/ScopDetection.h"
 #include "polli/log.h"
 
 #include "polly/Canonicalization.h"
