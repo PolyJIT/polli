@@ -1,12 +1,4 @@
-#include "polli/Schema.h"
-#include "polli/FuncTools.h"
-#include "polli/FunctionCloner.h"
-#include "polli/ModuleExtractor.h"
-#include "polli/Options.h"
-#include "polli/ScopDetection.h"
-#include "polli/Stats.h"
-#include "polli/Utils.h"
-#include "polli/log.h"
+#include "absl/strings/str_cat.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Analysis/CallGraph.h"
@@ -24,6 +16,16 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
+
+#include "polli/Schema.h"
+#include "polli/FuncTools.h"
+#include "polli/FunctionCloner.h"
+#include "polli/ModuleExtractor.h"
+#include "polli/Options.h"
+#include "polli/ScopDetection.h"
+#include "polli/Stats.h"
+#include "polli/Utils.h"
+#include "polli/log.h"
 
 using namespace llvm;
 using namespace polli;
@@ -603,6 +605,8 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
 
       SmallVector<BasicBlock *, 8> RealBlocks(TrackThis->blocks());
       CodeExtractor RealExtractor(RealBlocks, &DT, /*AggregateArgs*/ false);
+      std::hash<std::string> FnNameHasher;
+
       if (Function *ExtractedF = RealExtractor.extractCodeRegion()) {
         CallSite FunctionCall = findExtractedCallSite(*ExtractedF, F);
         if (FunctionCall.isCall() || FunctionCall.isInvoke()) {
@@ -618,8 +622,9 @@ extractCandidates(Function &F, JITScopDetection &SD, ScalarEvolution &SE,
           fixSuccessorPHI(BB);
         }
         ExtractedF->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
-        ExtractedF->setName(F.getName() + "_" + fmt::format("{:d}", Cnt++) +
-                            ".pjit.scop");
+        ExtractedF->setName(absl::StrCat(
+            F.getName().str(), "_", Cnt++, "_",
+            FnNameHasher(F.getParent()->getName().str()), ".pjit.scop"));
         ExtractedF->addFnAttr("polyjit-jit-candidate");
 
         Functions.insert(ExtractedF);
