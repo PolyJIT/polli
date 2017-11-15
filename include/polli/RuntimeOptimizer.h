@@ -22,6 +22,7 @@
 using namespace llvm;
 
 namespace polli {
+using SharedModule = std::shared_ptr<Module>;
 void SetOptimizationPipeline(PipelineType Choice);
 
 /// @brief Optimize a function during the runtime of the program.
@@ -31,6 +32,6 @@ void SetOptimizationPipeline(PipelineType Choice);
 //
 // @param F The function to optimize
 // @return The optimized function.
-std::shared_ptr<Module> optimizeForRuntime(std::shared_ptr<Module> M);
+SharedModule optimizeForRuntime(std::shared_ptr<Module> M);
 } // namespace polli
 #endif // POLLI_RUNTIMEOPTIMIZER_H

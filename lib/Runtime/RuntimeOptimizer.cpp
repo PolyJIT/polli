@@ -439,7 +439,6 @@ PassManagerBuilder createPMB() {
   return Builder;
 }
 
-using SharedModule = std::shared_ptr<Module>;
 SharedModule optimizeForRuntime(SharedModule M) {
   PassManagerBuilder Builder = createPMB();
 #ifdef POLLI_STORE_OUTPUT
