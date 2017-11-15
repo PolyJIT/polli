@@ -368,7 +368,8 @@ static void registerPollyWithDiagnostics(const llvm::PassManagerBuilder &Builder
   //polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionWrapperPassPass());
   PM.add(polly::createScopInfoRegionPassPass());
-  PM.add(new TileSizeLearner());
+  if (!opt::runtime::UsePollyOptions)
+    PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
 
   if (opt::runtime::EnableScheduleReport)
