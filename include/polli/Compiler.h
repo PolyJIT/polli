@@ -2,6 +2,7 @@
 #define POLLI_COMPILER_H
 
 #include "polli/Monitor.h"
+#include "polli/RuntimeOptimizer.h"
 #include "polli/Options.h"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
@@ -38,14 +39,18 @@ public:
       std::pair<llvm::Module &, polli::Monitor<llvm::LLVMContext> &>;
 
 private:
+  polli::Monitor<llvm::LLVMContext> Ctx;
+
   std::mutex DLMutex;
   std::mutex ModuleMutex;
 
   llvm::orc::RTDyldObjectLinkingLayer ObjectLayer;
   llvm::orc::IRCompileLayer<decltype(ObjectLayer), ModuleCompiler> CompileLayer;
+
+  polli::RuntimeOptimizer RtOptFtor;
+
   llvm::orc::IRTransformLayer<decltype(CompileLayer), OptimizeFunction> OptimizeLayer;
   void *LibHandle;
-
 public:
   using ModuleHandleT = decltype(OptimizeLayer)::ModuleHandleT;
 
@@ -59,9 +64,19 @@ public:
    */
   using ModCacheResult = std::pair<SharedModule, bool>;
   ModCacheResult getModule(const uint64_t ID, const char *prototype);
-  std::shared_ptr<context_type> getContext(const uint64_t ID);
 
-  llvm::Expected<ModuleHandleT> addModule(std::shared_ptr<llvm::Module> M);
+  const polli::Monitor<llvm::LLVMContext> &getContext() const;
+
+  /**
+   * @brief Add a module for eager compilation.
+   *
+   * @param M
+   *
+   * @return
+   */
+  using OptimizedModule =
+      std::pair<llvm::Expected<ModuleHandleT>, /*IsOptimized=*/bool>;
+  OptimizedModule addModule(std::shared_ptr<llvm::Module> M);
 
   void removeModule(ModuleHandleT H);
 
@@ -69,11 +84,27 @@ public:
                              const llvm::DataLayout &DL);
   ~SpecializingCompiler();
 
-private:
-  using context_list = std::vector<context_type>;
+  bool IsOptimizeable(const polli::SharedModule &M) const;
 
-  std::unordered_map<uint64_t, std::shared_ptr<context_type>> LoadedContexts;
+  /**
+   * @brief Maintain a set of blocked modules, where optimization is useless.
+   */
+  using BlockedModules = std::set<std::shared_ptr<const llvm::Module>>;
+  bool isBlocked(std::shared_ptr<const llvm::Module> M) const {
+    return BlockedMods.find(M) != BlockedMods.end();
+  }
+
+  void block(std::shared_ptr<const llvm::Module> M) {
+    BlockedMods.insert(M);
+  }
+
+  void unblock(std::shared_ptr<const llvm::Module> M) {
+    BlockedMods.erase(M);
+  }
+
+private:
   std::unordered_map<uint64_t, SharedModule> LoadedModules;
+  BlockedModules BlockedMods;
 };
 
 } // namespace polli

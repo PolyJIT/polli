@@ -71,8 +71,8 @@ public:
   llvm::Function &prototype() const {
     return *F;
   }
-  const llvm::Module &prototypeModule() const {
-    return *M;
+  std::shared_ptr<const llvm::Module> prototypeModule() const {
+    return M;
   }
 };
 

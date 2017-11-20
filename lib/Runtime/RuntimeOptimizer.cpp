@@ -13,6 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "runtime_optimizer"
+#include <iostream>
+
 #include "polli/RuntimeOptimizer.h"
 #include "polli/Db.h"
 #include "polli/Utils.h"
@@ -40,8 +42,6 @@
 #include "polly/Support/GICHelper.h"
 
 #include "isl/isl-noexceptions.h"
-
-#include <iostream>
 
 REGISTER_LOG(console, DEBUG_TYPE);
 
@@ -439,7 +439,7 @@ PassManagerBuilder createPMB() {
   return Builder;
 }
 
-SharedModule optimizeForRuntime(SharedModule M) {
+SharedModule RuntimeOptimizer::operator()(SharedModule M) {
   PassManagerBuilder Builder = createPMB();
 #ifdef POLLI_STORE_OUTPUT
   opt::GenerateOutput = true;
@@ -463,10 +463,14 @@ SharedModule optimizeForRuntime(SharedModule M) {
 #endif
 
   FPM.doInitialization();
+
+  bool Optimized = false;
   for (auto &F : *M) {
     FPM.run(F);
+    bool FnOptimized = F.hasFnAttribute("polly-optimized");
+    Optimized |= FnOptimized;
     DEBUG({
-      if (F.hasFnAttribute("polly-optimized"))
+      if (FnOptimized)
         console->error("fn got optimized by polly");
       else
         console->error("fn did not get optimized by polly");
@@ -475,6 +479,9 @@ SharedModule optimizeForRuntime(SharedModule M) {
 
   FPM.doFinalization();
   PM.run(*M);
+
+  if (Optimized)
+    OptimizedModules.insert(M);
 
 #ifdef POLLI_STORE_OUTPUT
   DEBUG(StoreModule(*M, M->getModuleIdentifier() + ".after.polly.ll"));

@@ -15,11 +15,9 @@
 #ifndef POLLI_FUNCTIONCLONER_H
 #define POLLI_FUNCTIONCLONER_H
 
-#include "polli/FuncTools.h"
-#include "polli/Options.h"
-#include "polli/TypeMapper.h"
-#include "polli/Utils.h"
-#include "polli/log.h"
+#include <chrono>
+
+#include "absl/strings/str_cat.h"
 
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
@@ -45,7 +43,11 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "llvm/Transforms/Utils/ValueMapper.h"
 
-#include <chrono>
+#include "polli/FuncTools.h"
+#include "polli/Options.h"
+#include "polli/TypeMapper.h"
+#include "polli/Utils.h"
+#include "polli/log.h"
 
 using namespace llvm;
 

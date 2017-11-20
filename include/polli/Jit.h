@@ -25,8 +25,8 @@ class PolyJIT {
   void setup();
   void tearDown();
 
-  std::recursive_mutex TracingMutex;
-  std::recursive_mutex CacheMutex;
+  mutable std::recursive_mutex TracingMutex;
+  mutable std::recursive_mutex CacheMutex;
 
   std::unordered_map<uint64_t, uint64_t> Events;
   std::unordered_map<uint64_t, uint64_t> Entries;

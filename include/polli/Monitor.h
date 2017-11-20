@@ -67,7 +67,7 @@ public:
 
 private:
   object_type Obj;
-  std::mutex M;
+  mutable std::mutex M;
 };
 } // namespace polli
 

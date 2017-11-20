@@ -78,7 +78,7 @@ SpecializingCompiler::SpecializingCompiler()
         return std::make_shared<PolySectionMemoryManager>();
       }),
       CompileLayer(ObjectLayer, ModuleCompiler()),
-      OptimizeLayer(CompileLayer, optimizeForRuntime), LibHandle(nullptr) {
+      OptimizeLayer(CompileLayer, RtOptFtor), LibHandle(nullptr) {
   SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
   LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
   llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
@@ -92,8 +92,7 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
-    auto Ctx = absl::make_unique<Monitor<LLVMContext>>();
-    auto M = parseIR(Buf, Err, Ctx->monitored());
+    std::unique_ptr<llvm::Module> M = parseIR(Buf, Err, Ctx.monitored());
 
     if (!M) {
       Err.print("libpjit", errs, true, true);
@@ -104,20 +103,18 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
     if (!verifyModule(*M, &errs)) {
       std::lock_guard<std::mutex> Guard(ModuleMutex);
       LoadedModules.insert(std::make_pair(ID, std::move(M)));
-      LoadedContexts.insert(std::make_pair(ID, std::move(Ctx)));
     }
   }
 
   return std::make_pair(LoadedModules.at(ID), CacheHit);
 }
 
-std::shared_ptr<SpecializingCompiler::context_type>
-SpecializingCompiler::getContext(const uint64_t ID) {
-  assert(LoadedContexts.count(ID) && "No context with this ID.");
-  return LoadedContexts[ID];
+const polli::Monitor<llvm::LLVMContext> &
+SpecializingCompiler::getContext() const {
+  return Ctx;
 }
 
-Expected<SpecializingCompiler::ModuleHandleT>
+SpecializingCompiler::OptimizedModule
 SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
   for (GlobalValue &GV : M->globals()) {
     if (GV.hasInternalLinkage() || GV.hasPrivateLinkage()) {
@@ -125,8 +122,11 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
     }
     std::lock_guard<std::mutex> Lock(DLMutex);
     dlerror();
-    if(void *Addr = dlsym(LibHandle, GV.getName().str().c_str()); Addr) {
-      llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
+    {
+      void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
+      if (Addr) {
+        llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
+      }
     }
 
     if (char *Error = dlerror()) {
@@ -151,15 +151,22 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
       });
 
   Expected<ModuleHandleT> MH = OptimizeLayer.addModule(M, Resolver);
+  const bool IsOptimized =
+      RtOptFtor.OptimizedModules.find(M) != RtOptFtor.OptimizedModules.end();
+  if (!IsOptimized) {
+    block(M);
+  }
 
-  return MH;
+  console->error_if(!MH, "Module compilation failed!");
+  assert(MH && "Adding the module failed!");
+  return std::make_pair(std::move(MH), IsOptimized);
 }
 
 void SpecializingCompiler::removeModule(ModuleHandleT H) {
   llvm::Error Status = CompileLayer.removeModule(H);
-  console->error_if(!Status.success(), "Unable to remove module!"); 
+  console->error_if(!Status.success(), "Unable to remove module!");
   assert(Status.success() && "Unable to remove module!");
-    
+
 }
 
 JITSymbol SpecializingCompiler::findSymbol(const std::string &Name,
@@ -173,7 +180,11 @@ JITSymbol SpecializingCompiler::findSymbol(const std::string &Name,
 SpecializingCompiler::~SpecializingCompiler() {
   std::lock_guard<std::mutex> Guard(ModuleMutex);
   LoadedModules.clear();
-  LoadedContexts.clear();
   SPDLOG_DEBUG("libpjit", "Stopping PolyJIT Engine.");
+}
+
+bool SpecializingCompiler::IsOptimizeable(const polli::SharedModule &M) const {
+  auto RtOptFtorEnd = RtOptFtor.OptimizedModules.end();
+  return RtOptFtor.OptimizedModules.find(M) != RtOptFtorEnd;
 }
 } // namespace polli
