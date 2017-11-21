@@ -183,6 +183,7 @@ private:
             CalledF->setName(
                 CalledF->getName() + "_FN_" +
                 fmt::format("{:d}", name_hash(TgtM->getModuleIdentifier())));
+            CalledF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
             CalledF->addFnAttr("polli.mapped_fn");
           }
 
