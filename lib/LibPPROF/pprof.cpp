@@ -30,10 +30,10 @@ Options getPprofOptionsFromEnv() {
   Opts.group = Grp ? Grp : "unknown";
   Opts.src_uri = Uri ? Uri : "unknown";
   Opts.command = Cmd ? Cmd : "unknown";
-  Opts.use_db = Db ? (bool)stoi(Db) : true;
-  Opts.use_csv = Csv ? (bool)stoi(Csv) : false;
-  Opts.use_file = File ? (bool)stoi(File) : false;
-  Opts.execute_atexit = Exec ? (bool)stoi(Exec) : true;
+  Opts.use_db = Db ? (bool)std::stoi(Db) : true;
+  Opts.use_csv = Csv ? (bool)std::stoi(Csv) : false;
+  Opts.use_file = File ? (bool)std::stoi(File) : false;
+  Opts.execute_atexit = Exec ? (bool)std::stoi(Exec) : true;
 
   return Opts;
 }

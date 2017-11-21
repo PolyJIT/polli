@@ -17,15 +17,11 @@
 #include "polli/Options.h"
 #include <memory>
 
-#include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
-
 #include <set>
 
-using namespace llvm;
-
 namespace polli {
-using SharedModule = std::shared_ptr<Module>;
+using SharedModule = std::shared_ptr<llvm::Module>;
 void SetOptimizationPipeline(PipelineType Choice);
 
 // @brief Optimize a function during the runtime of the program.

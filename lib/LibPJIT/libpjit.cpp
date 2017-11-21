@@ -137,7 +137,6 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
 static void
 GetOrCreateVariantFunction(const SpecializerRequest Request,
                            uint64_t ID, CacheKey K) {
-  //auto Ctx = Compiler->getContext(ID);
   auto &Ctx = Compiler->getContext();
   Ctx.RunInCS(DoCreateVariant, Request, K);
 }

@@ -211,7 +211,6 @@ extern Run<PPEvent> PapiEvents;
 } // end of namespace pprof
 
 #include <iostream>
-using namespace std;
 std::ostream &operator<<(std::ostream &os, const PPEvent &event);
 std::ostream &operator<<(std::ostream &os, const PPStringRegion &R);
 std::istream &operator>>(std::istream &is, PPEvent &event);

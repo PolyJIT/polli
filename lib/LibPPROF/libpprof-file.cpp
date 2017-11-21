@@ -84,7 +84,7 @@ static bool ReadRun(std::unique_ptr<std::ifstream> &in, Run<PPEvent> &Events,
   return true;
 }
 
-std::unique_ptr<ifstream> Ifs;
+std::unique_ptr<std::ifstream> Ifs;
 
 bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
              const Options &opt) {
@@ -93,7 +93,7 @@ bool ReadRun(Run<PPEvent> &Events, std::map<uint32_t, PPStringRegion> &Regions,
 
   if (!Ifs) {
     Ifs = std::unique_ptr<std::ifstream>(
-        new std::ifstream(FileOpts.profile, ios_base::in));
+        new std::ifstream(FileOpts.profile, std::ios_base::in));
     std::cout << "Reading runs from: " << FileOpts.profile << "\n";
   }
 

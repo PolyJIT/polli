@@ -37,7 +37,7 @@ Options *getOptions() {
   return &Opts;
 }
 
-using RunMap = std::map<const thread::id, Run<PPEvent>>;
+using RunMap = std::map<const std::thread::id, Run<PPEvent>>;
 static inline RunMap &papi_threaded_events() {
   static RunMap PapiThreadedEvents;
   return PapiThreadedEvents;
@@ -50,10 +50,10 @@ static inline Run<PPEvent> *papi_local_events(Run<PPEvent> *Evs = nullptr) {
   return PapiLocalEvents;
 }
 
-using TIDMapT = std::map<thread::id, uint64_t>;
+using TIDMapT = std::map<std::thread::id, uint64_t>;
 static uint64_t TID = 0;
 static inline TIDMapT &papi_get_tid_map() {
-  static std::map<thread::id, uint64_t> TIDMap;
+  static std::map<std::thread::id, uint64_t> TIDMap;
   return TIDMap;
 }
 
@@ -66,7 +66,7 @@ static inline TIDMapT &papi_get_tid_map() {
  * @return a unique thread_id of type uint64_t.
  */
 static uint64_t papi_get_thread_id() {
-  thread::id STid = std::this_thread::get_id();
+  std::thread::id STid = std::this_thread::get_id();
   TIDMapT &TIDMap = papi_get_tid_map();
 
   if (TIDMap.find(STid) != TIDMap.end())
@@ -82,7 +82,7 @@ static uint64_t papi_get_thread_id() {
 Run<PPEvent> PapiEvents;
 
 void papi_store_thread_events(const Options &opts) {
-  thread::id Tid = std::this_thread::get_id();
+  std::thread::id Tid = std::this_thread::get_id();
   uint64_t Id = papi_get_tid_map()[Tid];
   pgsql::StoreRun(Id, papi_threaded_events()[Tid], opts);
 }
