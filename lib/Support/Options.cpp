@@ -93,6 +93,13 @@ static cl::opt<bool, true> DisableExecutionX(
     cl::desc("Disable execution just produce all intermediate files"),
     cl::location(DisableExecution), cl::init(false), cl::cat(PolyJitRuntime));
 
+bool DisableDelinearization;
+static cl::opt<bool, true> DisableDelinearizationX(
+    "polli-no-delinearization",
+    cl::desc("Disable delinearization of multi-dimensional arrays"),
+    cl::location(DisableDelinearization), cl::init(false),
+    cl::cat(PolliCategory));
+
 bool DisableSpecialization;
 static cl::opt<bool, true>
     DisableSpecializationX("polli-no-specialization",

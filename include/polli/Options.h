@@ -58,6 +58,7 @@ extern bool EnableScopReport;
 extern bool EnableFunctionReport;
 extern bool EnableASTReport;
 extern bool UsePollyOptions;
+extern bool DisableDelinearization;
 extern bool EnablePolly;
 
 extern PipelineType PipelineChoice;

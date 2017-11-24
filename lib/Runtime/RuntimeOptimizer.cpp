@@ -418,6 +418,9 @@ PassManagerBuilder createPMB() {
 
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
+
+  polly::PollyDelinearize = opt::runtime::DisableDelinearization;
+
   if (!opt::runtime::UsePollyOptions) {
     polly::opt::UseContext = true;
     polly::opt::PollyParallelForce = false;
