@@ -24,47 +24,29 @@
 #include <vector>
 
 #include "absl/strings/string_view.h"
-
-#include "llvm/ADT/APInt.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/CodeGen/LinkAllCodegenComponents.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/Orc/CompileUtils.h"
-#include "llvm/ExecutionEngine/Orc/IRCompileLayer.h"
-#include "llvm/ExecutionEngine/Orc/IRTransformLayer.h"
-#include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
-#include "llvm/ExecutionEngine/Orc/RTDyldObjectLinkingLayer.h"
-#include "llvm/ExecutionEngine/RuntimeDyld.h"
-#include "llvm/ExecutionEngine/SectionMemoryManager.h"
-#include "llvm/IR/Mangler.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/TargetSelect.h"
-
-#include "llvm/IRReader/IRReader.h"
-#include "llvm/LinkAllPasses.h"
-#include "llvm/Support/DynamicLibrary.h"
 
 #include "polli/Caching.h"
 #include "polli/Compiler.h"
 #include "polli/Jit.h"
-#include "polli/Options.h"
 #include "polli/RunValues.h"
-#include "polli/RuntimeOptimizer.h"
 #include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
-#include "polli/Tasks.h"
 #include "polli/VariantFunction.h"
 #include "polli/log.h"
-#include "polly/RegisterPasses.h"
 #include "pprof/Tracing.h"
 
 #define DEBUG_TYPE "polyjit"
 
-using namespace llvm;
-using namespace polli;
+using llvm::ThreadPool;
+using llvm::Function;
+using llvm::ManagedStatic;
+using llvm::Module;
+using llvm::JITSymbol;
+using llvm::llvm_shutdown;
+
+using polli::PolyJIT;
+using polli::SpecializingCompiler;
 
 REGISTER_LOG(console, DEBUG_TYPE);
 
@@ -75,11 +57,11 @@ static void wait_for_threads();
 struct ThreadPoolCreator {
   static void *call() {
     std::atexit(&wait_for_threads);
-    return new llvm::ThreadPool(1);
+    return new ThreadPool(1);
   }
 };
 
-static ManagedStatic<llvm::ThreadPool, ThreadPoolCreator> Pool;
+static ManagedStatic<ThreadPool, ThreadPoolCreator> Pool;
 static void wait_for_threads() {
   Pool->wait();
 }
@@ -109,8 +91,7 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   RunValueList Values = runValues(Request);
   std::string FnName;
 
-  std::shared_ptr<llvm::Module> Variant =
-      createVariant(Prototype, Values, FnName);
+  std::shared_ptr<Module> Variant = createVariant(Prototype, Values, FnName);
   assert(Variant && "Failed to get a new variant.");
   auto OptimizedModule = Compiler->addModule(Variant);
   const bool IsOptimized = std::get<1>(OptimizedModule);
@@ -119,7 +100,7 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   }
 
 
-  llvm::JITSymbol FPtr = Compiler->findSymbol(FnName, PM->getDataLayout());
+  JITSymbol FPtr = Compiler->findSymbol(FnName, PM->getDataLayout());
   auto Addr = FPtr.getAddress();
   console->error_if(!Addr, "Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
