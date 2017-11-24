@@ -12,9 +12,13 @@
 #ifndef POLLI_STATS_H
 #define POLLI_STATS_H
 
+#include <stdint.h>
+
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/Function.h"
-#include <stdint.h>
+
+using llvm::Function;
+using llvm::Twine;
 
 namespace llvm {
 class Value;
@@ -30,9 +34,8 @@ struct Stats {
   uint64_t RegionExit;
 };
 
-llvm::Value *registerStatStruct(llvm::Function &F,
-                                const llvm::Twine &NameSuffix);
+llvm::Value *registerStatStruct(Function &F, const Twine &NameSuffix);
 
-uint64_t GetCandidateId(const llvm::Function &F);
+uint64_t GetCandidateId(const Function &F);
 } // namespace polli
 #endif // POLLI_STATS_H

@@ -39,20 +39,21 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
   return Sinks;
 }
 
-static inline void setup(const std::string &name) {
-  if (!spdlog::get(name)) {
+static inline void setup(const std::string &Name, const spdlog::level::level_enum Level) {
+  if (!spdlog::get(Name)) {
     auto &Sinks = global_init();
     auto Logger =
-        std::make_shared<spdlog::logger>(name, Sinks.begin(), Sinks.end());
+        std::make_shared<spdlog::logger>(Name, Sinks.begin(), Sinks.end());
     spdlog::register_logger(Logger);
-    Logger->set_level(polli::opt::LogLevel);
+    Logger->set_level(Level);
   }
 }
 } // namespace
 
 namespace polli {
-std::shared_ptr<spdlog::logger> register_log(const std::string &name) {
-  setup(name);
-  return spdlog::get(name);
+std::shared_ptr<spdlog::logger> register_log(const std::string &Name,
+                                             const spdlog::level::level_enum Level) {
+  setup(Name, Level);
+  return spdlog::get(Name);
 }
 } // namespace polli

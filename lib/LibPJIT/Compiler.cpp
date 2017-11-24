@@ -5,14 +5,51 @@
 #include "polli/RuntimeOptimizer.h"
 #include "polli/log.h"
 
+#include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Mangler.h"
 #include "llvm/IR/Verifier.h"
+#include "llvm/IRReader/IRReader.h"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/Orc/CompileUtils.h"
+#include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
+#include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/PassSupport.h"
 #include "llvm/Support/DynamicLibrary.h"
+#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
 
 #include <dlfcn.h>
 
-using namespace llvm;
+using llvm::CodeGenOpt::Level;
+using llvm::EngineBuilder;
+using llvm::Error;
+using llvm::Expected;
+using llvm::errs;
+using llvm::GlobalValue;
+using llvm::JITSymbolFlags;
+using llvm::LLVMContext;
+using llvm::legacy::PassManager;
+using llvm::Mangler;
+using llvm::MCContext;
+using llvm::MemoryBuffer;
+using llvm::MemoryBufferRef;
+using llvm::Module;
+using llvm::ObjectMemoryBuffer;
+using llvm::object::ObjectFile;
+using llvm::orc::createLambdaResolver;
+using llvm::parseIR;
+using llvm::RTDyldMemoryManager;
+using llvm::raw_string_ostream;
+using llvm::raw_svector_ostream;
+using llvm::SectionMemoryManager;
+using llvm::SMDiagnostic;
+using llvm::SmallVector;
+using llvm::StringRef;
+using llvm::sys::DynamicLibrary;
+using llvm::TargetMachine;
+using llvm::verifyModule;
 
 REGISTER_LOG(console, "compiler");
 
@@ -43,28 +80,28 @@ public:
   }
 };
 
-ModuleCompiler::ObjFileT ModuleCompiler::operator()(llvm::Module &M) const {
+ModuleCompiler::ObjFileT ModuleCompiler::operator()(Module &M) const {
   SmallVector<char, 0> ObjBufferSV;
   raw_svector_ostream ObjStream(ObjBufferSV);
 
-  legacy::PassManager PM;
+  PassManager PM;
   MCContext *Ctx;
-  llvm::EngineBuilder BuildEngine;
+  EngineBuilder BuildEngine;
   TargetMachine *TM = BuildEngine.setMCPU(opt::runtime::MCPU)
                           .setMArch(opt::runtime::MArch)
                           .setMAttrs(opt::runtime::MAttrs)
                           .selectTarget();
 
-  TM->setOptLevel(llvm::CodeGenOpt::Aggressive);
+  TM->setOptLevel(Level::Aggressive);
   if (TM->addPassesToEmitMC(PM, Ctx, ObjStream))
     llvm_unreachable("Target does not support MC emission.");
   PM.run(M);
 
-  std::unique_ptr<llvm::MemoryBuffer> ObjBuffer(
-      new llvm::ObjectMemoryBuffer(std::move(ObjBufferSV)));
+  std::unique_ptr<MemoryBuffer> ObjBuffer(
+      new ObjectMemoryBuffer(std::move(ObjBufferSV)));
 
-  Expected<std::unique_ptr<llvm::object::ObjectFile>> Obj =
-      object::ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
+  Expected<std::unique_ptr<ObjectFile>> Obj =
+      ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
 
   if (Obj)
     return ObjFileT(std::move(*Obj), std::move(ObjBuffer));
@@ -81,26 +118,26 @@ SpecializingCompiler::SpecializingCompiler()
       OptimizeLayer(CompileLayer, RtOptFtor), LibHandle(nullptr) {
   SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
   LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
-  llvm::sys::DynamicLibrary::LoadLibraryPermanently(nullptr);
+  DynamicLibrary::LoadLibraryPermanently(nullptr);
 }
 
 SpecializingCompiler::ModCacheResult
 SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
   bool CacheHit = LoadedModules.find(ID) != LoadedModules.end();
   if (!CacheHit) {
-    auto &errs = llvm::errs();
+    auto &Errs = errs();
     std::string Str(prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
-    std::unique_ptr<llvm::Module> M = parseIR(Buf, Err, Ctx.monitored());
+    std::unique_ptr<Module> M = parseIR(Buf, Err, Ctx.monitored());
 
     if (!M) {
-      Err.print("libpjit", errs, true, true);
+      Err.print("libpjit", Errs, true, true);
     }
     assert(M && "Could not load the prototype!");
 
     // Ensure the module is not broken.
-    if (!verifyModule(*M, &errs)) {
+    if (!verifyModule(*M, &Errs)) {
       std::lock_guard<std::mutex> Guard(ModuleMutex);
       LoadedModules.insert(std::make_pair(ID, std::move(M)));
     }
@@ -109,7 +146,7 @@ SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
   return std::make_pair(LoadedModules.at(ID), CacheHit);
 }
 
-const polli::Monitor<llvm::LLVMContext> &
+const polli::Monitor<LLVMContext> &
 SpecializingCompiler::getContext() const {
   return Ctx;
 }
@@ -125,7 +162,7 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
     {
       void *Addr = dlsym(LibHandle, GV.getName().str().c_str());
       if (Addr) {
-        llvm::sys::DynamicLibrary::AddSymbol(GV.getName(), Addr);
+        DynamicLibrary::AddSymbol(GV.getName(), Addr);
       }
     }
 
@@ -138,7 +175,7 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
     }
   }
 
-  auto Resolver = orc::createLambdaResolver(
+  auto Resolver = createLambdaResolver(
       [&](const std::string &Name) -> JITSymbol {
         if (auto Sym = findSymbol(Name, M->getDataLayout()))
           return Sym;
@@ -163,7 +200,7 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
 }
 
 void SpecializingCompiler::removeModule(ModuleHandleT H) {
-  llvm::Error Status = CompileLayer.removeModule(H);
+  Error Status = CompileLayer.removeModule(H);
   console->error_if(!Status.success(), "Unable to remove module!");
   assert(Status.success() && "Unable to remove module!");
 

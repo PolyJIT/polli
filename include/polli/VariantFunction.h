@@ -1,16 +1,29 @@
 #ifndef POLLI_VARIANTFUNCTION_H
 #define POLLI_VARIANTFUNCTION_H
 
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
+#include "llvm/ADT/APInt.h"
+#include "llvm/IR/Constant.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "polli/RuntimeValues.h"
 
-#include <memory>
-#include <unordered_map>
-#include <vector>
+using llvm::APInt;
+using llvm::Constant;
+using llvm::Function;
+using llvm::Module;
+using llvm::SmallVector;
+using llvm::StringRef;
+using llvm::Type;
+using llvm::raw_ostream;
 
 namespace polli {
 
@@ -88,15 +101,15 @@ public:
     return IsLess;
   }
 
-  llvm::StringRef getShortName() const {
+  StringRef getShortName() const {
     std::string Res = "";
 
     for (unsigned I = 0; I < Params.size(); ++I)
-      if (llvm::Constant *C = Params[I].Val) {
-        const llvm::APInt &Val = C->getUniqueInteger();
-        llvm::SmallVector<char, 2> Str;
+      if (Constant *C = Params[I].Val) {
+        const APInt &Val = C->getUniqueInteger();
+        SmallVector<char, 2> Str;
         Val.toStringUnsigned(Str);
-        Res = Res + "." + llvm::StringRef(Str.data(), Str.size()).str();
+        Res = Res + "." + StringRef(Str.data(), Str.size()).str();
       }
     return Res;
   }
@@ -104,13 +117,13 @@ public:
 
 struct Param {
   /// @brief The type of this runtime param
-  llvm::Type *Ty;
+  Type *Ty;
 
   /// @brief The runtime value assigned to this param.
-  llvm::Constant *Val;
+  Constant *Val;
 
   /// @brief The argument name we are assigned to
-  llvm::StringRef Name;
+  StringRef Name;
 
   bool operator<(const Param &RHS) const { return Val < RHS.Val; }
 
@@ -122,14 +135,11 @@ typedef ParamVector<Param> FunctionKey;
 
 // @brief Create a new function variant with they values included in the
 // key replaced.
-std::unique_ptr<llvm::Module> createVariant(llvm::Function &BaseF,
-                                            const RunValueList &K,
-                                            std::string &FnName);
+std::unique_ptr<Module> createVariant(Function &BaseF, const RunValueList &K,
+                                      std::string &FnName);
 
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P);
-llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                              const ParamVector<Param> &Params);
-llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                              const RunValueList &Params);
+raw_ostream &operator<<(raw_ostream &OS, const Param &P);
+raw_ostream &operator<<(raw_ostream &out, const ParamVector<Param> &Params);
+raw_ostream &operator<<(raw_ostream &out, const RunValueList &Params);
 } // namespace polli
 #endif // POLLI_VARIANTFUNCTION_H

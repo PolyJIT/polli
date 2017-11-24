@@ -1,17 +1,14 @@
 #ifndef POLLI_JIT_H
 #define POLLI_JIT_H
 
-#include "polli/Caching.h"
-#include "polli/Tasks.h"
-#include "polli/VariantFunction.h"
-
-#include "llvm/ExecutionEngine/JITSymbol.h"
-#include "llvm/IR/Function.h"
-#include "llvm/Support/ThreadPool.h"
-
 #include <mutex>
 #include <unordered_map>
 #include <utility>
+
+#include "polli/Caching.h"
+#include "llvm/ExecutionEngine/JITSymbol.h"
+
+using llvm::JITSymbol;
 
 namespace polli {
 enum JitRegion : int {
@@ -70,8 +67,8 @@ public:
    * @name CodeCache interface.
    * @{ */
   using CodeCacheT =
-      std::unordered_map<CacheKey, llvm::JITSymbol>;
-  using value_type = std::pair<const CacheKey, llvm::JITSymbol>;
+      std::unordered_map<CacheKey, JITSymbol>;
+  using value_type = std::pair<const CacheKey, JITSymbol>;
   using iterator = CodeCacheT::iterator;
   using const_iterator = CodeCacheT::const_iterator;
 

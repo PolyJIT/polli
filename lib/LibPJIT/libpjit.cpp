@@ -25,6 +25,7 @@
 
 #include "absl/strings/string_view.h"
 #include "llvm/Support/ManagedStatic.h"
+#include "llvm/Support/ThreadPool.h"
 
 #include "polli/Caching.h"
 #include "polli/Compiler.h"
@@ -156,7 +157,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
 
   SpecializerRequest Request(FnHash(fName), paramc, params, M);
   if (!CacheHit) {
-    llvm::Function &F = Request.prototype();
+    Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
   }
 
@@ -207,7 +208,7 @@ void *pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
   SpecializerRequest Request(FnHash(fName), paramc, params, M);
 
   if (!CacheHit) {
-    llvm::Function &F = Request.prototype();
+    Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
   }
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);

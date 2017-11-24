@@ -1,35 +1,42 @@
-#include "polli/Jit.h"
+#include "llvm/PassRegistry.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/Support/TargetSelect.h"
+
 #include "polli/Db.h"
+#include "polli/Jit.h"
 #include "polli/Options.h"
 #include "polli/RuntimeOptimizer.h"
 #include "polli/log.h"
-#include "pprof/pprof.h"
 
-#include "llvm/IR/Function.h"
-#include "llvm/LinkAllPasses.h"
-#include "llvm/PassRegistry.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/TargetSelect.h"
-
+#include "pprof/Tracing.h"
 #include "polly/RegisterPasses.h"
 namespace papi {
 #include <papi.h>
 } // namespace papi
 
-using namespace llvm;
+using llvm::InitializeNativeTarget;
+using llvm::InitializeNativeTargetAsmPrinter;
+using llvm::InitializeNativeTargetAsmParser;
+using llvm::PassRegistry;
+using llvm::PrettyStackTraceProgram;
+
+using polli::opt::ValidateOptions;
+using polli::tracing::setup_tracing;
+
+using polly::initializePollyPasses;
 
 REGISTER_LOG(console, "jit");
 
 namespace polli {
-using StackTracePtr = std::unique_ptr<llvm::PrettyStackTraceProgram>;
+using StackTracePtr = std::unique_ptr<PrettyStackTraceProgram>;
 static StackTracePtr StackTrace;
 
 void PolyJIT::setup() {
-  tracing::setup_tracing();
+  setup_tracing();
   enter(JitRegion::START, papi::PAPI_get_real_usec());
 
-  using polly::initializePollyPasses;
-  StackTrace = StackTracePtr(new llvm::PrettyStackTraceProgram(0, nullptr));
+  StackTrace = StackTracePtr(new PrettyStackTraceProgram(0, nullptr));
 
   // Make sure to initialize tracing before planting the atexit handler.
   PassRegistry &Registry = *PassRegistry::getPassRegistry();

@@ -28,12 +28,13 @@
 #include <iostream>
 #include <memory>
 
-#include "absl/strings/string_view.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Module.h"
+
 #include "polli/RuntimeValues.h"
 
-namespace llvm {
-class Function;
-} // namespace llvm
+using llvm::Function;
+using llvm::Module;
 
 namespace polli {
 class SpecializerRequest {
@@ -42,14 +43,14 @@ private:
   const unsigned ParamC;
   std::vector<void *> Params;
 
-  std::shared_ptr<const llvm::Module> M;
-  llvm::Function *F;
+  std::shared_ptr<const Module> M;
+  Function *F;
 
-  llvm::Function *init(std::shared_ptr<llvm::Module> PrototypeM);
+  Function *init(std::shared_ptr<Module> PrototypeM);
 
 public:
   SpecializerRequest(uint64_t key, unsigned ParamC, void *params,
-                     std::shared_ptr<llvm::Module> M)
+                     std::shared_ptr<Module> M)
       : IRKey(key), ParamC(ParamC), Params(), M(M), F(init(M)) {
     size_t N = ParamC * sizeof(void *);
     Params.resize(ParamC);
@@ -71,14 +72,14 @@ public:
   llvm::Function &prototype() const {
     return *F;
   }
-  std::shared_ptr<const llvm::Module> prototypeModule() const {
+  std::shared_ptr<const Module> prototypeModule() const {
     return M;
   }
 };
 
 RunValueList runValues(const SpecializerRequest &Request);
 #ifndef NDEBUG
-void printArgs(const llvm::Function &F, size_t argc,
+void printArgs(const Function &F, size_t argc,
                const std::vector<void *> &Params);
 #endif
 void printRunValues(const RunValueList &Values);

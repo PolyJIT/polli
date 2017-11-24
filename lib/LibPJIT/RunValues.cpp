@@ -10,12 +10,23 @@
 #define DEBUG_TYPE "polyjit"
 #include "llvm/Support/Debug.h"
 
+using llvm::Argument;
+using llvm::Constant;
+using llvm::ConstantFP;
+using llvm::ConstantInt;
+using llvm::Function;
+using llvm::Module;
+using llvm::Type;
+using llvm::dbgs;
+using llvm::raw_string_ostream;
+
+using polli::canSpecialize;
+
 REGISTER_LOG(console, "runvals");
 
 namespace polli {
-llvm::Function *
-SpecializerRequest::init(std::shared_ptr<llvm::Module> PrototypeM) {
-  for (llvm::Function &ProtoF : *PrototypeM) {
+Function *SpecializerRequest::init(std::shared_ptr<Module> PrototypeM) {
+  for (Function &ProtoF : *PrototypeM) {
     if (ProtoF.hasFnAttribute("polyjit-jit-candidate")) {
       return &ProtoF;
     }
@@ -31,9 +42,9 @@ RunValueList runValues(const SpecializerRequest &Request) {
   int I = 0;
   RunValueList RunValues(boost::hash_value(Request.key()));
 
-  const llvm::Function &F = Request.prototype();
+  const Function &F = Request.prototype();
   DEBUG(printArgs(F, Request.paramSize(), Request.params()));
-  for (const llvm::Argument &Arg : F.args()) {
+  for (const Argument &Arg : F.args()) {
     RunValues.add({reinterpret_cast<uint64_t *>(Request.params()[I]), &Arg});
     I++;
   }
@@ -42,19 +53,20 @@ RunValueList runValues(const SpecializerRequest &Request) {
 }
 
 #ifndef NDEBUG
-void printArgs(const llvm::Function &F, size_t argc, const std::vector<void *> &Params) {
+void printArgs(const Function &F, size_t argc,
+               const std::vector<void *> &Params) {
   std::string buf;
-  llvm::raw_string_ostream s(buf);
+  raw_string_ostream s(buf);
 
   size_t i = 0;
   for (auto &Arg : F.args()) {
     if (i < argc) {
       RunValue<uint64_t *> V{reinterpret_cast<uint64_t *>(Params[i]), &Arg};
-      if (polli::canSpecialize(V)) {
+      if (canSpecialize(V)) {
         s << fmt::format("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
                          *V.value);
       }
-      llvm::Type *Ty = Arg.getType();
+      Type *Ty = Arg.getType();
       if (Ty->isIntegerTy())
         console->debug("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
                        *reinterpret_cast<int64_t *>(Params[i]));
@@ -67,22 +79,22 @@ void printArgs(const llvm::Function &F, size_t argc, const std::vector<void *> &
       i++;
     }
   }
-  llvm::dbgs() << "\n";
+  dbgs() << "\n";
 }
 #endif
 
 void printRunValues(const RunValueList &Values) {
   for (auto &RV : Values) {
-    llvm::Constant *Cst = nullptr;
-    llvm::Type *Ty = RV.Arg->getType();
+    Constant *Cst = nullptr;
+    Type *Ty = RV.Arg->getType();
     if (Ty->isIntegerTy()) {
-      Cst = llvm::ConstantInt::get(Ty, *RV.value);
+      Cst = ConstantInt::get(Ty, *RV.value);
     } else if (Ty->isFloatTy()) {
-      Cst = llvm::ConstantFP::get(Ty, (double)(*RV.value));
+      Cst = ConstantFP::get(Ty, (double)(*RV.value));
     }
 
     std::string Buf;
-    llvm::raw_string_ostream Os(Buf);
+    raw_string_ostream Os(Buf);
     if (Cst) {
       Cst->print(Os, true);
     } else {
@@ -90,8 +102,8 @@ void printRunValues(const RunValueList &Values) {
       W << "U 0x" << fmt::hex(*RV.value);
       Os << W.c_str();
     }
-    console->info("{} => {:s}", reinterpret_cast<void *>(
-                                    const_cast<llvm::Argument *>(RV.Arg)),
+    console->info("{} => {:s}",
+                  reinterpret_cast<void *>(const_cast<Argument *>(RV.Arg)),
                   Os.str());
     Os.flush();
   }
