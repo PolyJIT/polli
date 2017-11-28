@@ -55,104 +55,6 @@ using namespace polly;
 using namespace isl;
 
 namespace polli {
-class TileSizeLearner : public polly::ScopPass {
-public:
-  static char ID;
-  explicit TileSizeLearner() : polly::ScopPass(ID){};
-
-  /// @name ScopPass interface
-  //@{
-  void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
-    AU.addRequired<llvm::ScalarEvolutionWrapperPass>();
-    ScopPass::getAnalysisUsage(AU);
-    AU.setPreservesAll();
-  }
-
-  bool runOnScop(Scop &S) override {
-    DEBUG({
-      std::string buf;
-      raw_string_ostream os(buf);
-      os << "\n==============================================================="
-            "\n Learn TileSizes"
-            "\n==============================================================="
-            "\n";
-      console->info(os.str());
-    });
-    ScalarEvolution &SE = getAnalysis<ScalarEvolutionWrapperPass>().getSE();
-    const Loop *L, *SecondL;
-    uint64_t NumThreads = polli::opt::getNumThreads();
-    uint64_t NumAccesses = 0;
-    uint64_t MaxDimensions = 0;
-    uint64_t TaskSize = 32;
-
-    ConstantInt *FirstLevelTileSize =
-        ConstantInt::get(Type::getInt64Ty(SE.getContext()), TaskSize);
-    ConstantInt *SecondLevelTileSize =
-        ConstantInt::get(Type::getInt64Ty(SE.getContext()), 32);
-
-    for (auto &Stmt : S) {
-      L = nullptr;
-      if (Stmt.getNumIterators() > 0)
-        L = Stmt.getLoopForDimension(0);
-      MaxDimensions = (uint64_t)std::max((double)MaxDimensions,
-                                         (double)Stmt.getNumIterators());
-      if (!L)
-        continue;
-
-      /* First level */
-      {
-        auto *TripCount = SE.getBackedgeTakenCount(L);
-        if (const SCEVConstant *Constant = dyn_cast<SCEVConstant>(TripCount)) {
-          ConstantInt *CI = Constant->getValue();
-          uint64_t Cnt = static_cast<uint64_t>(
-              std::ceil((double)CI->getLimitedValue() / NumThreads));
-          uint64_t OldCnt = static_cast<uint64_t>(
-              std::ceil((double)FirstLevelTileSize->getLimitedValue()));
-
-          TaskSize = std::max(Cnt, OldCnt);
-          FirstLevelTileSize =
-              ConstantInt::get(FirstLevelTileSize->getType(), TaskSize);
-        }
-      }
-
-      /* Second level */
-      SecondL = nullptr;
-      if (Stmt.getNumIterators() > 1)
-        SecondL = Stmt.getLoopForDimension(1);
-      if (!SecondL)
-        continue;
-      {
-        NumAccesses += Stmt.size();
-        SecondLevelTileSize = ConstantInt::get(
-            FirstLevelTileSize->getType(),
-            static_cast<uint64_t>((double)TaskSize / NumAccesses));
-      }
-    }
-
-    if (polly::opt::FirstLevelTileSizes.empty()) {
-      polly::opt::FirstLevelTileSizes.addValue(
-          FirstLevelTileSize->getLimitedValue());
-      for (unsigned I = 1; I < MaxDimensions; I++) {
-        polly::opt::FirstLevelTileSizes.addValue(
-            std::numeric_limits<int>::max());
-      }
-    }
-    DEBUG({
-      std::string buf;
-      raw_string_ostream os(buf);
-      os << " FirstLevelTileSize : " << *FirstLevelTileSize << " tile size.\n";
-      os << " SecondLevelTileSize : " << *SecondLevelTileSize
-         << " tile size.\n";
-      console->info(os.str());
-    });
-    return false;
-  }
-
-  void print(llvm::raw_ostream &OS, const llvm::Module *) const override {}
-  //@}
-};
-char TileSizeLearner::ID = 0;
-
 class PollyFnReport : public llvm::FunctionPass {
 public:
   static char ID;
@@ -295,7 +197,7 @@ public:
     std::string ST = STree.to_str();
 
     Os << "\n" << ST << "\n";
-    console->info(Os.str());
+    console->debug(Os.str());
     return false;
   }
 
@@ -352,7 +254,6 @@ static void registerPolly(const llvm::PassManagerBuilder &Builder,
   PM.add(polly::createCodePreparationPass());
   PM.add(polly::createScopDetectionWrapperPassPass());
   PM.add(polly::createScopInfoRegionPassPass());
-  PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
   PM.add(polly::createCodeGenerationPass());
   PM.add(polly::createCodegenCleanupPass());
@@ -368,8 +269,6 @@ static void registerPollyWithDiagnostics(const llvm::PassManagerBuilder &Builder
   //polly::registerCanonicalicationPasses(PM);
   PM.add(polly::createScopDetectionWrapperPassPass());
   PM.add(polly::createScopInfoRegionPassPass());
-  if (!opt::runtime::UsePollyOptions)
-    PM.add(new TileSizeLearner());
   PM.add(polly::createIslScheduleOptimizerPass());
 
   if (opt::runtime::EnableScheduleReport)
@@ -418,27 +317,17 @@ PassManagerBuilder createPMB() {
 
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
-
+  polly::opt::DynamicTileSizes = !opt::runtime::UsePollyOptions;
   polly::PollyDelinearize = !opt::runtime::DisableDelinearization;
-
-  if (!opt::runtime::UsePollyOptions) {
-    polly::opt::UseContext = true;
-    polly::opt::PollyParallelForce = false;
-    polly::PollyProcessUnprofitable = false;
-    polly::opt::FusionStrategy = "max";
-    polly::opt::WholeComponent = true;
-    polly::opt::FirstLevelTiling = true;
-    polly::opt::SecondLevelTiling = false;
-    polly::opt::RegisterTiling = false;
-    polly::PollyAllowNonAffineSubRegions = false;
-    polly::PollyInvariantLoadHoisting = true;
-  }
 
   if (opt::runtime::EnablePolly) {
     Builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
                          ActivePipeline);
   }
 
+  DEBUG(console->debug("Specializer: {:d} Delinearization: {:d}",
+                       !opt::runtime::DisableSpecialization,
+                       polly::PollyDelinearize));
   return Builder;
 }
 
@@ -469,16 +358,12 @@ SharedModule RuntimeOptimizer::operator()(SharedModule M) {
 
   bool Optimized = false;
   for (auto &F : *M) {
+    if (F.isDeclaration())
+      continue;
     FPM.run(F);
-    bool FnOptimized = F.hasFnAttribute("polly-optimized");
-    Optimized |= FnOptimized;
-    DEBUG({
-      if (FnOptimized)
-        console->error("fn got optimized by polly");
-      else
-        console->error("fn did not get optimized by polly");
-    });
+    Optimized |= F.hasFnAttribute("polly-optimized");;
   }
+  DEBUG(console->debug("{:s} optimized? {:d}", M->getName().str(), Optimized));
 
   FPM.doFinalization();
   PM.run(*M);
