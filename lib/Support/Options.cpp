@@ -221,7 +221,7 @@ uint64_t getNumThreads() {
     return std::atoi(NumThreadsStr);
   }
 
-  return 0;
+  return std::thread::hardware_concurrency();
 }
 
 } // namespace opt
