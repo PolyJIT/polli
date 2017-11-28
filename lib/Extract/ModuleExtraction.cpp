@@ -521,8 +521,9 @@ static llvm::Region *findBiggerRegion(llvm::Region *R,
     SmallVector<BasicBlock *, 8> NextBlocks(TrackNext->blocks());
     CodeExtractor TestExtract(NextBlocks, &DT,
                               /*AggregateArgs*/ false);
-    if (TestExtract.isEligible())
+    if (TestExtract.isEligible()) {
       TrackThis = RI.getCommonRegion(TrackNext, TrackThis);
+    }
   }
   return TrackThis;
 }
