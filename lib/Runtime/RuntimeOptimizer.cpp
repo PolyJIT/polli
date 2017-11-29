@@ -41,6 +41,11 @@
 #include "polly/ScopPass.h"
 #include "polly/Support/GICHelper.h"
 
+#define LIKWID_PERFMON
+namespace likwid {
+#include <likwid.h>
+}
+
 #include "isl/isl-noexceptions.h"
 
 REGISTER_LOG(console, DEBUG_TYPE);
@@ -305,7 +310,18 @@ void SetOptimizationPipeline(PipelineType Choice) {
   }
 }
 
+static int getTotalCacheSize(const likwid::CpuTopology_t Topo) {
+  int Size = 0;
+  for (uint32_t i = 0; i < Topo->numCacheLevels; i++) {
+    Size += Topo->cacheLevels[i].size;
+  }
+
+  return Size;
+}
+
 PassManagerBuilder createPMB() {
+  static int TopoInit = likwid::topology_init();
+  static auto *CpuTopo = likwid::get_cpuTopology();
   PassManagerBuilder Builder;
 
   Builder.VerifyInput = false;
@@ -319,6 +335,11 @@ PassManagerBuilder createPMB() {
   polly::opt::DetectParallel = true;
   polly::opt::DynamicTileSizes = !opt::runtime::UsePollyOptions;
   polly::PollyDelinearize = !opt::runtime::DisableDelinearization;
+
+  polly::opt::CacheSizeInBytes = getTotalCacheSize(CpuTopo);
+
+  // Query likwid for more reliable data.
+  polly::opt::NumberOfPhysicalCores = CpuTopo->activeHWThreads;
 
   if (opt::runtime::EnablePolly) {
     Builder.addExtension(PassManagerBuilder::EP_EarlyAsPossible,
