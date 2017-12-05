@@ -54,7 +54,7 @@ void getRuntimeParameters(Function *F, unsigned paramc, void *params,
     Type *ArgTy = Arg.getType();
 
     /* TODO: Add more types to be suitable for spawning new functions. */
-    if (IntegerType *IntTy = dyn_cast<IntegerType>(ArgTy)) {
+    if (auto *IntTy = dyn_cast<IntegerType>(ArgTy)) {
       Param P;
       P.Ty = IntTy;
       P.Name = Arg.getName();
@@ -197,12 +197,12 @@ public:
       auto P = SpecValues[I++];
       if (!canSpecialize(P))
         continue;
-      Type *Ty = Arg.getType();
-
-      if (Ty->isIntegerTy()) {
-        auto *IntVal = ConstantInt::get(Ty, *P.value);
-        Value *MappedArg = VMap[&Arg];
-        MappedArg->replaceAllUsesWith(IntVal);
+      if (Type *Ty = Arg.getType()) {
+        if (Ty->isIntegerTy()) {
+          auto *IntVal = ConstantInt::get(Ty, *P.value);
+          Value *MappedArg = VMap[&Arg];
+          MappedArg->replaceAllUsesWith(IntVal);
+        }
       }
     }
   }

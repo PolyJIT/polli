@@ -333,6 +333,7 @@ PassManagerBuilder createPMB() {
 
   polly::opt::PollyParallel = true;
   polly::opt::DetectParallel = true;
+  polly::opt::RegisterTiling = true;
   polly::opt::DynamicTileSizes = !opt::runtime::UsePollyOptions;
   polly::PollyDelinearize = !opt::runtime::DisableDelinearization;
 
