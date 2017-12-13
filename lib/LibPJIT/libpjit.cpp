@@ -152,6 +152,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
   SharedModule M = std::get<0>(ModRes);
   const bool CacheHit = std::get<1>(ModRes);
   if (Compiler->isBlocked(M)) {
+    pjit_trace_fnstats_exit(JitRegion::CODEGEN);
     return ptr;
   }
 
