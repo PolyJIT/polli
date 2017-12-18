@@ -15,7 +15,9 @@ enum JitRegion : int {
   START = 0,
   CODEGEN = 1,
   VARIANTS = 2,
-  CACHE_HIT = 3
+  CACHE_HIT = 3,
+  REQUESTS = 4,
+  BLOCKED = 5
 };
 
 class PolyJIT {

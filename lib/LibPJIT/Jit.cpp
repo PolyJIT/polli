@@ -58,12 +58,12 @@ void PolyJIT::setup() {
   InitializeNativeTargetAsmParser();
 
   /* CACHE_HIT */
-  enter(JitRegion::CACHE_HIT, 0);
-
   Regions[JitRegion::START] = "START";
   Regions[JitRegion::CODEGEN] = "CODEGEN";
   Regions[JitRegion::VARIANTS] = "VARIANTS";
   Regions[JitRegion::CACHE_HIT] = "CACHE_HIT";
+  Regions[JitRegion::REQUESTS] = "REQUESTS";
+  Regions[JitRegion::BLOCKED] = "BLOCKED";
 
   SetOptimizationPipeline(opt::runtime::PipelineChoice);
   opt::ValidateOptions();

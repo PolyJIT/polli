@@ -80,10 +80,8 @@ using MainFnT = std::function<void(int, char **)>;
 
 static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   if (JitContext->find(K) != JitContext->end()) {
-    JitContext->increment(JitRegion::CACHE_HIT);
     return;
   }
-
   JitContext->increment(JitRegion::VARIANTS);
 
   auto PM = Request.prototypeModule();
@@ -97,6 +95,7 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   auto OptimizedModule = Compiler->addModule(Variant);
   const bool IsOptimized = std::get<1>(OptimizedModule);
   if (!IsOptimized) {
+    JitContext->increment(JitRegion::BLOCKED);
     Compiler->block(PM);
   }
 
@@ -172,6 +171,9 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
   }
 
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
+  if (Compiler->isBlocked(M)) {
+    return ptr;
+  }
 
   {
     auto FnIt = JitContext->find(K);
@@ -180,6 +182,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
       {
         auto Addr = Symbol.getAddress();
         if (Addr) {
+          JitContext->increment(JitRegion::CACHE_HIT);
           return reinterpret_cast<void *>(*Addr);
         }
       }

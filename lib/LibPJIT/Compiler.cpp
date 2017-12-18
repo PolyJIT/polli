@@ -109,13 +109,12 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(Module &M) const {
   llvm_unreachable("No object file generated.");
 }
 
-
 SpecializingCompiler::SpecializingCompiler()
-    : ObjectLayer([]() {
-        return std::make_shared<PolySectionMemoryManager>();
-      }),
+    : ObjectLayer(
+          []() { return std::make_shared<PolySectionMemoryManager>(); }),
       CompileLayer(ObjectLayer, ModuleCompiler()),
-      OptimizeLayer(CompileLayer, RtOptFtor), LibHandle(nullptr) {
+      OptimizeLayer(CompileLayer, RuntimeOptimizer(OptimizedModules)),
+      LibHandle(nullptr) {
   SPDLOG_DEBUG("libpjit", "Starting PolyJIT Engine.");
   LibHandle = dlopen(nullptr, RTLD_NOW | RTLD_GLOBAL);
   DynamicLibrary::LoadLibraryPermanently(nullptr);
@@ -188,8 +187,8 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
       });
 
   Expected<ModuleHandleT> MH = OptimizeLayer.addModule(M, Resolver);
-  const bool IsOptimized =
-      RtOptFtor.OptimizedModules.find(M) != RtOptFtor.OptimizedModules.end();
+  const bool IsOptimized = OptimizedModules.find(M) != OptimizedModules.end();
+  console->debug("Compiler: {:d}", IsOptimized);
   if (!IsOptimized) {
     block(M);
   }
@@ -221,7 +220,7 @@ SpecializingCompiler::~SpecializingCompiler() {
 }
 
 bool SpecializingCompiler::IsOptimizeable(const polli::SharedModule &M) const {
-  auto RtOptFtorEnd = RtOptFtor.OptimizedModules.end();
-  return RtOptFtor.OptimizedModules.find(M) != RtOptFtorEnd;
+  auto RtOptFtorEnd = OptimizedModules.end();
+  return OptimizedModules.find(M) != RtOptFtorEnd;
 }
 } // namespace polli

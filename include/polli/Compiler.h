@@ -55,7 +55,7 @@ private:
   RTDyldObjectLinkingLayer ObjectLayer;
   IRCompileLayer<decltype(ObjectLayer), ModuleCompiler> CompileLayer;
 
-  RuntimeOptimizer RtOptFtor;
+  std::set<SharedModule> OptimizedModules;
 
   llvm::orc::IRTransformLayer<decltype(CompileLayer), OptimizeFunction> OptimizeLayer;
   void *LibHandle;

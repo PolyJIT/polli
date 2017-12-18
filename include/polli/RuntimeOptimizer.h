@@ -32,7 +32,9 @@ void SetOptimizationPipeline(PipelineType Choice);
 // @param F The function to optimize
 // @return The optimized function.
 struct RuntimeOptimizer {
-  std::set<SharedModule> OptimizedModules;
+  std::set<SharedModule> &OptimizedModules;
+  explicit RuntimeOptimizer(std::set<SharedModule> &ModRef)
+      : OptimizedModules(ModRef) {}
   SharedModule operator()(SharedModule M);
 };
 } // namespace polli
