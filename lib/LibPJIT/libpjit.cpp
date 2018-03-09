@@ -93,6 +93,8 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   std::shared_ptr<Module> Variant = createVariant(Prototype, Values, FnName);
   assert(Variant && "Failed to get a new variant.");
   auto OptimizedModule = Compiler->addModule(Variant);
+  auto &ExpectedModule = std::get<0>(OptimizedModule);
+  console->error_if(!ExpectedModule, "Error in compiled module!");
   const bool IsOptimized = std::get<1>(OptimizedModule);
   if (!IsOptimized) {
     JitContext->increment(JitRegion::BLOCKED);
@@ -108,7 +110,8 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   {
     auto InsertRes = JitContext->insert(std::make_pair(K, std::move(FPtr)));
     const bool Inserted = std::get<1>(InsertRes);
-    if (Inserted) {
+    if (!Inserted) {
+      console->error("Key collision in function cache: {:d}", K.ValueHash);
       llvm_unreachable("Key collision in function cace, abort.");
     }
   }
