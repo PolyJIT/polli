@@ -105,6 +105,27 @@ protected:
   Function *To;
 };
 
+static void mapToNewFunction(Function &F, Module &M, ValueToValueMapTy &VMap) {
+  Function *NewF = cast<Function>(M.getOrInsertFunction(
+      F.getName(), F.getFunctionType(), F.getAttributes()));
+  if (F.hasPersonalityFn())
+    NewF->setPersonalityFn(F.getPersonalityFn());
+  NewF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
+  VMap[&F] = NewF;
+}
+
+static void renameUnique(Function &F, Module &M) {
+  std::hash<std::string> name_hash;
+  F.setName(F.getName() + "_FN_" +
+            fmt::format("{:d}", name_hash(M.getModuleIdentifier())));
+  F.setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
+  F.addFnAttr("polli.mapped_fn");
+}
+
+static bool isInModule(const Module &M, const StringRef FnName) {
+  return M.getFunction(FnName) != nullptr;
+}
+
 template <class OnCreate, class SourceAfterClone, class TargetAfterClone>
 class FunctionCloner : public FunctionClonerBase,
                        public OnCreate,
@@ -173,31 +194,25 @@ private:
       if (isa<CallInst>(&I) || isa<InvokeInst>(&I)) {
         CallSite CS = CallSite(&I);
         if (Function *CalledF = CS.getCalledFunction()) {
-          if (CalledF->hasFnAttribute("polli.mapped_fn"))
+          if (CalledF->hasFnAttribute("polli.mapped_fn")) {
+            if (!isInModule(*TgtM, CalledF->getName())) {
+              mapToNewFunction(*CalledF, *TgtM, VMap);
+            }
+
             continue;
+          }
 
           bool IsInternal = (CalledF->getLinkage() ==
                              GlobalValue::LinkageTypes::InternalLinkage);
           if (IsInternal) {
-            std::hash<std::string> name_hash;
-            CalledF->setName(
-                CalledF->getName() + "_FN_" +
-                fmt::format("{:d}", name_hash(TgtM->getModuleIdentifier())));
-            CalledF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
-            CalledF->addFnAttr("polli.mapped_fn");
+            renameUnique(*CalledF, *TgtM);
           }
 
-          Function *NewF = cast<Function>(TgtM->getOrInsertFunction(
-              CalledF->getName(), CalledF->getFunctionType(),
-              CalledF->getAttributes()));
-          if (CalledF->hasPersonalityFn())
-            NewF->setPersonalityFn(CalledF->getPersonalityFn());
-          VMap[CalledF] = NewF;
+          mapToNewFunction(*CalledF, *TgtM, VMap);
 
           if (isa<IntrinsicInst>(&I))
             continue;
 
-          NewF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
       }
