@@ -483,9 +483,8 @@ static void PrepareRegionForExtraction(const Region *R, RegionInfo *RI,
   }
 }
 
-#ifndef NDEBUG
 static void printOperands(Value *V, raw_ostream &os, int level = 0) {
-  if (Instruction *I = dyn_cast<Instruction>(V)) {
+  if (auto *I = dyn_cast<Instruction>(V)) {
     I->print((os << "\n").indent(level) << "> ");
 
     if (!isa<PHINode>(I)) {
@@ -497,7 +496,6 @@ static void printOperands(Value *V, raw_ostream &os, int level = 0) {
     V->print((os << "\n").indent(level) << "|= ");
   }
 }
-#endif
 
 static const llvm::Region *findBiggerRegion(const llvm::Region *R,
                                             std::set<Value *> TrackedParams,
