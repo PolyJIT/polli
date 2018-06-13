@@ -743,10 +743,8 @@ bool JITScopDetection::isValidAccess(Instruction *Inst, const SCEV *AF,
       }
     }
 
-    if (CanBuildRunTimeCheck) {
-      Context.requiresJIT = true;
+    if (CanBuildRunTimeCheck)
       return true;
-    }
     return invalid<polly::ReportAlias>(Context, /*Assert=*/true, Inst, AS);
   }
 
@@ -987,14 +985,11 @@ void JITScopDetection::findScops(Region &R) {
   }
 
   if (!HasErrors) {
-    if (Context.requiresJIT) {
+    if (Context.requiresJIT)
       ValidRuntimeRegions.insert(&R);
-      ++JitRegion;
-    }
     ValidRegions.insert(&R);
 
     RequiredParams[&R] = Context.RequiredParams;
-    ++ValidRegion;
     return;
   }
 
@@ -1032,19 +1027,15 @@ void JITScopDetection::findScops(Region &R) {
 
     // We could expand the region. Check, if we require the JIT for it.
     const DetectionContext *ExpandedCtx = getDetectionContext(ExpandedR);
-    if (ExpandedCtx->requiresJIT) {
+    if (ExpandedCtx->requiresJIT)
       ValidRuntimeRegions.insert(ExpandedR);
-      ++JitRegion;
-    }
     ValidRegions.insert(ExpandedR);
     RequiredParams[ExpandedR] = ExpandedCtx->RequiredParams;
-    ++ValidRegion;
 
     // Erase all (direct and indirect) children of ExpandedR from the valid
     // regions and update the number of valid regions.
-    ValidRegion -= removeCachedResultsRecursively(*ExpandedR, ValidRegions);
-    JitRegion -=
-        removeCachedResultsRecursively(*ExpandedR, ValidRuntimeRegions);
+    removeCachedResultsRecursively(*ExpandedR, ValidRegions);
+    removeCachedResultsRecursively(*ExpandedR, ValidRuntimeRegions);
   }
 }
 
@@ -1306,12 +1297,8 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
       continue;
 
     ValidRegions.remove(&DC.CurRegion);
-    --ValidRegion;
-
-    if (ValidRuntimeRegions.count(&DC.CurRegion)) {
+    if (ValidRuntimeRegions.count(&DC.CurRegion))
       ValidRuntimeRegions.remove(&DC.CurRegion);
-      --JitRegion;
-    }
   }
 
   if (ReportLevel)
@@ -1319,6 +1306,9 @@ bool JITScopDetection::runOnFunction(llvm::Function &F) {
 
   assert(ValidRegions.size() <= DetectionContextMap.size() &&
          "Cached more results than valid regions");
+
+  JitRegion += ValidRuntimeRegions.size();
+  ValidRegion += ValidRegions.size() - ValidRuntimeRegions.size();
   return false;
 }
 

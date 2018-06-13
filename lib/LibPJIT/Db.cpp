@@ -7,6 +7,7 @@
 
 #include "polli/Db.h"
 #include "polli/Options.h"
+#include "polli/log.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ManagedStatic.h"
 
