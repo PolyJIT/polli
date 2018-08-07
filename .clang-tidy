@@ -1,13 +1,38 @@
-Checks: '-*,clang-diagnostic-*,llvm-*,misc-*,-misc-unused-parameters,readability-identifier-naming'
+Checks: '-*,
+         clang-diagnostic-*,
+         llvm-*,
+         misc-*,
+           -misc-unused-parameters,
+         readability-*,
+           -readability-else-after*,
+           -readability-simplify-boolean-expr,
+           -readability-implicit-bool-cast,
+           -readability-static-definition-in-anonymous-namespace,
+           -readability-implicit-bool-conversion,
+         cppcoreguidelines-*,
+           -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+           -cppcoreguidelines-owning-memory,
+         bugprone-*,
+         modernize-*,
+         performance-*,
+         clang-analyzer-*,
+        '
 CheckOptions:
   - key:             readability-identifier-naming.ClassCase
     value:           CamelCase
   - key:             readability-identifier-naming.EnumCase
     value:           CamelCase
   - key:             readability-identifier-naming.FunctionCase
-    value:           lowerCase
+    value:           camelBack, lower_case
+  - key:             readability-identifier-naming.MemberCase
+    value:           CamelCase
+  - key:             readability-identifier-naming.ParameterCase
+    value:           CamelCase
   - key:             readability-identifier-naming.UnionCase
     value:           CamelCase
   - key:             readability-identifier-naming.VariableCase
     value:           CamelCase
-
+  - key:             cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor
+    value:           1
+  - key:             cppcoreguidelines-special-member-functions.AllowMissingMoveFunctions
+    value:           1
