@@ -17,10 +17,13 @@ include_directories(AFTER
 )
 
 # Where is LLVM installed?
-find_package(LLVM 6.0 CONFIG REQUIRED)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${LLVM_CMAKE_DIR})
+find_package(LLVM 6.0 REQUIRED CONFIG)
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 include(HandleLLVMOptions)
 include(AddLLVM)
+
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 
 # Add the llvm header path.
 include_directories(${LLVM_INCLUDE_DIRS})
@@ -82,8 +85,11 @@ add_definitions(-DFMT_HEADER_ONLY)
 
 # We only require the header-only part of these libraries, no need to include them
 # in the ALL target.
+set(INSTALL_GMOCK Off)
+set(INSTALL_GTEST Off)
+add_subdirectory(external/gtest)
+
 add_subdirectory(external/spdlog EXCLUDE_FROM_ALL)
-add_subdirectory(external/gtest EXCLUDE_FROM_ALL)
 add_subdirectory(external/cctz EXCLUDE_FROM_ALL)
 add_subdirectory(external/abseil EXCLUDE_FROM_ALL)
 
