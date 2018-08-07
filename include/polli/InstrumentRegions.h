@@ -96,8 +96,8 @@ private:
   void instrumentRegion(llvm::Module *M,
                         std::vector<llvm::BasicBlock *> &EntryBBs,
                         std::vector<llvm::BasicBlock *> &ExitBBs,
-                        const llvm::Region *R, std::string entryName,
-                        std::string exitName);
+                        const llvm::Region *R, const std::string& EntryName,
+                        const std::string& ExitName);
 
   /**
    * @brief Print analysis information. Empty.

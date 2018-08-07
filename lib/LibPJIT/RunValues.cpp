@@ -14,11 +14,11 @@ using llvm::Argument;
 using llvm::Constant;
 using llvm::ConstantFP;
 using llvm::ConstantInt;
+using llvm::dbgs;
 using llvm::Function;
 using llvm::Module;
-using llvm::Type;
-using llvm::dbgs;
 using llvm::raw_string_ostream;
+using llvm::Type;
 
 using polli::canSpecialize;
 
@@ -53,30 +53,33 @@ RunValueList runValues(const SpecializerRequest &Request) {
 }
 
 #ifndef NDEBUG
-void printArgs(const Function &F, size_t argc,
+void printArgs(const Function &F, size_t Argc,
                const std::vector<void *> &Params) {
-  std::string buf;
-  raw_string_ostream s(buf);
+  std::string Buf;
+  raw_string_ostream S(Buf);
 
-  size_t i = 0;
+  size_t I = 0;
   for (auto &Arg : F.args()) {
-    if (i < argc) {
-      RunValue<uint64_t *> V{reinterpret_cast<uint64_t *>(Params[i]), &Arg};
+    if (I < Argc) {
+      RunValue<uint64_t *> V{reinterpret_cast<uint64_t *>(Params[I]), &Arg};
       if (canSpecialize(V)) {
-        s << fmt::format("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
+        S << fmt::format("{:s} [{:d}] -> {} ", Arg.getName().str(), I,
                          *V.value);
       }
       Type *Ty = Arg.getType();
-      if (Ty->isIntegerTy())
-        console->debug("{:s} [{:d}] -> {} ", Arg.getName().str(), i,
-                       *reinterpret_cast<int64_t *>(Params[i]));
-      if (Ty->isDoubleTy())
-        console->debug("[{:d}] -> {:g} ", i,
-                       (double)*(reinterpret_cast<double *>(Params[i])));
-      if (Ty->isPointerTy())
-        console->debug("[{:d}] -> 0x{:x} ", i,
-                       (int64_t)(reinterpret_cast<int64_t *>(Params[i])));
-      i++;
+      if (Ty->isIntegerTy()) {
+        console->debug("{:s} [{:d}] -> {} ", Arg.getName().str(), I,
+                       *reinterpret_cast<int64_t *>(Params[I]));
+      }
+      if (Ty->isDoubleTy()) {
+        console->debug("[{:d}] -> {:g} ", I,
+                       (double)*(reinterpret_cast<double *>(Params[I])));
+      }
+      if (Ty->isPointerTy()) {
+        console->debug("[{:d}] -> 0x{:x} ", I,
+                       (int64_t)(reinterpret_cast<int64_t *>(Params[I])));
+      }
+      I++;
     }
   }
   dbgs() << "\n";

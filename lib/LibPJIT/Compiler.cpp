@@ -6,19 +6,19 @@
 #include "polli/log.h"
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/Mangler.h"
-#include "llvm/IR/Verifier.h"
-#include "llvm/IRReader/IRReader.h"
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
 #include "llvm/ExecutionEngine/Orc/CompileUtils.h"
 #include "llvm/ExecutionEngine/Orc/LambdaResolver.h"
 #include "llvm/ExecutionEngine/RTDyldMemoryManager.h"
 #include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/IR/Mangler.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/IRReader/IRReader.h"
 #include "llvm/PassSupport.h"
 #include "llvm/Support/DynamicLibrary.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <dlfcn.h>
 
@@ -69,9 +69,9 @@ public:
 
   uint8_t *allocateDataSection(uintptr_t Size, unsigned Alignment,
                                unsigned SectionID, StringRef SectionName,
-                               bool isReadOnly) override {
+                               bool IsReadOnly) override {
     uint8_t *Ptr = SectionMemoryManager::allocateDataSection(
-        Size, Alignment, SectionID, SectionName, isReadOnly);
+        Size, Alignment, SectionID, SectionName, IsReadOnly);
     SPDLOG_DEBUG(console,
         "ds @ 0x{:x} sz: {:d} align: {:d} id: {:d} name: {:s} ro: {:d}",
         (uint64_t)ptr, (uint64_t)Size, Alignment, SectionID, SectionName.str(),
@@ -93,8 +93,9 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(Module &M) const {
                           .selectTarget();
 
   TM->setOptLevel(Level::Aggressive);
-  if (TM->addPassesToEmitMC(PM, Ctx, ObjStream))
+  if (TM->addPassesToEmitMC(PM, Ctx, ObjStream)) {
     llvm_unreachable("Target does not support MC emission.");
+}
   PM.run(M);
 
   std::unique_ptr<MemoryBuffer> ObjBuffer(
@@ -103,8 +104,9 @@ ModuleCompiler::ObjFileT ModuleCompiler::operator()(Module &M) const {
   Expected<std::unique_ptr<ObjectFile>> Obj =
       ObjectFile::createObjectFile(ObjBuffer->getMemBufferRef());
 
-  if (Obj)
+  if (Obj) {
     return ObjFileT(std::move(*Obj), std::move(ObjBuffer));
+}
 
   llvm_unreachable("No object file generated.");
 }
@@ -121,11 +123,11 @@ SpecializingCompiler::SpecializingCompiler()
 }
 
 SpecializingCompiler::ModCacheResult
-SpecializingCompiler::getModule(const uint64_t ID, const char *prototype) {
+SpecializingCompiler::getModule(const uint64_t ID, const char *Prototype) {
   bool CacheHit = LoadedModules.find(ID) != LoadedModules.end();
   if (!CacheHit) {
     auto &Errs = errs();
-    std::string Str(prototype);
+    std::string Str(Prototype);
     MemoryBufferRef Buf(Str, "polli.prototype.module");
     SMDiagnostic Err;
     std::unique_ptr<Module> M = parseIR(Buf, Err, Ctx.monitored());
@@ -176,13 +178,15 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
 
   auto Resolver = createLambdaResolver(
       [&](const std::string &Name) -> JITSymbol {
-        if (auto Sym = findSymbol(Name, M->getDataLayout()))
+        if (auto Sym = findSymbol(Name, M->getDataLayout())) {
           return Sym;
+}
         return JITSymbol(nullptr);
       },
       [](const std::string &S) {
-        if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S))
+        if (auto SymAddr = RTDyldMemoryManager::getSymbolAddressInProcess(S)) {
           return JITSymbol(SymAddr, JITSymbolFlags::Exported);
+}
         return JITSymbol(nullptr);
       });
 

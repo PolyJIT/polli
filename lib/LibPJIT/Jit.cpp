@@ -36,7 +36,7 @@ void PolyJIT::setup() {
   setup_tracing();
   enter(JitRegion::START, papi::PAPI_get_real_usec());
 
-  StackTrace = StackTracePtr(new PrettyStackTraceProgram(0, nullptr));
+  StackTrace = std::make_unique<PrettyStackTraceProgram>(0, nullptr);
 
   // Make sure to initialize tracing before planting the atexit handler.
   PassRegistry &Registry = *PassRegistry::getPassRegistry();

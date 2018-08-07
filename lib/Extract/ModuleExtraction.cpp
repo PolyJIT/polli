@@ -17,11 +17,11 @@
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/CodeExtractor.h"
 
-#include "polli/Schema.h"
 #include "polli/FuncTools.h"
 #include "polli/FunctionCloner.h"
 #include "polli/ModuleExtractor.h"
 #include "polli/Options.h"
+#include "polli/Schema.h"
 #include "polli/ScopDetection.h"
 #include "polli/Stats.h"
 #include "polli/Utils.h"
@@ -47,7 +47,8 @@ char ModuleInstrumentation::ID = 0;
 using UniqueModule = std::unique_ptr<Module>;
 
 static inline UniqueModule copyModule(const Module &M) {
-  auto NewM = UniqueModule(new Module(M.getModuleIdentifier(), M.getContext()));
+  auto NewM =
+      std::make_unique<llvm::Module>(M.getModuleIdentifier(), M.getContext());
   NewM->setDataLayout(M.getDataLayout());
   NewM->setTargetTriple(M.getTargetTriple());
   NewM->setMaterializer(M.getMaterializer());
@@ -172,32 +173,33 @@ struct InstrumentEndpoint {
     assert(To && "No target function!");
     assert(FallbackF && "No fallback function!");
 
-    if (To->isDeclaration())
+    if (To->isDeclaration()) {
       return;
+    }
 
     Module *M = To->getParent();
     assert(M && "TgtF has no parent module!");
 
     LLVMContext &Ctx = M->getContext();
     std::string CallbackName = "pjit_main";
-    if (opt::DisableRecompile)
+    if (opt::DisableRecompile) {
       CallbackName = "pjit_main_no_recompile";
+    }
 
-    Type *Int64T = Type::getInt64Ty(Ctx);
-    Type *Void = Type::getVoidTy(Ctx);
-    Type *VoidPtr = Type::getInt64PtrTy(Ctx);
-    Type *CharPtr = Type::getInt8PtrTy(Ctx);
-    Type *Int32T = Type::getInt32Ty(Ctx);
+    auto *Int64T = Type::getInt64Ty(Ctx);
+    auto *Void = Type::getVoidTy(Ctx);
+    auto *VoidPtr = Type::getInt64PtrTy(Ctx);
+    auto *CharPtr = Type::getInt8PtrTy(Ctx);
+    auto *Int32T = Type::getInt32Ty(Ctx);
 
-    Function *PJITCB = cast<Function>(M->getOrInsertFunction(
-        CallbackName, VoidPtr,
-        CharPtr, VoidPtr, Int64T, Int32T, CharPtr));
+    auto *PJITCB = cast<Function>(M->getOrInsertFunction(
+        CallbackName, VoidPtr, CharPtr, VoidPtr, Int64T, Int32T, CharPtr));
     PJITCB->setLinkage(GlobalValue::ExternalLinkage);
 
-    Function *TraceFnStatsEntry = cast<Function>(M->getOrInsertFunction(
-        "pjit_trace_fnstats_entry", Void, Int64T));
-    Function *TraceFnStatsExit = cast<Function>(M->getOrInsertFunction(
-        "pjit_trace_fnstats_exit", Void, Int64T));
+    auto *TraceFnStatsEntry = cast<Function>(
+        M->getOrInsertFunction("pjit_trace_fnstats_entry", Void, Int64T));
+    auto *TraceFnStatsExit = cast<Function>(
+        M->getOrInsertFunction("pjit_trace_fnstats_exit", Void, Int64T));
 
     To->deleteBody();
     To->setLinkage(GlobalValue::WeakAnyLinkage);
@@ -287,7 +289,7 @@ private:
   Function *FallbackF;
 };
 
-static inline void collectRegressionTest(const std::string Name,
+static inline void collectRegressionTest(const std::string &Name,
                                          const std::string &ModStr) {
   if (!opt::compiletime::CollectRegressionTests) {
     return;
@@ -301,12 +303,13 @@ static inline void collectRegressionTest(const std::string Name,
 }
 
 static void clearFunctionLocalMetadata(Function *F) {
-  if (!F)
+  if (!F) {
     return;
+  }
 
   SmallVector<Instruction *, 4> DeleteInsts;
   for (auto &I : instructions(F)) {
-    if (DbgInfoIntrinsic *DI = dyn_cast_or_null<DbgInfoIntrinsic>(&I)) {
+    if (auto *DI = dyn_cast_or_null<DbgInfoIntrinsic>(&I)) {
       DeleteInsts.push_back(DI);
     }
   }
@@ -400,8 +403,9 @@ static CallSite findExtractedCallSite(const Function &F, Function *SrcF) {
     CallSite CS(&Inst);
     if (CS.isCall() || CS.isInvoke()) {
       Function *CalledF = CS.getCalledFunction();
-      if (CalledF == &F)
+      if (CalledF == &F) {
         return CS;
+      }
     }
   }
   return {};
@@ -417,8 +421,9 @@ static bool hasDuplicatePredsInPHI(const BasicBlock &BB) {
       for (unsigned I = 0; I < N; I++) {
         Value *V = PHI->getIncomingValue(I);
         BasicBlock *InBB = PHI->getIncomingBlock(I);
-        if (InBB && !IncomingValues.insert(std::make_pair(V, InBB)))
+        if (InBB && !IncomingValues.insert(std::make_pair(V, InBB))) {
           return true;
+        }
       }
     }
   }
@@ -426,26 +431,30 @@ static bool hasDuplicatePredsInPHI(const BasicBlock &BB) {
 }
 
 static bool hasDuplicatePredsInPHI(const Function &F) {
-  for (const auto &BB : F)
-    if (hasDuplicatePredsInPHI(BB))
+  for (const auto &BB : F) {
+    if (hasDuplicatePredsInPHI(BB)) {
       return true;
+    }
+  }
   return false;
 }
 
 static void fixSuccessorPHI(BasicBlock *BB) {
-  if (!BB)
+  if (!BB) {
     return;
+  }
 
   for (BasicBlock *Succ : llvm::successors(BB)) {
     for (Instruction &I : *Succ) {
-      if (PHINode *PHI = dyn_cast<PHINode>(&I)) {
+      if (auto *PHI = dyn_cast<PHINode>(&I)) {
         unsigned N = PHI->getNumIncomingValues();
         SetVector<BasicBlock *> IncomingEdges;
         SmallVector<int, 2> MarkedIndices;
         for (unsigned I = 0; I < N; I++) {
           BasicBlock *Pred = PHI->getIncomingBlock(N - (I + 1));
-          if (!IncomingEdges.insert(Pred))
+          if (!IncomingEdges.insert(Pred)) {
             MarkedIndices.push_back(N - (I + 1));
+          }
         }
         for (int J : MarkedIndices) {
           PHI->removeIncomingValue(J);
@@ -462,8 +471,9 @@ static void PrepareRegionForExtraction(const Region *R, RegionInfo *RI,
     BasicBlock *Exit = R->getExit();
     SmallVector<BasicBlock *, 4> ExitPreds;
     for (auto *PredBB : predecessors(Exit)) {
-      if (R->contains(PredBB))
+      if (R->contains(PredBB)) {
         ExitPreds.push_back(PredBB);
+      }
     }
     BasicBlock *NewBB =
         SplitBlockPredecessors(Exit, ExitPreds, ".polyjit.ext.split", DT);
@@ -483,17 +493,17 @@ static void PrepareRegionForExtraction(const Region *R, RegionInfo *RI,
   }
 }
 
-static void printOperands(Value *V, raw_ostream &os, int level = 0) {
+static void printOperands(Value *V, raw_ostream &OS, int Level = 0) {
   if (auto *I = dyn_cast<Instruction>(V)) {
-    I->print((os << "\n").indent(level) << "> ");
+    I->print((OS << "\n").indent(Level) << "> ");
 
     if (!isa<PHINode>(I)) {
       for (auto &Op : I->operands()) {
-        printOperands(Op.get(), os, level + 2);
+        printOperands(Op.get(), OS, Level + 2);
       }
     }
   } else {
-    V->print((os << "\n").indent(level) << "|= ");
+    V->print((OS << "\n").indent(Level) << "|= ");
   }
 }
 
@@ -539,8 +549,9 @@ static void cleanupCallSite(const llvm::CallSite &FunctionCall,
     auto Arg = ExtractedF->arg_begin();
     for (Use &U : I->operands()) {
       Value *Operand = U.get();
-      if (TrackedParams.count(Operand))
+      if (TrackedParams.count(Operand)) {
         Arg->addAttr(ParamAttr);
+      }
       Arg++;
     }
     fixSuccessorPHI(BB);
@@ -551,8 +562,9 @@ static SetVector<const Region *>
 filterChildren(const SetVector<const Region *> &In, const Region *R) {
   SetVector<const Region *> New;
   for (auto *Pivot : In) {
-    if (!R->contains(Pivot))
+    if (!R->contains(Pivot)) {
       New.insert(Pivot);
+    }
   }
   return New;
 }
@@ -569,8 +581,9 @@ findParametersToTrack(const std::vector<const SCEV *> &Params,
     DEBUG({
       std::string buf;
       raw_string_ostream os(buf);
-      for (auto *Val : Values)
+      for (auto *Val : Values) {
         printOperands(Val, os);
+      }
       console->debug(os.str());
       os.flush();
     });
@@ -587,10 +600,11 @@ static bool canExtractRegion(const llvm::Region *R, llvm::DominatorTree *DT,
   SmallVector<BasicBlock *, 8> RegionBlocks(R->blocks());
   CodeExtractor Extractor(RegionBlocks, DT, /*AggregateArgs*/ false);
   bool IsEligible = Extractor.isEligible();
-  if (!IsEligible)
+  if (!IsEligible) {
     NotEligible++;
-  else
+  } else {
     Extractor.findInputsOutputs(In, Out, {});
+  }
   return IsEligible;
 }
 
@@ -620,20 +634,25 @@ static llvm::Function *extractRegion(const llvm::Region *R,
 static bool regionInfoValid(const Region *R, const Function &F) {
   bool RIValid = true;
   llvm::errs() << "Region: " << R->getNameStr() << "\n";
-  if (R->getEnteringBlock())
+  if (R->getEnteringBlock()) {
     llvm::errs() << " Entering: " << R->getEnteringBlock()->getName() << "\n";
-  if (R->getEntry())
+  }
+  if (R->getEntry()) {
     llvm::errs() << " Entry: " << R->getEntry()->getName() << "\n";
-  if (R->getExitingBlock())
+  }
+  if (R->getExitingBlock()) {
     llvm::errs() << " Exiting: " << R->getExitingBlock()->getName() << "\n";
-  if (R->getExit())
+  }
+  if (R->getExit()) {
     llvm::errs() << " Exit: " << R->getExit()->getName() << "\n";
+  }
   llvm::errs() << "BLOCKS:\n";
   for (const auto *BB : R->blocks()) {
     RIValid = RIValid && (BB->getParent() == &F);
     BB->print(llvm::errs());
-    if (BB->getParent() != &F)
+    if (BB->getParent() != &F) {
       llvm::errs() << "\nEXTRACTED\n";
+    }
   }
   llvm::errs() << "\n>>>>\n";
   return RIValid;
@@ -652,23 +671,23 @@ extractCandidates(const Function &F, JITScopDetection *SD, ScalarEvolution *SE,
     return Functions;
   }
 
-
   SetVector<const Region *> CandidateRegions = SD->ValidRegions;
   llvm::DenseMap<const Region *, std::set<Value *>> ExtractRegions;
   while (!CandidateRegions.empty()) {
     auto *R = CandidateRegions.pop_back_val();
-    //if (!regionInfoValid(R, F))
+    // if (!regionInfoValid(R, F))
     //    continue;
     PrepareRegionForExtraction(R, RI, DT);
 
     SetVector<Value *> In, Out;
-    if (!canExtractRegion(R, DT, In, Out))
+    if (!canExtractRegion(R, DT, In, Out)) {
       continue;
+    }
 
     auto Params = SD->RequiredParams[R];
-    auto TrackedParams = findParametersToTrack(Params, In, SE); 
+    auto TrackedParams = findParametersToTrack(Params, In, SE);
     auto TrackThis = R;
-    //auto TrackThis = findBiggerRegion(R, TrackedParams, RI, DT);
+    // auto TrackThis = findBiggerRegion(R, TrackedParams, RI, DT);
     ExtractRegions.insert(std::make_pair(TrackThis, TrackedParams));
 
     DEBUG({
@@ -678,12 +697,14 @@ extractCandidates(const Function &F, JITScopDetection *SD, ScalarEvolution *SE,
       os << "\nExtract Region: " << R->getNameStr();
       os << "\n===========================================================";
       os << "\n Required Params:\n";
-      for (auto *SCEV : Params)
+      for (auto *SCEV : Params) {
         SCEV->print((os << "\n").indent(2) << ": ");
+      }
       os << "\n-----------------------------------------------------------";
       os << "\n In Values:\n";
-      for (auto *Val : In)
+      for (auto *Val : In) {
         printOperands(Val, os);
+      }
       os << "\n-----------------------------------------------------------";
       os << "\n SCEV to Params:\n";
       console->debug(os.str());
@@ -700,7 +721,7 @@ extractCandidates(const Function &F, JITScopDetection *SD, ScalarEvolution *SE,
 
   for (auto RegionParamsPair : ExtractRegions) {
     auto R = std::get<0>(RegionParamsPair);
-    //if (!regionInfoValid(R, F))
+    // if (!regionInfoValid(R, F))
     //    continue;
     auto TrackedParams = std::get<1>(RegionParamsPair);
 
@@ -730,10 +751,13 @@ extractCandidates(const Function &F, JITScopDetection *SD, ScalarEvolution *SE,
 
 bool ModuleExtractor::runOnFunction(Function &F) {
 
-  if (F.isDeclaration())
+  if (F.isDeclaration()) {
     return false;
-  if (F.hasFnAttribute("polyjit-jit-candidate"))
+  }
+
+  if (F.hasFnAttribute("polyjit-jit-candidate")) {
     return false;
+  }
 
   auto *RI = &getAnalysis<RegionInfoPass>().getRegionInfo();
   auto *DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
@@ -760,27 +784,31 @@ void ModuleInstrumentation::getAnalysisUsage(AnalysisUsage &AU) const {
 
 void ModuleInstrumentation::releaseMemory() { InstrumentedFunctions.clear(); }
 
-void ModuleInstrumentation::print(raw_ostream &os, const Module *M) const {
+void ModuleInstrumentation::print(raw_ostream &OS, const Module *M) const {
   int I = 0;
   for (const Function *F : InstrumentedFunctions) {
-    os << fmt::format("{:d} {:s} ", I++, F->getName().str());
-    F->print(os);
-    os << "\n";
+    OS << fmt::format("{:d} {:s} ", I++, F->getName().str());
+    F->print(OS);
+    OS << "\n";
   }
 }
 
 bool ModuleInstrumentation::runOnFunction(Function &F) {
-  ModuleExtractor &ME = getAnalysis<ModuleExtractor>();
-  DominatorTree &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
+  auto &ME = getAnalysis<ModuleExtractor>();
+  auto &DT = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
 
-  if (F.isDeclaration())
+  if (F.isDeclaration()) {
     return false;
-  if (F.hasFnAttribute("polyjit-jit-candidate"))
+  }
+
+  if (F.hasFnAttribute("polyjit-jit-candidate")) {
     return false;
+  }
 
   for (auto *ExtractedFromF : ME) {
-    if (ExtractedFromF->isDeclaration())
+    if (ExtractedFromF->isDeclaration()) {
       continue;
+    }
     console->info("Instrumenting: {:s}", ExtractedFromF->getName().str());
 
     ValueToValueMapTy VMap;

@@ -61,9 +61,9 @@ static inline void verifyFn(const Twine &Prefix, const Function *F) {
   llvm::raw_string_ostream S(Buffer);
   S << Prefix;
   if (F && !F->isDeclaration()) {
-    if (!verifyFunction(*F, &S))
+    if (!verifyFunction(*F, &S)) {
       S << " OK";
-    else {
+    } else {
       F->print(S, nullptr, true, true);
       S << " FAILED";
     }
@@ -84,14 +84,13 @@ static inline void verifyFunctions(const Twine &Prefix, const Function *SrcF,
 
 class FunctionClonerBase {
 public:
-  FunctionClonerBase()
-      : ToM(nullptr), DT(nullptr), From(nullptr), To(nullptr) {}
+  FunctionClonerBase() = default;
 
   auto setTargetModule(Module *M) -> void { ToM = M; }
 
   auto setSource(Function *F) -> void { From = F; }
 
-  auto setDominatorTree(DominatorTree *_DT) -> void { DT = _DT; }
+  auto setDominatorTree(DominatorTree *Dt) -> void { DT = Dt; }
 
   virtual ~FunctionClonerBase() = default;
 
@@ -99,25 +98,26 @@ public:
                           bool RemapGlobals = true) = 0;
 
 protected:
-  Module *ToM;
-  DominatorTree *DT;
-  Function *From;
-  Function *To;
+  Module *ToM{nullptr};
+  DominatorTree *DT{nullptr};
+  Function *From{nullptr};
+  Function *To{nullptr};
 };
 
 static void mapToNewFunction(Function &F, Module &M, ValueToValueMapTy &VMap) {
-  Function *NewF = cast<Function>(M.getOrInsertFunction(
+  auto *NewF = cast<Function>(M.getOrInsertFunction(
       F.getName(), F.getFunctionType(), F.getAttributes()));
-  if (F.hasPersonalityFn())
+  if (F.hasPersonalityFn()) {
     NewF->setPersonalityFn(F.getPersonalityFn());
+  }
   NewF->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
   VMap[&F] = NewF;
 }
 
 static void renameUnique(Function &F, Module &M) {
-  std::hash<std::string> name_hash;
+  std::hash<std::string> NameHash;
   F.setName(F.getName() + "_FN_" +
-            fmt::format("{:d}", name_hash(M.getModuleIdentifier())));
+            fmt::format("{:d}", NameHash(M.getModuleIdentifier())));
   F.setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
   F.addFnAttr("polli.mapped_fn");
 }
@@ -140,13 +140,15 @@ public:
    * If target module does not exist, create the target
    * function in the source module. */
   Function *start(ValueToValueMapTy &VMap, bool RemapCalls = false,
-                  bool RemapGlobals = true) {
+                  bool RemapGlobals = true) override {
     using namespace std::placeholders;
-    if (!ToM)
+    if (!ToM) {
       ToM = From->getParent();
+    }
 
-    if (!To)
+    if (!To) {
       To = OnCreate::Create(From, ToM);
+    }
     OnCreate::MapArguments(VMap, From, To);
 
     // Prepare the source function.
@@ -160,11 +162,13 @@ public:
     DEBUG(polli::verifyFunctions("\t>> ", From, To));
 
     // Collect all calls for remapping.
-    if (RemapCalls)
+    if (RemapCalls) {
       mapCalls(*From, ToM, VMap);
+    }
 
-    if (RemapGlobals)
+    if (RemapGlobals) {
       mapGlobals(*From, ToM, VMap);
+    }
 
     ClonedCodeInfo CI;
     CloneFunctionInto(To, From, VMap, /* ModuleLevelChanges=*/true, Returns, "",
@@ -173,8 +177,9 @@ public:
     SourceAfterClone::Apply(From, To, VMap);
     TargetAfterClone::Apply(From, To, VMap);
 
-    if (DT)
+    if (DT) {
       polli::removeFunctionFromDomTree(*To, *DT);
+    }
 
     DEBUG(polli::verifyFunctions("\t<< ", From, To));
 
@@ -185,8 +190,9 @@ public:
 
 private:
   void mapCalls(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
-    if (SrcF.getParent() == TgtM)
+    if (SrcF.getParent() == TgtM) {
       return;
+    }
 
     SPDLOG_DEBUG("cloner", "Checking for functions to remap in {:s}",
                  SrcF.getName().str());
@@ -210,8 +216,9 @@ private:
 
           mapToNewFunction(*CalledF, *TgtM, VMap);
 
-          if (isa<IntrinsicInst>(&I))
+          if (isa<IntrinsicInst>(&I)) {
             continue;
+          }
 
           SPDLOG_DEBUG("cloner", "Mapped: {:s}", NewF->getName().str());
         }
@@ -221,8 +228,9 @@ private:
 
   void mapGlobals(Function &SrcF, Module *TgtM, ValueToValueMapTy &VMap) const {
     Module *SrcM = SrcF.getParent();
-    if (SrcM == TgtM)
+    if (SrcM == TgtM) {
       return;
+    }
 
     GlobalList GVs = apply<GlobalList>(SrcF, selectGV);
     for (GlobalValue *GV : GVs) {
@@ -230,20 +238,22 @@ private:
           GV->getLinkage() == GlobalValue::LinkageTypes::InternalLinkage;
 
       GlobalValue *NewGV = TgtM->getNamedGlobal(GV->getName());
-      if (NewGV)
+      if (NewGV) {
         continue;
+      }
 
-      if (GlobalVariable *GVar = dyn_cast<GlobalVariable>(GV)) {
+      if (auto *GVar = dyn_cast<GlobalVariable>(GV)) {
         bool IsConstant = GVar->isConstant();
-        GlobalVariable *NewGVar = cast<GlobalVariable>(
+        auto *NewGVar = cast<GlobalVariable>(
             TgtM->getOrInsertGlobal(GVar->getName(), GVar->getValueType()));
 
         NewGVar->setConstant(IsConstant);
         NewGVar->setLinkage(GlobalValue::ExternalLinkage);
         NewGVar->setUnnamedAddr(GlobalValue::UnnamedAddr::None);
 
-        if (GVar->hasInitializer())
+        if (GVar->hasInitializer()) {
           NewGVar->setInitializer(GVar->getInitializer());
+        }
         NewGVar->setAlignment(GVar->getAlignment());
         NewGVar->setThreadLocalMode(GVar->getThreadLocalMode());
         NewGVar->setVisibility(GVar->getVisibility());
@@ -270,10 +280,12 @@ private:
 
         NewGVar->setName(GV->getName());
 
-        if (IsConstant)
+        if (IsConstant) {
           NewGVar->setLinkage(GVar->getLinkage());
-        else
-          NewGVar->setLinkage(GlobalValue::LinkageTypes::AvailableExternallyLinkage);
+        } else {
+          NewGVar->setLinkage(
+              GlobalValue::LinkageTypes::AvailableExternallyLinkage);
+        }
 
         if (!IsConstant) {
           if (NewGVar->getValueType()->isAggregateType()) {
@@ -314,13 +326,15 @@ struct CopyCreator {
  * Endpoint policies for the function cloner host.
  */
 struct IgnoreSource {
-  void Apply(Function *, Function *, ValueToValueMapTy &){
+  void Apply(Function * /*unused*/, Function * /*unused*/,
+             ValueToValueMapTy & /*unused*/){
       /* Do nothing */
   };
 };
 
 struct IgnoreTarget {
-  void Apply(Function *, Function *, ValueToValueMapTy &){
+  void Apply(Function * /*unused*/, Function * /*unused*/,
+             ValueToValueMapTy & /*unused*/){
       /* Do nothing */
   };
 };
@@ -336,7 +350,7 @@ struct ConnectTarget {
     IRBuilder<> Builder(Context);
     BasicBlock *EntryBB = &To->getEntryBlock();
     BasicBlock *SrcEntryBB = &From->getEntryBlock();
-    BasicBlock *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
+    auto *ClonedEntryBB = cast<BasicBlock>(VMap[SrcEntryBB]);
 
     Builder.SetInsertPoint(EntryBB);
     Builder.CreateBr(ClonedEntryBB);
@@ -344,22 +358,19 @@ struct ConnectTarget {
 };
 
 struct DestroySource {
-  void Apply(Function *SrcF, Function *, ValueToValueMapTy &VMap) {
+  void Apply(Function *SrcF, Function * /*unused*/, ValueToValueMapTy &VMap) {
     SrcF->deleteBody();
   }
 };
 
 struct DestroyTarget {
-  void Apply(Function *, Function *TgtF, ValueToValueMapTy &VMap) {
+  void Apply(Function * /*unused*/, Function *TgtF, ValueToValueMapTy &VMap) {
     TgtF->deleteBody();
   }
 };
 
-typedef FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>
-    DefaultFunctionCloner;
-
-typedef FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>
-    MovingFunctionCloner;
+using DefaultFunctionCloner = FunctionCloner<CopyCreator, IgnoreSource, IgnoreTarget>;
+using MovingFunctionCloner = FunctionCloner<CopyCreator, DestroySource, IgnoreTarget>;
 } // namespace polli
 #undef DEBUG_TYPE
 #endif // POLLI_FUNCTIONCLONER_H

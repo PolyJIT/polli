@@ -1,7 +1,10 @@
+#include <cstdlib>
+#include <memory>
 #include <iostream>
 #include <pqxx/pqxx>
-#include <stdlib.h>
 #include <string>
+#include <utility>
+#include <utility>
 
 #include "absl/strings/str_cat.h"
 
@@ -130,11 +133,11 @@ string now() {
 
 static bool enable_tracking() { return opt::EnableDatabase; }
 
-static pqxx::result submit(const string &Query, pqxx::work &w) noexcept(false) {
+static pqxx::result submit(const string &Query, pqxx::work &W) noexcept(false) {
   pqxx::result Res;
   try {
-    Res = w.exec(Query);
-  } catch (pqxx::data_exception E) {
+    Res = W.exec(Query);
+  } catch (pqxx::data_exception &E) {
     cerr << "pgsql: Encountered the following error:\n";
     cerr << E.what();
     cerr << "\n";
@@ -145,7 +148,7 @@ static pqxx::result submit(const string &Query, pqxx::work &w) noexcept(false) {
 }
 
 class DBConnection {
-  std::unique_ptr<pqxx::connection> c;
+  std::unique_ptr<pqxx::connection> C;
   string ConnectionString;
 
   string Experiment;
@@ -161,11 +164,11 @@ class DBConnection {
   int RunID;
 
   void connect() {
-    if (!enable_tracking())
+    if (!enable_tracking()) {
       return;
+    }
 
-    c = std::unique_ptr<pqxx::connection>(
-        new pqxx::connection(ConnectionString));
+    C = std::make_unique<pqxx::connection>(ConnectionString);
   }
 
 public:
@@ -173,9 +176,11 @@ public:
                         string Project, string Domain, string Group,
                         string SourceURI, string Argv0, string RunGroupUUID,
                         int RunID)
-      : Experiment(Experiment), ExperimentUUID(ExperimentUUID),
-        Project(Project), Domain(Domain), Group(Group), SourceURI(SourceURI),
-        Argv0(Argv0), RunGroupUUID(RunGroupUUID), RunID(RunID) {
+      : Experiment(std::move(Experiment)),
+        ExperimentUUID(std::move(ExperimentUUID)), Project(std::move(Project)),
+        Domain(std::move(Domain)), Group(std::move(Group)),
+        SourceURI(std::move(SourceURI)), Argv0(std::move(Argv0)),
+        RunGroupUUID(std::move(RunGroupUUID)), RunID(RunID) {
     string ConnectionFmtStr = "user={} port={} host={} dbname={} password={}";
     ConnectionString =
         fmt::format(ConnectionFmtStr, opt::DbUsername, opt::DbPort, opt::DbHost,
@@ -183,7 +188,7 @@ public:
   }
 
   void prepare() {
-    if (c) {
+    if (C) {
       string SelectRun =
           "SELECT id,type,timestamp FROM papi_results WHERE run_id=$1 ORDER BY "
           "timestamp;";
@@ -196,29 +201,31 @@ public:
       string SelectRunGroups =
           "SELECT DISTINCT run_group FROM run WHERE experiment_group = $1;";
 
-      c->prepare("select_run", SelectRun);
-      c->prepare("select_simple_run", SelectSimpleRun);
-      c->prepare("delete_simple_run", DeleteSimpleRun);
-      c->prepare("select_run_ids", SelectRunIDs);
-      c->prepare("select_run_groups", SelectRunGroups);
+      C->prepare("select_run", SelectRun);
+      C->prepare("select_simple_run", SelectSimpleRun);
+      C->prepare("delete_simple_run", DeleteSimpleRun);
+      C->prepare("select_run_ids", SelectRunIDs);
+      C->prepare("select_run_groups", SelectRunGroups);
     }
   }
 
   pqxx::connection &operator->() {
-    if (c)
-      return *c;
+    if (C) {
+      return *C;
+    }
     connect();
-    return *c;
+    return *C;
   }
 
   pqxx::connection &operator*() {
-    if (c)
-      return *c;
+    if (C) {
+      return *C;
+    }
     connect();
-    return *c;
+    return *C;
   }
 
-  uint64_t prepareRun(pqxx::work &w) {
+  uint64_t prepareRun(pqxx::work &W) {
     string SearchProjectSql = "SELECT name, group_name FROM project WHERE name "
                               "= '{}' AND group_name = '{}';";
 
@@ -233,12 +240,13 @@ public:
                        "'{}', '{}', '{}', '{}') RETURNING id;";
 
     pqxx::result ProjectExists =
-        submit(fmt::format(SearchProjectSql, Project, Group), w);
+        submit(fmt::format(SearchProjectSql, Project, Group), W);
 
-    if (ProjectExists.affected_rows() == 0)
+    if (ProjectExists.affected_rows() == 0) {
       submit(fmt::format(NewProjectSql, Project, Project, SourceURI, Domain,
                          Group),
-             w);
+             W);
+    }
 
     uint64_t RunId = opt::RunID;
     if (RunID == 0) {
@@ -251,7 +259,7 @@ public:
               Experiment, "', '", RunGroupUUID, "', '", ExperimentUUID,
               "')"
               "RETURNING id;"),
-          w);
+          W);
       R[0]["id"].to(RunId);
     }
 
@@ -259,9 +267,10 @@ public:
   }
 
   ~DBConnection() {
-    if (c && c->is_open())
-      c->disconnect();
-    c.reset(nullptr);
+    if (C && C->is_open()) {
+      C->disconnect();
+    }
+    C.reset(nullptr);
   }
 };
 
@@ -296,8 +305,9 @@ void ValidateOptions() {
 }
 void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
               const RegionMapTy &Regions) {
-  if (!enable_tracking())
+  if (!enable_tracking()) {
     return;
+  }
 
   pqxx::work W(**DB);
   uint64_t RunId = DB->prepareRun(W);
@@ -306,21 +316,26 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
                            "duration, events, run_id) "
                            "VALUES";
 
-  if (Events.size() <= 0)
+  if (Events.empty()) {
     return;
+  }
 
   int Cnt = 0;
   stringstream Vals;
   for (auto KV : Events) {
-    if (Cnt > 0)
+    if (Cnt > 0) {
       Vals << ",";
+    }
     auto Key = KV.first;
-    if (!Regions.count(Key))
+    if (!Regions.count(Key)) {
       cerr << fmt::format("Key {:d} missing in Regions.", Key);
-    if (!Events.count(Key))
+    }
+    if (!Events.count(Key)) {
       cerr << fmt::format("Key {:d} missing in Events.", Key);
-    if (!Entries.count(Key))
+    }
+    if (!Entries.count(Key)) {
       cerr << fmt::format("Key {:d} missing in Entries.", Key);
+    }
     Vals << fmt::format(" ('{:s}', {:d}, {:d}, {:d}, {:d})", Regions.at(Key),
                         Key, KV.second, Entries.at(Key), RunId);
     Cnt++;
@@ -334,8 +349,9 @@ void StoreRun(const EventMapTy &Events, const EventMapTy &Entries,
 
 void StoreTransformedScop(const string &FnName, const string &IslAstStr,
                           const string &ScheduleTreeStr) {
-  if (!enable_tracking())
+  if (!enable_tracking()) {
     return;
+  }
 
   pqxx::work W(**DB);
   uint64_t RunId = DB->prepareRun(W);
@@ -354,31 +370,36 @@ void StoreTransformedScop(const string &FnName, const string &IslAstStr,
 namespace tracing {
 static ManagedStatic<TraceData> TD;
 
-void enter_region(uint64_t id, const char *name) {
+void enter_region(uint64_t Id, const char *Name) {
   uint64_t Time = papi::PAPI_get_real_usec();
-  if (!TD->Events.count(id))
-    TD->Events[id] = 0;
-  if (!TD->Entries.count(id))
-    TD->Entries[id] = 0;
-  if (!TD->Regions.count(id))
-    TD->Regions[id] = name;
+  if (!TD->Events.count(Id)) {
+    TD->Events[Id] = 0;
+  }
+  if (!TD->Entries.count(Id)) {
+    TD->Entries[Id] = 0;
+  }
+  if (!TD->Regions.count(Id)) {
+    TD->Regions[Id] = Name;
+  }
 
-  TD->Events[id] -= Time;
-  TD->Entries[id] += 1;
+  TD->Events[Id] -= Time;
+  TD->Entries[Id] += 1;
 }
 
-void exit_region(uint64_t id) {
+void exit_region(uint64_t Id) {
   uint64_t Time = papi::PAPI_get_real_usec();
-  if (!TD->Events.count(id))
+  if (!TD->Events.count(Id)) {
     cerr << fmt::format(
-        "exit_region called before enter_region for ID: {:d}!\n", id);
+        "exit_region called before enter_region for ID: {:d}!\n", Id);
+  }
 
-  TD->Events[id] += Time;
+  TD->Events[Id] += Time;
 }
 
 TraceData::~TraceData() {
-  if (!polli::opt::ExecuteAtExit)
+  if (!polli::opt::ExecuteAtExit) {
     return;
+  }
 
   cerr << fmt::format("Submitting: {:d} events", Events.size()) << "\n";
   polli::db::StoreRun(Events, Entries, Regions);

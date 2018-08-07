@@ -143,22 +143,22 @@ void pjit_trace_fnstats_exit(uint64_t Id) {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void *pjit_main(const char *fName, void *ptr, uint64_t ID,
-                unsigned paramc, char **params) {
+void *pjit_main(const char *FName, void *Ptr, uint64_t ID,
+                unsigned Paramc, char **Params) {
   // 1. JitContext.
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
   std::hash<std::string> FnHash;
 
   // 2. Compiler.
-  auto ModRes = Compiler->getModule(ID, fName);
+  auto ModRes = Compiler->getModule(ID, FName);
   SharedModule M = std::get<0>(ModRes);
   const bool CacheHit = std::get<1>(ModRes);
   if (Compiler->isBlocked(M)) {
     pjit_trace_fnstats_exit(JitRegion::CODEGEN);
-    return ptr;
+    return Ptr;
   }
 
-  SpecializerRequest Request(FnHash(fName), paramc, params, M);
+  SpecializerRequest Request(FnHash(FName), Paramc, Params, M);
   if (!CacheHit) {
     Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
@@ -175,7 +175,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
 
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
   if (Compiler->isBlocked(M)) {
-    return ptr;
+    return Ptr;
   }
 
   {
@@ -191,7 +191,7 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
       }
     }
   }
-  return ptr;
+  return Ptr;
 }
 
 /**
@@ -204,22 +204,22 @@ void *pjit_main(const char *fName, void *ptr, uint64_t ID,
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void *pjit_main_no_recompile(const char *fName, void *ptr, uint64_t ID,
-                             unsigned paramc, char **params) {
+void *pjit_main_no_recompile(const char *FName, void *Ptr, uint64_t ID,
+                             unsigned Paramc, char **Params) {
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
   std::hash<std::string> FnHash;
 
-  auto ModRes = Compiler->getModule(ID, fName);
+  auto ModRes = Compiler->getModule(ID, FName);
   SharedModule M = std::get<0>(ModRes);
   bool CacheHit = std::get<1>(ModRes);
-  SpecializerRequest Request(FnHash(fName), paramc, params, M);
+  SpecializerRequest Request(FnHash(FName), Paramc, Params, M);
 
   if (!CacheHit) {
     Function &F = Request.prototype();
     JitContext->addRegion(F.getName().str(), ID);
   }
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
-  return ptr;
+  return Ptr;
 }
 } /* extern "C" */
 } // namespace polli
