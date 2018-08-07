@@ -42,7 +42,6 @@ SCENARIO("String-Attribute attached to function arguments", "[unit]") {
       F->addParamAttrs(0, Builder);
       THEN("The first Fn attribute has string value 'polli.specialize'") {
         Attribute FnArgAttr = F->getAttribute(1, "polli.specialize");
-        REQUIRE(FnArgAttr.getKindAsEnum() != llvm::Attribute::AttrKind::None);
         REQUIRE(FnArgAttr.getAsString() == "\"polli.specialize\"");
         REQUIRE(ParamAttr.getAsString() == "\"polli.specialize\"");
       }

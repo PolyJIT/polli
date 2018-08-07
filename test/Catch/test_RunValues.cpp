@@ -56,6 +56,7 @@ SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
     Function *F = Function::Create(
         FunctionType::get(Type::getVoidTy(Ctx), Args, false),
         GlobalValue::ExternalLinkage, "test_run_values", M.get());
+    F->addFnAttr("polyjit-jit-candidate");
 
     int64_t *A = reinterpret_cast<int64_t *>(std::malloc(sizeof(int64_t*)));
     int64_t I = 1;
@@ -93,6 +94,7 @@ SCENARIO("runValues() can align parameter values to run-time values", "[run]") {
     Function *F = Function::Create(
         FunctionType::get(Type::getVoidTy(Ctx), Args, false),
         GlobalValue::ExternalLinkage, "test_run_values_2", M.get());
+    F->addFnAttr("polyjit-jit-candidate");
 
     int64_t *A = reinterpret_cast<int64_t *>(std::malloc(2*sizeof(int64_t*)));
     int64_t I = 2;
