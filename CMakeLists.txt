@@ -80,10 +80,12 @@ set(POLLI_LIBRARY_OUTPUT_INTDIR ${POLLI_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib)
 
 add_definitions(-DFMT_HEADER_ONLY)
 
-add_subdirectory(external/spdlog)
-add_subdirectory(external/gtest)
-add_subdirectory(external/cctz)
-add_subdirectory(external/abseil)
+# We only require the header-only part of these libraries, no need to include them
+# in the ALL target.
+add_subdirectory(external/spdlog EXCLUDE_FROM_ALL)
+add_subdirectory(external/gtest EXCLUDE_FROM_ALL)
+add_subdirectory(external/cctz EXCLUDE_FROM_ALL)
+add_subdirectory(external/abseil EXCLUDE_FROM_ALL)
 
 add_subdirectory(include)
 add_subdirectory(lib)
