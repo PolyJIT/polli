@@ -22,7 +22,6 @@
 #include <memory>
 #include <vector>
 
-
 namespace {
 template <typename C, typename P> C filterOut(C const &container, P pred) {
   C Filtered(container);
@@ -33,17 +32,22 @@ template <typename C, typename P> C filterOut(C const &container, P pred) {
 } // namespace
 
 namespace polli {
-template <typename T>
-struct RunValue {
+template <typename T> struct RunValue {
   T value;
-  const llvm::Argument * Arg;
+  const llvm::Argument *Arg;
 };
 
-template<typename T>
-inline bool canSpecialize(const RunValue<T> &V) {
+template <typename T> inline bool canSpecialize(const RunValue<T> &V) {
   const llvm::Function *F = V.Arg->getParent();
   unsigned I = V.Arg->getArgNo();
-  llvm::Attribute Attr = F->getAttribute(I+1, "polli.specialize");
+  llvm::Attribute Attr = F->getAttribute(I + 1, "polli.specialize");
+  return Attr.getAsString() == "\"polli.specialize\"";
+}
+
+inline bool canSpecialize(const llvm::Argument &Arg) {
+  const llvm::Function *F = Arg.getParent();
+  llvm::Attribute Attr =
+      F->getAttribute(Arg.getArgNo() + 1, "polli.specialize");
   return Attr.getAsString() == "\"polli.specialize\"";
 }
 } // namespace polli
@@ -59,18 +63,15 @@ public:
   using RunValueListT = std::vector<RunValueT>;
   using iterator = RunValueListT::iterator;
   using const_iterator = RunValueListT::const_iterator;
-  using reference = RunValueT&;
+  using reference = RunValueT &;
 
-  explicit RunValueList(std::size_t Seed = 0)
-      : Seed(Seed){};
+  explicit RunValueList(std::size_t Seed = 0) : Seed(Seed){};
 
   bool operator==(const RunValueList &RHS) const {
     return hash() == RHS.hash();
   }
 
-  void add(const RunValueT &NewVal) {
-    List.push_back(NewVal);
-  }
+  void add(const RunValueT &NewVal) { List.push_back(NewVal); }
 
   iterator begin() { return List.begin(); }
   iterator end() { return List.end(); }
@@ -80,18 +81,16 @@ public:
   size_t size() const { return List.size(); }
   size_t hash() const {
     size_t LocalSeed = Seed;
-    RunValueListT Tmp = filterOut(List, [](const RunValueT &V) {
-      return !canSpecialize(V);
-    });
+    RunValueListT Tmp =
+        filterOut(List, [](const RunValueT &V) { return !canSpecialize(V); });
 
     boost::hash_range(LocalSeed, Tmp.begin(), Tmp.end());
     return LocalSeed;
   }
 
   std::string str() const {
-    RunValueListT Tmp = filterOut(List, [](const RunValueT &V) {
-      return !canSpecialize(V);
-    });
+    RunValueListT Tmp =
+        filterOut(List, [](const RunValueT &V) { return !canSpecialize(V); });
 
     int I = 0;
     std::stringstream Os;

@@ -39,12 +39,12 @@
 
 #define DEBUG_TYPE "polyjit"
 
-using llvm::ThreadPool;
 using llvm::Function;
-using llvm::ManagedStatic;
-using llvm::Module;
 using llvm::JITSymbol;
 using llvm::llvm_shutdown;
+using llvm::ManagedStatic;
+using llvm::Module;
+using llvm::ThreadPool;
 
 using polli::PolyJIT;
 using polli::SpecializingCompiler;
@@ -63,9 +63,7 @@ struct ThreadPoolCreator {
 };
 
 static ManagedStatic<ThreadPool, ThreadPoolCreator> Pool;
-static void wait_for_threads() {
-  Pool->wait();
-}
+static void wait_for_threads() { Pool->wait(); }
 
 struct PolyjitShutdownObject {
   ~PolyjitShutdownObject() {
@@ -78,19 +76,15 @@ static PolyjitShutdownObject Shutdown;
 namespace polli {
 using MainFnT = std::function<void(int, char **)>;
 
-static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
+static void DoCreateVariant(const JitRequest JR, const VariantRequest R, CacheKey K) {
   if (JitContext->find(K) != JitContext->end()) {
     return;
   }
   JitContext->increment(JitRegion::VARIANTS);
 
-  auto PM = Request.prototypeModule();
-
-  Function &Prototype = Request.prototype();
-  RunValueList Values = runValues(Request);
   std::string FnName;
+  std::shared_ptr<Module> Variant = createVariant(R, FnName);
 
-  std::shared_ptr<Module> Variant = createVariant(Prototype, Values, FnName);
   assert(Variant && "Failed to get a new variant.");
   auto OptimizedModule = Compiler->addModule(Variant);
   auto &ExpectedModule = std::get<0>(OptimizedModule);
@@ -98,11 +92,10 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
   const bool IsOptimized = std::get<1>(OptimizedModule);
   if (!IsOptimized) {
     JitContext->increment(JitRegion::BLOCKED);
-    Compiler->block(PM);
+    Compiler->block(JR.M);
   }
 
-
-  JITSymbol FPtr = Compiler->findSymbol(FnName, PM->getDataLayout());
+  JITSymbol FPtr = Compiler->findSymbol(FnName, JR.M->getDataLayout());
   auto Addr = FPtr.getAddress();
   console->error_if(!Addr, "Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
@@ -115,14 +108,15 @@ static void DoCreateVariant(const SpecializerRequest Request, CacheKey K) {
       llvm_unreachable("Key collision in function cace, abort.");
     }
   }
+  #if 0
   DEBUG(printRunValues(Values));
+  #endif
 }
 
-static void
-GetOrCreateVariantFunction(const SpecializerRequest Request,
-                           uint64_t ID, CacheKey K) {
+static void GetOrCreateVariantFunction(const JitRequest JitReq, const VariantRequest Request,
+                                       CacheKey K) {
   auto &Ctx = Compiler->getContext();
-  Ctx.RunInCS(DoCreateVariant, Request, K);
+  Ctx.RunInCS(DoCreateVariant, JitReq, Request, K);
 }
 
 extern "C" {
@@ -143,11 +137,10 @@ void pjit_trace_fnstats_exit(uint64_t Id) {
  * @param paramc number of arguments of the function we want to call
  * @param params arugments of the function we want to call.
  */
-void *pjit_main(const char *FName, void *Ptr, uint64_t ID,
-                unsigned Paramc, char **Params) {
+void *pjit_main(const char *FName, void *Ptr, uint64_t ID, unsigned Paramc,
+                char **Params) {
   // 1. JitContext.
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
-  std::hash<std::string> FnHash;
 
   // 2. Compiler.
   auto ModRes = Compiler->getModule(ID, FName);
@@ -158,15 +151,20 @@ void *pjit_main(const char *FName, void *Ptr, uint64_t ID,
     return Ptr;
   }
 
-  SpecializerRequest Request(FnHash(FName), Paramc, Params, M);
+  llvm::SmallVector<void *, 4> JitParams;
+  for (int i = 0; i < Paramc; i++) {
+    JitParams.push_back(static_cast<void *>(Params[i]));
+  }
+  auto Req = make_request(FName, M, JitParams);
+  auto VarReq = make_variant_request(Req);
+
   if (!CacheHit) {
-    Function &F = Request.prototype();
-    JitContext->addRegion(F.getName().str(), ID);
+    JitContext->addRegion(FName, ID);
   }
 
-  CacheKey K{ID, runValues(Request).hash()};
+  CacheKey K{ID, VarReq.Hash};
   // 3. ThreadPool
-  auto FutureFn = Pool->async(GetOrCreateVariantFunction, Request, ID, K);
+  auto FutureFn = Pool->async(GetOrCreateVariantFunction, Req, VarReq, K);
 
   // If it was not a cache-hit, wait until the first variant is ready.
   if (!CacheHit) {
@@ -207,16 +205,18 @@ void *pjit_main(const char *FName, void *Ptr, uint64_t ID,
 void *pjit_main_no_recompile(const char *FName, void *Ptr, uint64_t ID,
                              unsigned Paramc, char **Params) {
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
-  std::hash<std::string> FnHash;
 
   auto ModRes = Compiler->getModule(ID, FName);
   SharedModule M = std::get<0>(ModRes);
   bool CacheHit = std::get<1>(ModRes);
-  SpecializerRequest Request(FnHash(FName), Paramc, Params, M);
+  llvm::SmallVector<void *, 4> JitParams;
+  for (int i = 0; i < Paramc; i++) {
+    JitParams.push_back(static_cast<void *>(Params[i]));
+  }
+  auto JitReq = make_request(FName, M, JitParams);
 
   if (!CacheHit) {
-    Function &F = Request.prototype();
-    JitContext->addRegion(F.getName().str(), ID);
+    JitContext->addRegion(FName, ID);
   }
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
   return Ptr;

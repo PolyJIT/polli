@@ -34,7 +34,9 @@ set(POLLI_LINK_LIBS
   pthread
   pqxx
   absl::base
+  absl::optional
   absl::strings
+  absl::variant
   spdlog
 )
 

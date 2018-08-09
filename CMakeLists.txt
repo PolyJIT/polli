@@ -90,7 +90,6 @@ set(INSTALL_GTEST Off)
 add_subdirectory(external/gtest)
 
 add_subdirectory(external/spdlog EXCLUDE_FROM_ALL)
-add_subdirectory(external/cctz EXCLUDE_FROM_ALL)
 add_subdirectory(external/abseil EXCLUDE_FROM_ALL)
 
 add_subdirectory(include)

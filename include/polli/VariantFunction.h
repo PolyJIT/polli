@@ -14,6 +14,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "polli/RunValues.h"
 #include "polli/RuntimeValues.h"
 
 using llvm::APInt;
@@ -135,8 +136,7 @@ typedef ParamVector<Param> FunctionKey;
 
 // @brief Create a new function variant with they values included in the
 // key replaced.
-std::unique_ptr<Module> createVariant(Function &BaseF, const RunValueList &K,
-                                      std::string &FnName);
+std::unique_ptr<Module> createVariant(const VariantRequest R, std::string &FnName);
 
 raw_ostream &operator<<(raw_ostream &OS, const Param &P);
 raw_ostream &operator<<(raw_ostream &out, const ParamVector<Param> &Params);

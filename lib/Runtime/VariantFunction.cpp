@@ -3,6 +3,7 @@
 #include "absl/memory/memory.h"
 
 #include "polli/FunctionCloner.h"
+#include "polli/RunValues.h"
 #include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
 #include "polli/Utils.h"
@@ -167,10 +168,12 @@ struct MainCreator {
 //
 template <class ParamT> class SpecializeEndpoint {
 private:
-  RunValueList SpecValues;
+  llvm::SmallVector<VarParam, 4> SpecValues;
 
 public:
-  void setParameters(RunValueList const &Values) { SpecValues = Values; }
+  void setParameters(llvm::SmallVector<VarParam, 4> const &Values) {
+    SpecValues = Values;
+  }
 
   Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
     return std::find_if(
@@ -191,25 +194,26 @@ public:
    * @param VMap A value-to-value map that tracks cloned values/function args.
    */
   void Apply(Function *From, Function *To, ValueToValueMapTy &VMap) {
-    unsigned I = 0;
-
+    auto I = SpecValues.begin();
     for (Argument &Arg : From->args()) {
-      auto P = SpecValues[I++];
-      if (!canSpecialize(P))
+      Type *Ty = Arg.getType();
+      if (!canSpecialize(Arg)) {
         continue;
-      if (Type *Ty = Arg.getType()) {
-        if (Ty->isIntegerTy()) {
-          auto *IntVal = ConstantInt::get(Ty, *P.value);
-          Value *MappedArg = VMap[&Arg];
-          MappedArg->replaceAllUsesWith(IntVal);
-        }
       }
+
+      if (Ty->isIntegerTy()) {
+        auto *IntVal = ConstantInt::get(Ty, absl::get<uint64_t>(*I));
+        Value *MappedArg = VMap[&Arg];
+        MappedArg->replaceAllUsesWith(IntVal);
+      }
+
+      I++;
     }
   }
 };
 
 static std::unique_ptr<FunctionClonerBase>
-createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
+createCloner(const VariantRequest Req, ValueToValueMapTy &VMap) {
   if (!opt::runtime::DisableSpecialization) {
     // Perform parameter value substitution.
     auto Specializer = absl::make_unique<FunctionCloner<
@@ -219,11 +223,11 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
      * function
      * and substitute all known parameter values.
      */
-    Specializer->setParameters(K);
+    Specializer->setParameters(Req.Params);
     return Specializer;
   }
 
-  //auto Specializer = std::make_unique<
+  // auto Specializer = std::make_unique<
   //    FunctionCloner<MainCreator, IgnoreSource, ConnectTarget>>();
   auto Specializer = absl::make_unique<DefaultFunctionCloner>();
   return Specializer;
@@ -235,20 +239,19 @@ createCloner(const RunValueList &K, ValueToValueMapTy &VMap) {
  * This creates a copy of the existing prototype function and substitutes
  * all uses of K's name with K's value.
  *
- * @param K the function key K we want to substitute in.
+ * @param R The request we process.
  * @param FnName the function name of the new variant inside the module.
  *
  * @return a copy of the base function, with the values of K substituted.
  */
-std::unique_ptr<Module> createVariant(Function &BaseF,
-                                      const RunValueList &K,
-                                      std::string &FnName) {
+std::unique_ptr<Module> createVariant(VariantRequest R, std::string &FnName) {
   ValueToValueMapTy VMap;
 
   /* Copy properties of our source module */
 
   // Prepare a new module to hold our new function.
-  const Module *M = BaseF.getParent();
+  const Function *BaseF = R.F.value();
+  const Module *M = BaseF->getParent();
   assert(M && "Function without parent module?!");
   if (!M)
     llvm_unreachable("Broken function.");
@@ -259,10 +262,11 @@ std::unique_ptr<Module> createVariant(Function &BaseF,
   NewM->setTargetTriple(M->getTargetTriple());
   NewM->setDataLayout(M->getDataLayout());
   NewM->setMaterializer(M->getMaterializer());
-  NewM->setModuleIdentifier(
-      fmt::format("{}.{}-{:s}-{:d}.variant", M->getModuleIdentifier(),
-                  BaseF.getName().str(), K.str(), K.hash()));
+  NewM->setModuleIdentifier(fmt::format("{}.{}-{:d}.variant",
+                                        M->getModuleIdentifier(),
+                                        BaseF->getName().str(), R.Hash));
 
+#if 0
   DEBUG({
     console->error(
         "\n==============================================================="
@@ -298,17 +302,18 @@ std::unique_ptr<Module> createVariant(Function &BaseF,
     console->error("Create Variant {} Hash: {:d}:\n{:s}", K.str(), K.hash(),
                    os.str());
   });
-
-  auto Specializer = createCloner(K, VMap);
+#endif
+  auto Specializer = createCloner(R, VMap);
   Specializer->setTargetModule(NewM.get());
-  Specializer->setSource(&BaseF);
+  Specializer->setSource(const_cast<llvm::Function *>(BaseF));
 
-  if (!BaseF.hasFnAttribute("polyjit-id"))
+  if (!BaseF->hasFnAttribute("polyjit-id"))
     console->critical("{:s} has no polyjit-id. Tracking will not work.",
-                      BaseF.getName().str());
+                      BaseF->getName().str());
   Function *NewF = Specializer->start(VMap, /*RemapCalls=*/true);
-  NewF->setName(fmt::format("{:s}_{:d}", NewF->getName().str(), K.hash()));
-  NewF->addFnAttr("polyjit-id", fmt::format("{:d}", polli::GetCandidateId(BaseF)));
+  NewF->setName(fmt::format("{:s}_{:d}", NewF->getName().str(), R.Hash));
+  NewF->addFnAttr("polyjit-id",
+                  fmt::format("{:d}", polli::GetCandidateId(*BaseF)));
   FnName = NewF->getName().str();
 
   return NewM;

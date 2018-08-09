@@ -2,6 +2,8 @@
 #include "polli/log.h"
 #include "pprof/Tracing.h"
 
+#include <boost/functional/hash.hpp>
+
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -24,7 +26,59 @@ using polli::canSpecialize;
 
 REGISTER_LOG(console, "runvals");
 
+namespace absl {
+inline size_t hash_value(const polli::VarParam &V) {
+  return absl::get<uint64_t>(V);
+}
+}
+
+
 namespace polli {
+JitRequest make_request(const absl::string_view FnName,
+                        std::shared_ptr<const Module> M,
+                        llvm::SmallVector<void *, 4> Params) {
+  std::hash<const char *> FnHash;
+  return {FnHash(FnName.data()), M, Params};
+}
+
+VariantRequest make_variant_request(JitRequest JitReq) {
+  VariantRequest VarReq;
+
+  size_t Hash = JitReq.Hash;
+  const Function *ProtoF;
+  llvm::SmallVector<VarParam, 4> Params;
+
+  for (const Function &F : *JitReq.M) {
+    if (F.hasFnAttribute("polyjit-jit-candidate")) {
+      ProtoF = &F;
+      auto I = JitReq.Params.begin();
+
+      for (const Argument &Arg : F.args()) {
+        if (!canSpecialize(Arg)) {
+          continue;
+        }
+
+        if (Arg.getType()->isIntegerTy()) {
+          Params.push_back(*static_cast<uint64_t *>(*I));
+        } else {
+          Params.push_back(*I);
+        }
+      }
+    }
+  }
+
+  if (!ProtoF)
+    llvm_unreachable("No JIT candidate in prototype!");
+
+  boost::hash_range(Hash, Params.begin(), Params.end());
+
+  VarReq.F = ProtoF;
+  VarReq.Params = Params;
+  VarReq.Hash = Hash;
+
+  return VarReq;
+}
+
 Function *SpecializerRequest::init(std::shared_ptr<Module> PrototypeM) {
   for (Function &ProtoF : *PrototypeM) {
     if (ProtoF.hasFnAttribute("polyjit-jit-candidate")) {

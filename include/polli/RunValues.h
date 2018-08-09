@@ -18,7 +18,7 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
  * OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
+ */
 #ifndef POLLI_RUNVALUES_H
 #define POLLI_RUNVALUES_H
 
@@ -27,6 +27,10 @@
 #include <cstring>
 #include <iostream>
 #include <memory>
+
+#include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
+#include "absl/types/variant.h"
 
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
@@ -37,6 +41,25 @@ using llvm::Function;
 using llvm::Module;
 
 namespace polli {
+using VarParam = absl::variant<uint64_t, void *>;
+struct JitRequest {
+  size_t Hash;
+  std::shared_ptr<const Module> M;
+  llvm::SmallVector<void *, 4> Params;
+};
+
+struct VariantRequest {
+  size_t Hash;
+  absl::optional<const Function *> F;
+  llvm::SmallVector<VarParam, 4> Params;
+};
+
+JitRequest make_request(const absl::string_view FnName,
+                        std::shared_ptr<const Module> M,
+                        llvm::SmallVector<void *, 4> Params);
+
+VariantRequest make_variant_request(JitRequest JitReq);
+
 class SpecializerRequest {
 private:
   const uint64_t IRKey;
@@ -57,24 +80,14 @@ public:
     std::memcpy(Params.data(), params, N);
   }
 
-  size_t paramSize() const {
-    return ParamC;
-  }
+  size_t paramSize() const { return ParamC; }
 
-  const std::vector<void *> &params() const {
-    return Params;
-  }
+  const std::vector<void *> &params() const { return Params; }
 
-  uint64_t key() const {
-    return IRKey;
-  }
+  uint64_t key() const { return IRKey; }
 
-  llvm::Function &prototype() const {
-    return *F;
-  }
-  std::shared_ptr<const Module> prototypeModule() const {
-    return M;
-  }
+  llvm::Function &prototype() const { return *F; }
+  std::shared_ptr<const Module> prototypeModule() const { return M; }
 };
 
 RunValueList runValues(const SpecializerRequest &Request);
