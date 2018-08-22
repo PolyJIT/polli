@@ -33,6 +33,9 @@ enum PipelineType {
 };
 
 namespace opt {
+extern bool EnableTracking;
+extern std::string TrackMetricsFilename;
+extern std::string TrackScopMetadataFilename;
 extern bool EnableLogFile;
 extern bool DisableRecompile;
 extern bool DisableCoreFiles;
@@ -40,6 +43,8 @@ extern std::string EntryFunc;
 extern std::string FakeArgv0;
 
 extern spdlog::level::level_enum LogLevel;
+
+extern int RunID;
 
 namespace runtime {
 extern char OptLevel;

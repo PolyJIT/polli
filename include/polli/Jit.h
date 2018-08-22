@@ -5,8 +5,10 @@
 #include <unordered_map>
 #include <utility>
 
-#include "polli/Caching.h"
 #include "llvm/ExecutionEngine/JITSymbol.h"
+
+#include "polli/Caching.h"
+#include "polli/ExportMetrics.h"
 
 using llvm::JITSymbol;
 
@@ -26,6 +28,8 @@ class PolyJIT {
 
   mutable std::recursive_mutex TracingMutex;
   mutable std::recursive_mutex CacheMutex;
+
+  JitEventData EventData;
 
   std::unordered_map<uint64_t, uint64_t> Events;
   std::unordered_map<uint64_t, uint64_t> Entries;

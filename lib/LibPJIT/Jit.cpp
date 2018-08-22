@@ -3,7 +3,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/TargetSelect.h"
 
-#include "polli/Db.h"
+#include "polli/ExportMetrics.h"
 #include "polli/Jit.h"
 #include "polli/Options.h"
 #include "polli/RuntimeOptimizer.h"
@@ -16,29 +16,35 @@ namespace papi {
 } // namespace papi
 
 using llvm::InitializeNativeTarget;
-using llvm::InitializeNativeTargetAsmPrinter;
 using llvm::InitializeNativeTargetAsmParser;
+using llvm::InitializeNativeTargetAsmPrinter;
 using llvm::PassRegistry;
 using llvm::PrettyStackTraceProgram;
 
 using polli::opt::ValidateOptions;
-using polli::tracing::setup_tracing;
 
 using polly::initializePollyPasses;
 
 REGISTER_LOG(console, "jit");
 
 namespace polli {
-using StackTracePtr = std::unique_ptr<PrettyStackTraceProgram>;
-static StackTracePtr StackTrace;
+static std::unique_ptr<PrettyStackTraceProgram> StackTrace;
 
-void PolyJIT::setup() {
-  setup_tracing();
-  enter(JitRegion::START, papi::PAPI_get_real_usec());
+static void SetupJitEventData(JitEventData &Data) {
+  Data.RunID = opt::RunID;
+  Data.OutFile = opt::TrackMetricsFilename;
+}
 
-  StackTrace = std::make_unique<PrettyStackTraceProgram>(0, nullptr);
+static void SetupDefaultRegions(RegionMapTy &Regions) {
+  Regions[JitRegion::START] = "START";
+  Regions[JitRegion::CODEGEN] = "CODEGEN";
+  Regions[JitRegion::VARIANTS] = "VARIANTS";
+  Regions[JitRegion::CACHE_HIT] = "CACHE_HIT";
+  Regions[JitRegion::REQUESTS] = "REQUESTS";
+  Regions[JitRegion::BLOCKED] = "BLOCKED";
+}
 
-  // Make sure to initialize tracing before planting the atexit handler.
+static void SetupLLVM() {
   PassRegistry &Registry = *PassRegistry::getPassRegistry();
   polly::initializePollyPasses(Registry);
   initializeCore(Registry);
@@ -56,22 +62,31 @@ void PolyJIT::setup() {
   InitializeNativeTarget();
   InitializeNativeTargetAsmPrinter();
   InitializeNativeTargetAsmParser();
+}
 
-  /* CACHE_HIT */
-  Regions[JitRegion::START] = "START";
-  Regions[JitRegion::CODEGEN] = "CODEGEN";
-  Regions[JitRegion::VARIANTS] = "VARIANTS";
-  Regions[JitRegion::CACHE_HIT] = "CACHE_HIT";
-  Regions[JitRegion::REQUESTS] = "REQUESTS";
-  Regions[JitRegion::BLOCKED] = "BLOCKED";
+void PolyJIT::setup() {
+  papi::PAPI_library_init(PAPI_VER_CURRENT);
+  llvm::cl::ParseEnvironmentOptions("profile-scops", "PJIT_ARGS", "");
 
-  SetOptimizationPipeline(opt::runtime::PipelineChoice);
+  StackTrace = std::make_unique<PrettyStackTraceProgram>(0, nullptr);
   opt::ValidateOptions();
-  db::ValidateOptions();
+  SetupJitEventData(EventData);
+  SetupDefaultRegions(Regions);
+  SetupLLVM();
+  SetOptimizationPipeline(opt::runtime::PipelineChoice);
+
+  enter(JitRegion::START, papi::PAPI_get_real_usec());
 }
 
 void PolyJIT::tearDown() {
   exit(JitRegion::START, papi::PAPI_get_real_usec());
-  db::StoreRun(Events, Entries, Regions);
+  EventData.Events =
+      llvm::SmallVector<JitEventData::EventTy, 8>(Events.begin(), Events.end());
+  EventData.Entries = llvm::SmallVector<JitEventData::EventTy, 8>(
+      Entries.begin(), Entries.end());
+  EventData.Regions = llvm::SmallVector<JitEventData::IdToNameTy, 8>(
+      Regions.begin(), Regions.end());
+
+  yaml::StoreRun(EventData);
 }
 } // namespace polli

@@ -16,7 +16,6 @@
 #include <iostream>
 
 #include "polli/RuntimeOptimizer.h"
-#include "polli/Db.h"
 #include "polli/Utils.h"
 
 #include "llvm/Analysis/Passes.h"
@@ -26,6 +25,7 @@
 #include "llvm/Transforms/IPO.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#include "polli/ExportMetrics.h"
 #include "polli/LikwidMarker.h"
 #include "polli/log.h"
 #include "polly/Canonicalization.h"
@@ -158,16 +158,22 @@ public:
 
   bool runOnScop(Scop &S) override {
     IslAstInfoWrapperPass &AI = getAnalysis<IslAstInfoWrapperPass>();
-    std::string Buf, IslAstrStr, ScheduleTreeStr;
+    std::string Buf, IslAstStr, ScheduleTreeStr;
     raw_string_ostream Os(Buf);
     AI.printScop(Os, S);
-    IslAstrStr = Os.str();
+    IslAstStr = Os.str();
 
     isl::schedule STree = S.getScheduleTree();
     ScheduleTreeStr = STree.to_str();
 
-    db::StoreTransformedScop(S.getFunction().getName().str(), IslAstrStr,
-                             ScheduleTreeStr);
+    polli::ScopMetadata MD;
+    MD.RunID = opt::RunID;
+    MD.FunctionName = S.getFunction().getName().str();
+    MD.AST = IslAstStr;
+    MD.Schedule = ScheduleTreeStr;
+    MD.OutFile = opt::TrackScopMetadataFilename;
+
+    polli::yaml::StoreScopMetadata(MD);
 
     return false;
   }

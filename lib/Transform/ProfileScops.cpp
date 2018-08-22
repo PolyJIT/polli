@@ -124,7 +124,6 @@ namespace polli {
 
     Type *Voidty = Type::getVoidTy(Context);
 
-    //void setup_tracing()
     FunctionType *FType = FunctionType::get(Voidty, false);
     Constant *F = M->getOrInsertFunction("setup_tracing", FType);
     Builder.CreateCall(F, {});

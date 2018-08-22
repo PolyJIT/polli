@@ -31,7 +31,6 @@
 #include "polli/Compiler.h"
 #include "polli/Jit.h"
 #include "polli/RunValues.h"
-#include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
 #include "polli/VariantFunction.h"
 #include "polli/log.h"
@@ -88,7 +87,8 @@ static void DoCreateVariant(const JitRequest JR, const VariantRequest R, CacheKe
   assert(Variant && "Failed to get a new variant.");
   auto OptimizedModule = Compiler->addModule(Variant);
   auto &ExpectedModule = std::get<0>(OptimizedModule);
-  console->error_if(!ExpectedModule, "Error in compiled module!");
+  if(!ExpectedModule)
+    console->error("Error in compiled module!");
   const bool IsOptimized = std::get<1>(OptimizedModule);
   if (!IsOptimized) {
     JitContext->increment(JitRegion::BLOCKED);
@@ -97,7 +97,8 @@ static void DoCreateVariant(const JitRequest JR, const VariantRequest R, CacheKe
 
   JITSymbol FPtr = Compiler->findSymbol(FnName, JR.M->getDataLayout());
   auto Addr = FPtr.getAddress();
-  console->error_if(!Addr, "Could not get the address of the JITSymbol.");
+  if (!Addr)
+    console->error("Could not get the address of the JITSymbol.");
   assert((bool)Addr && "Could not get the address of the JITSymbol.");
 
   {

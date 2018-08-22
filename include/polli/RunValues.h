@@ -35,8 +35,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
-#include "polli/RuntimeValues.h"
-
 using llvm::Function;
 using llvm::Module;
 
@@ -60,41 +58,18 @@ JitRequest make_request(const absl::string_view FnName,
 
 VariantRequest make_variant_request(JitRequest JitReq);
 
-class SpecializerRequest {
-private:
-  const uint64_t IRKey;
-  const unsigned ParamC;
-  std::vector<void *> Params;
+inline bool canSpecialize(const llvm::Argument &Arg) {
+  const llvm::Function *F = Arg.getParent();
+  llvm::Attribute Attr =
+      F->getAttribute(Arg.getArgNo() + 1, "polli.specialize");
+  return Attr.getAsString() == "\"polli.specialize\"";
+}
 
-  std::shared_ptr<const Module> M;
-  Function *F;
-
-  Function *init(std::shared_ptr<Module> PrototypeM);
-
-public:
-  SpecializerRequest(uint64_t key, unsigned ParamC, void *params,
-                     std::shared_ptr<Module> M)
-      : IRKey(key), ParamC(ParamC), Params(), M(M), F(init(M)) {
-    size_t N = ParamC * sizeof(void *);
-    Params.resize(ParamC);
-    std::memcpy(Params.data(), params, N);
-  }
-
-  size_t paramSize() const { return ParamC; }
-
-  const std::vector<void *> &params() const { return Params; }
-
-  uint64_t key() const { return IRKey; }
-
-  llvm::Function &prototype() const { return *F; }
-  std::shared_ptr<const Module> prototypeModule() const { return M; }
-};
-
-RunValueList runValues(const SpecializerRequest &Request);
+#if 0
 #ifndef NDEBUG
 void printArgs(const Function &F, size_t argc,
                const std::vector<void *> &Params);
 #endif
-void printRunValues(const RunValueList &Values);
+#endif
 } // namespace polli
 #endif // POLLI_RUNVALUES_H

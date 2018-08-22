@@ -23,6 +23,7 @@ static inline std::vector<spdlog::sink_ptr> &global_init() {
     return Sinks;
 
   Init = true;
+  spdlog::set_pattern("%L: %v");
 
   if (polli::opt::EnableLogFile &&
       (polli::opt::LogLevel != spdlog::level::off)) {

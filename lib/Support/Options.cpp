@@ -26,30 +26,99 @@
 REGISTER_LOG(console, "polyjit.options");
 
 using namespace llvm;
+using namespace llvm::cl;
+using std::string;
 
 llvm::cl::OptionCategory PolliCategory("PolyJIT Options",
                                        "Configure options of PolyJIT");
-llvm::cl::OptionCategory
-    PolyJitRuntime("libpjit Options", "Configure runtime options of libpjit "
-                                       "(Use environment variable: PJIT_ARGS");
+llvm::cl::OptionCategory PolyJitRuntime("libpjit Options",
+                                        "Configure runtime options of libpjit "
+                                        "(Use environment variable: PJIT_ARGS");
 llvm::cl::OptionCategory
     PolyJitCompiletime("LLVMPolyJIT Options",
-                        "Configure compile-time options of PolyJIT ");
+                       "Configure compile-time options of PolyJIT ");
 
 namespace polli {
 namespace opt {
+bool EnableTracking;
+static ::opt<bool, true> EnableTrackingX("polli-track",
+                                         ::desc("Track metrics in .yml files."),
+                                         ::location(EnableTracking),
+                                         ::init(false), ::cat(PolyJitRuntime));
+
+string TrackMetricsFilename;
+static ::opt<string, true> TrackMetricsFilenameX(
+    "polli-track-metrics-outfile", ::desc("Path for .yml outfile."),
+    ::location(TrackMetricsFilename), ::init("UNSET"), ::cat(PolyJitRuntime));
+
+string TrackScopMetadataFilename;
+static ::opt<string, true>
+    TrackScopMetadataFilenameX("polli-track-scop-metadata-outfile",
+                               ::desc("Path for .yml outfile."),
+                               ::location(TrackScopMetadataFilename),
+                               ::init("UNSET"), ::cat(PolyJitRuntime));
+string Experiment;
+static ::opt<string, true> ExperimentX(
+    "polli-experiment", ::desc("Name of the experiment we are running under."),
+    ::location(Experiment), ::init("unknown"), ::cat(PolyJitRuntime));
+
+string ExperimentUUID;
+static ::opt<string, true>
+    ExperimentUUIDX("polli-experiment-uuid", ::desc("Experiment UUID."),
+                    ::location(ExperimentUUID),
+                    ::init("00000000-0000-0000-0000-000000000000"),
+                    ::cat(PolyJitRuntime));
+
+string Project;
+static ::opt<string, true> ProjectX("polli-project",
+                                    ::desc("The project we are running under."),
+                                    ::location(Project), ::init("unknown"),
+                                    ::cat(PolyJitRuntime));
+
+string Domain;
+static ::opt<string, true> DomainX("polli-domain",
+                                   ::desc("The domain we are running under."),
+                                   ::location(Domain), ::init("unknown"),
+                                   ::cat(PolyJitRuntime));
+
+string Group;
+static ::opt<string, true> GroupX("polli-group",
+                                  ::desc("The group we are running under."),
+                                  ::location(Group), ::init("unknown"),
+                                  ::cat(PolyJitRuntime));
+
+string SourceUri;
+static ::opt<string, true>
+    SourceUriX("polli-src-uri", ::desc("The src_uri we are running under."),
+               ::location(SourceUri), ::init("unknown"), ::cat(PolyJitRuntime));
+
+string Argv0;
+static ::opt<string, true> Argv0X("polli-argv",
+                                  ::desc("The command we are executing."),
+                                  ::location(SourceUri), ::init("unknown"),
+                                  ::cat(PolyJitRuntime));
+
+string RunGroupUUID;
+static ::opt<string, true> RunGroupUUIDX(
+    "polli-run-group", ::desc("RunGroup (UUID)"), ::location(RunGroupUUID),
+    ::init("00000000-0000-0000-0000-000000000000"), ::cat(PolyJitRuntime));
+
+int RunID;
+static ::opt<int, true> RunIdX("polli-run-id", ::desc("RunGroup (UUID)"),
+                               ::location(RunID), ::init(0),
+                               ::cat(PolyJitRuntime));
+
 spdlog::level::level_enum LogLevel;
-static cl::opt<spdlog::level::level_enum, true> LogLevelX(
-    "polli-log-level",
-    cl::desc("Configure PolyJIT's log level."),
-    cl::values(
-        clEnumValN(spdlog::level::off, "off", "Off"),
-        clEnumValN(spdlog::level::info, "info", "Info"),
-        clEnumValN(spdlog::level::warn, "warn", "Warn"),
-        clEnumValN(spdlog::level::err,  "error", "Error"),
-        clEnumValN(spdlog::level::debug, "debug", "Debug"),
-        clEnumValN(spdlog::level::trace, "trace", "Trace")),
-    cl::location(LogLevel), cl::init(spdlog::level::off), cl::ZeroOrMore, cl::cat(PolyJitRuntime));
+static cl::opt<spdlog::level::level_enum, true>
+    LogLevelX("polli-log-level", cl::desc("Configure PolyJIT's log level."),
+              cl::values(clEnumValN(spdlog::level::off, "off", "Off"),
+                         clEnumValN(spdlog::level::info, "info", "Info"),
+                         clEnumValN(spdlog::level::warn, "warn", "Warn"),
+                         clEnumValN(spdlog::level::err, "error", "Error"),
+                         clEnumValN(spdlog::level::debug, "debug", "Debug"),
+                         clEnumValN(spdlog::level::trace, "trace", "Trace")),
+              cl::location(LogLevel), cl::init(spdlog::level::off),
+              cl::ZeroOrMore, cl::cat(PolyJitRuntime));
 
 bool DisableRecompile;
 static cl::opt<bool, true> DisableRecompileX(
@@ -64,9 +133,11 @@ static cl::opt<bool, true>
                       cl::cat(PolliCategory));
 
 bool EnableLogFile;
-static cl::opt<bool, true> EnableLogFileX(
-    "polli-enable-log", cl::desc("Enable logging to file instead of stderr"),
-    cl::location(EnableLogFile), cl::init(false), cl::ZeroOrMore, cl::cat(PolliCategory));
+static cl::opt<bool, true>
+    EnableLogFileX("polli-enable-log",
+                   cl::desc("Enable logging to file instead of stderr"),
+                   cl::location(EnableLogFile), cl::init(false), cl::ZeroOrMore,
+                   cl::cat(PolliCategory));
 
 namespace runtime {
 PipelineType PipelineChoice;
@@ -76,10 +147,12 @@ static cl::opt<PipelineType, true> PipelineChoiceX(
     cl::values(
         clEnumValN(RELEASE, "release",
                    "Enable the default 'release' pipeline. No debug output"),
-        clEnumValN(DEBUG, "debug", "Enable the debug pipeline. Additional "
-                                   "configuration determines the amount of "
-                                   "debug output you get.")),
-    cl::location(PipelineChoice), cl::init(RELEASE), cl::ZeroOrMore, cl::cat(PolyJitRuntime));
+        clEnumValN(DEBUG, "debug",
+                   "Enable the debug pipeline. Additional "
+                   "configuration determines the amount of "
+                   "debug output you get.")),
+    cl::location(PipelineChoice), cl::init(RELEASE), cl::ZeroOrMore,
+    cl::cat(PolyJitRuntime));
 
 char OptLevel = ' ';
 std::string MArch = "";
@@ -159,10 +232,11 @@ static cl::opt<bool, true> UsePollyOptionsX(
     cl::location(UsePollyOptions), cl::init(true), cl::cat(PolyJitRuntime));
 
 bool EnablePolly;
-static cl::opt<bool, true> EnablePollyX(
-    "polli-enable-polly",
-    cl::desc("Use Polly's settings in the optimizer pipeline."),
-    cl::location(EnablePolly), cl::init(true), cl::cat(PolyJitRuntime));
+static cl::opt<bool, true>
+    EnablePollyX("polli-enable-polly",
+                 cl::desc("Use Polly's settings in the optimizer pipeline."),
+                 cl::location(EnablePolly), cl::init(true),
+                 cl::cat(PolyJitRuntime));
 
 } // namespace runtime
 
@@ -176,16 +250,20 @@ static cl::opt<bool, true>
                        cl::cat(PolyJitCompiletime));
 
 bool AnalyzeIR;
-static cl::opt<bool, true> AnalyzeIRX(
-    "polli-analyze", cl::desc("Throw in a bunch of function printers for "
-                              "PolyJIT's static compilation passes."),
-    cl::location(AnalyzeIR), cl::init(false), cl::cat(PolyJitCompiletime));
+static cl::opt<bool, true>
+    AnalyzeIRX("polli-analyze",
+               cl::desc("Throw in a bunch of function printers for "
+                        "PolyJIT's static compilation passes."),
+               cl::location(AnalyzeIR), cl::init(false),
+               cl::cat(PolyJitCompiletime));
 
 bool ProfileScops;
-static cl::opt<bool, true> ProfileScopsX(
-    "polli-profile-scops", cl::desc("Instrument regions that are not yet a "
-                                    "valid SCoP for runtime-profiling"),
-    cl::location(ProfileScops), cl::init(false), cl::cat(PolyJitCompiletime));
+static cl::opt<bool, true>
+    ProfileScopsX("polli-profile-scops",
+                  cl::desc("Instrument regions that are not yet a "
+                           "valid SCoP for runtime-profiling"),
+                  cl::location(ProfileScops), cl::init(false),
+                  cl::cat(PolyJitCompiletime));
 
 bool CollectRegressionTests = false;
 static cl::opt<bool, true> PolliCollectX(
@@ -206,6 +284,15 @@ void ValidateOptions() {
   if (EnableScheduleReport || EnableScopReport || EnableFunctionReport ||
       EnableASTReport || EnableDatabaseExport) {
     PipelineChoice = DEBUG;
+  }
+
+  // This needs to be supported via environment variable too
+  // because there is no way for the tool 'benchbuild' to provide
+  // the run_id as program argument for now.
+  if (RunID == 0) {
+    if (const char *RunId = std::getenv("BB_DB_RUN_ID")) {
+      opt::RunID = RunId ? std::stoi(RunId) : 0;
+    }
   }
 }
 

@@ -42,10 +42,9 @@ set(POLLI_LINK_LIBS
 
 set(POLYJIT_RUNTIME_SOURCES
   libpjit.cpp
-  BlockingMap.cpp
-  CodeGen.cpp
   Compiler.cpp
-  Db.cpp
+  #Db.cpp
+  ExportMetrics.cpp
   Jit.cpp
   RunValues.cpp
   ../Runtime/LikwidMarker.cpp
@@ -60,6 +59,12 @@ set(POLYJIT_RUNTIME_SOURCES
   ../Support/Utils.cpp
 )
 
+add_definitions(
+  -DSPDLOG_NO_DATETIME
+  -DSPDLOG_NO_THREAD_ID
+  -DSPDLOG_NO_NAME
+  -DSPDLOG_NO_ATOMIC_LEVELS
+)
 add_polli_library(pjit SHARED
   ${POLYJIT_RUNTIME_SOURCES}
 )

@@ -11,6 +11,7 @@ using spdlog::level::level_enum;
 
 using polli::opt::LogLevel;
 
+
 namespace polli {
 std::shared_ptr<spdlog::logger>
 register_log(const std::string &Name = "default",

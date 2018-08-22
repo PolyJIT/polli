@@ -4,7 +4,6 @@
 
 #include "polli/FunctionCloner.h"
 #include "polli/RunValues.h"
-#include "polli/RuntimeValues.h"
 #include "polli/Stats.h"
 #include "polli/Utils.h"
 #include "polli/VariantFunction.h"
@@ -19,53 +18,6 @@ using namespace llvm;
 REGISTER_LOG(console, "variants");
 
 namespace polli {
-llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Param &P) {
-  return OS << P.Val->getUniqueInteger();
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                              const RunValueList &Params) {
-  out << "[";
-
-  for (auto &Val : Params) {
-    out << Val.value;
-    out << " ";
-  }
-  out << "]";
-  return out;
-}
-
-llvm::raw_ostream &operator<<(llvm::raw_ostream &out,
-                              const ParamVector<Param> &Params) {
-  out << "[";
-  for (size_t I = 0; I < Params.size(); ++I) {
-    out << Params[I];
-    if (!(I == Params.size() - 1))
-      out << " ";
-  }
-
-  out << "]";
-  return out;
-}
-
-void getRuntimeParameters(Function *F, unsigned paramc, void *params,
-                          std::vector<Param> &ParamV) {
-  int I = 0;
-  for (const Argument &Arg : F->args()) {
-    Type *ArgTy = Arg.getType();
-
-    /* TODO: Add more types to be suitable for spawning new functions. */
-    if (auto *IntTy = dyn_cast<IntegerType>(ArgTy)) {
-      Param P;
-      P.Ty = IntTy;
-      P.Name = Arg.getName();
-      P.Val = ConstantInt::get(IntTy, ((uint64_t **)params)[I][0]);
-      ParamV.push_back(P);
-    }
-    I++;
-  }
-}
-
 /**
  * @brief  Convert srcF signature into a 'main' function format,
  * i.e. f(int argc, char** argv). This way the parameters can be passed by
@@ -166,7 +118,7 @@ struct MainCreator {
 // All uses of the a Value are replaced with the parameter value associated
 // to this value.
 //
-template <class ParamT> class SpecializeEndpoint {
+class SpecializeEndpoint {
 private:
   llvm::SmallVector<VarParam, 4> SpecValues;
 
@@ -178,7 +130,7 @@ public:
   Function::arg_iterator getArgument(Function *F, StringRef ArgName) {
     return std::find_if(
         F->arg_begin(), F->arg_end(),
-        [&](Function::arg_iterator &It) { return It->getName() == ArgName; });
+        [ArgName](llvm::Argument &Arg) { return Arg.getName() == ArgName; });
   }
 
   /**
@@ -217,7 +169,7 @@ createCloner(const VariantRequest Req, ValueToValueMapTy &VMap) {
   if (!opt::runtime::DisableSpecialization) {
     // Perform parameter value substitution.
     auto Specializer = absl::make_unique<FunctionCloner<
-        CopyCreator, IgnoreSource, SpecializeEndpoint<RunValue<uint64_t *>>>>();
+        CopyCreator, IgnoreSource, SpecializeEndpoint>>();
 
     /* Perform a parameter specialization by taking the unchanged base
      * function

@@ -192,19 +192,21 @@ SpecializingCompiler::addModule(std::shared_ptr<Module> M) {
 
   Expected<ModuleHandleT> MH = OptimizeLayer.addModule(M, Resolver);
   const bool IsOptimized = OptimizedModules.find(M) != OptimizedModules.end();
-  console->debug("Compiler: {:d}", IsOptimized);
   if (!IsOptimized) {
+    console->debug("Blocking: {:s}", M->getModuleIdentifier());
     block(M);
   }
 
-  console->error_if(!MH, "Module compilation failed!");
+  if (!MH)
+    console->error("Module compilation failed!");
   assert(MH && "Adding the module failed!");
   return std::make_pair(std::move(MH), IsOptimized);
 }
 
 void SpecializingCompiler::removeModule(ModuleHandleT H) {
   Error Status = CompileLayer.removeModule(H);
-  console->error_if(!Status.success(), "Unable to remove module!");
+  if (!Status.success())
+  console->error("Unable to remove module!");
   assert(Status.success() && "Unable to remove module!");
 
 }
