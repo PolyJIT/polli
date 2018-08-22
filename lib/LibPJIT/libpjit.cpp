@@ -160,7 +160,9 @@ void *pjit_main(const char *FName, void *Ptr, uint64_t ID, unsigned Paramc,
   auto VarReq = make_variant_request(Req);
 
   if (!CacheHit) {
-    JitContext->addRegion(FName, ID);
+    auto MaybeF = VarReq.F;
+    if (MaybeF.has_value())
+      JitContext->addRegion(MaybeF.value()->getName(), ID);
   }
 
   CacheKey K{ID, VarReq.Hash};
