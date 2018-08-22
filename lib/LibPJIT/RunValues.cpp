@@ -64,7 +64,6 @@ VariantRequest make_variant_request(JitRequest JitReq) {
         if (Ty->isIntegerTy()) {
           Params.push_back(*static_cast<uint64_t *>(*I));
         } else {
-          console->debug("void* inserted {:x}", *I);
           Params.push_back(*I);
         }
       }
@@ -80,11 +79,8 @@ VariantRequest make_variant_request(JitRequest JitReq) {
   VarReq.Params = Params;
   VarReq.Hash = Hash;
 
-  console->debug("VaReq: {:d} - {:d} - {:s}", Hash, Params.size(),
-                 ProtoF->getName().str());
   for (auto P : Params) {
     auto Value = absl::get<uint64_t>(P);
-    console->debug(" > {:d} {:d}", (int64_t)Value, Value);
   }
 
   return VarReq;

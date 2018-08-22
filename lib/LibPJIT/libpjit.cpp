@@ -134,17 +134,19 @@ void pjit_trace_fnstats_exit(uint64_t Id) {
  *
  * All calls to the PolyJIT runtime will land here.
  *
- * @param fName The function name we want to call.
- * @param paramc number of arguments of the function we want to call
- * @param params arugments of the function we want to call.
+ * @param Prototype Pointer to the serialized prototype we want to call.
+ * @param Ptr 
+ * @param ID
+ * @param Paramc number of arguments of the function we want to call
+ * @param Params arugments of the function we want to call.
  */
-void *pjit_main(const char *FName, void *Ptr, uint64_t ID, unsigned Paramc,
+void *pjit_main(const char *Prototype, void *Ptr, uint64_t ID, unsigned Paramc,
                 char **Params) {
   // 1. JitContext.
   pjit_trace_fnstats_entry(JitRegion::CODEGEN);
 
   // 2. Compiler.
-  auto ModRes = Compiler->getModule(ID, FName);
+  auto ModRes = Compiler->getModule(ID, Prototype);
   SharedModule M = std::get<0>(ModRes);
   const bool CacheHit = std::get<1>(ModRes);
   if (Compiler->isBlocked(M)) {
@@ -156,7 +158,7 @@ void *pjit_main(const char *FName, void *Ptr, uint64_t ID, unsigned Paramc,
   for (int i = 0; i < Paramc; i++) {
     JitParams.push_back(static_cast<void *>(Params[i]));
   }
-  auto Req = make_request(FName, M, JitParams);
+  auto Req = make_request(Prototype, M, JitParams);
   auto VarReq = make_variant_request(Req);
 
   if (!CacheHit) {

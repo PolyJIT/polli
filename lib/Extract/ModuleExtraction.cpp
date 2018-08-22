@@ -611,6 +611,7 @@ static llvm::Function *extractRegion(const llvm::Region *R,
                                      const llvm::Function &F,
                                      const std::set<Value *> &TrackedParams,
                                      llvm::DominatorTree *DT) {
+  static int RegionID = 0;
   SmallVector<BasicBlock *, 8> RealBlocks(R->blocks());
   CodeExtractor RealExtractor(RealBlocks, DT, /*AggregateArgs*/ false);
   std::hash<std::string> FnNameHasher;
@@ -621,10 +622,12 @@ static llvm::Function *extractRegion(const llvm::Region *R,
         ExtractedF, TrackedParams);
 
     ExtractedF->setLinkage(GlobalValue::LinkageTypes::WeakODRLinkage);
-    ExtractedF->setName(absl::StrCat(
-        F.getName().str(), "_", std::rand(), "_",
-        FnNameHasher(F.getParent()->getName().str()), ".pjit.scop"));
+    ExtractedF->setName(
+        absl::StrCat(F.getName().str(), "_", RegionID, "_",
+                     FnNameHasher(F.getParent()->getName().str())));
     ExtractedF->addFnAttr("polyjit-jit-candidate");
+
+    RegionID++;
     return ExtractedF;
   }
   return nullptr;
