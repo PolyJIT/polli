@@ -216,10 +216,13 @@ void *pjit_main_no_recompile(const char *FName, void *Ptr, uint64_t ID,
   for (int i = 0; i < Paramc; i++) {
     JitParams.push_back(static_cast<void *>(Params[i]));
   }
-  auto JitReq = make_request(FName, M, JitParams);
+  auto Req = make_request(FName, M, JitParams);
+  auto VarReq = make_variant_request(Req);
 
   if (!CacheHit) {
-    JitContext->addRegion(FName, ID);
+    auto MaybeF = VarReq.F;
+    if (MaybeF.has_value())
+      JitContext->addRegion(MaybeF.value()->getName(), ID);
   }
   pjit_trace_fnstats_exit(JitRegion::CODEGEN);
   return Ptr;
